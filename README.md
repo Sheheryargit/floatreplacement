@@ -28,7 +28,7 @@ Build: `npm run build`, preview: `npm run preview`.
 
 ## Deploy (GitHub + Vercel)
 
-Remote for this project: **`git@github.com:sherryyar/floatreplacement.git`** (HTTPS: `https://github.com/sherryyar/floatreplacement.git`).
+Remote for this project: **`https://github.com/Sheheryargit/floatreplacement.git`** (SSH: `git@github.com:Sheheryargit/floatreplacement.git`).
 
 ### Push from this machine
 
@@ -53,7 +53,7 @@ The script pushes and then resets the remote URL so the token is not left in `.g
 
 ### Vercel
 
-1. [vercel.com](https://vercel.com) → **Add New** → **Project** → **Import** `sherryyar/floatreplacement`.
+1. [vercel.com](https://vercel.com) → **Add New** → **Project** → **Import** `Sheheryargit/floatreplacement`.
 2. Framework: **Vite**; build `npm run build`, output `dist`.
 
 Client-side routes use `vercel.json` rewrites so `/people` and `/projects` work on refresh.

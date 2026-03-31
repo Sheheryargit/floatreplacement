@@ -6,8 +6,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-REMOTE_HTTPS="https://github.com/sherryyar/floatreplacement.git"
-REMOTE_AUTH="https://${GITHUB_TOKEN:-}@github.com/sherryyar/floatreplacement.git"
+REMOTE_HTTPS="https://github.com/Sheheryargit/floatreplacement.git"
+REMOTE_AUTH="https://${GITHUB_TOKEN:-}@github.com/Sheheryargit/floatreplacement.git"
 
 if [[ -z "${GITHUB_TOKEN:-}" ]]; then
   echo "Missing GITHUB_TOKEN."
