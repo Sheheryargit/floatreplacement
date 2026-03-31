@@ -28,22 +28,35 @@ Build: `npm run build`, preview: `npm run preview`.
 
 ## Deploy (GitHub + Vercel)
 
-1. **Create a GitHub repository** (empty, no README required) at [github.com/new](https://github.com/new).
+Remote for this project: **`git@github.com:sherryyar/floatreplacement.git`** (HTTPS: `https://github.com/sherryyar/floatreplacement.git`).
 
-2. **Push this project** (from the repo folder):
+### Push from this machine
+
+**Why SSH might fail:** GitHub must trust an SSH key. A key was generated at `~/.ssh/id_ed25519_github` and `~/.ssh/config` points `github.com` to it. Add the **public** key once:
+
+1. Copy the key: `cat ~/.ssh/id_ed25519_github.pub`
+2. GitHub → **Settings** → **SSH and GPG keys** → **New SSH key** → paste → save.
+3. Test: `ssh -T git@github.com` (should say “Hi sher…!”).
+4. Push: `git push -u origin main`
+
+**Or use HTTPS + token (no SSH key on GitHub):**
+
+1. Create a [Personal Access Token (classic)](https://github.com/settings/tokens) with **`repo`** scope.
+2. Run (do not commit the token):
 
 ```bash
-git init
-git add .
-git commit -m "Initial commit: Float SPA"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
-git push -u origin main
+export GITHUB_TOKEN=ghp_your_token_here
+./scripts/push-github.sh
 ```
 
-3. **Vercel**: Sign in at [vercel.com](https://vercel.com) → **Add New** → **Project** → **Import** your GitHub repo. Vercel detects **Vite**; leave defaults (`npm run build`, output `dist`). Deploy.
+The script pushes and then resets the remote URL so the token is not left in `.git/config`.
 
-Client-side routes (`/people`, `/projects`) are handled via `vercel.json` rewrites so refreshes work in production.
+### Vercel
+
+1. [vercel.com](https://vercel.com) → **Add New** → **Project** → **Import** `sherryyar/floatreplacement`.
+2. Framework: **Vite**; build `npm run build`, output `dist`.
+
+Client-side routes use `vercel.json` rewrites so `/people` and `/projects` work on refresh.
 
 ## Note on `front-end/`
 
