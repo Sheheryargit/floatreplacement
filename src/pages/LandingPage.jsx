@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { NavLink } from "react-router-dom";
 import {
   CalendarDays,
@@ -18,52 +18,364 @@ import {
   Share,
   Sun,
   Moon,
+  Clock,
+  Percent,
+  LayoutGrid,
+  Rows3,
+  Maximize2,
+  Check,
 } from "lucide-react";
+import PersonModal, {
+  T,
+  useToasts,
+  Toasts,
+  formToPerson,
+  nextPersonId,
+  PEOPLE_SEED,
+  SEED_ROLES,
+  SEED_DEPTS,
+  SEED_TAGS,
+  ini,
+  avGrad,
+} from "../components/PersonModal.jsx";
 import "./LandingPage.css";
 
-const weekLabels = [
-  "14 Mar – Apr",
-  "15 Apr",
-  "18 Apr – May",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-  "Jan",
+const VIEW_OPTIONS = [
+  { id: "day", label: "Days" },
+  { id: "week", label: "Weeks" },
+  { id: "month", label: "Months" },
 ];
 
-const dayNums = [30, 31, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
-
-const people = [
-  {
-    initials: "AB",
-    name: "Aditi Bali",
-    sub: "Fire Nation",
-    tag: "Firenation",
-    hours: "16h",
-    grad: "linear-gradient(135deg,#667eea,#764ba2)",
-  },
-  {
-    initials: "AP",
-    name: "Akhil Prasad",
-    sub: "Graduate · Eaas",
-    tag: "Cloud Secure",
-    hours: "134.5h",
-    grad: "linear-gradient(135deg,#4facfe,#00f2fe)",
-  },
+const DENSITY_OPTIONS = [
+  { id: "compact", label: "Compact", Icon: LayoutGrid, desc: "Tightest spacing" },
+  { id: "comfortable", label: "Comfortable", Icon: Rows3, desc: "Balanced" },
+  { id: "spacious", label: "Spacious", Icon: Maximize2, desc: "Maximum row height" },
 ];
+
+function startOfWeekMonday(d) {
+  const x = new Date(d);
+  const day = x.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  x.setDate(x.getDate() + diff);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function addDays(d, n) {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+function addMonths(d, n) {
+  const x = new Date(d);
+  x.setMonth(x.getMonth() + n);
+  return x;
+}
+
+function daysInMonth(y, m) {
+  return new Date(y, m + 1, 0).getDate();
+}
+
+function isWeekendDate(dt) {
+  const dow = dt.getDay();
+  return dow === 0 || dow === 6;
+}
+
+/** Move anchor by N weekdays (skips Sat/Sun). */
+function addWeekdays(date, delta) {
+  const x = new Date(date);
+  let n = Math.abs(delta);
+  const step = delta >= 0 ? 1 : -1;
+  while (n > 0) {
+    x.setDate(x.getDate() + step);
+    if (!isWeekendDate(x)) n--;
+  }
+  return x;
+}
+
+function weekMondayKey(dt) {
+  const m = startOfWeekMonday(dt);
+  return `${m.getFullYear()}-${m.getMonth()}-${m.getDate()}`;
+}
+
+function formatDayMonth(dt) {
+  return dt.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
+}
+
+/** All Mon–Fri dates inside calendar month (y, mo). */
+function weekdaysInMonth(y, mo) {
+  const dim = daysInMonth(y, mo);
+  const out = [];
+  for (let day = 1; day <= dim; day++) {
+    const dt = new Date(y, mo, day);
+    if (!isWeekendDate(dt)) out.push(dt);
+  }
+  return out;
+}
+
+/** Mon–Fri for the ISO week containing d. */
+function weekdaysInAnchorWeek(d) {
+  const mon = startOfWeekMonday(d);
+  return [0, 1, 2, 3, 4].map((i) => addDays(mon, i));
+}
+
+/** Demo allocation blocks: column indices are 0..columnCount-1 */
+function demoBlocksForView(columnCount) {
+  const n = Math.max(columnCount, 1);
+  const leaveW = Math.min(2, n);
+  const w1 = Math.max(1, Math.floor(n * 0.14));
+  const w2 = Math.max(1, Math.floor(n * 0.12));
+  const s1 = Math.min(Math.floor(n * 0.22), n - w1);
+  const s2 = Math.min(s1 + w1 + Math.max(1, Math.floor(n * 0.04)), n - w2);
+  const blocks = [
+    { type: "leave", start: 0, span: leaveW, label: "Annual Leave" },
+    { type: "orange", start: s1, span: Math.min(w1, n - s1), label: "ASF Managed Servi", sub: "ASF · 2h" },
+    { type: "pink", start: s2, span: Math.min(w2, n - s2), label: "Cloud Managed Ser", sub: "ARTC · 1.5h" },
+  ];
+  return blocks.filter((b) => b.start >= 0 && b.start + b.span <= n && b.span > 0);
+}
+
+function buildScheduleModel(viewMode, anchorDate) {
+  const d = new Date(anchorDate);
+  const y = d.getFullYear();
+  const mo = d.getMonth();
+
+  if (viewMode === "day") {
+    const cols = 12;
+    const slots = Array.from({ length: cols }, (_, i) => {
+      const h = 8 + i * 2;
+      return {
+        main: `${String(h).padStart(2, "0")}:00`,
+        sub: null,
+        weekParity: 0,
+        weekBlockStart: false,
+        weekBlockEnd: false,
+      };
+    });
+    const title = d.toLocaleDateString("en-AU", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+    return {
+      columnCount: cols,
+      bandTitle: title,
+      bandSpans: null,
+      slots,
+    };
+  }
+
+  if (viewMode === "week") {
+    const dates = weekdaysInAnchorWeek(d);
+    const bandLabel = `${formatDayMonth(dates[0])} – ${formatDayMonth(dates[4])}`;
+    const slots = dates.map((dt, i) => ({
+      main: String(dt.getDate()),
+      sub: dt.toLocaleDateString("en-AU", { weekday: "short" }),
+      weekParity: 0,
+      weekBlockStart: i === 0,
+      weekBlockEnd: i === dates.length - 1,
+    }));
+    return {
+      columnCount: 5,
+      bandTitle: bandLabel,
+      bandSpans: [{ span: 5, label: bandLabel, weekParity: 0 }],
+      slots,
+    };
+  }
+
+  const dates = weekdaysInMonth(y, mo);
+  const bandTitle = d.toLocaleDateString("en-AU", { month: "long", year: "numeric" });
+
+  if (dates.length === 0) {
+    return {
+      columnCount: 1,
+      bandTitle,
+      bandSpans: [{ span: 1, label: "—", weekParity: 0 }],
+      slots: [
+        {
+          main: "—",
+          sub: "",
+          weekParity: 0,
+          weekBlockStart: true,
+          weekBlockEnd: true,
+        },
+      ],
+    };
+  }
+
+  let weekStripe = -1;
+  let prevMondayKey = null;
+  const slots = dates.map((dt, i) => {
+    const mk = weekMondayKey(dt);
+    if (mk !== prevMondayKey) {
+      weekStripe++;
+      prevMondayKey = mk;
+    }
+    const prevK = i > 0 ? weekMondayKey(dates[i - 1]) : null;
+    const nextK = i < dates.length - 1 ? weekMondayKey(dates[i + 1]) : null;
+    return {
+      main: String(dt.getDate()),
+      sub: dt.toLocaleDateString("en-AU", { weekday: "short" }),
+      weekParity: weekStripe % 2,
+      weekBlockStart: mk !== prevK,
+      weekBlockEnd: mk !== nextK,
+    };
+  });
+
+  const bandSpans = [];
+  let i = 0;
+  while (i < dates.length) {
+    const mk0 = weekMondayKey(dates[i]);
+    let j = i + 1;
+    while (j < dates.length && weekMondayKey(dates[j]) === mk0) j++;
+    const span = j - i;
+    bandSpans.push({
+      span,
+      label: `${formatDayMonth(dates[i])} – ${formatDayMonth(dates[j - 1])}`,
+      weekParity: slots[i].weekParity,
+    });
+    i = j;
+  }
+
+  return {
+    columnCount: dates.length,
+    bandTitle,
+    bandSpans,
+    slots,
+  };
+}
+
+function formatHourTotal(n) {
+  return `${n.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}h`;
+}
+
+function mockPersonHours(personId) {
+  const s = String(personId);
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = s.charCodeAt(i) + ((h << 5) - h);
+  const base = 80 + (Math.abs(h) % 80);
+  return base + (Math.abs(h) % 100) / 100;
+}
 
 export default function LandingPage() {
   const [theme, setTheme] = useState("dark");
+  const t = T[theme];
 
-  const muted = useMemo(() => (theme === "dark" ? "#636d84" : "#858da3"), [theme]);
+  const [people, setPeople] = useState(() => PEOPLE_SEED.map((p) => ({ ...p })));
+  const [roles, setRoles] = useState([...SEED_ROLES]);
+  const [depts, setDepts] = useState([...SEED_DEPTS]);
+  const [tagOpts, setTagOpts] = useState([...SEED_TAGS]);
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingPerson, setEditingPerson] = useState(null);
+
+  const [viewMode, setViewMode] = useState("month");
+  const [anchorDate, setAnchorDate] = useState(() => new Date());
+  const [density, setDensity] = useState("comfortable");
+  const [utilizationMode, setUtilizationMode] = useState("hours");
+
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
+  const [densityOpen, setDensityOpen] = useState(false);
+
+  const viewWrapRef = useRef(null);
+  const densityWrapRef = useRef(null);
+  const { ts, add: toast } = useToasts();
+
+  useEffect(() => {
+    function onDoc(e) {
+      if (viewWrapRef.current && !viewWrapRef.current.contains(e.target)) setViewMenuOpen(false);
+      if (densityWrapRef.current && !densityWrapRef.current.contains(e.target)) setDensityOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  const scheduleModel = useMemo(() => buildScheduleModel(viewMode, anchorDate), [viewMode, anchorDate]);
+
+  const schedulePeople = useMemo(() => people.filter((p) => !p.archived), [people]);
+
+  const totalHours = useMemo(() => {
+    let s = 0;
+    for (const p of schedulePeople) s += mockPersonHours(p.id);
+    return s;
+  }, [schedulePeople]);
+
+  const demoBlocks = useMemo(
+    () => demoBlocksForView(scheduleModel.columnCount),
+    [scheduleModel.columnCount]
+);
+
+  const muted = theme === "dark" ? "#636d84" : "#858da3";
+
+  const navigatePrev = useCallback(() => {
+    if (viewMode === "day") setAnchorDate((d) => addWeekdays(d, -1));
+    else if (viewMode === "week") setAnchorDate((d) => addDays(startOfWeekMonday(d), -7));
+    else setAnchorDate((d) => addMonths(d, -1));
+  }, [viewMode]);
+
+  const navigateNext = useCallback(() => {
+    if (viewMode === "day") setAnchorDate((d) => addWeekdays(d, 1));
+    else if (viewMode === "week") setAnchorDate((d) => addDays(startOfWeekMonday(d), 7));
+    else setAnchorDate((d) => addMonths(d, 1));
+  }, [viewMode]);
+
+  const goToday = useCallback(() => setAnchorDate(new Date()), []);
+
+  const openAdd = () => {
+    setEditingPerson(null);
+    setModalOpen(true);
+  };
+
+  const openEdit = (person) => {
+    setEditingPerson(person);
+    setModalOpen(true);
+  };
+
+  const handleModalSave = (form) => {
+    if (editingPerson) {
+      const updated = formToPerson(form, editingPerson.id, editingPerson.archived);
+      setPeople(
+        people.map((p) => (p.id === editingPerson.id ? updated : p)).sort((a, b) => a.name.localeCompare(b.name))
+      );
+      toast(`${form.name} updated`, "success");
+    } else {
+      const newP = formToPerson(form, nextPersonId(), false);
+      setPeople([...people, newP].sort((a, b) => a.name.localeCompare(b.name)));
+      toast(`${form.name} added to directory`, "success");
+    }
+    setModalOpen(false);
+    setEditingPerson(null);
+  };
+
+  const handleModalArchive = () => {
+    if (editingPerson) {
+      setPeople(
+        people.map((p) =>
+          p.id === editingPerson.id ? { ...p, archived: !p.archived } : p
+        )
+      );
+      toast(`${editingPerson.name} ${editingPerson.archived ? "restored" : "archived"}`, "warn");
+      setModalOpen(false);
+      setEditingPerson(null);
+    }
+  };
+
+  const viewLabel = VIEW_OPTIONS.find((v) => v.id === viewMode)?.label ?? "Months";
+
+  /** Minimum column width (px) per view — keeps timeline readable and scrolls horizontally when needed */
+  const colMinPx = viewMode === "day" ? 52 : viewMode === "week" ? 72 : 36;
+  const gridTemplate = `repeat(${scheduleModel.columnCount}, minmax(${colMinPx}px, 1fr))`;
+  const timelineMinWidthPx = scheduleModel.columnCount * colMinPx;
 
   return (
-    <div className="lp-root" data-theme={theme === "light" ? "light" : "dark"}>
+    <div
+      className="lp-root"
+      data-theme={theme === "light" ? "light" : "dark"}
+      data-density={density}
+      data-view={viewMode}
+    >
       <link
         href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap"
         rel="stylesheet"
@@ -105,7 +417,7 @@ export default function LandingPage() {
           type="button"
           className="lp-theme-btn"
           title={theme === "dark" ? "Light mode" : "Dark mode"}
-          onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+          onClick={() => setTheme((x) => (x === "dark" ? "light" : "dark"))}
         >
           {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
         </button>
@@ -129,97 +441,318 @@ export default function LandingPage() {
             </div>
             <div className="lp-toolbar-right">
               <div className="lp-date-nav">
-                <button type="button" aria-label="Previous">
+                <button type="button" aria-label="Previous period" onClick={navigatePrev}>
                   <ChevronLeft size={16} />
                 </button>
-                <button type="button" className="lp-today">
+                <button type="button" className="lp-today" onClick={goToday}>
                   Today
                 </button>
-                <button type="button" aria-label="Next">
+                <button type="button" aria-label="Next period" onClick={navigateNext}>
                   <ChevronRight size={16} />
                 </button>
               </div>
-              <span className="lp-pill">
-                <Calendar size={14} />
-                Months
-                <ChevronDown size={14} />
-              </span>
-              <button type="button" className="lp-icon-btn" aria-label="View settings">
-                <SlidersHorizontal size={18} />
-              </button>
+
+              <div className="lp-dropdown-wrap" ref={viewWrapRef}>
+                <button
+                  type="button"
+                  className="lp-pill lp-pill-btn"
+                  aria-expanded={viewMenuOpen}
+                  aria-haspopup="listbox"
+                  onClick={() => {
+                    setViewMenuOpen((o) => !o);
+                    setDensityOpen(false);
+                  }}
+                >
+                  <Calendar size={14} />
+                  {viewLabel}
+                  <ChevronDown size={14} />
+                </button>
+                {viewMenuOpen && (
+                  <div className="lp-popover lp-popover-view" role="listbox">
+                    {VIEW_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        role="option"
+                        className={"lp-popover-item" + (viewMode === opt.id ? " lp-popover-item-active" : "")}
+                        onClick={() => {
+                          setViewMode(opt.id);
+                          setViewMenuOpen(false);
+                        }}
+                      >
+                        {opt.label}
+                        {viewMode === opt.id && <Check size={16} className="lp-popover-check" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="lp-dropdown-wrap" ref={densityWrapRef}>
+                <button
+                  type="button"
+                  className={"lp-icon-btn" + (densityOpen ? " lp-icon-btn-active" : "")}
+                  aria-label="View settings"
+                  aria-expanded={densityOpen}
+                  onClick={() => {
+                    setDensityOpen((o) => !o);
+                    setViewMenuOpen(false);
+                  }}
+                >
+                  <SlidersHorizontal size={18} />
+                </button>
+                {densityOpen && (
+                  <div className="lp-popover lp-popover-density">
+                    <div className="lp-popover-title">Density</div>
+                    {DENSITY_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        className={
+                          "lp-density-row" + (density === opt.id ? " lp-density-row-active" : "")
+                        }
+                        onClick={() => {
+                          setDensity(opt.id);
+                        }}
+                      >
+                        <opt.Icon size={18} strokeWidth={1.8} className="lp-density-icon" />
+                        <span className="lp-density-text">
+                          <span className="lp-density-label">{opt.label}</span>
+                          <span className="lp-density-desc">{opt.desc}</span>
+                        </span>
+                        {density === opt.id && <Check size={16} className="lp-popover-check" />}
+                      </button>
+                    ))}
+                    <div className="lp-popover-divider" />
+                    <div className="lp-popover-title">Date range insights</div>
+                    <div className="lp-util-row">
+                      <span className="lp-util-label">Show utilization in</span>
+                      <div className="lp-segment" role="group" aria-label="Utilization unit">
+                        <button
+                          type="button"
+                          className={utilizationMode === "hours" ? "lp-seg-active" : ""}
+                          onClick={() => setUtilizationMode("hours")}
+                          title="Hours"
+                        >
+                          <Clock size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className={utilizationMode === "percent" ? "lp-seg-active" : ""}
+                          onClick={() => setUtilizationMode("percent")}
+                          title="Percent"
+                        >
+                          <Percent size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button type="button" className="lp-icon-btn" aria-label="Share">
                 <Share size={18} />
               </button>
-              <button type="button" className="lp-btn-primary" aria-label="Add">
+              <button type="button" className="lp-btn-primary" aria-label="Add allocation" onClick={openAdd}>
                 <Plus size={18} strokeWidth={2.5} />
               </button>
             </div>
           </div>
 
           <div className="lp-subbar">
-            <div className="lp-subbar-left">
-              <button type="button" className="lp-icon-btn" aria-label="Add person">
+            <div className="lp-subbar-people">
+              <button type="button" className="lp-icon-btn" aria-label="Add person" onClick={openAdd}>
                 <UserPlus size={18} />
               </button>
-              <span className="lp-pill">
-                This month
-                <ChevronDown size={14} />
+              <span className="lp-pill lp-pill-muted">
+                {viewMode === "month" && "This month"}
+                {viewMode === "week" && "This week"}
+                {viewMode === "day" && "This day"}
               </span>
-              <span className="lp-hours-total">4,040.14h</span>
+            </div>
+            <div className="lp-subbar-timeline">
+              <span className="lp-hours-total">
+                {utilizationMode === "hours"
+                  ? formatHourTotal(totalHours)
+                  : `${Math.min(100, Math.round((totalHours / (schedulePeople.length * 160 || 1)) * 100))}%`}
+              </span>
             </div>
           </div>
         </div>
 
         <div className="lp-schedule">
-          <div className="lp-people-col">
-            {people.map((p) => (
-              <div key={p.name} className="lp-person-row">
-                <div className="lp-avatar" style={{ background: p.grad }}>
-                  {p.initials}
+          <div
+            className="lp-schedule-viewport"
+            style={{
+              "--lp-cols": scheduleModel.columnCount,
+              "--lp-col-min": `${colMinPx}px`,
+              "--lp-timeline-min": `${timelineMinWidthPx}px`,
+            }}
+          >
+            <div
+              key={`${viewMode}-${anchorDate.getTime()}`}
+              className="lp-schedule-canvas lp-timeline-enter"
+            >
+              <div className="lp-sched-row lp-sched-row-head">
+                <div className="lp-sched-corner" aria-hidden />
+                <div className="lp-sched-timeline lp-sched-sticky-top">
+                  <div className="lp-cal-head">
+                    <div
+                      className="lp-band-row"
+                      style={{
+                        gridTemplateColumns: gridTemplate,
+                      }}
+                    >
+                      {scheduleModel.bandSpans
+                        ? scheduleModel.bandSpans.map((w, i, arr) => (
+                            <div
+                              key={i}
+                              className={
+                                "lp-week-cell lp-week-band-block" +
+                                (w.weekParity ? " lp-week-band-b" : " lp-week-band-a") +
+                                (i === 0 ? " lp-week-band-outer-left" : "") +
+                                (i === arr.length - 1 ? " lp-week-band-outer-right" : "")
+                              }
+                              style={{ gridColumn: `span ${w.span}` }}
+                            >
+                              <span className="lp-week-band-label">{w.label}</span>
+                            </div>
+                          ))
+                        : (
+                            <div className="lp-week-cell lp-week-cell-full" style={{ gridColumn: "1 / -1" }}>
+                              {scheduleModel.bandTitle}
+                            </div>
+                          )}
+                    </div>
+                    <div
+                      className="lp-days"
+                      style={{
+                        gridTemplateColumns: gridTemplate,
+                      }}
+                    >
+                      {scheduleModel.slots.map((slot, i) => (
+                        <div
+                          key={`slot-${i}-${slot.main}`}
+                          className={
+                            "lp-day-cell" +
+                            (viewMode !== "day" && slot.weekParity ? " lp-day-week-b" : "") +
+                            (viewMode !== "day" && !slot.weekParity ? " lp-day-week-a" : "") +
+                            (viewMode !== "day" && slot.weekBlockStart ? " lp-day-week-start" : "") +
+                            (viewMode !== "day" && slot.weekBlockEnd ? " lp-day-week-end" : "")
+                          }
+                        >
+                          <span className="lp-day-main">{slot.main}</span>
+                          {slot.sub ? <span className="lp-day-sub">{slot.sub}</span> : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <div className="lp-person-meta">
-                  <div className="lp-person-name">{p.name}</div>
-                  <div className="lp-person-sub">{p.sub}</div>
-                  <span className="lp-tag">{p.tag}</span>
-                </div>
-                <div className="lp-person-hours">{p.hours}</div>
               </div>
-            ))}
-          </div>
 
-          <div className="lp-grid-wrap">
-            <div className="lp-cal-head">
-              <div className="lp-weeks">
-                {weekLabels.map((w) => (
-                  <div key={w} className="lp-week-cell">
-                    {w}
+              {schedulePeople.map((p) => {
+                const hours = mockPersonHours(p.id);
+                const pct = Math.min(100, Math.round((hours / 160) * 100));
+                const right =
+                  utilizationMode === "hours"
+                    ? `${hours.toFixed(hours % 1 ? 1 : 0)}h`
+                    : `${pct}%`;
+                return (
+                  <div key={p.id} className="lp-sched-row">
+                    <div className="lp-sched-person">
+                      <button
+                        type="button"
+                        className="lp-person-row"
+                        onClick={() => openEdit(p)}
+                      >
+                        <div className="lp-avatar" style={{ background: avGrad(p.name) }}>
+                          {ini(p.name)}
+                        </div>
+                        <div className="lp-person-meta">
+                          <div className="lp-person-name">{p.name}</div>
+                          <div className="lp-person-sub">
+                            {p.role !== "—" ? `${p.role} · ` : ""}
+                            {p.department || "—"}
+                          </div>
+                          {p.tags.length > 0 && (
+                            <div className="lp-person-tags">
+                              {p.tags.slice(0, 2).map((tag) => (
+                                <span key={tag} className="lp-tag">
+                                  {tag}
+                                </span>
+                              ))}
+                              {p.tags.length > 2 && (
+                                <span className="lp-tag lp-tag-more">+{p.tags.length - 2}</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="lp-person-hours">{right}</div>
+                      </button>
+                    </div>
+                    <div className="lp-sched-timeline">
+                      <div className="lp-grid-stack">
+                        <div
+                          className="lp-grid-week-lanes"
+                          style={{ gridTemplateColumns: gridTemplate }}
+                          aria-hidden
+                        >
+                          {scheduleModel.slots.map((slot, i) => (
+                            <div
+                              key={`lane-${p.id}-${i}`}
+                              className={
+                                "lp-week-lane" +
+                                (viewMode !== "day" && slot.weekParity ? " lp-week-lane-b" : "") +
+                                (viewMode !== "day" && !slot.weekParity ? " lp-week-lane-a" : "") +
+                                (viewMode !== "day" && slot.weekBlockStart ? " lp-week-lane-block-start" : "") +
+                                (viewMode !== "day" && slot.weekBlockEnd ? " lp-week-lane-block-end" : "")
+                              }
+                            />
+                          ))}
+                        </div>
+                        <div
+                          className="lp-grid-row"
+                          style={{
+                            gridTemplateColumns: gridTemplate,
+                          }}
+                        >
+                          {demoBlocks.map((b, j) => {
+                            const n = scheduleModel.columnCount;
+                            const left = (b.start / n) * 100;
+                            const width = (b.span / n) * 100;
+                            const cls =
+                              b.type === "leave"
+                                ? "lp-hatch"
+                                : b.type === "orange"
+                                  ? "lp-block lp-block-orange"
+                                  : "lp-block lp-block-pink";
+                            return (
+                              <div
+                                key={`${p.id}-${j}`}
+                                className={cls}
+                                style={{
+                                  left: `${left}%`,
+                                  width: `${width}%`,
+                                }}
+                              >
+                                {b.type === "leave" ? (
+                                  b.label
+                                ) : (
+                                  <>
+                                    {b.label}
+                                    <br />
+                                    {b.sub}
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                ))}
-              </div>
-              <div className="lp-days">
-                {dayNums.map((d, i) => (
-                  <div key={`day-${i}-${d}`} className="lp-day-cell">
-                    {d}
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="lp-rows">
-              {people.map((p) => (
-                <div key={p.name} className="lp-grid-row">
-                  <div className="lp-hatch">Annual Leave</div>
-                  <div className="lp-block lp-block-orange">
-                    ASF Managed Servi
-                    <br />
-                    ASF · 2h
-                  </div>
-                  <div className="lp-block lp-block-pink">
-                    Cloud Managed Ser
-                    <br />
-                    ARTC · 1.5h
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -228,6 +761,26 @@ export default function LandingPage() {
       <button type="button" className="lp-fab" aria-label="Pointer tool">
         <MousePointer2 size={16} />
       </button>
+
+      <PersonModal
+        open={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setEditingPerson(null);
+        }}
+        onSave={handleModalSave}
+        onArchive={handleModalArchive}
+        editPerson={editingPerson}
+        roles={roles}
+        setRoles={setRoles}
+        depts={depts}
+        setDepts={setDepts}
+        tagOpts={tagOpts}
+        setTagOpts={setTagOpts}
+        t={t}
+      />
+
+      <Toasts ts={ts} t={t} />
     </div>
   );
 }
