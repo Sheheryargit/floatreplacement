@@ -25,6 +25,7 @@ import {
   Maximize2,
   Check,
 } from "lucide-react";
+import { useAppTheme } from "../context/ThemeContext.jsx";
 import PersonModal, {
   T,
   useToasts,
@@ -345,7 +346,7 @@ function mockPersonHours(personId) {
 }
 
 export default function LandingPage() {
-  const [theme, setTheme] = useState("dark");
+  const { theme, toggleTheme } = useAppTheme();
   const t = T[theme];
 
   const [people, setPeople] = useState(() => PEOPLE_SEED.map((p) => ({ ...p })));
@@ -565,7 +566,7 @@ export default function LandingPage() {
           type="button"
           className="lp-theme-btn"
           title={theme === "dark" ? "Light mode" : "Dark mode"}
-          onClick={() => setTheme((x) => (x === "dark" ? "light" : "dark"))}
+          onClick={toggleTheme}
         >
           {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
         </button>

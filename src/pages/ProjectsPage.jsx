@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { NavLink } from "react-router-dom";
+import { useAppTheme } from "../context/ThemeContext.jsx";
 import {
   Users, FolderOpen, BarChart3, CalendarDays, ClipboardList,
   Plus, Download, Trash2, Search, X, ChevronRight, ChevronDown, ChevronUp,
@@ -325,7 +326,8 @@ function ProjectModal({open,onClose,onSave,onArchive,editProject,clients,setClie
    APP
    ═══════════════════════════════════════════════════════════ */
 export default function ProjectsPage(){
-  const[mode,setMode]=useState("dark");const t=T[mode];
+  const { theme: mode, toggleTheme } = useAppTheme();
+  const t=T[mode];
   const[projects,setProjects]=useState(PROJECTS_SEED);
   const[selected,setSelected]=useState(new Set());
   const[search,setSearch]=useState("");
@@ -369,7 +371,7 @@ export default function ProjectsPage(){
         {sideNav.map((item,i)=>{const Icon=item.icon;const base={display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",borderRadius:10,width:58,textAlign:"center",transition:"all 0.2s",position:"relative",textDecoration:"none",color:t.textMuted};
           if(item.to){return(<NavLink key={i} to={item.to} end={!!item.end} style={({isActive})=>({...base,cursor:"pointer",background:isActive?t.sidebarAct:"transparent",color:isActive?t.accent:t.textMuted})}>{({isActive})=>(<>{isActive&&<div style={{position:"absolute",left:0,top:12,bottom:12,width:3,borderRadius:"0 3px 3px 0",background:t.accent}}/>}<Icon size={19} strokeWidth={isActive?2.2:1.8}/><span style={{fontSize:10,fontWeight:isActive?600:500}}>{item.label}</span></>)}</NavLink>);}
           return(<div key={i} onMouseEnter={e=>{e.currentTarget.style.background=t.sidebarAct;}} onMouseLeave={e=>{e.currentTarget.style.background="transparent";}} style={{...base,cursor:"default",opacity:0.65}}><Icon size={19} strokeWidth={1.8}/><span style={{fontSize:10,fontWeight:500}}>{item.label}</span></div>);})}
-        <div style={{marginTop:"auto",marginBottom:16}}><button onClick={()=>setMode(mode==="dark"?"light":"dark")} title={mode==="dark"?"Light mode":"Dark mode"} style={{width:40,height:40,borderRadius:10,border:`1px solid ${t.borderIn}`,background:t.surfAlt,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:t.textSoft,transition:"all 0.25s"}} onMouseEnter={e=>e.currentTarget.style.borderColor=t.accent} onMouseLeave={e=>e.currentTarget.style.borderColor=t.borderIn}>{mode==="dark"?<Sun size={16}/>:<Moon size={16}/>}</button></div>
+        <div style={{marginTop:"auto",marginBottom:16}}><button onClick={toggleTheme} title={mode==="dark"?"Light mode":"Dark mode"} style={{width:40,height:40,borderRadius:10,border:`1px solid ${t.borderIn}`,background:t.surfAlt,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:t.textSoft,transition:"all 0.25s"}} onMouseEnter={e=>e.currentTarget.style.borderColor=t.accent} onMouseLeave={e=>e.currentTarget.style.borderColor=t.borderIn}>{mode==="dark"?<Sun size={16}/>:<Moon size={16}/>}</button></div>
       </nav>
 
       {/* Main */}

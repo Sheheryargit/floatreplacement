@@ -6,6 +6,7 @@ import {
   Sun, Moon, UserPlus, Shield,
   Archive, ArchiveRestore,
 } from "lucide-react";
+import { useAppTheme } from "../context/ThemeContext.jsx";
 import PersonModal, {
   T,
   useToasts,
@@ -26,8 +27,8 @@ import PersonModal, {
    APP
    ═══════════════════════════════════════════════════════════ */
 export default function PeoplePage() {
-  const [mode,setMode]=useState("dark");
-  const t=T[mode];
+  const { theme: mode, toggleTheme } = useAppTheme();
+  const t = T[mode];
 
   const [people,setPeople]=useState(() => PEOPLE_SEED.map((p) => ({ ...p })));
   const [selected,setSelected]=useState(new Set());
@@ -120,7 +121,7 @@ export default function PeoplePage() {
           );
         })}
         <div style={{ marginTop:"auto",marginBottom:16 }}>
-          <button onClick={()=>setMode(mode==="dark"?"light":"dark")} title={mode==="dark"?"Light mode":"Dark mode"}
+          <button onClick={toggleTheme} title={mode==="dark"?"Light mode":"Dark mode"}
             style={{ width:40,height:40,borderRadius:10,border:`1px solid ${t.borderIn}`,background:t.surfAlt,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:t.textSoft,transition:"all 0.25s" }}
             onMouseEnter={(e)=>{ e.currentTarget.style.borderColor=t.accent; }} onMouseLeave={(e)=>{ e.currentTarget.style.borderColor=t.borderIn; }}>
             {mode==="dark"?<Sun size={16}/>:<Moon size={16}/>}
