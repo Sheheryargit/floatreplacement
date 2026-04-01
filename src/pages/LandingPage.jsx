@@ -31,6 +31,7 @@ import {
   CreateAllocationModal,
   AllocationDetailModal,
   advanceRepeatWindow,
+  leaveLabel,
 } from "../components/AllocationModals.jsx";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
 import {
@@ -239,17 +240,26 @@ function shortenAllocLabel(s, maxLen) {
 
 function allocationDisplay(alloc) {
   const parts = alloc.project.split("/").map((x) => x.trim());
-  const code = parts[0] || "";
-  const name = parts[1] || parts[0] || alloc.project;
+  const name = parts.length > 1 ? parts.slice(1).join(" / ") : parts[0] || alloc.project;
+  const code = parts.length > 1 ? parts[0] : "";
   const h = alloc.hoursPerDay;
   const hStr = Number.isInteger(h) ? String(h) : String(h);
   return {
-    label: shortenAllocLabel(name, 17),
-    sub: `${code} · ${hStr}h`,
+    projectName: name,
+    projectCode: code,
+    hoursLabel: `${hStr}h`,
   };
 }
 
 function allocationAriaLabel(alloc) {
+  if (alloc.isLeave) {
+    const lbl = alloc.leaveType ? leaveLabel(alloc.leaveType) : "Leave";
+    const range =
+      alloc.startDate === alloc.endDate
+        ? `on ${alloc.startDate}`
+        : `from ${alloc.startDate} to ${alloc.endDate}`;
+    return `${lbl} ${range}.`;
+  }
   const h = alloc.hoursPerDay;
   const hStr = Number.isInteger(h) ? String(h) : String(h);
   const range =
@@ -426,6 +436,7 @@ export default function LandingPage() {
 
   const [allocCreateOpen, setAllocCreateOpen] = useState(false);
   const [allocPreselectPerson, setAllocPreselectPerson] = useState(null);
+  const [allocPreselectDate, setAllocPreselectDate] = useState(null);
   const [allocDetailOpen, setAllocDetailOpen] = useState(false);
   const [selectedAllocation, setSelectedAllocation] = useState(null);
 
@@ -473,18 +484,63 @@ export default function LandingPage() {
     setModalOpen(true);
   };
 
-  const openCreateAllocation = useCallback((person) => {
+  const openCreateAllocation = useCallback((person, date) => {
     setAllocPreselectPerson(person ?? null);
+    setAllocPreselectDate(date ?? null);
     setAllocCreateOpen(true);
   }, []);
 
   const closeCreateAllocation = useCallback(() => {
     setAllocCreateOpen(false);
     setAllocPreselectPerson(null);
+    setAllocPreselectDate(null);
   }, []);
+
+  /** Click on empty timeline space → open allocation modal with person + date */
+  const handleTimelineClick = useCallback(
+    (e, person, nCols) => {
+      // Don't open if user clicked on an existing allocation block
+      if (e.target.closest(".lp-block")) return;
+      const row = e.currentTarget;
+      const rect = row.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const colWidth = rect.width / nCols;
+      const colIndex = Math.min(Math.max(0, Math.floor(x / colWidth)), nCols - 1);
+      const slot = scheduleModel.slots[colIndex];
+      const clickedDate = slot?.dateKey ?? null;
+      openCreateAllocation(person, clickedDate);
+    },
+    [scheduleModel, openCreateAllocation]
+  );
 
   const handleCreateAllocation = useCallback(
     (payload) => {
+      // ── Block allocation if any assigned person is on leave during these dates ──
+      if (!payload.isLeave) {
+        const pStart = payload.startDate;
+        const pEnd = payload.endDate;
+        for (const pid of payload.personIds) {
+          const leaveConflict = allocations.find(
+            (a) =>
+              a.isLeave &&
+              allocationHasPerson(a, pid) &&
+              a.startDate <= pEnd &&
+              a.endDate >= pStart
+          );
+          if (leaveConflict) {
+            const personName = people.find((p) => p.id === pid)?.name || "This person";
+            const leaveTypeName = leaveConflict.leaveType
+              ? (leaveConflict.project || "Leave")
+              : "Leave";
+            toast(
+              `Cannot allocate ${personName} — they are on ${leaveTypeName} (${leaveConflict.startDate} to ${leaveConflict.endDate})`,
+              "danger"
+            );
+            return;
+          }
+        }
+      }
+
       const projectColor = resolveColorForProjectLabel(payload.project, projects);
       setAllocations((prev) => {
         const nextId = prev.reduce((m, a) => Math.max(m, Number(a.id) || 0), 0) + 1;
@@ -499,9 +555,9 @@ export default function LandingPage() {
           },
         ];
       });
-      toast("Allocation created", "success");
+      toast(payload.isLeave ? "Leave created" : "Allocation created", "success");
     },
-    [toast, setAllocations, projects]
+    [toast, setAllocations, projects, allocations, people]
   );
 
   const handleDeleteAllocation = useCallback(
@@ -839,7 +895,7 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              {schedulePeople.map((p) => {
+              {schedulePeople.map((p, i) => {
                 const hours = mockPersonHours(p.id);
                 const pct = Math.min(100, Math.round((hours / 160) * 100));
                 const right =
@@ -863,7 +919,7 @@ export default function LandingPage() {
                   ? Math.max(...rowSegments.map((s) => s.stack)) + 1
                   : 1;
                 return (
-                  <div key={p.id} className="lp-sched-row">
+                  <div key={p.id} className="lp-sched-row" style={{ ["--animation-order"]: i }}>
                     <div className="lp-sched-person">
                       <div className="lp-person-row-shell">
                         <div className="lp-person-row-cluster">
@@ -943,13 +999,37 @@ export default function LandingPage() {
                           className="lp-grid-row"
                           style={{
                             gridTemplateColumns: gridTemplate,
+                            cursor: "pointer",
                           }}
+                          onClick={(e) => handleTimelineClick(e, p, nCols)}
                         >
                           {rowSegments.map((seg) => {
                             const left = (seg.lay.start / nCols) * 100;
                             const width = (seg.lay.span / nCols) * 100;
-                            const { label, sub } = allocationDisplay(seg.a);
                             const z = 12 + seg.stack * 20 + seg.occIdx;
+
+                            if (seg.a.isLeave) {
+                              const lbl = seg.a.leaveType ? leaveLabel(seg.a.leaveType) : "Leave";
+                              return (
+                                <button
+                                  key={`${seg.a.id}-occ-${seg.occIdx}`}
+                                  type="button"
+                                  className="lp-block lp-block-alloc lp-block-leave"
+                                  style={{
+                                    left: `${left}%`,
+                                    width: `${width}%`,
+                                    zIndex: z,
+                                    ["--alloc-stack"]: seg.stack,
+                                  }}
+                                  aria-label={allocationAriaLabel(seg.a)}
+                                  onClick={() => openAllocationDetail(seg.a)}
+                                >
+                                  <span className="lp-leave-label">{lbl}</span>
+                                </button>
+                              );
+                            }
+
+                            const { projectName, projectCode, hoursLabel } = allocationDisplay(seg.a);
                             const barColor = colorForAllocationBar(seg.a, projects);
                             const fg = contrastingTextColor(barColor);
                             return (
@@ -968,9 +1048,11 @@ export default function LandingPage() {
                                 aria-label={allocationAriaLabel(seg.a)}
                                 onClick={() => openAllocationDetail(seg.a)}
                               >
-                                {label}
-                                <br />
-                                {sub}
+                                <span className="lp-alloc-top">
+                                  <span className="lp-alloc-name">{projectName}</span>
+                                  {projectCode && <span className="lp-alloc-code">{projectCode}</span>}
+                                </span>
+                                <span className="lp-alloc-hours">{hoursLabel}</span>
                               </button>
                             );
                           })}
@@ -1011,8 +1093,10 @@ export default function LandingPage() {
         open={allocCreateOpen}
         onClose={closeCreateAllocation}
         onCreate={handleCreateAllocation}
+        onCreateLeave={handleCreateAllocation}
         people={schedulePeople}
         preselectPerson={allocPreselectPerson}
+        preselectDate={allocPreselectDate}
         projects={allocationProjectOptions}
         projectRegistry={projects}
         onAddProject={addAllocationProjectLabel}

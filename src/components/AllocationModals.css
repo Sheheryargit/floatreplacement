@@ -19,7 +19,14 @@
   background: rgba(6, 8, 14, 0.58);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  animation: lpamFadeIn 0.22s ease-out;
+}
+
+.lpam-overlay-radix[data-state="open"] {
+  animation: lpamBackdropFadeIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.lpam-overlay-radix[data-state="closed"] {
+  animation: lpamBackdropFadeOut 0.2s ease-in forwards;
 }
 
 .lpam-sr-only {
@@ -34,12 +41,25 @@
   border: 0;
 }
 
-@keyframes lpamFadeIn {
+@keyframes lpamBackdropFadeIn {
   from {
     opacity: 0;
+    backdrop-filter: blur(0px);
   }
   to {
     opacity: 1;
+    backdrop-filter: blur(12px);
+  }
+}
+
+@keyframes lpamBackdropFadeOut {
+  from {
+    opacity: 1;
+    backdrop-filter: blur(12px);
+  }
+  to {
+    opacity: 0;
+    backdrop-filter: blur(0px);
   }
 }
 
@@ -51,7 +71,6 @@
   border: 1px solid;
   padding: 24px 28px 28px;
   box-shadow: var(--shadow-lg, 0 24px 80px rgba(0, 0, 0, 0.45));
-  animation: lpamPop 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .lpam-modal[data-state="open"] {
@@ -61,6 +80,17 @@
   transform: translate(-50%, -50%);
   z-index: 201;
   margin: 0;
+  animation: lpamSpringPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.lpam-modal[data-state="closed"] {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 201;
+  margin: 0;
+  animation: lpamFadeOutScale 0.2s ease-in forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -70,12 +100,28 @@
   }
 }
 
-@keyframes lpamPop {
-  from {
+@keyframes lpamSpringPop {
+  0% {
     opacity: 0;
+    transform: translate(-50%, -46%) scale(0.92);
+  }
+  60% {
+    transform: translate(-50%, -50%) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes lpamFadeOutScale {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
   }
   to {
-    opacity: 1;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.96);
   }
 }
 
@@ -589,4 +635,84 @@
   align-items: center;
   gap: 8px;
   font-size: 12px;
+}
+
+/* ── Tabs ────────────────────────────────────────────────────── */
+.lpam-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid;
+  margin-bottom: 24px;
+}
+
+.lpam-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-bottom: 2.5px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.2s, border-bottom-color 0.35s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s;
+  border-radius: 8px 8px 0 0;
+}
+
+.lpam-tab:hover {
+  background: rgba(128, 128, 128, 0.05);
+}
+
+.lpam-tab-active {
+  font-weight: 700;
+  background: rgba(128, 128, 128, 0.08);
+}
+
+/* ── Leave-specific ──────────────────────────────────────────── */
+.lpam-panel-leave {
+  text-align: left;
+}
+
+.lpam-leave-icon-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.lpam-leave-icon-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lpam-leave-swatch {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: repeating-linear-gradient(
+    -45deg,
+    #8a95a8,
+    #8a95a8 2px,
+    #c4cad5 2px,
+    #c4cad5 5px
+  );
+  border: 1.5px solid rgba(120, 130, 150, 0.55);
+}
+
+.lpam-btn-leave {
+  box-shadow: 0 4px 20px rgba(124, 138, 158, 0.25) !important;
+}
+
+.lpam-btn-leave:hover {
+  filter: brightness(1.08);
 }
