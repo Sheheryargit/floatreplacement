@@ -17,14 +17,13 @@ import { useAppData } from "../context/AppDataContext.jsx";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
 import PersonModal, {
   T,
-  useToasts,
-  Toasts,
   Confirm,
   RowActions,
   formToPerson,
   ini,
   avGrad,
 } from "../components/PersonModal.jsx";
+import { toast } from "sonner";
 
 /* ═══════════════════════════════════════════════════════════
    APP
@@ -52,7 +51,7 @@ export default function PeoplePage() {
   const [editingPerson,setEditingPerson]=useState(null);
   const [confirmDel,setConfirmDel]=useState(false);
   const [mounted,setMounted]=useState(false);
-  const { ts, add:toast } = useToasts();
+
 
   useEffect(()=>{ setMounted(true); },[]);
 
@@ -72,8 +71,8 @@ export default function PeoplePage() {
   const toggleSel=(id)=>setSelected((p)=>{ const n=new Set(p); n.has(id)?n.delete(id):n.add(id); return n; });
   const toggleAll=()=>setSelected(selected.size===filtered.length?new Set():new Set(filtered.map((p)=>p.id)));
 
-  const doDelete=()=>{ const c=selected.size; setPeople(people.filter((p)=>!selected.has(p.id))); setSelected(new Set()); setConfirmDel(false); toast(`${c} ${c===1?"person":"people"} removed`,"danger"); };
-  const archivePerson=(id)=>{ setPeople(people.map((p)=>p.id===id?{...p,archived:!p.archived}:p)); setSelected(new Set()); const p=people.find((x)=>x.id===id); toast(`${p.name} ${p.archived?"restored":"archived"}`,"warn"); };
+  const doDelete=()=>{ const c=selected.size; setPeople(people.filter((p)=>!selected.has(p.id))); setSelected(new Set()); setConfirmDel(false); toast.error(`${c} ${c===1?"person":"people"} removed`); };
+  const archivePerson=(id)=>{ setPeople(people.map((p)=>p.id===id?{...p,archived:!p.archived}:p)); setSelected(new Set()); const p=people.find((x)=>x.id===id); toast.warning(`${p.name} ${p.archived?"restored":"archived"}`); };
 
   const openAdd=()=>{ setEditingPerson(null); setModalOpen(true); };
   const openEdit=(person)=>{ setEditingPerson(person); setModalOpen(true); };
@@ -82,11 +81,11 @@ export default function PeoplePage() {
     if(editingPerson) {
       const updated = formToPerson(form, editingPerson.id, editingPerson.archived);
       setPeople(people.map((p)=>p.id===editingPerson.id?updated:p).sort((a,b)=>a.name.localeCompare(b.name)));
-      toast(`${form.name} updated`,"success");
+      toast.success(`${form.name} updated`);
     } else {
       const newP = formToPerson(form, getNextPersonId(), false);
       setPeople([...people,newP].sort((a,b)=>a.name.localeCompare(b.name)));
-      toast(`${form.name} added to directory`,"success");
+      toast.success(`${form.name} added to directory`);
     }
     setModalOpen(false); setEditingPerson(null);
   };
@@ -245,7 +244,7 @@ export default function PeoplePage() {
         title="Confirm deletion" desc={<>You are about to permanently remove <strong style={{color:t.text}}>{selected.size} {selected.size===1?"person":"people"}</strong> from the directory.</>}
         yesLabel="Delete" yesIcon={Trash2} yesDanger/>
 
-      <Toasts ts={ts} t={t}/>
+
 
       <style>{`
         @keyframes fadeIn{from{opacity:0}to{opacity:1}}

@@ -24,12 +24,11 @@ import { useAppData } from "../context/AppDataContext.jsx";
 import { ProjectModal } from "./ProjectsPage.jsx";
 import PersonModal, {
   T,
-  useToasts,
-  Toasts,
   formToPerson,
   ini,
   avGrad,
 } from "../components/PersonModal.jsx";
+import { toast } from "sonner";
 import {
   CreateAllocationModal,
   AllocationDetailModal,
@@ -158,6 +157,10 @@ function layoutAllocation(alloc, scheduleModel, viewMode) {
   if (viewMode === "day") {
     const anchorK = scheduleModel.anchorDateKey;
     if (!anchorK || anchorK < sk || anchorK > ek) return null;
+    // Leave covers the entire day
+    if (alloc.isLeave) {
+      return { start: 0, span: n };
+    }
     const hpd = Math.max(0.25, Number(alloc.hoursPerDay) || 0);
     let spanCols = hpd / DAY_COLUMN_HOURS;
     spanCols = Math.max(spanCols, MIN_DAY_SPAN_COLUMNS);
@@ -285,14 +288,14 @@ function buildScheduleModel(viewMode, anchorDate, offsets = { prev: 0, next: 0 }
     const colsPerDay = 12;
     const slots = [];
     let title = "";
-    
+
     for (let o = -offsets.prev; o <= offsets.next; o++) {
       const dt = addWeekdays(d, o);
       if (o === 0) {
         title = dt.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
       }
       const anchorKey = dateKeyLocal(dt);
-      
+
       for (let i = 0; i < colsPerDay; i++) {
         const rawH = 8 + i * 2;
         const h = rawH >= 24 ? rawH - 24 : rawH;
@@ -414,10 +417,10 @@ const timelineRowEqual = (prev, next) => {
   if (prev.gridTemplate !== next.gridTemplate) return false;
   if (prev.scheduleModel !== next.scheduleModel) return false;
   if (prev.projects !== next.projects) return false;
-  
+
   const prevAlloc = prev.allocations.filter((a) => allocationHasPerson(a, prev.p.id));
   const nextAlloc = next.allocations.filter((a) => allocationHasPerson(a, next.p.id));
-  
+
   if (prevAlloc.length !== nextAlloc.length) return false;
   for (let idx = 0; idx < prevAlloc.length; idx++) {
     if (prevAlloc[idx] !== nextAlloc[idx]) return false;
@@ -440,6 +443,8 @@ const TimelineRow = memo(function TimelineRow({
   openAllocationDetail,
   handleTimelineClick
 }) {
+  const { theme } = useAppTheme();
+  const t = T[theme];
   const hours = mockPersonHours(p.id);
   const pct = Math.min(100, Math.round((hours / 160) * 100));
   const right =
@@ -456,8 +461,13 @@ const TimelineRow = memo(function TimelineRow({
         span: lay.span,
       }))
     );
-  assignAllocationStackLevels(rowSegments);
-  const allocLaneCount = rowSegments.length ? Math.max(...rowSegments.map((s) => s.stack)) + 1 : 1;
+  
+  const workSegments = rowSegments.filter((s) => !s.a.isLeave);
+  const leaveSegments = rowSegments.filter((s) => s.a.isLeave);
+  
+  assignAllocationStackLevels(workSegments);
+  const allocLaneCount = workSegments.length ? Math.max(...workSegments.map((s) => s.stack)) + 1 : 1;
+
 
   return (
     <div key={p.id} className="lp-sched-row" style={{ ["--animation-order"]: i }}>
@@ -500,7 +510,11 @@ const TimelineRow = memo(function TimelineRow({
         </div>
       </div>
       <div className="lp-sched-timeline">
-        <div className="lp-grid-stack" style={{ ["--lp-alloc-lane-count"]: allocLaneCount }}>
+        <div 
+          className="lp-grid-stack" 
+          style={{ ["--lp-alloc-lane-count"]: allocLaneCount, cursor: "pointer" }}
+          onClick={(e) => handleTimelineClick(e, p, nCols)}
+        >
           <div className="lp-grid-week-lanes" style={{ gridTemplateColumns: gridTemplate }} aria-hidden>
             {scheduleModel.slots.map((slot, idx) => (
               <div
@@ -515,26 +529,91 @@ const TimelineRow = memo(function TimelineRow({
               />
             ))}
           </div>
+
+          {leaveSegments.length > 0 && (
+            <div
+              className="lp-grid-leave-layer"
+              style={{
+                display: "grid",
+                gridTemplateColumns: gridTemplate,
+                gridColumn: 1,
+                gridRow: 1,
+                alignSelf: "stretch",
+                pointerEvents: "none",
+                zIndex: 1,
+              }}
+            >
+              {leaveSegments.map((seg) => {
+                // Day view: leave covers the entire day, so span all columns
+                // Week/Month view: use the integer column positions from layoutAllocation
+                const isDay = viewMode === "day";
+                const colStart = isDay ? 1 : Math.max(1, Math.round(seg.lay.start) + 1);
+                const colSpan = isDay ? nCols : Math.max(1, Math.round(seg.lay.span));
+                const lbl = seg.a.leaveType ? leaveLabel(seg.a.leaveType) : "Leave";
+                return (
+                  <button
+                    key={`${seg.a.id}-occ-${seg.occIdx}`}
+                    type="button"
+                    style={{
+                      gridColumn: `${colStart} / span ${colSpan}`,
+                      gridRow: 1,
+                      alignSelf: "stretch",
+                      pointerEvents: "auto",
+                      border: "none",
+                      margin: 0,
+                      borderRadius: 0,
+                      backgroundColor: t.surface,
+                      backgroundImage: theme === "light"
+                        ? "repeating-linear-gradient(-45deg, rgba(140, 150, 170, 0.25), rgba(140, 150, 170, 0.25) 4px, rgba(100, 115, 140, 0.05) 4px, rgba(100, 115, 140, 0.05) 9px)"
+                        : "repeating-linear-gradient(-45deg, rgba(140, 150, 170, 0.35), rgba(140, 150, 170, 0.35) 4px, rgba(100, 115, 140, 0.12) 4px, rgba(100, 115, 140, 0.12) 9px)",
+                      display: "flex",
+                      alignItems: "flex-start",
+                      justifyContent: "flex-start",
+                      padding: "18px 12px",
+                      cursor: "pointer",
+                      boxShadow: "inset 0 0 0 1px rgba(140, 155, 175, 0.12)",
+                      minHeight: "100%",
+                    }}
+                    aria-label={allocationAriaLabel(seg.a)}
+                    onClick={(e) => { e.stopPropagation(); openAllocationDetail(seg.a); }}
+                  >
+                    <span style={{ fontWeight: 700, fontSize: "12px", color: t.text }}>
+                      {lbl}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           <div
             className="lp-grid-row"
-            style={{ gridTemplateColumns: gridTemplate, cursor: "pointer", padding: "12px 0", alignContent: "start" }}
-            onClick={(e) => handleTimelineClick(e, p, nCols)}
+            style={{ 
+              gridTemplateColumns: gridTemplate, 
+              padding: "12px 0", 
+              alignContent: "start", 
+              zIndex: 2,
+              pointerEvents: "none" 
+            }}
           >
-            <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "10px", width: "100%" }}>
+            <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "10px", width: "100%", position: "relative" }}>
               {Array.from({ length: allocLaneCount }).map((_, stackIdx) => {
-                const laneSegs = rowSegments
+                const laneSegs = workSegments
                   .filter((s) => s.stack === stackIdx)
                   .sort((a, b) => a.lay.start - b.lay.start);
 
                 if (laneSegs.length === 0) return null;
 
                 return (
-                  <div key={stackIdx} style={{ display: "flex", width: "100%", position: "relative" }}>
+                  <div key={stackIdx} style={{ display: "flex", width: "100%", position: "relative", alignItems: "flex-start" }}>
                     {laneSegs.map((seg, idx) => {
                       const prevEnd = idx === 0 ? 0 : laneSegs[idx - 1].lay.start + laneSegs[idx - 1].lay.span;
                       const marginLeft = ((seg.lay.start - prevEnd) / nCols) * 100;
                       const width = (seg.lay.span / nCols) * 100;
-                      const z = 12 + seg.stack * 20 + seg.occIdx;
+                      const z = 20 + seg.stack * 20 + seg.occIdx;
+
+                      const h = parseFloat(seg.a.hoursPerDay) || 8;
+                      const calculatedHeight = Math.max(28, Math.min(84, h * 10.5));
 
                       const baseStyle = {
                         position: "relative",
@@ -545,23 +624,12 @@ const TimelineRow = memo(function TimelineRow({
                         flexShrink: 0,
                         zIndex: z,
                         marginTop: 0,
+                        minHeight: `${calculatedHeight}px`,
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "flex-start",
+                        pointerEvents: "auto",
                       };
-
-                      if (seg.a.isLeave) {
-                        const lbl = seg.a.leaveType ? leaveLabel(seg.a.leaveType) : "Leave";
-                        return (
-                          <button
-                            key={`${seg.a.id}-occ-${seg.occIdx}`}
-                            type="button"
-                            className="lp-block lp-block-alloc lp-block-leave"
-                            style={baseStyle}
-                            aria-label={allocationAriaLabel(seg.a)}
-                            onClick={(e) => { e.stopPropagation(); openAllocationDetail(seg.a); }}
-                          >
-                            <span className="lp-leave-label">{lbl}</span>
-                          </button>
-                        );
-                      }
 
                       const { projectName, projectCode, hoursLabel } = allocationDisplay(seg.a);
                       const barColor = colorForAllocationBar(seg.a, projects);
@@ -655,7 +723,6 @@ export default function LandingPage() {
   const viewWrapRef = useRef(null);
   const densityWrapRef = useRef(null);
   const addWrapRef = useRef(null);
-  const { ts, add: toast } = useToasts();
 
   useEffect(() => {
     function onDoc(e) {
@@ -759,9 +826,8 @@ export default function LandingPage() {
             const leaveTypeName = leaveConflict.leaveType
               ? (leaveConflict.project || "Leave")
               : "Leave";
-            toast(
-              `Cannot allocate ${personName} — they are on ${leaveTypeName} (${leaveConflict.startDate} to ${leaveConflict.endDate})`,
-              "danger"
+            toast.error(
+              `Cannot allocate ${personName} — they are on ${leaveTypeName} (${leaveConflict.startDate} to ${leaveConflict.endDate})`
             );
             return;
           }
@@ -782,9 +848,9 @@ export default function LandingPage() {
           },
         ];
       });
-      toast(payload.isLeave ? "Leave created" : "Allocation created", "success");
+      toast.success(payload.isLeave ? "Leave created" : "Allocation created");
     },
-    [toast, setAllocations, projects, allocations, people]
+    [setAllocations, projects, allocations, people]
   );
 
   const handleEditAllocation = useCallback(
@@ -807,9 +873,8 @@ export default function LandingPage() {
             const leaveTypeName = leaveConflict.leaveType
               ? (leaveConflict.project || "Leave")
               : "Leave";
-            toast(
-              `Cannot allocate ${personName} — they are on ${leaveTypeName} (${leaveConflict.startDate} to ${leaveConflict.endDate})`,
-              "danger"
+            toast.error(
+              `Cannot allocate ${personName} — they are on ${leaveTypeName} (${leaveConflict.startDate} to ${leaveConflict.endDate})`
             );
             return;
           }
@@ -829,17 +894,17 @@ export default function LandingPage() {
           };
         })
       );
-      toast(payload.isLeave ? "Leave updated" : "Allocation updated", "success");
+      toast.success(payload.isLeave ? "Leave updated" : "Allocation updated");
     },
-    [toast, setAllocations, projects, allocations, people]
+    [setAllocations, projects, allocations, people]
   );
 
   const handleDeleteAllocation = useCallback(
     (alloc) => {
       setAllocations((prev) => prev.filter((a) => a.id !== alloc.id));
-      toast("Allocation deleted", "success");
+      toast.success("Allocation deleted");
     },
-    [setAllocations, toast]
+    [setAllocations]
   );
 
   const openAllocationDetail = useCallback((alloc) => {
@@ -877,11 +942,11 @@ export default function LandingPage() {
       setPeople(
         people.map((p) => (p.id === editingPerson.id ? updated : p)).sort((a, b) => a.name.localeCompare(b.name))
       );
-      toast(`${form.name} updated`, "success");
+      toast.success(`${form.name} updated`);
     } else {
       const newP = formToPerson(form, getNextPersonId(), false);
       setPeople([...people, newP].sort((a, b) => a.name.localeCompare(b.name)));
-      toast(`${form.name} added to directory`, "success");
+      toast.success(`${form.name} added to directory`);
     }
     setModalOpen(false);
     setEditingPerson(null);
@@ -894,7 +959,7 @@ export default function LandingPage() {
           p.id === editingPerson.id ? { ...p, archived: !p.archived } : p
         )
       );
-      toast(`${editingPerson.name} ${editingPerson.archived ? "restored" : "archived"}`, "warn");
+      toast.warning(`${editingPerson.name} ${editingPerson.archived ? "restored" : "archived"}`);
       setModalOpen(false);
       setEditingPerson(null);
     }
@@ -910,15 +975,15 @@ export default function LandingPage() {
   useLayoutEffect(() => {
     if (!scheduleViewportRef.current || scheduleModel.columnCount === 0) return;
     const el = scheduleViewportRef.current;
-    
+
     // 1. Initial/Anchor jump: if the anchor date completely changed (e.g. clicked < > Next/Prev)
     if (scheduleModel.anchorDateKey !== lastAnchorKey.current) {
-       const slotIdx = scheduleModel.slots.findIndex(s => s.dateKey >= scheduleModel.anchorDateKey);
-       if (slotIdx >= 0) {
-          el.scrollLeft = slotIdx * colMinPx;
-       }
-       lastAnchorKey.current = scheduleModel.anchorDateKey;
-    } 
+      const slotIdx = scheduleModel.slots.findIndex(s => s.dateKey >= scheduleModel.anchorDateKey);
+      if (slotIdx >= 0) {
+        el.scrollLeft = slotIdx * colMinPx;
+      }
+      lastAnchorKey.current = scheduleModel.anchorDateKey;
+    }
     // 2. Endless scroll jump: if we just dynamically added months to the PAST (left)
     else if (prevColCount.current > 0 && scheduleModel.columnCount > prevColCount.current) {
       if (timelineOffsets.prev > prevOffsets.current.prev) {
@@ -926,7 +991,7 @@ export default function LandingPage() {
         el.scrollLeft += addedCols * colMinPx;
       }
     }
-    
+
     prevColCount.current = scheduleModel.columnCount;
     prevOffsets.current = timelineOffsets;
   }, [scheduleModel, timelineOffsets, colMinPx]);
@@ -934,12 +999,12 @@ export default function LandingPage() {
   const handleTimelineScroll = useCallback((e) => {
     const el = e.target;
     const thresholdBase = 250;
-    
+
     // Left endless load
     if (el.scrollLeft < thresholdBase) {
       setTimelineOffsets((o) => (o.prev < 36 ? { ...o, prev: o.prev + 1 } : o));
     }
-    
+
     // Right endless load
     if (el.scrollLeft + el.clientWidth > el.scrollWidth - thresholdBase) {
       setTimelineOffsets((o) => (o.next < 36 ? { ...o, next: o.next + 1 } : o));
@@ -1109,7 +1174,7 @@ export default function LandingPage() {
               <button type="button" className="lp-icon-btn" aria-label="Share">
                 <Share size={18} />
               </button>
-              
+
               <div className="lp-dropdown-wrap" ref={addWrapRef}>
                 <button
                   type="button"
@@ -1219,24 +1284,24 @@ export default function LandingPage() {
                     >
                       {scheduleModel.bandSpans
                         ? scheduleModel.bandSpans.map((w, i, arr) => (
-                            <div
-                              key={i}
-                              className={
-                                "lp-week-cell lp-week-band-block" +
-                                (w.weekParity ? " lp-week-band-b" : " lp-week-band-a") +
-                                (i === 0 ? " lp-week-band-outer-left" : "") +
-                                (i === arr.length - 1 ? " lp-week-band-outer-right" : "")
-                              }
-                              style={{ gridColumn: `span ${w.span}` }}
-                            >
-                              <span className="lp-week-band-label">{w.label}</span>
-                            </div>
-                          ))
+                          <div
+                            key={i}
+                            className={
+                              "lp-week-cell lp-week-band-block" +
+                              (w.weekParity ? " lp-week-band-b" : " lp-week-band-a") +
+                              (i === 0 ? " lp-week-band-outer-left" : "") +
+                              (i === arr.length - 1 ? " lp-week-band-outer-right" : "")
+                            }
+                            style={{ gridColumn: `span ${w.span}` }}
+                          >
+                            <span className="lp-week-band-label">{w.label}</span>
+                          </div>
+                        ))
                         : (
-                            <div className="lp-week-cell lp-week-cell-full" style={{ gridColumn: "1 / -1" }}>
-                              {scheduleModel.bandTitle}
-                            </div>
-                          )}
+                          <div className="lp-week-cell lp-week-cell-full" style={{ gridColumn: "1 / -1" }}>
+                            {scheduleModel.bandTitle}
+                          </div>
+                        )}
                     </div>
                     <div
                       className="lp-days"
@@ -1259,8 +1324,8 @@ export default function LandingPage() {
                             }
                           >
                             <span className="lp-day-main">
-                               {isToday && <span className="lp-today-grid-dot" />}
-                               {slot.main}
+                              {isToday && <span className="lp-today-grid-dot" />}
+                              {slot.main}
                             </span>
                             {slot.sub ? <span className="lp-day-sub">{slot.sub}</span> : null}
                           </div>
@@ -1352,8 +1417,8 @@ export default function LandingPage() {
         onSave={(form) => {
           const clean = { ...form };
           delete clean._colorOpen;
-          setProjects([...projects, { ...clean, id: getNextProjectId(), archived: false }].sort((a,b)=>a.name.localeCompare(b.name)));
-          toast(`Project "${form.name}" created!`, "success");
+          setProjects([...projects, { ...clean, id: getNextProjectId(), archived: false }].sort((a, b) => a.name.localeCompare(b.name)));
+          toast.success(`Project "${form.name}" created!`);
           setProjectCreateOpen(false);
         }}
         people={people}
@@ -1365,7 +1430,7 @@ export default function LandingPage() {
         t={t}
       />
 
-      <Toasts ts={ts} t={t} />
+
     </div>
   );
 }

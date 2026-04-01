@@ -3,6 +3,7 @@ import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useAppData } from "../context/AppDataContext.jsx";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
 import { PROJECT_COLOR_PALETTE, colorForNewProjectId } from "../utils/projectColors.js";
+import { toast } from "sonner";
 import {
   Users,
   FolderOpen,
@@ -66,19 +67,6 @@ const T = {
   light: { bg:"#f5f6f8",surface:"#ffffff",surfRaised:"#ffffff",surfAlt:"#f8f9fb",border:"#e4e7ed",borderSub:"#ebedf2",borderIn:"#d4d8e0",text:"#151922",textSoft:"#4a5168",textMuted:"#858da3",textDim:"#c0c4d0",accent:"#4f6ae6",accentHov:"#3a54d4",accentTxt:"#ffffff",accentGlow:"rgba(79,106,230,0.08)",sidebar:"#ffffff",sidebarAct:"#f0f1f5",rowHov:"#f8f9fb",tagBg:"#eef1f8",tagTxt:"#4a5da8",btnSec:"#eef0f4",btnSecHov:"#e2e5eb",btnSecTxt:"#3e4560",danger:"#e8364f",dangerHov:"#d42a42",dangerSoft:"rgba(232,54,79,0.06)",dangerTxt:"#fff",success:"#16a06a",warn:"#d97706",warnSoft:"rgba(217,119,6,0.06)",overlay:"rgba(15,18,28,0.35)",shadow:"0 32px 100px rgba(0,0,0,0.12)",chk:"#4f6ae6",scroll:"#d4d8e0",selRow:"#eef1fa",focus:"#4f6ae6",toastBg:"#ffffff",toastBdr:"#e4e7ed",tabActiveBg:"rgba(79,106,230,0.08)",tabHovBg:"rgba(79,106,230,0.04)" },
 };
 
-/* ═══════════════════ TOASTS ═══════════════════ */
-let _tid=0;
-function useToasts(){const[ts,setTs]=useState([]);const add=useCallback((msg,type="info")=>{const id=++_tid;setTs(p=>[...p,{id,msg,type,out:false}]);setTimeout(()=>setTs(p=>p.map(x=>x.id===id?{...x,out:true}:x)),2600);setTimeout(()=>setTs(p=>p.filter(x=>x.id!==id)),3000);},[]);return{ts,add};}
-function Toasts({ts,t}){
-  const icons={success:Check,danger:Trash2,info:Layers,warn:Archive};
-  const colors={success:t.success,danger:t.danger,info:t.accent,warn:t.warn};
-  return(<div style={{position:"fixed",bottom:24,right:24,zIndex:999,display:"flex",flexDirection:"column-reverse",gap:8}}>
-    {ts.map(x=>{const I=icons[x.type]||Layers;return(
-      <div key={x.id} style={{background:t.toastBg,border:`1px solid ${t.toastBdr}`,borderRadius:10,padding:"12px 18px",display:"flex",alignItems:"center",gap:10,boxShadow:`0 8px 30px rgba(0,0,0,0.18)`,minWidth:280,maxWidth:400,animation:x.out?"toastOut 0.35s ease-in forwards":"toastIn 0.35s ease-out",borderLeft:`3px solid ${colors[x.type]}`}}>
-        <I size={16} style={{color:colors[x.type],flexShrink:0}}/><span style={{color:t.text,fontSize:13,fontWeight:500}}>{x.msg}</span>
-      </div>);})}
-  </div>);
-}
 
 /* ═══════════════════ CONFIRM ═══════════════════ */
 function Confirm({open,onYes,onNo,title,desc,yesLabel,yesIcon:YI,yesDanger,t}){
@@ -341,7 +329,7 @@ export default function ProjectsPage(){
   const[editingProject,setEditingProject]=useState(null);
   const[confirmDel,setConfirmDel]=useState(false);
   const[mounted,setMounted]=useState(false);
-  const{ts,add:toast}=useToasts();
+
   useEffect(()=>{setMounted(true);},[]);
 
   const filtered=useMemo(()=>{const isArch=viewTab==="archived";return projects.filter(p=>{if(p.archived!==isArch)return false;if(!search)return true;const s=search.toLowerCase();return p.name.toLowerCase().includes(s)||p.client.toLowerCase().includes(s)||p.code.toLowerCase().includes(s)||p.tags.some(tg=>tg.toLowerCase().includes(s));});},[projects,search,viewTab]);
@@ -349,11 +337,11 @@ export default function ProjectsPage(){
   const archivedCount=projects.filter(p=>p.archived).length;
   const toggleSel=id=>setSelected(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
   const toggleAll=()=>setSelected(selected.size===filtered.length?new Set():new Set(filtered.map(p=>p.id)));
-  const doDelete=()=>{const c=selected.size;setProjects(projects.filter(p=>!selected.has(p.id)));setSelected(new Set());setConfirmDel(false);toast(`${c} project${c===1?"":"s"} removed`,"danger");};
-  const archiveProject=id=>{const p=projects.find(x=>x.id===id);setProjects(projects.map(x=>x.id===id?{...x,archived:!x.archived}:x));setSelected(new Set());toast(`${p.name} ${p.archived?"restored":"archived"}`,"warn");};
+  const doDelete=()=>{const c=selected.size;setProjects(projects.filter(p=>!selected.has(p.id)));setSelected(new Set());setConfirmDel(false);toast.error(`${c} project${c===1?"":"s"} removed`);};
+  const archiveProject=id=>{const p=projects.find(x=>x.id===id);setProjects(projects.map(x=>x.id===id?{...x,archived:!x.archived}:x));setSelected(new Set());toast.warning(`${p.name} ${p.archived?"restored":"archived"}`);};
   const openAdd=()=>{setEditingProject(null);setModalOpen(true);};
   const openEdit=p=>{setEditingProject(p);setModalOpen(true);};
-  const handleSave=form=>{const clean={...form};delete clean._colorOpen;if(editingProject){setProjects(projects.map(p=>p.id===editingProject.id?{...clean,id:editingProject.id,archived:editingProject.archived}:p).sort((a,b)=>a.name.localeCompare(b.name)));toast(`${form.name} updated`,"success");}else{setProjects([...projects,{...clean,id:getNextProjectId(),archived:false}].sort((a,b)=>a.name.localeCompare(b.name)));toast(`${form.name} created`,"success");}setModalOpen(false);setEditingProject(null);};
+  const handleSave=form=>{const clean={...form};delete clean._colorOpen;if(editingProject){setProjects(projects.map(p=>p.id===editingProject.id?{...clean,id:editingProject.id,archived:editingProject.archived}:p).sort((a,b)=>a.name.localeCompare(b.name)));toast.success(`${form.name} updated`);}else{setProjects([...projects,{...clean,id:getNextProjectId(),archived:false}].sort((a,b)=>a.name.localeCompare(b.name)));toast.success(`${form.name} created`);}setModalOpen(false);setEditingProject(null);};
   const handleModalArchive=()=>{if(editingProject){archiveProject(editingProject.id);setModalOpen(false);setEditingProject(null);}};
 
   return(
@@ -410,7 +398,7 @@ export default function ProjectsPage(){
 
       <ProjectModal open={modalOpen} onClose={()=>{setModalOpen(false);setEditingProject(null);}} onSave={handleSave} onArchive={handleModalArchive} editProject={editingProject} people={people} clients={clients} setClients={setClients} tagOpts={projectTagOpts} setTagOpts={setProjectTagOpts} getNextProjectId={getNextProjectId} t={t}/>
       <Confirm open={confirmDel} t={t} onYes={doDelete} onNo={()=>{setConfirmDel(false);setSelected(new Set());}} title="Confirm deletion" desc={<>You are about to permanently remove <strong style={{color:t.text}}>{selected.size} project{selected.size===1?"":"s"}</strong>.</>} yesLabel="Delete" yesIcon={Trash2} yesDanger/>
-      <Toasts ts={ts} t={t}/>
+
 
       <style>{`
         @keyframes fadeIn{from{opacity:0}to{opacity:1}}

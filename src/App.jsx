@@ -1,12 +1,42 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { ThemeProvider } from "./context/ThemeContext.jsx";
+import { ThemeProvider, useAppTheme } from "./context/ThemeContext.jsx";
 import { AppDataProvider } from "./context/AppDataContext.jsx";
 import RouteSkeleton from "./components/ui/RouteSkeleton.jsx";
+import { Toaster } from "sonner";
 
 const LandingPage = lazy(() => import("./pages/LandingPage.jsx"));
 const PeoplePage = lazy(() => import("./pages/PeoplePage.jsx"));
 const ProjectsPage = lazy(() => import("./pages/ProjectsPage.jsx"));
+
+function ThemedToaster() {
+  const { theme } = useAppTheme();
+  return (
+    <Toaster
+      theme={theme}
+      position="bottom-right"
+      richColors
+      closeButton
+      expand
+      visibleToasts={5}
+      toastOptions={{
+        style: {
+          borderRadius: "14px",
+          fontSize: "13.5px",
+          fontWeight: 500,
+          fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+          backdropFilter: "blur(16px)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)",
+          border: theme === "light"
+            ? "1px solid rgba(0,0,0,0.06)"
+            : "1px solid rgba(255,255,255,0.08)",
+          padding: "14px 18px",
+        },
+        className: "float-toast",
+      }}
+    />
+  );
+}
 
 export default function App() {
   return (
@@ -22,6 +52,7 @@ export default function App() {
               </Routes>
             </Suspense>
           </div>
+          <ThemedToaster />
         </BrowserRouter>
       </AppDataProvider>
     </ThemeProvider>

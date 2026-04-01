@@ -1335,7 +1335,8 @@
 }
 
 .lp-grid-week-lanes,
-.lp-grid-row {
+.lp-grid-row,
+.lp-grid-leave-layer {
   grid-column: 1;
   grid-row: 1;
 }
