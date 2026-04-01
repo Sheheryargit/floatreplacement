@@ -42,6 +42,9 @@ export default function PeoplePage() {
     peopleTagOpts,
     setPeopleTagOpts,
     getNextPersonId,
+    syncPersonCreate,
+    syncPersonUpdate,
+    syncPeopleDelete,
   } = useAppData();
 
   const [selected,setSelected]=useState(new Set());
@@ -71,8 +74,8 @@ export default function PeoplePage() {
   const toggleSel=(id)=>setSelected((p)=>{ const n=new Set(p); n.has(id)?n.delete(id):n.add(id); return n; });
   const toggleAll=()=>setSelected(selected.size===filtered.length?new Set():new Set(filtered.map((p)=>p.id)));
 
-  const doDelete=()=>{ const c=selected.size; setPeople(people.filter((p)=>!selected.has(p.id))); setSelected(new Set()); setConfirmDel(false); toast.error(`${c} ${c===1?"person":"people"} removed`); };
-  const archivePerson=(id)=>{ setPeople(people.map((p)=>p.id===id?{...p,archived:!p.archived}:p)); setSelected(new Set()); const p=people.find((x)=>x.id===id); toast.warning(`${p.name} ${p.archived?"restored":"archived"}`); };
+  const doDelete=()=>{ const c=selected.size; const ids=[...selected]; setPeople(people.filter((p)=>!selected.has(p.id))); setSelected(new Set()); setConfirmDel(false); syncPeopleDelete(ids); toast.error(`${c} ${c===1?"person":"people"} removed`); };
+  const archivePerson=(id)=>{ const p=people.find((x)=>x.id===id); const next={...p,archived:!p.archived}; setPeople(people.map((x)=>x.id===id?next:x)); setSelected(new Set()); toast.warning(`${p.name} ${p.archived?"restored":"archived"}`); syncPersonUpdate(next); };
 
   const openAdd=()=>{ setEditingPerson(null); setModalOpen(true); };
   const openEdit=(person)=>{ setEditingPerson(person); setModalOpen(true); };
@@ -81,10 +84,12 @@ export default function PeoplePage() {
     if(editingPerson) {
       const updated = formToPerson(form, editingPerson.id, editingPerson.archived);
       setPeople(people.map((p)=>p.id===editingPerson.id?updated:p).sort((a,b)=>a.name.localeCompare(b.name)));
+      syncPersonUpdate(updated);
       toast.success(`${form.name} updated`);
     } else {
       const newP = formToPerson(form, getNextPersonId(), false);
       setPeople([...people,newP].sort((a,b)=>a.name.localeCompare(b.name)));
+      syncPersonCreate(newP);
       toast.success(`${form.name} added to directory`);
     }
     setModalOpen(false); setEditingPerson(null);

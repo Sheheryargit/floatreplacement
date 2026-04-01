@@ -1,13 +1,19 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider, useAppTheme } from "./context/ThemeContext.jsx";
-import { AppDataProvider } from "./context/AppDataContext.jsx";
+import { AppDataProvider, useAppStore } from "./context/AppDataContext.jsx";
 import RouteSkeleton from "./components/ui/RouteSkeleton.jsx";
 import { Toaster } from "sonner";
 
 const LandingPage = lazy(() => import("./pages/LandingPage.jsx"));
 const PeoplePage = lazy(() => import("./pages/PeoplePage.jsx"));
 const ProjectsPage = lazy(() => import("./pages/ProjectsPage.jsx"));
+
+function WorkspaceReady({ children }) {
+  const ready = useAppStore((s) => s.workspaceReady);
+  if (!ready) return <RouteSkeleton />;
+  return children;
+}
 
 function ThemedToaster() {
   const { theme } = useAppTheme();
@@ -43,16 +49,18 @@ export default function App() {
     <ThemeProvider>
       <AppDataProvider>
         <BrowserRouter>
-          <div className="app-viewport">
-            <Suspense fallback={<RouteSkeleton />}>
-              <Routes>
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/people" element={<PeoplePage />} />
-                <Route path="/projects" element={<ProjectsPage />} />
-              </Routes>
-            </Suspense>
-          </div>
-          <ThemedToaster />
+          <WorkspaceReady>
+            <div className="app-viewport">
+              <Suspense fallback={<RouteSkeleton />}>
+                <Routes>
+                  <Route path="/" element={<LandingPage />} />
+                  <Route path="/people" element={<PeoplePage />} />
+                  <Route path="/projects" element={<ProjectsPage />} />
+                </Routes>
+              </Suspense>
+            </div>
+            <ThemedToaster />
+          </WorkspaceReady>
         </BrowserRouter>
       </AppDataProvider>
     </ThemeProvider>

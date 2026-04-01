@@ -321,6 +321,9 @@ export default function ProjectsPage(){
     projectTagOpts,
     setProjectTagOpts,
     getNextProjectId,
+    syncProjectCreate,
+    syncProjectUpdate,
+    syncProjectsDelete,
   }=useAppData();
   const[selected,setSelected]=useState(new Set());
   const[search,setSearch]=useState("");
@@ -337,11 +340,11 @@ export default function ProjectsPage(){
   const archivedCount=projects.filter(p=>p.archived).length;
   const toggleSel=id=>setSelected(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
   const toggleAll=()=>setSelected(selected.size===filtered.length?new Set():new Set(filtered.map(p=>p.id)));
-  const doDelete=()=>{const c=selected.size;setProjects(projects.filter(p=>!selected.has(p.id)));setSelected(new Set());setConfirmDel(false);toast.error(`${c} project${c===1?"":"s"} removed`);};
-  const archiveProject=id=>{const p=projects.find(x=>x.id===id);setProjects(projects.map(x=>x.id===id?{...x,archived:!x.archived}:x));setSelected(new Set());toast.warning(`${p.name} ${p.archived?"restored":"archived"}`);};
+  const doDelete=()=>{const c=selected.size;const ids=[...selected];setProjects(projects.filter(p=>!selected.has(p.id)));setSelected(new Set());setConfirmDel(false);syncProjectsDelete(ids);toast.error(`${c} project${c===1?"":"s"} removed`);};
+  const archiveProject=id=>{const p=projects.find(x=>x.id===id);const next={...p,archived:!p.archived};setProjects(projects.map(x=>x.id===id?next:x));setSelected(new Set());toast.warning(`${p.name} ${p.archived?"restored":"archived"}`);syncProjectUpdate(next);};
   const openAdd=()=>{setEditingProject(null);setModalOpen(true);};
   const openEdit=p=>{setEditingProject(p);setModalOpen(true);};
-  const handleSave=form=>{const clean={...form};delete clean._colorOpen;if(editingProject){setProjects(projects.map(p=>p.id===editingProject.id?{...clean,id:editingProject.id,archived:editingProject.archived}:p).sort((a,b)=>a.name.localeCompare(b.name)));toast.success(`${form.name} updated`);}else{setProjects([...projects,{...clean,id:getNextProjectId(),archived:false}].sort((a,b)=>a.name.localeCompare(b.name)));toast.success(`${form.name} created`);}setModalOpen(false);setEditingProject(null);};
+  const handleSave=form=>{const clean={...form};delete clean._colorOpen;if(editingProject){const updated={...clean,id:editingProject.id,archived:editingProject.archived};setProjects(projects.map(p=>p.id===editingProject.id?updated:p).sort((a,b)=>a.name.localeCompare(b.name)));syncProjectUpdate(updated);toast.success(`${form.name} updated`);}else{const id=getNextProjectId();const created={...clean,id,archived:false};setProjects([...projects,created].sort((a,b)=>a.name.localeCompare(b.name)));syncProjectCreate(created);toast.success(`${form.name} created`);}setModalOpen(false);setEditingProject(null);};
   const handleModalArchive=()=>{if(editingProject){archiveProject(editingProject.id);setModalOpen(false);setEditingProject(null);}};
 
   return(

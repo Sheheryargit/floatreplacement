@@ -687,6 +687,12 @@ export default function LandingPage() {
     addAllocationProjectLabel,
     getNextPersonId,
     getNextProjectId,
+    syncPersonCreate,
+    syncPersonUpdate,
+    syncProjectCreate,
+    syncAllocationCreate,
+    syncAllocationUpdate,
+    syncAllocationDelete,
   } = useAppData();
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -837,20 +843,19 @@ export default function LandingPage() {
       const projectColor = resolveColorForProjectLabel(payload.project, projects);
       setAllocations((prev) => {
         const nextId = prev.reduce((m, a) => Math.max(m, Number(a.id) || 0), 0) + 1;
-        return [
-          ...prev,
-          {
-            id: nextId,
-            ...payload,
-            updatedBy: "You",
-            updatedAt: new Date().toISOString(),
-            projectColor,
-          },
-        ];
+        const created = {
+          id: nextId,
+          ...payload,
+          updatedBy: "You",
+          updatedAt: new Date().toISOString(),
+          projectColor,
+        };
+        queueMicrotask(() => syncAllocationCreate(created));
+        return [...prev, created];
       });
       toast.success(payload.isLeave ? "Leave created" : "Allocation created");
     },
-    [setAllocations, projects, allocations, people]
+    [setAllocations, projects, allocations, people, syncAllocationCreate]
   );
 
   const handleEditAllocation = useCallback(
@@ -885,26 +890,29 @@ export default function LandingPage() {
       setAllocations((prev) =>
         prev.map((a) => {
           if (a.id !== id) return a;
-          return {
+          const merged = {
             ...a,
             ...payload,
             updatedBy: "You",
             updatedAt: new Date().toISOString(),
             projectColor,
           };
+          queueMicrotask(() => syncAllocationUpdate(merged));
+          return merged;
         })
       );
       toast.success(payload.isLeave ? "Leave updated" : "Allocation updated");
     },
-    [setAllocations, projects, allocations, people]
+    [setAllocations, projects, allocations, people, syncAllocationUpdate]
   );
 
   const handleDeleteAllocation = useCallback(
     (alloc) => {
       setAllocations((prev) => prev.filter((a) => a.id !== alloc.id));
+      syncAllocationDelete(alloc.id);
       toast.success("Allocation deleted");
     },
-    [setAllocations]
+    [setAllocations, syncAllocationDelete]
   );
 
   const openAllocationDetail = useCallback((alloc) => {
@@ -942,10 +950,12 @@ export default function LandingPage() {
       setPeople(
         people.map((p) => (p.id === editingPerson.id ? updated : p)).sort((a, b) => a.name.localeCompare(b.name))
       );
+      syncPersonUpdate(updated);
       toast.success(`${form.name} updated`);
     } else {
       const newP = formToPerson(form, getNextPersonId(), false);
       setPeople([...people, newP].sort((a, b) => a.name.localeCompare(b.name)));
+      syncPersonCreate(newP);
       toast.success(`${form.name} added to directory`);
     }
     setModalOpen(false);
@@ -954,11 +964,9 @@ export default function LandingPage() {
 
   const handleModalArchive = () => {
     if (editingPerson) {
-      setPeople(
-        people.map((p) =>
-          p.id === editingPerson.id ? { ...p, archived: !p.archived } : p
-        )
-      );
+      const next = { ...editingPerson, archived: !editingPerson.archived };
+      setPeople(people.map((p) => (p.id === editingPerson.id ? next : p)));
+      syncPersonUpdate(next);
       toast.warning(`${editingPerson.name} ${editingPerson.archived ? "restored" : "archived"}`);
       setModalOpen(false);
       setEditingPerson(null);
@@ -1417,7 +1425,10 @@ export default function LandingPage() {
         onSave={(form) => {
           const clean = { ...form };
           delete clean._colorOpen;
-          setProjects([...projects, { ...clean, id: getNextProjectId(), archived: false }].sort((a, b) => a.name.localeCompare(b.name)));
+          const id = getNextProjectId();
+          const created = { ...clean, id, archived: false };
+          setProjects([...projects, created].sort((a, b) => a.name.localeCompare(b.name)));
+          syncProjectCreate(created);
           toast.success(`Project "${form.name}" created!`);
           setProjectCreateOpen(false);
         }}
