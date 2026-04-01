@@ -38,6 +38,12 @@ import PersonModal, {
   ini,
   avGrad,
 } from "../components/PersonModal.jsx";
+import {
+  CreateAllocationModal,
+  AllocationDetailModal,
+  ALLOCATION_PROJECT_SEED,
+  advanceRepeatWindow,
+} from "../components/AllocationModals.jsx";
 import "./LandingPage.css";
 
 const VIEW_OPTIONS = [
@@ -120,20 +126,89 @@ function weekdaysInAnchorWeek(d) {
   return [0, 1, 2, 3, 4].map((i) => addDays(mon, i));
 }
 
-/** Demo allocation blocks: column indices are 0..columnCount-1 */
-function demoBlocksForView(columnCount) {
-  const n = Math.max(columnCount, 1);
-  const leaveW = Math.min(2, n);
-  const w1 = Math.max(1, Math.floor(n * 0.14));
-  const w2 = Math.max(1, Math.floor(n * 0.12));
-  const s1 = Math.min(Math.floor(n * 0.22), n - w1);
-  const s2 = Math.min(s1 + w1 + Math.max(1, Math.floor(n * 0.04)), n - w2);
-  const blocks = [
-    { type: "leave", start: 0, span: leaveW, label: "Annual Leave" },
-    { type: "orange", start: s1, span: Math.min(w1, n - s1), label: "ASF Managed Servi", sub: "ASF · 2h" },
-    { type: "pink", start: s2, span: Math.min(w2, n - s2), label: "Cloud Managed Ser", sub: "ARTC · 1.5h" },
-  ];
-  return blocks.filter((b) => b.start >= 0 && b.start + b.span <= n && b.span > 0);
+function dateKeyLocal(dt) {
+  const x = new Date(dt);
+  const y = x.getFullYear();
+  const m = String(x.getMonth() + 1).padStart(2, "0");
+  const day = String(x.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Map allocation date range to visible column start + span (Mon–Fri columns). */
+function layoutAllocation(alloc, scheduleModel, viewMode) {
+  const n = scheduleModel.columnCount;
+  const keys = scheduleModel.slots.map((s) => s.dateKey);
+  const sk = alloc.startDate;
+  const ek = alloc.endDate;
+
+  if (viewMode === "day") {
+    const anchorK = scheduleModel.anchorDateKey;
+    if (!anchorK || anchorK < sk || anchorK > ek) return null;
+    const w = Math.max(2, Math.floor(n * 0.22));
+    const s = Math.max(0, Math.floor((n - w) / 2));
+    return { start: s, span: Math.min(w, n - s) };
+  }
+
+  let i0 = keys.findIndex((k) => k >= sk);
+  if (i0 < 0) return null;
+  let i1 = -1;
+  for (let i = keys.length - 1; i >= 0; i--) {
+    if (keys[i] <= ek) {
+      i1 = i;
+      break;
+    }
+  }
+  if (i1 < i0) return null;
+  return { start: i0, span: i1 - i0 + 1 };
+}
+
+function allocationHasPerson(a, pid) {
+  if (Array.isArray(a.personIds) && a.personIds.length > 0) return a.personIds.includes(pid);
+  return a.personId === pid;
+}
+
+/** Visible timeline segments for an allocation (includes recurring occurrences). */
+function layoutsForAllocation(alloc, scheduleModel, viewMode) {
+  const out = [];
+  let start = alloc.startDate;
+  let end = alloc.endDate;
+  const repeatId = alloc.repeatId ?? "none";
+  const originMs = new Date(`${alloc.startDate}T12:00:00`).getTime();
+  const maxMs = originMs + 800 * 864e5;
+
+  for (let i = 0; i < 80; i++) {
+    const lay = layoutAllocation({ ...alloc, startDate: start, endDate: end }, scheduleModel, viewMode);
+    if (lay) out.push({ ...lay, occ: i });
+    if (repeatId === "none") break;
+    const next = advanceRepeatWindow(start, end, repeatId);
+    if (!next) break;
+    ({ start, end } = next);
+    if (new Date(`${start}T12:00:00`).getTime() > maxMs) break;
+  }
+  return out;
+}
+
+function shortenAllocLabel(s, maxLen) {
+  if (!s) return "";
+  return s.length > maxLen ? `${s.slice(0, maxLen - 1)}…` : s;
+}
+
+function allocationDisplay(alloc) {
+  const parts = alloc.project.split("/").map((x) => x.trim());
+  const code = parts[0] || "";
+  const name = parts[1] || parts[0] || alloc.project;
+  const h = alloc.hoursPerDay;
+  const hStr = Number.isInteger(h) ? String(h) : String(h);
+  return {
+    label: shortenAllocLabel(name, 17),
+    sub: `${code} · ${hStr}h`,
+  };
+}
+
+function blockClassForColor(key) {
+  if (key === "pink") return "lp-block lp-block-pink";
+  if (key === "teal") return "lp-block lp-block-teal";
+  return "lp-block lp-block-orange";
 }
 
 function buildScheduleModel(viewMode, anchorDate) {
@@ -143,6 +218,7 @@ function buildScheduleModel(viewMode, anchorDate) {
 
   if (viewMode === "day") {
     const cols = 12;
+    const anchorKey = dateKeyLocal(d);
     const slots = Array.from({ length: cols }, (_, i) => {
       const h = 8 + i * 2;
       return {
@@ -151,6 +227,7 @@ function buildScheduleModel(viewMode, anchorDate) {
         weekParity: 0,
         weekBlockStart: false,
         weekBlockEnd: false,
+        dateKey: anchorKey,
       };
     });
     const title = d.toLocaleDateString("en-AU", {
@@ -164,6 +241,7 @@ function buildScheduleModel(viewMode, anchorDate) {
       bandTitle: title,
       bandSpans: null,
       slots,
+      anchorDateKey: anchorKey,
     };
   }
 
@@ -176,12 +254,14 @@ function buildScheduleModel(viewMode, anchorDate) {
       weekParity: 0,
       weekBlockStart: i === 0,
       weekBlockEnd: i === dates.length - 1,
+      dateKey: dateKeyLocal(dt),
     }));
     return {
       columnCount: 5,
       bandTitle: bandLabel,
       bandSpans: [{ span: 5, label: bandLabel, weekParity: 0 }],
       slots,
+      anchorDateKey: dateKeyLocal(d),
     };
   }
 
@@ -189,6 +269,7 @@ function buildScheduleModel(viewMode, anchorDate) {
   const bandTitle = d.toLocaleDateString("en-AU", { month: "long", year: "numeric" });
 
   if (dates.length === 0) {
+    const fallbackKey = dateKeyLocal(d);
     return {
       columnCount: 1,
       bandTitle,
@@ -200,8 +281,10 @@ function buildScheduleModel(viewMode, anchorDate) {
           weekParity: 0,
           weekBlockStart: true,
           weekBlockEnd: true,
+          dateKey: fallbackKey,
         },
       ],
+      anchorDateKey: fallbackKey,
     };
   }
 
@@ -221,6 +304,7 @@ function buildScheduleModel(viewMode, anchorDate) {
       weekParity: weekStripe % 2,
       weekBlockStart: mk !== prevK,
       weekBlockEnd: mk !== nextK,
+      dateKey: dateKeyLocal(dt),
     };
   });
 
@@ -244,6 +328,7 @@ function buildScheduleModel(viewMode, anchorDate) {
     bandTitle,
     bandSpans,
     slots,
+    anchorDateKey: dateKeyLocal(d),
   };
 }
 
@@ -279,6 +364,14 @@ export default function LandingPage() {
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const [densityOpen, setDensityOpen] = useState(false);
 
+  const [allocations, setAllocations] = useState([]);
+  const allocIdRef = useRef(1);
+  const [allocCreateOpen, setAllocCreateOpen] = useState(false);
+  const [allocPreselectPerson, setAllocPreselectPerson] = useState(null);
+  const [allocDetailOpen, setAllocDetailOpen] = useState(false);
+  const [selectedAllocation, setSelectedAllocation] = useState(null);
+  const [allocationProjects, setAllocationProjects] = useState(() => [...ALLOCATION_PROJECT_SEED]);
+
   const viewWrapRef = useRef(null);
   const densityWrapRef = useRef(null);
   const { ts, add: toast } = useToasts();
@@ -302,11 +395,6 @@ export default function LandingPage() {
     return s;
   }, [schedulePeople]);
 
-  const demoBlocks = useMemo(
-    () => demoBlocksForView(scheduleModel.columnCount),
-    [scheduleModel.columnCount]
-);
-
   const muted = theme === "dark" ? "#636d84" : "#858da3";
 
   const navigatePrev = useCallback(() => {
@@ -327,6 +415,66 @@ export default function LandingPage() {
     setEditingPerson(null);
     setModalOpen(true);
   };
+
+  const openCreateAllocation = useCallback((person) => {
+    setAllocPreselectPerson(person ?? null);
+    setAllocCreateOpen(true);
+  }, []);
+
+  const closeCreateAllocation = useCallback(() => {
+    setAllocCreateOpen(false);
+    setAllocPreselectPerson(null);
+  }, []);
+
+  const handleCreateAllocation = useCallback(
+    (payload) => {
+      const id = allocIdRef.current++;
+      const colorKeys = ["orange", "pink", "teal"];
+      const colorKey = colorKeys[id % 3];
+      setAllocations((prev) => [
+        ...prev,
+        {
+          id,
+          ...payload,
+          updatedBy: "You",
+          updatedAt: new Date().toISOString(),
+          colorKey,
+        },
+      ]);
+      toast("Allocation created", "success");
+    },
+    [toast]
+  );
+
+  const openAllocationDetail = useCallback((alloc) => {
+    setSelectedAllocation(alloc);
+    setAllocDetailOpen(true);
+  }, []);
+
+  const closeAllocationDetail = useCallback(() => {
+    setAllocDetailOpen(false);
+    setSelectedAllocation(null);
+  }, []);
+
+  const handleAddAllocationProject = useCallback((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    setAllocationProjects((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
+  }, []);
+
+  const selectedAssigneeNames = useMemo(() => {
+    if (!selectedAllocation) return "";
+    const ids =
+      selectedAllocation.personIds?.length > 0
+        ? selectedAllocation.personIds
+        : selectedAllocation.personId != null
+          ? [selectedAllocation.personId]
+          : [];
+    return ids
+      .map((id) => schedulePeople.find((x) => x.id === id)?.name)
+      .filter(Boolean)
+      .join(", ");
+  }, [selectedAllocation, schedulePeople]);
 
   const openEdit = (person) => {
     setEditingPerson(person);
@@ -553,7 +701,12 @@ export default function LandingPage() {
               <button type="button" className="lp-icon-btn" aria-label="Share">
                 <Share size={18} />
               </button>
-              <button type="button" className="lp-btn-primary" aria-label="Add allocation" onClick={openAdd}>
+              <button
+                type="button"
+                className="lp-btn-primary"
+                aria-label="Add allocation"
+                onClick={() => openCreateAllocation(null)}
+              >
                 <Plus size={18} strokeWidth={2.5} />
               </button>
             </div>
@@ -660,35 +813,54 @@ export default function LandingPage() {
                 return (
                   <div key={p.id} className="lp-sched-row">
                     <div className="lp-sched-person">
-                      <button
-                        type="button"
-                        className="lp-person-row"
-                        onClick={() => openEdit(p)}
-                      >
-                        <div className="lp-avatar" style={{ background: avGrad(p.name) }}>
-                          {ini(p.name)}
-                        </div>
-                        <div className="lp-person-meta">
-                          <div className="lp-person-name">{p.name}</div>
-                          <div className="lp-person-sub">
-                            {p.role !== "—" ? `${p.role} · ` : ""}
-                            {p.department || "—"}
-                          </div>
-                          {p.tags.length > 0 && (
-                            <div className="lp-person-tags">
-                              {p.tags.slice(0, 2).map((tag) => (
-                                <span key={tag} className="lp-tag">
-                                  {tag}
-                                </span>
-                              ))}
-                              {p.tags.length > 2 && (
-                                <span className="lp-tag lp-tag-more">+{p.tags.length - 2}</span>
+                      <div className="lp-person-row-shell">
+                        <div className="lp-person-row-cluster">
+                          <button
+                            type="button"
+                            className="lp-person-row lp-person-row-main"
+                            onClick={() => openEdit(p)}
+                          >
+                            <div className="lp-avatar" style={{ background: avGrad(p.name) }}>
+                              {ini(p.name)}
+                            </div>
+                            <div className="lp-person-meta">
+                              <div className="lp-person-name">{p.name}</div>
+                              <div className="lp-person-sub">
+                                {p.role !== "—" ? `${p.role} · ` : ""}
+                                {p.department || "—"}
+                              </div>
+                              {p.tags.length > 0 && (
+                                <div className="lp-person-tags">
+                                  {p.tags.slice(0, 2).map((tag) => (
+                                    <span key={tag} className="lp-tag">
+                                      {tag}
+                                    </span>
+                                  ))}
+                                  {p.tags.length > 2 && (
+                                    <span className="lp-tag lp-tag-more">+{p.tags.length - 2}</span>
+                                  )}
+                                </div>
                               )}
                             </div>
-                          )}
+                          </button>
+                          <button
+                            type="button"
+                            className="lp-person-add-alloc"
+                            title="Add allocation"
+                            aria-label={`Add allocation for ${p.name}`}
+                            onClick={() => openCreateAllocation(p)}
+                          >
+                            <Plus size={12} strokeWidth={2} />
+                          </button>
                         </div>
-                        <div className="lp-person-hours">{right}</div>
-                      </button>
+                        <button
+                          type="button"
+                          className="lp-person-row lp-person-hours-hit"
+                          onClick={() => openEdit(p)}
+                        >
+                          <span className="lp-person-hours">{right}</span>
+                        </button>
+                      </div>
                     </div>
                     <div className="lp-sched-timeline">
                       <div className="lp-grid-stack">
@@ -716,37 +888,34 @@ export default function LandingPage() {
                             gridTemplateColumns: gridTemplate,
                           }}
                         >
-                          {demoBlocks.map((b, j) => {
-                            const n = scheduleModel.columnCount;
-                            const left = (b.start / n) * 100;
-                            const width = (b.span / n) * 100;
-                            const cls =
-                              b.type === "leave"
-                                ? "lp-hatch"
-                                : b.type === "orange"
-                                  ? "lp-block lp-block-orange"
-                                  : "lp-block lp-block-pink";
-                            return (
-                              <div
-                                key={`${p.id}-${j}`}
-                                className={cls}
-                                style={{
-                                  left: `${left}%`,
-                                  width: `${width}%`,
-                                }}
-                              >
-                                {b.type === "leave" ? (
-                                  b.label
-                                ) : (
-                                  <>
-                                    {b.label}
+                          {allocations
+                            .filter((a) => allocationHasPerson(a, p.id))
+                            .flatMap((a) =>
+                              layoutsForAllocation(a, scheduleModel, viewMode).map((lay, occIdx) => {
+                                const n = scheduleModel.columnCount;
+                                const left = (lay.start / n) * 100;
+                                const width = (lay.span / n) * 100;
+                                const { label, sub } = allocationDisplay(a);
+                                const z = 12 + occIdx;
+                                return (
+                                  <button
+                                    key={`${a.id}-occ-${occIdx}`}
+                                    type="button"
+                                    className={`${blockClassForColor(a.colorKey)} lp-block-alloc`}
+                                    style={{
+                                      left: `${left}%`,
+                                      width: `${width}%`,
+                                      zIndex: z,
+                                    }}
+                                    onClick={() => openAllocationDetail(a)}
+                                  >
+                                    {label}
                                     <br />
-                                    {b.sub}
-                                  </>
-                                )}
-                              </div>
-                            );
-                          })}
+                                    {sub}
+                                  </button>
+                                );
+                              })
+                            )}
                         </div>
                       </div>
                     </div>
@@ -777,6 +946,25 @@ export default function LandingPage() {
         setDepts={setDepts}
         tagOpts={tagOpts}
         setTagOpts={setTagOpts}
+        t={t}
+      />
+
+      <CreateAllocationModal
+        open={allocCreateOpen}
+        onClose={closeCreateAllocation}
+        onCreate={handleCreateAllocation}
+        people={schedulePeople}
+        preselectPerson={allocPreselectPerson}
+        projects={allocationProjects}
+        onAddProject={handleAddAllocationProject}
+        t={t}
+      />
+
+      <AllocationDetailModal
+        open={allocDetailOpen}
+        allocation={selectedAllocation}
+        assigneeNames={selectedAssigneeNames}
+        onClose={closeAllocationDetail}
         t={t}
       />
 

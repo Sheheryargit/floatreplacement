@@ -34,6 +34,7 @@
   --warn: #f59e0b;
   --orange: #e8892c;
   --pink: #e85d9a;
+  --teal: #2bb8a8;
   --hatch: rgba(255, 255, 255, 0.05);
   --scroll: #252d3f;
   /* Mon–Fri week bands (no Sat/Sun columns) */
@@ -764,6 +765,99 @@
   }
 }
 
+.lp-person-row-shell {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-height: var(--lp-row-h);
+}
+
+/* Name + meta share one flex grow region; + is a slim sibling (does not sit between meta and hours). */
+.lp-person-row-cluster {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.lp-person-row-main {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+
+.lp-person-row.lp-person-hours-hit {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+.lp-person-hours-hit {
+  flex-shrink: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: var(--lp-person-pad-y) var(--lp-person-pad-x) var(--lp-person-pad-y) 8px;
+  min-width: 3.25rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.lp-person-hours-hit:hover {
+  background: rgba(108, 140, 255, 0.06);
+}
+
+.lp-root[data-theme="light"] .lp-person-hours-hit:hover {
+  background: rgba(79, 106, 230, 0.08);
+}
+
+.lp-person-add-alloc {
+  flex-shrink: 0;
+  align-self: flex-start;
+  width: 22px;
+  height: 22px;
+  margin: 3px 0 0 1px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.42;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.lp-person-row-shell:hover .lp-person-add-alloc {
+  opacity: 0.85;
+}
+
+.lp-person-add-alloc:hover {
+  opacity: 1;
+  color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.lp-person-add-alloc:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Touch / coarse pointers: keep control discoverable without hover */
+@media (hover: none) {
+  .lp-person-add-alloc {
+    opacity: 0.72;
+  }
+}
+
 .lp-person-row {
   flex: 1;
   width: 100%;
@@ -783,6 +877,12 @@
   cursor: pointer;
   transition: background 0.12s, min-height 0.28s cubic-bezier(0.22, 1, 0.36, 1),
     padding 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lp-person-row.lp-person-row-main {
+  flex: 1;
+  width: auto;
+  min-width: 0;
 }
 
 .lp-person-row:hover {
@@ -819,9 +919,13 @@
   font-size: 14px;
   color: var(--text);
   margin-bottom: 2px;
+  line-height: 1.25;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .lp-person-sub {
@@ -1140,6 +1244,32 @@
   left: 54%;
   width: 12%;
   min-width: 90px;
+}
+
+.lp-block-teal {
+  background: var(--teal);
+  left: 70%;
+  width: 12%;
+  min-width: 90px;
+}
+
+button.lp-block.lp-block-alloc {
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  border: none;
+}
+
+.lp-block-alloc:hover {
+  filter: brightness(1.06);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.lp-block-alloc:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .lp-fab {
