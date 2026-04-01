@@ -1,26 +1,29 @@
 import { useState, useEffect, useMemo } from "react";
-import { NavLink } from "react-router-dom";
 import {
-  Users, FolderOpen, BarChart3, CalendarDays, ClipboardList,
-  Plus, Download, Trash2, Search, X, ChevronRight,
-  Sun, Moon, UserPlus, Shield,
-  Archive, ArchiveRestore,
+  Users,
+  Plus,
+  Download,
+  Trash2,
+  Search,
+  X,
+  ChevronRight,
+  UserPlus,
+  Shield,
+  Archive,
+  ArchiveRestore,
 } from "lucide-react";
 import { useAppTheme } from "../context/ThemeContext.jsx";
+import { useAppData } from "../context/AppDataContext.jsx";
+import AppSideNav from "../components/navigation/AppSideNav.jsx";
 import PersonModal, {
   T,
   useToasts,
   Toasts,
   Confirm,
   RowActions,
-  PEOPLE_SEED,
   formToPerson,
-  SEED_ROLES,
-  SEED_DEPTS,
-  SEED_TAGS,
   ini,
   avGrad,
-  nextPersonId,
 } from "../components/PersonModal.jsx";
 
 /* ═══════════════════════════════════════════════════════════
@@ -30,7 +33,18 @@ export default function PeoplePage() {
   const { theme: mode, toggleTheme } = useAppTheme();
   const t = T[mode];
 
-  const [people,setPeople]=useState(() => PEOPLE_SEED.map((p) => ({ ...p })));
+  const {
+    people,
+    setPeople,
+    roles,
+    setRoles,
+    depts,
+    setDepts,
+    peopleTagOpts,
+    setPeopleTagOpts,
+    getNextPersonId,
+  } = useAppData();
+
   const [selected,setSelected]=useState(new Set());
   const [search,setSearch]=useState("");
   const [viewTab,setViewTab]=useState("active"); // active | archived
@@ -38,9 +52,6 @@ export default function PeoplePage() {
   const [editingPerson,setEditingPerson]=useState(null);
   const [confirmDel,setConfirmDel]=useState(false);
   const [mounted,setMounted]=useState(false);
-  const [roles,setRoles]=useState([...SEED_ROLES]);
-  const [depts,setDepts]=useState([...SEED_DEPTS]);
-  const [tagOpts,setTagOpts]=useState([...SEED_TAGS]);
   const { ts, add:toast } = useToasts();
 
   useEffect(()=>{ setMounted(true); },[]);
@@ -73,7 +84,7 @@ export default function PeoplePage() {
       setPeople(people.map((p)=>p.id===editingPerson.id?updated:p).sort((a,b)=>a.name.localeCompare(b.name)));
       toast(`${form.name} updated`,"success");
     } else {
-      const newP = formToPerson(form, nextPersonId(), false);
+      const newP = formToPerson(form, getNextPersonId(), false);
       setPeople([...people,newP].sort((a,b)=>a.name.localeCompare(b.name)));
       toast(`${form.name} added to directory`,"success");
     }
@@ -83,54 +94,21 @@ export default function PeoplePage() {
     if(editingPerson) { archivePerson(editingPerson.id); setModalOpen(false); setEditingPerson(null); }
   };
 
-  const sideNav = [
-    { to:"/", end:true, icon:CalendarDays, label:"Schedule" },
-    { to:null, icon:ClipboardList, label:"Project plan" },
-    { to:"/people", icon:Users, label:"People" },
-    { to:"/projects", icon:FolderOpen, label:"Projects" },
-    { to:null, icon:BarChart3, label:"Report" },
-  ];
-
   return (
-    <div style={{ background:t.bg,minHeight:"100vh",color:t.text,fontFamily:"'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",fontSize:14,transition:"background 0.35s ease,color 0.35s ease" }}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet"/>
+    <div
+      style={{
+        display: "flex",
+        minHeight: "100vh",
+        background: t.bg,
+        color: t.text,
+        fontFamily: "var(--font-sans, Inter, system-ui, sans-serif)",
+        fontSize: 14,
+        transition: "background 0.35s ease, color 0.35s ease",
+      }}
+    >
+      <AppSideNav theme={mode} onToggleTheme={toggleTheme} />
 
-      {/* ── Sidebar ── */}
-      <nav style={{ position:"fixed",left:0,top:0,bottom:0,width:72,background:t.sidebar,display:"flex",flexDirection:"column",alignItems:"center",paddingTop:16,gap:4,zIndex:50,borderRight:`1px solid ${t.border}`,transition:"background 0.35s" }}>
-        <NavLink to="/" style={{ marginBottom:12,width:36,height:36,borderRadius:10,background:`linear-gradient(135deg,${t.accent},#a78bfa)`,display:"flex",alignItems:"center",justifyContent:"center" }}>
-          <span style={{ color:"#fff",fontWeight:800,fontSize:14 }}>R1</span>
-        </NavLink>
-        {sideNav.map((item,i)=>{
-          const Icon=item.icon;
-          const base={ display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",borderRadius:10,width:58,textAlign:"center",transition:"all 0.2s",position:"relative",textDecoration:"none",color:t.textMuted };
-          if(item.to) {
-            return (
-              <NavLink key={i} to={item.to} end={!!item.end} style={({ isActive })=>({ ...base, cursor:"pointer", background:isActive?t.sidebarAct:"transparent", color:isActive?t.accent:t.textMuted })}>
-                {({ isActive })=>(<>
-                  {isActive&&<div style={{ position:"absolute",left:0,top:12,bottom:12,width:3,borderRadius:"0 3px 3px 0",background:t.accent }}/>}
-                  <Icon size={19} strokeWidth={isActive?2.2:1.8}/><span style={{ fontSize:10,fontWeight:isActive?600:500 }}>{item.label}</span>
-                </>)}
-              </NavLink>
-            );
-          }
-          return (
-            <div key={i} onMouseEnter={(e)=>{ e.currentTarget.style.background=t.sidebarAct; }} onMouseLeave={(e)=>{ e.currentTarget.style.background="transparent"; }}
-              style={{ ...base, cursor:"default", opacity:0.65 }}>
-              <Icon size={19} strokeWidth={1.8}/><span style={{ fontSize:10,fontWeight:500 }}>{item.label}</span>
-            </div>
-          );
-        })}
-        <div style={{ marginTop:"auto",marginBottom:16 }}>
-          <button onClick={toggleTheme} title={mode==="dark"?"Light mode":"Dark mode"}
-            style={{ width:40,height:40,borderRadius:10,border:`1px solid ${t.borderIn}`,background:t.surfAlt,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:t.textSoft,transition:"all 0.25s" }}
-            onMouseEnter={(e)=>{ e.currentTarget.style.borderColor=t.accent; }} onMouseLeave={(e)=>{ e.currentTarget.style.borderColor=t.borderIn; }}>
-            {mode==="dark"?<Sun size={16}/>:<Moon size={16}/>}
-          </button>
-        </div>
-      </nav>
-
-      {/* ── Main ── */}
-      <main style={{ marginLeft:72,padding:"24px 36px" }}>
+      <main style={{ flex: 1, minWidth: 0, padding: "24px 36px" }}>
         {/* Header */}
         <header style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8 }}>
           <h1 style={{ fontSize:26,fontWeight:700,margin:0,letterSpacing:-0.5 }}>People</h1>
@@ -261,7 +239,7 @@ export default function PeoplePage() {
         open={modalOpen} onClose={()=>{ setModalOpen(false); setEditingPerson(null); }}
         onSave={handleModalSave} onArchive={handleModalArchive}
         editPerson={editingPerson}
-        roles={roles} setRoles={setRoles} depts={depts} setDepts={setDepts} tagOpts={tagOpts} setTagOpts={setTagOpts} t={t}/>
+        roles={roles} setRoles={setRoles} depts={depts} setDepts={setDepts} tagOpts={peopleTagOpts} setTagOpts={setPeopleTagOpts} t={t}/>
 
       <Confirm open={confirmDel} t={t} onYes={doDelete} onNo={()=>{ setConfirmDel(false); setSelected(new Set()); }}
         title="Confirm deletion" desc={<>You are about to permanently remove <strong style={{color:t.text}}>{selected.size} {selected.size===1?"person":"people"}</strong> from the directory.</>}

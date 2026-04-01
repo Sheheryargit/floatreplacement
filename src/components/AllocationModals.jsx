@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { X, ChevronDown, ArrowLeftRight, Zap } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { X, ChevronDown, ArrowLeftRight, Zap, Trash2 } from "lucide-react";
+import { resolveColorForProjectLabel } from "../utils/projectColors.js";
 import "./AllocationModals.css";
 
 export const ALLOCATION_PROJECT_SEED = [
@@ -104,6 +106,7 @@ export function CreateAllocationModal({
   people,
   preselectPerson,
   projects,
+  projectRegistry = [],
   onAddProject,
   t,
 }) {
@@ -233,17 +236,22 @@ export function CreateAllocationModal({
   const repeatOptionLabel = repeatLabel(repeatId);
 
   return (
-    <div className="lpam-backdrop" onMouseDown={onClose}>
-      <div
-        className="lpam-modal lpam-create"
-        style={{ background: t.surface, borderColor: t.border, color: t.text }}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
+    <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="lpam-overlay-radix" />
+        <Dialog.Content className="lpam-modal lpam-create" style={{ background: t.surface, borderColor: t.border, color: t.text }}>
+          <Dialog.Description className="lpam-sr-only">
+            Set hours, dates, project, and assign people for a new allocation.
+          </Dialog.Description>
         <div className="lpam-head">
-          <h2 className="lpam-title">Allocation</h2>
-          <button type="button" className="lpam-icon-close" onClick={onClose} aria-label="Close">
-            <X size={20} color={t.textMuted} />
-          </button>
+          <Dialog.Title asChild>
+            <h2 className="lpam-title">Allocation</h2>
+          </Dialog.Title>
+          <Dialog.Close asChild>
+            <button type="button" className="lpam-icon-close" aria-label="Close">
+              <X size={20} color={t.textMuted} />
+            </button>
+          </Dialog.Close>
         </div>
 
         <div className="lpam-panel" style={{ background: t.surfRaised, borderColor: t.border }}>
@@ -377,7 +385,16 @@ export function CreateAllocationModal({
                 if (projectOpen) setProjectCreateMode(false);
               }}
             >
-              <span className="lpam-project-trigger-text">{project || "Select project"}</span>
+              <span className="lpam-project-trigger-inner">
+                {project ? (
+                  <span
+                    className="lpam-project-swatch"
+                    style={{ background: resolveColorForProjectLabel(project, projectRegistry) }}
+                    aria-hidden
+                  />
+                ) : null}
+                <span className="lpam-project-trigger-text">{project || "Select project"}</span>
+              </span>
               <ChevronDown size={16} style={{ color: t.textMuted }} />
             </button>
             {projectOpen && (
@@ -426,20 +443,30 @@ export function CreateAllocationModal({
                   </div>
                 ) : (
                   <>
-                    {(projects.length ? projects : ALLOCATION_PROJECT_SEED).map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        className={"lpam-menu-item" + (project === p ? " lpam-menu-item-active" : "")}
-                        style={{ color: t.text }}
-                        onClick={() => {
-                          setProject(p);
-                          setProjectOpen(false);
-                        }}
-                      >
-                        {p}
-                      </button>
-                    ))}
+                    {(projects.length ? projects : ALLOCATION_PROJECT_SEED).map((p) => {
+                      const swatch = resolveColorForProjectLabel(p, projectRegistry);
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          className={"lpam-menu-item" + (project === p ? " lpam-menu-item-active" : "")}
+                          style={{ color: t.text }}
+                          onClick={() => {
+                            setProject(p);
+                            setProjectOpen(false);
+                          }}
+                        >
+                          <span className="lpam-menu-item-inner">
+                            <span
+                              className="lpam-project-swatch"
+                              style={{ background: swatch }}
+                              aria-hidden
+                            />
+                            <span className="lpam-menu-item-label">{p}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
                     <div className="lpam-menu-divider" style={{ background: t.border }} />
                     <button
                       type="button"
@@ -536,38 +563,55 @@ export function CreateAllocationModal({
           >
             Create allocation
           </button>
-          <button
-            type="button"
-            className="lpam-btn lpam-btn-secondary"
-            style={{ borderColor: t.border, background: t.btnSec, color: t.textSoft }}
-            onClick={onClose}
-          >
-            Cancel
-          </button>
+          <Dialog.Close asChild>
+            <button
+              type="button"
+              className="lpam-btn lpam-btn-secondary"
+              style={{ borderColor: t.border, background: t.btnSec, color: t.textSoft }}
+            >
+              Cancel
+            </button>
+          </Dialog.Close>
         </div>
-      </div>
-    </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 
-export function AllocationDetailModal({ open, allocation, assigneeNames, onClose, t }) {
+export function AllocationDetailModal({ open, allocation, assigneeNames, onClose, onDelete, t }) {
   if (!open || !allocation) return null;
 
   const wd = allocation.workingDays ?? countWorkingDaysBetween(allocation.startDate, allocation.endDate);
   const repeatText = allocation.repeatId && allocation.repeatId !== "none" ? repeatLabel(allocation.repeatId) : null;
 
+  const handleDelete = () => {
+    if (!onDelete) return;
+    if (typeof window !== "undefined" && !window.confirm("Delete this allocation? This cannot be undone.")) return;
+    onDelete(allocation);
+    onClose();
+  };
+
   return (
-    <div className="lpam-backdrop" onMouseDown={onClose}>
-      <div
-        className="lpam-modal lpam-detail"
-        style={{ background: t.surface, borderColor: t.border, color: t.text }}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
+    <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="lpam-overlay-radix" />
+        <Dialog.Content
+          className="lpam-modal lpam-detail"
+          style={{ background: t.surface, borderColor: t.border, color: t.text }}
+        >
+          <Dialog.Description className="lpam-sr-only">
+            Hours, project, assignments, and notes for this allocation.
+          </Dialog.Description>
         <div className="lpam-head">
-          <h2 className="lpam-title">Allocation</h2>
-          <button type="button" className="lpam-icon-close" onClick={onClose} aria-label="Close">
-            <X size={20} color={t.textMuted} />
-          </button>
+          <Dialog.Title asChild>
+            <h2 className="lpam-title">Allocation</h2>
+          </Dialog.Title>
+          <Dialog.Close asChild>
+            <button type="button" className="lpam-icon-close" aria-label="Close">
+              <X size={20} color={t.textMuted} />
+            </button>
+          </Dialog.Close>
         </div>
 
         <div className="lpam-detail-metrics">
@@ -640,12 +684,27 @@ export function AllocationDetailModal({ open, allocation, assigneeNames, onClose
               Updated by {allocation.updatedBy} · {formatAllocDate(allocation.updatedAt)}
             </span>
           </div>
-          <button type="button" className="lpam-link" style={{ color: t.accent }}>
-            View changes
-          </button>
+          <div className="lpam-detail-actions">
+            {onDelete ? (
+              <button
+                type="button"
+                className="lpam-btn lpam-btn-secondary lpam-btn-danger"
+                style={{
+                  background: t.dangerSoft,
+                  borderColor: t.danger,
+                  color: t.danger,
+                }}
+                onClick={handleDelete}
+              >
+                <Trash2 size={16} strokeWidth={2} aria-hidden />
+                Delete allocation
+              </button>
+            ) : null}
+          </div>
         </div>
-      </div>
-    </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 

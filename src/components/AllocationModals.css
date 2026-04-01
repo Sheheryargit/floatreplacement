@@ -1,3 +1,4 @@
+/* Legacy — kept for any non-Radix usage */
 .lpam-backdrop {
   position: fixed;
   inset: 0;
@@ -11,6 +12,28 @@
   animation: lpamFadeIn 0.2s ease;
 }
 
+.lpam-overlay-radix {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(6, 8, 14, 0.58);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: lpamFadeIn 0.22s ease-out;
+}
+
+.lpam-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 @keyframes lpamFadeIn {
   from {
     opacity: 0;
@@ -21,25 +44,38 @@
 }
 
 .lpam-modal {
-  width: 100%;
-  max-width: 520px;
+  width: min(92vw, 520px);
   max-height: min(92vh, 880px);
   overflow-y: auto;
-  border-radius: 16px;
+  border-radius: var(--radius-xl, 16px);
   border: 1px solid;
   padding: 24px 28px 28px;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--shadow-lg, 0 24px 80px rgba(0, 0, 0, 0.45));
   animation: lpamPop 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lpam-modal[data-state="open"] {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 201;
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lpam-modal,
+  .lpam-overlay-radix {
+    animation: none;
+  }
 }
 
 @keyframes lpamPop {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
   }
 }
 
@@ -283,12 +319,44 @@
   text-align: left;
 }
 
+.lpam-project-trigger-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
 .lpam-project-trigger-text {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.lpam-project-swatch {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.14);
+}
+
+.lpam-menu-item-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.lpam-menu-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
 }
 
 .lpam-project-create {
@@ -432,6 +500,27 @@
 
 .lpam-btn-secondary {
   border: 1px solid;
+}
+
+.lpam-btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: 8px;
+}
+
+.lpam-btn-danger:hover {
+  filter: brightness(1.06);
+}
+
+.lpam-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
 }
 
 /* Detail */

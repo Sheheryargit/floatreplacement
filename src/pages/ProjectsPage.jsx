@@ -1,30 +1,42 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { NavLink } from "react-router-dom";
 import { useAppTheme } from "../context/ThemeContext.jsx";
+import { useAppData } from "../context/AppDataContext.jsx";
+import AppSideNav from "../components/navigation/AppSideNav.jsx";
+import { PROJECT_COLOR_PALETTE, colorForNewProjectId } from "../utils/projectColors.js";
 import {
-  Users, FolderOpen, BarChart3, CalendarDays, ClipboardList,
-  Plus, Download, Trash2, Search, X, ChevronRight, ChevronDown, ChevronUp,
-  Sun, Moon, Check, AlertTriangle, Pencil, Save,
-  Archive, ArchiveRestore, MoreHorizontal, UserPlus,
-  Tag, Mail, Circle, Calendar, Hash, FileText, User, Briefcase,
-  Palette, StickyNote, Shield, UserCheck, UserMinus, Layers
+  Users,
+  FolderOpen,
+  Plus,
+  Download,
+  Trash2,
+  Search,
+  X,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  AlertTriangle,
+  Pencil,
+  Save,
+  Archive,
+  ArchiveRestore,
+  MoreHorizontal,
+  UserPlus,
+  Tag,
+  Mail,
+  Circle,
+  Calendar,
+  Hash,
+  FileText,
+  User,
+  Briefcase,
+  Palette,
+  StickyNote,
+  Shield,
+  UserCheck,
+  UserMinus,
+  Layers,
 } from "lucide-react";
-
-/* ═══════════════════ SHARED PEOPLE (mirrors add-person-modal.jsx) ═══════════════════ */
-const ALL_PEOPLE = [
-  { id:1,name:"Aditi Bali",role:"—",department:"Fire Nation" },
-  { id:2,name:"Akhil Prasad",role:"Graduate",department:"Eaas" },
-  { id:3,name:"Ali Raza",role:"Senior Consultant",department:"Sky" },
-  { id:4,name:"Amisha Punj",role:"Consultant",department:"Transition" },
-  { id:5,name:"Amy Schroter",role:"Senior Consultant",department:"Anger Management" },
-  { id:6,name:"Amy Yienni Liu",role:"Engineer",department:"Azkaban" },
-  { id:7,name:"Andrew Charles Millard Brown",role:"Manager",department:"Sliced Secure" },
-  { id:8,name:"Ankit Patel",role:"Senior Consultant",department:"Sliced Secure" },
-  { id:9,name:"Ashish Dubey",role:"Senior Specialist Lead",department:"Hornets" },
-  { id:10,name:"Asmita Sayanthan",role:"Graduate",department:"Eaas" },
-  { id:11,name:"Belinda Chan",role:"Senior Consultant",department:"Anger Management" },
-  { id:12,name:"Belinda Wakefield",role:"Manager",department:"Anger Management" },
-];
 
 /* ═══════════════════ DATA ═══════════════════ */
 const STAGES = [
@@ -34,9 +46,7 @@ const STAGES = [
   { value:"completed", label:"Completed", color:"#4fc3f7", desc:"Allow final changes, no notifications." },
   { value:"cancelled", label:"Cancelled", color:"#ff4d6a", desc:"Mark as inactive, stop tracking." },
 ];
-const PROJECT_COLORS = ["#6c8cff","#34d399","#f59e0b","#ff4d6a","#a78bfa","#f093fb","#4facfe","#fcb69f","#fa709a","#43e97b","#48c6ef","#667eea","#ff6b6b","#feca57","#54a0ff","#5f27cd"];
-const SEED_CLIENTS = ["Wellness Lab","Perth Airport","SunCorp","Australia Post","Mecca","CMS","ACCC","Arts Centre","University of Adelaide","ADHA","Deloitte"];
-const SEED_TAGS = ["Data&AI","Cloud Secure","CMS",".NET","Azure","AWS","UI/UX","SDM"];
+const PROJECT_COLORS = PROJECT_COLOR_PALETTE;
 const SEED_OWNERS = [
   { id:"jf",name:"Jane Foster",initials:"JF" },{ id:"dc",name:"David Chen",initials:"DC" },
   { id:"tp",name:"Tina Park",initials:"TP" },{ id:"jc",name:"James Clark",initials:"JC" },
@@ -44,20 +54,6 @@ const SEED_OWNERS = [
   { id:"lm",name:"Lisa Morales",initials:"LM" },{ id:"gw",name:"George Wang",initials:"GW" },
   { id:"sy",name:"Sheher Yar",initials:"SY" },
 ];
-
-const PROJECTS_SEED = [
-  { id:1,name:"ACCC Managed Services",code:"ACCC-MS",client:"ACCC",tags:["Cloud Secure"],stage:"confirmed",billable:true,color:"#34d399",owner:"ss",startDate:"2025-02-04",endDate:"2026-12-22",notes:"",teamIds:[3,11],managerEdit:false,archived:false },
-  { id:2,name:"ADHA Disengagement",code:"ADHA-DIS",client:"ADHA",tags:[],stage:"confirmed",billable:true,color:"#6c8cff",owner:"gw",startDate:"2026-02-02",endDate:"2026-07-31",notes:"",teamIds:[5],managerEdit:false,archived:false },
-  { id:3,name:"ADHA Managed Services",code:"ADHA-MS",client:"ADHA",tags:["CMS"],stage:"confirmed",billable:true,color:"#f59e0b",owner:"sy",startDate:"2022-06-06",endDate:"2026-12-31",notes:"Long-running managed services engagement",teamIds:[6,7],managerEdit:true,archived:false },
-  { id:4,name:"Adelaide University Merger",code:"ADL-UNI",client:"University of Adelaide",tags:[],stage:"completed",billable:true,color:"#a78bfa",owner:"lm",startDate:"2024-04-02",endDate:"2024-06-28",notes:"",teamIds:[9],managerEdit:false,archived:false },
-  { id:5,name:".NET 6 API Development",code:"NET6-API",client:"Mecca",tags:[".NET"],stage:"completed",billable:true,color:"#4facfe",owner:"jc",startDate:"2022-06-06",endDate:"2023-01-31",notes:"",teamIds:[],managerEdit:false,archived:false },
-  { id:6,name:"SunCorp Data Platform",code:"SC-DATA",client:"SunCorp",tags:["Data&AI"],stage:"confirmed",billable:true,color:"#fa709a",owner:"tp",startDate:"2025-08-05",endDate:"2025-10-01",notes:"",teamIds:[3],managerEdit:false,archived:false },
-  { id:7,name:"Australia Post Migration",code:"AP-MIG",client:"Australia Post",tags:["Data&AI"],stage:"confirmed",billable:true,color:"#f59e0b",owner:"tp",startDate:"2025-08-05",endDate:"2026-05-29",notes:"",teamIds:[],managerEdit:false,archived:false },
-  { id:8,name:"Perth Airport CMS",code:"PA-CMS",client:"Perth Airport",tags:[],stage:"confirmed",billable:true,color:"#43e97b",owner:"dc",startDate:"",endDate:"",notes:"",teamIds:[],managerEdit:false,archived:false },
-  { id:9,name:"Wellness Lab Portal",code:"",client:"Wellness Lab",tags:[],stage:"draft",billable:false,color:"#667eea",owner:"jf",startDate:"",endDate:"",notes:"",teamIds:[],managerEdit:false,archived:false },
-  { id:10,name:"ACM Sitecore Upgrade",code:"ACM-SC",client:"Arts Centre",tags:[],stage:"completed",billable:true,color:"#ff6b6b",owner:"lm",startDate:"2023-06-19",endDate:"2023-08-25",notes:"",teamIds:[],managerEdit:false,archived:true },
-];
-let _nid = 100;
 
 /* ═══════════════════ HELPERS ═══════════════════ */
 const ini = (n) => { if(!n)return""; const p=n.trim().split(/\s+/); return p.length===1?(p[0][0]||"").toUpperCase():(p[0][0]+p[p.length-1][0]).toUpperCase(); };
@@ -154,13 +150,13 @@ function CTagInput({tags,setTags,options,t}){
 }
 
 /* ═══════════════════ TEAM MEMBER SEARCH DROPDOWN ═══════════════════ */
-function TeamMemberDropdown({teamIds,onAdd,t}){
+function TeamMemberDropdown({people,teamIds,onAdd,t}){
   const[open,setOpen]=useState(false);const[q,setQ]=useState("");
   const ref=useRef(null);const ir=useRef(null);
   useEffect(()=>{const h=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);};document.addEventListener("mousedown",h);return()=>document.removeEventListener("mousedown",h);},[]);
   useEffect(()=>{if(open&&ir.current)ir.current.focus();},[open]);
-  const available=ALL_PEOPLE.filter(p=>!teamIds.includes(p.id));
-  const filtered=available.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||p.role.toLowerCase().includes(q.toLowerCase())||p.department.toLowerCase().includes(q.toLowerCase()));
+  const available=people.filter(p=>!p.archived&&!teamIds.includes(p.id));
+  const filtered=available.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||(p.role||"").toLowerCase().includes(q.toLowerCase())||(p.department||"").toLowerCase().includes(q.toLowerCase()));
   return(<div ref={ref} style={{position:"relative"}}>
     <div onClick={()=>setOpen(!open)} style={{background:t.surfAlt,border:`1.5px solid ${open?t.focus:t.borderIn}`,borderRadius:8,padding:"10px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:8,color:t.textMuted,fontSize:14,transition:"border-color 0.2s,box-shadow 0.2s",boxShadow:open?`0 0 0 3px ${t.accentGlow}`:"none"}}>
       <UserPlus size={15} style={{color:t.accent,flexShrink:0}}/><span>Add team member…</span>
@@ -222,9 +218,9 @@ const Lbl=t=>({fontSize:13,color:t.textMuted,fontWeight:600,whiteSpace:"nowrap"}
 
 const defProject={name:"",code:"",owner:"sy",stage:"draft",billable:true,client:"",tags:[],startDate:"",endDate:"",notes:"",teamIds:[],managerEdit:false,color:"#6c8cff"};
 
-function ProjectModal({open,onClose,onSave,onArchive,editProject,clients,setClients,tagOpts,setTagOpts,t}){
+function ProjectModal({open,onClose,onSave,onArchive,editProject,people,clients,setClients,tagOpts,setTagOpts,getNextProjectId,t}){
   const[form,setForm]=useState(null);const ref=useRef(null);const isEdit=!!editProject;
-  useEffect(()=>{if(open)setForm(editProject?{...editProject,teamIds:[...(editProject.teamIds||[])]}:{...defProject,color:PROJECT_COLORS[Math.floor(Math.random()*PROJECT_COLORS.length)]});},[open,editProject]);
+  useEffect(()=>{if(!open)return;if(editProject)setForm({...editProject,teamIds:[...(editProject.teamIds||[])]});else setForm({...defProject,color:colorForNewProjectId(getNextProjectId())});},[open,editProject?.id,getNextProjectId]);
   if(!open||!form)return null;
   const upd=p=>setForm({...form,...p});
   const save=()=>{if(!form.name.trim())return;onSave(form);};
@@ -292,7 +288,7 @@ function ProjectModal({open,onClose,onSave,onArchive,editProject,clients,setClie
           {/* Team section */}
           <Section title="Team" icon={Users} count={form.teamIds.length} defaultOpen={form.teamIds.length>0} t={t}>
             <div style={{paddingTop:14,display:"flex",flexDirection:"column",gap:6}}>
-              {form.teamIds.map((pid,i)=>{const p=ALL_PEOPLE.find(x=>x.id===pid);if(!p)return null;return(
+              {form.teamIds.map((pid,i)=>{const p=people.find(x=>x.id===pid);if(!p)return null;return(
                 <div key={pid} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",borderRadius:8,transition:"background 0.1s",background:"transparent"}} onMouseEnter={e=>e.currentTarget.style.background=t.tabHovBg} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                   <div style={{display:"flex",alignItems:"center",gap:10}}>
                     <div style={{width:32,height:32,borderRadius:8,background:avGrad(p.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0}}>{ini(p.name)}</div>
@@ -301,7 +297,7 @@ function ProjectModal({open,onClose,onSave,onArchive,editProject,clients,setClie
                   <button onClick={()=>upd({teamIds:form.teamIds.filter(id=>id!==pid)})} style={{background:"transparent",border:"none",cursor:"pointer",color:t.textMuted,padding:6,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.background=t.dangerSoft;e.currentTarget.style.color=t.danger;}} onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=t.textMuted;}}><UserMinus size={15}/></button>
                 </div>);})}
               <div style={{marginTop:form.teamIds.length>0?6:0}}>
-                <TeamMemberDropdown teamIds={form.teamIds} onAdd={id=>upd({teamIds:[...form.teamIds,id]})} t={t}/>
+                <TeamMemberDropdown people={people} teamIds={form.teamIds} onAdd={id=>upd({teamIds:[...form.teamIds,id]})} t={t}/>
               </div>
             </div>
           </Section>
@@ -328,7 +324,16 @@ function ProjectModal({open,onClose,onSave,onArchive,editProject,clients,setClie
 export default function ProjectsPage(){
   const { theme: mode, toggleTheme } = useAppTheme();
   const t=T[mode];
-  const[projects,setProjects]=useState(PROJECTS_SEED);
+  const{
+    people,
+    projects,
+    setProjects,
+    clients,
+    setClients,
+    projectTagOpts,
+    setProjectTagOpts,
+    getNextProjectId,
+  }=useAppData();
   const[selected,setSelected]=useState(new Set());
   const[search,setSearch]=useState("");
   const[viewTab,setViewTab]=useState("active");
@@ -336,8 +341,6 @@ export default function ProjectsPage(){
   const[editingProject,setEditingProject]=useState(null);
   const[confirmDel,setConfirmDel]=useState(false);
   const[mounted,setMounted]=useState(false);
-  const[clients,setClients]=useState([...SEED_CLIENTS]);
-  const[tagOpts,setTagOpts]=useState([...SEED_TAGS]);
   const{ts,add:toast}=useToasts();
   useEffect(()=>{setMounted(true);},[]);
 
@@ -350,32 +353,14 @@ export default function ProjectsPage(){
   const archiveProject=id=>{const p=projects.find(x=>x.id===id);setProjects(projects.map(x=>x.id===id?{...x,archived:!x.archived}:x));setSelected(new Set());toast(`${p.name} ${p.archived?"restored":"archived"}`,"warn");};
   const openAdd=()=>{setEditingProject(null);setModalOpen(true);};
   const openEdit=p=>{setEditingProject(p);setModalOpen(true);};
-  const handleSave=form=>{const clean={...form};delete clean._colorOpen;if(editingProject){setProjects(projects.map(p=>p.id===editingProject.id?{...clean,id:editingProject.id,archived:editingProject.archived}:p).sort((a,b)=>a.name.localeCompare(b.name)));toast(`${form.name} updated`,"success");}else{setProjects([...projects,{...clean,id:_nid++,archived:false}].sort((a,b)=>a.name.localeCompare(b.name)));toast(`${form.name} created`,"success");}setModalOpen(false);setEditingProject(null);};
+  const handleSave=form=>{const clean={...form};delete clean._colorOpen;if(editingProject){setProjects(projects.map(p=>p.id===editingProject.id?{...clean,id:editingProject.id,archived:editingProject.archived}:p).sort((a,b)=>a.name.localeCompare(b.name)));toast(`${form.name} updated`,"success");}else{setProjects([...projects,{...clean,id:getNextProjectId(),archived:false}].sort((a,b)=>a.name.localeCompare(b.name)));toast(`${form.name} created`,"success");}setModalOpen(false);setEditingProject(null);};
   const handleModalArchive=()=>{if(editingProject){archiveProject(editingProject.id);setModalOpen(false);setEditingProject(null);}};
 
-  const sideNav=[
-    { to:"/", end:true, icon:CalendarDays, label:"Schedule" },
-    { to:null, icon:ClipboardList, label:"Project plan" },
-    { to:"/people", icon:Users, label:"People" },
-    { to:"/projects", icon:FolderOpen, label:"Projects" },
-    { to:null, icon:BarChart3, label:"Report" },
-  ];
-
   return(
-    <div style={{background:t.bg,minHeight:"100vh",color:t.text,fontFamily:"'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",fontSize:14,transition:"background 0.35s ease,color 0.35s ease"}}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet"/>
+    <div style={{display:"flex",minHeight:"100vh",background:t.bg,color:t.text,fontFamily:"var(--font-sans, Inter, system-ui, sans-serif)",fontSize:14,transition:"background 0.35s ease,color 0.35s ease"}}>
+      <AppSideNav theme={mode} onToggleTheme={toggleTheme} />
 
-      {/* Sidebar */}
-      <nav style={{position:"fixed",left:0,top:0,bottom:0,width:72,background:t.sidebar,display:"flex",flexDirection:"column",alignItems:"center",paddingTop:16,gap:4,zIndex:50,borderRight:`1px solid ${t.border}`,transition:"background 0.35s"}}>
-        <NavLink to="/" style={{marginBottom:12,width:36,height:36,borderRadius:10,background:`linear-gradient(135deg,${t.accent},#a78bfa)`,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:"#fff",fontWeight:800,fontSize:14}}>R1</span></NavLink>
-        {sideNav.map((item,i)=>{const Icon=item.icon;const base={display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",borderRadius:10,width:58,textAlign:"center",transition:"all 0.2s",position:"relative",textDecoration:"none",color:t.textMuted};
-          if(item.to){return(<NavLink key={i} to={item.to} end={!!item.end} style={({isActive})=>({...base,cursor:"pointer",background:isActive?t.sidebarAct:"transparent",color:isActive?t.accent:t.textMuted})}>{({isActive})=>(<>{isActive&&<div style={{position:"absolute",left:0,top:12,bottom:12,width:3,borderRadius:"0 3px 3px 0",background:t.accent}}/>}<Icon size={19} strokeWidth={isActive?2.2:1.8}/><span style={{fontSize:10,fontWeight:isActive?600:500}}>{item.label}</span></>)}</NavLink>);}
-          return(<div key={i} onMouseEnter={e=>{e.currentTarget.style.background=t.sidebarAct;}} onMouseLeave={e=>{e.currentTarget.style.background="transparent";}} style={{...base,cursor:"default",opacity:0.65}}><Icon size={19} strokeWidth={1.8}/><span style={{fontSize:10,fontWeight:500}}>{item.label}</span></div>);})}
-        <div style={{marginTop:"auto",marginBottom:16}}><button onClick={toggleTheme} title={mode==="dark"?"Light mode":"Dark mode"} style={{width:40,height:40,borderRadius:10,border:`1px solid ${t.borderIn}`,background:t.surfAlt,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:t.textSoft,transition:"all 0.25s"}} onMouseEnter={e=>e.currentTarget.style.borderColor=t.accent} onMouseLeave={e=>e.currentTarget.style.borderColor=t.borderIn}>{mode==="dark"?<Sun size={16}/>:<Moon size={16}/>}</button></div>
-      </nav>
-
-      {/* Main */}
-      <main style={{marginLeft:72,padding:"24px 36px"}}>
+      <main style={{flex:1,minWidth:0,padding:"24px 36px"}}>
         <header style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
           <h1 style={{fontSize:26,fontWeight:700,margin:0,letterSpacing:-0.5}}>Projects</h1>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
@@ -402,7 +387,7 @@ export default function ProjectsPage(){
               {["Project","Code","Client","Tags","Stage","Team","Start","End","Owner",""].map((h,i)=>(<th key={i} style={{textAlign:"left",padding:"14px 12px",fontSize:11,fontWeight:700,color:t.textMuted,textTransform:"uppercase",letterSpacing:0.8,whiteSpace:"nowrap",width:i===9?48:undefined}}>{h}</th>))}
             </tr></thead>
             <tbody>
-              {filtered.map((p,idx)=>{const sel=selected.has(p.id);const stg=STAGES.find(s=>s.value===p.stage)||STAGES[0];const owner=SEED_OWNERS.find(o=>o.id===p.owner);const teamPeople=p.teamIds.map(id=>ALL_PEOPLE.find(x=>x.id===id)).filter(Boolean);return(
+              {filtered.map((p,idx)=>{const sel=selected.has(p.id);const stg=STAGES.find(s=>s.value===p.stage)||STAGES[0];const owner=SEED_OWNERS.find(o=>o.id===p.owner);const teamPeople=p.teamIds.map(id=>people.find(x=>x.id===id)).filter(Boolean);return(
                 <tr key={p.id} onClick={()=>openEdit(p)} style={{borderBottom:`1px solid ${t.border}`,background:sel?t.selRow:"transparent",cursor:"pointer",transition:"background 0.12s",animation:mounted?`rowIn 0.35s ease-out ${idx*0.025}s both`:"none"}} onMouseEnter={e=>{if(!sel)e.currentTarget.style.background=t.rowHov;}} onMouseLeave={e=>{if(!sel)e.currentTarget.style.background=sel?t.selRow:"transparent";}}>
                   <td style={{padding:"12px 14px"}} onClick={e=>e.stopPropagation()}><input type="checkbox" checked={sel} onChange={()=>toggleSel(p.id)} style={{accentColor:t.chk,cursor:"pointer",width:16,height:16}}/></td>
                   <td style={{padding:"12px 12px"}}><div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:4,height:28,borderRadius:2,background:p.color,flexShrink:0}}/><span style={{fontWeight:600,color:p.archived?t.textMuted:t.text,fontSize:14}}>{p.name}</span></div></td>
@@ -423,7 +408,7 @@ export default function ProjectsPage(){
         </div>
       </main>
 
-      <ProjectModal open={modalOpen} onClose={()=>{setModalOpen(false);setEditingProject(null);}} onSave={handleSave} onArchive={handleModalArchive} editProject={editingProject} clients={clients} setClients={setClients} tagOpts={tagOpts} setTagOpts={setTagOpts} t={t}/>
+      <ProjectModal open={modalOpen} onClose={()=>{setModalOpen(false);setEditingProject(null);}} onSave={handleSave} onArchive={handleModalArchive} editProject={editingProject} people={people} clients={clients} setClients={setClients} tagOpts={projectTagOpts} setTagOpts={setProjectTagOpts} getNextProjectId={getNextProjectId} t={t}/>
       <Confirm open={confirmDel} t={t} onYes={doDelete} onNo={()=>{setConfirmDel(false);setSelected(new Set());}} title="Confirm deletion" desc={<>You are about to permanently remove <strong style={{color:t.text}}>{selected.size} project{selected.size===1?"":"s"}</strong>.</>} yesLabel="Delete" yesIcon={Trash2} yesDanger/>
       <Toasts ts={ts} t={t}/>
 

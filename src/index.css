@@ -1,4 +1,5 @@
-/* App shell — full viewport, matches dashboard pages */
+@import "./styles/design-system.css";
+
 *,
 *::before,
 *::after {
@@ -14,6 +15,7 @@ body {
   height: 100%;
   margin: 0;
   background: #0b0e14;
+  font-family: var(--font-sans);
 }
 
 #root {

@@ -52,9 +52,10 @@
   display: flex;
   background: var(--bg);
   color: var(--text);
-  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-sans, "Inter", system-ui, sans-serif);
   font-size: 14px;
-  line-height: 1.45;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
   transition: background 0.35s ease, color 0.35s ease;
 }
 
@@ -1124,6 +1125,9 @@
   display: grid;
   grid-template-columns: 1fr;
   grid-template-rows: 1fr;
+  --lp-alloc-lane-count: 1;
+  --lp-alloc-lane-h: calc(var(--lp-block-max-h, 58px) + 12px);
+  --lp-alloc-row-pad-vertical: 24px;
 }
 
 .lp-grid-week-lanes,
@@ -1135,13 +1139,18 @@
 .lp-grid-week-lanes {
   display: grid;
   align-self: stretch;
-  min-height: var(--lp-row-h);
+  min-height: max(
+    var(--lp-row-h),
+    calc(
+      var(--lp-alloc-lane-count, 1) * var(--lp-alloc-lane-h) + var(--lp-alloc-row-pad-vertical)
+    )
+  );
   z-index: 0;
   pointer-events: none;
 }
 
 .lp-week-lane {
-  min-height: var(--lp-row-h);
+  min-height: 100%;
   border-right: 1px solid var(--grid-line-soft);
   box-sizing: border-box;
 }
@@ -1182,7 +1191,12 @@
 
 .lp-grid-row {
   display: grid;
-  min-height: var(--lp-row-h);
+  min-height: max(
+    var(--lp-row-h),
+    calc(
+      var(--lp-alloc-lane-count, 1) * var(--lp-alloc-lane-h) + var(--lp-alloc-row-pad-vertical)
+    )
+  );
   border-bottom: 1px solid var(--border);
   position: relative;
   z-index: 1;
@@ -1260,6 +1274,13 @@ button.lp-block.lp-block-alloc {
   text-align: left;
   cursor: pointer;
   border: none;
+  --alloc-stack: 0;
+  top: calc(10px + var(--alloc-stack, 0) * var(--lp-alloc-lane-h));
+  height: var(--lp-block-max-h, 58px);
+  max-height: var(--lp-block-max-h, 58px);
+  min-width: 72px;
+  bottom: auto;
+  box-sizing: border-box;
 }
 
 .lp-block-alloc:hover {

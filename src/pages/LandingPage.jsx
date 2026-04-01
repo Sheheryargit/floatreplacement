@@ -1,11 +1,5 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
-import { NavLink } from "react-router-dom";
 import {
-  CalendarDays,
-  ClipboardList,
-  Users,
-  FolderOpen,
-  BarChart3,
   ChevronDown,
   Filter,
   ChevronLeft,
@@ -16,8 +10,6 @@ import {
   MousePointer2,
   SlidersHorizontal,
   Share,
-  Sun,
-  Moon,
   Clock,
   Percent,
   LayoutGrid,
@@ -26,25 +18,27 @@ import {
   Check,
 } from "lucide-react";
 import { useAppTheme } from "../context/ThemeContext.jsx";
+import { useAppData } from "../context/AppDataContext.jsx";
 import PersonModal, {
   T,
   useToasts,
   Toasts,
   formToPerson,
-  nextPersonId,
-  PEOPLE_SEED,
-  SEED_ROLES,
-  SEED_DEPTS,
-  SEED_TAGS,
   ini,
   avGrad,
 } from "../components/PersonModal.jsx";
 import {
   CreateAllocationModal,
   AllocationDetailModal,
-  ALLOCATION_PROJECT_SEED,
   advanceRepeatWindow,
 } from "../components/AllocationModals.jsx";
+import AppSideNav from "../components/navigation/AppSideNav.jsx";
+import {
+  colorForAllocationBar,
+  contrastingTextColor,
+  resolveColorForProjectLabel,
+} from "../utils/projectColors.js";
+import { motion } from "framer-motion";
 import "./LandingPage.css";
 
 const VIEW_OPTIONS = [
@@ -135,7 +129,18 @@ function dateKeyLocal(dt) {
   return `${y}-${m}-${day}`;
 }
 
-/** Map allocation date range to visible column start + span (Mon–Fri columns). */
+/** Day grid: 12 columns, each column = 2 hours starting at 08:00 (see buildScheduleModel). */
+const DAY_GRID_START_HOUR = 8;
+const DAY_COLUMN_HOURS = 2;
+/** Minimum span in column units so short bookings stay readable (~2.5h). */
+const MIN_DAY_SPAN_COLUMNS = 1.25;
+/** Minimum span in column units for week/month (integer columns). */
+const MIN_WEEK_MONTH_SPAN_COLS = 1;
+
+/**
+ * Map allocation date range to visible column start + span.
+ * `start` / `span` are in column index units (fractional allowed in day view).
+ */
 function layoutAllocation(alloc, scheduleModel, viewMode) {
   const n = scheduleModel.columnCount;
   const keys = scheduleModel.slots.map((s) => s.dateKey);
@@ -145,9 +150,19 @@ function layoutAllocation(alloc, scheduleModel, viewMode) {
   if (viewMode === "day") {
     const anchorK = scheduleModel.anchorDateKey;
     if (!anchorK || anchorK < sk || anchorK > ek) return null;
-    const w = Math.max(2, Math.floor(n * 0.22));
-    const s = Math.max(0, Math.floor((n - w) / 2));
-    return { start: s, span: Math.min(w, n - s) };
+    const hpd = Math.max(0.25, Number(alloc.hoursPerDay) || 0);
+    let spanCols = hpd / DAY_COLUMN_HOURS;
+    spanCols = Math.max(spanCols, MIN_DAY_SPAN_COLUMNS);
+    spanCols = Math.min(spanCols, n);
+    // Optional future: alloc.dayStartHour (0–24) anchors the block on the hourly grid.
+    const gridStart =
+      Number.isFinite(alloc.dayStartHour) && alloc.dayStartHour >= 0 && alloc.dayStartHour <= 24
+        ? Math.max(0, (alloc.dayStartHour - DAY_GRID_START_HOUR) / DAY_COLUMN_HOURS)
+        : 0;
+    let startCol = gridStart;
+    if (startCol + spanCols > n) startCol = Math.max(0, n - spanCols);
+    startCol = Math.min(startCol, Math.max(0, n - spanCols));
+    return { start: startCol, span: spanCols };
   }
 
   let i0 = keys.findIndex((k) => k >= sk);
@@ -160,7 +175,35 @@ function layoutAllocation(alloc, scheduleModel, viewMode) {
     }
   }
   if (i1 < i0) return null;
-  return { start: i0, span: i1 - i0 + 1 };
+  let span = i1 - i0 + 1;
+  span = Math.max(span, MIN_WEEK_MONTH_SPAN_COLS);
+  return { start: i0, span };
+}
+
+/** Greedy lane assignment for overlapping [start, start+span) intervals. Mutates segments with .stack. */
+function assignAllocationStackLevels(segments) {
+  const sorted = [...segments].sort((a, b) => {
+    if (a.start !== b.start) return a.start - b.start;
+    return b.span - a.span;
+  });
+  const laneEnds = [];
+  for (const seg of sorted) {
+    const s = seg.start;
+    const e = seg.start + seg.span;
+    let placed = false;
+    for (let k = 0; k < laneEnds.length; k++) {
+      if (laneEnds[k] <= s + 1e-9) {
+        seg.stack = k;
+        laneEnds[k] = e;
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      seg.stack = laneEnds.length;
+      laneEnds.push(e);
+    }
+  }
 }
 
 function allocationHasPerson(a, pid) {
@@ -206,10 +249,14 @@ function allocationDisplay(alloc) {
   };
 }
 
-function blockClassForColor(key) {
-  if (key === "pink") return "lp-block lp-block-pink";
-  if (key === "teal") return "lp-block lp-block-teal";
-  return "lp-block lp-block-orange";
+function allocationAriaLabel(alloc) {
+  const h = alloc.hoursPerDay;
+  const hStr = Number.isInteger(h) ? String(h) : String(h);
+  const range =
+    alloc.startDate === alloc.endDate
+      ? `on ${alloc.startDate}`
+      : `from ${alloc.startDate} to ${alloc.endDate}`;
+  return `${alloc.project}, ${hStr} hours per day, ${range}. Open allocation details.`;
 }
 
 function buildScheduleModel(viewMode, anchorDate) {
@@ -349,10 +396,22 @@ export default function LandingPage() {
   const { theme, toggleTheme } = useAppTheme();
   const t = T[theme];
 
-  const [people, setPeople] = useState(() => PEOPLE_SEED.map((p) => ({ ...p })));
-  const [roles, setRoles] = useState([...SEED_ROLES]);
-  const [depts, setDepts] = useState([...SEED_DEPTS]);
-  const [tagOpts, setTagOpts] = useState([...SEED_TAGS]);
+  const {
+    people,
+    setPeople,
+    roles,
+    setRoles,
+    depts,
+    setDepts,
+    peopleTagOpts,
+    setPeopleTagOpts,
+    allocations,
+    setAllocations,
+    projects,
+    allocationProjectOptions,
+    addAllocationProjectLabel,
+    getNextPersonId,
+  } = useAppData();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState(null);
@@ -365,13 +424,10 @@ export default function LandingPage() {
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const [densityOpen, setDensityOpen] = useState(false);
 
-  const [allocations, setAllocations] = useState([]);
-  const allocIdRef = useRef(1);
   const [allocCreateOpen, setAllocCreateOpen] = useState(false);
   const [allocPreselectPerson, setAllocPreselectPerson] = useState(null);
   const [allocDetailOpen, setAllocDetailOpen] = useState(false);
   const [selectedAllocation, setSelectedAllocation] = useState(null);
-  const [allocationProjects, setAllocationProjects] = useState(() => [...ALLOCATION_PROJECT_SEED]);
 
   const viewWrapRef = useRef(null);
   const densityWrapRef = useRef(null);
@@ -429,22 +485,31 @@ export default function LandingPage() {
 
   const handleCreateAllocation = useCallback(
     (payload) => {
-      const id = allocIdRef.current++;
-      const colorKeys = ["orange", "pink", "teal"];
-      const colorKey = colorKeys[id % 3];
-      setAllocations((prev) => [
-        ...prev,
-        {
-          id,
-          ...payload,
-          updatedBy: "You",
-          updatedAt: new Date().toISOString(),
-          colorKey,
-        },
-      ]);
+      const projectColor = resolveColorForProjectLabel(payload.project, projects);
+      setAllocations((prev) => {
+        const nextId = prev.reduce((m, a) => Math.max(m, Number(a.id) || 0), 0) + 1;
+        return [
+          ...prev,
+          {
+            id: nextId,
+            ...payload,
+            updatedBy: "You",
+            updatedAt: new Date().toISOString(),
+            projectColor,
+          },
+        ];
+      });
       toast("Allocation created", "success");
     },
-    [toast]
+    [toast, setAllocations, projects]
+  );
+
+  const handleDeleteAllocation = useCallback(
+    (alloc) => {
+      setAllocations((prev) => prev.filter((a) => a.id !== alloc.id));
+      toast("Allocation deleted", "success");
+    },
+    [setAllocations, toast]
   );
 
   const openAllocationDetail = useCallback((alloc) => {
@@ -457,12 +522,6 @@ export default function LandingPage() {
     setSelectedAllocation(null);
   }, []);
 
-  const handleAddAllocationProject = useCallback((line) => {
-    const trimmed = line.trim();
-    if (!trimmed) return;
-    setAllocationProjects((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
-  }, []);
-
   const selectedAssigneeNames = useMemo(() => {
     if (!selectedAllocation) return "";
     const ids =
@@ -472,10 +531,10 @@ export default function LandingPage() {
           ? [selectedAllocation.personId]
           : [];
     return ids
-      .map((id) => schedulePeople.find((x) => x.id === id)?.name)
+      .map((id) => people.find((x) => x.id === id)?.name)
       .filter(Boolean)
       .join(", ");
-  }, [selectedAllocation, schedulePeople]);
+  }, [selectedAllocation, people]);
 
   const openEdit = (person) => {
     setEditingPerson(person);
@@ -490,7 +549,7 @@ export default function LandingPage() {
       );
       toast(`${form.name} updated`, "success");
     } else {
-      const newP = formToPerson(form, nextPersonId(), false);
+      const newP = formToPerson(form, getNextPersonId(), false);
       setPeople([...people, newP].sort((a, b) => a.name.localeCompare(b.name)));
       toast(`${form.name} added to directory`, "success");
     }
@@ -525,52 +584,7 @@ export default function LandingPage() {
       data-density={density}
       data-view={viewMode}
     >
-      <link
-        href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap"
-        rel="stylesheet"
-      />
-
-      <aside className="lp-sidenav" aria-label="Primary">
-        <NavLink to="/" className="lp-logo" end title="Home">
-          R1
-        </NavLink>
-
-        <NavLink to="/" end className={({ isActive }) => "lp-nav-item" + (isActive ? " lp-active" : "")}>
-          <CalendarDays size={19} strokeWidth={2} />
-          Schedule
-        </NavLink>
-
-        <span className="lp-nav-item lp-disabled" title="Coming soon">
-          <ClipboardList size={19} strokeWidth={1.8} />
-          Project plan
-        </span>
-
-        <NavLink to="/people" className={({ isActive }) => "lp-nav-item" + (isActive ? " lp-active" : "")}>
-          <Users size={19} strokeWidth={2} />
-          People
-        </NavLink>
-
-        <NavLink to="/projects" className={({ isActive }) => "lp-nav-item" + (isActive ? " lp-active" : "")}>
-          <FolderOpen size={19} strokeWidth={2} />
-          Projects
-        </NavLink>
-
-        <span className="lp-nav-item lp-disabled" title="Coming soon">
-          <BarChart3 size={19} strokeWidth={1.8} />
-          Report
-        </span>
-
-        <div className="lp-sidenav-spacer" />
-
-        <button
-          type="button"
-          className="lp-theme-btn"
-          title={theme === "dark" ? "Light mode" : "Dark mode"}
-          onClick={toggleTheme}
-        >
-          {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
-      </aside>
+      <AppSideNav theme={theme} onToggleTheme={toggleTheme} />
 
       <div className="lp-main">
         <div className="lp-header-block">
@@ -590,15 +604,36 @@ export default function LandingPage() {
             </div>
             <div className="lp-toolbar-right">
               <div className="lp-date-nav">
-                <button type="button" aria-label="Previous period" onClick={navigatePrev}>
+                <motion.button
+                  type="button"
+                  aria-label="Previous period"
+                  onClick={navigatePrev}
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.94 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                >
                   <ChevronLeft size={16} />
-                </button>
-                <button type="button" className="lp-today" onClick={goToday}>
+                </motion.button>
+                <motion.button
+                  type="button"
+                  className="lp-today"
+                  onClick={goToday}
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.96 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                >
                   Today
-                </button>
-                <button type="button" aria-label="Next period" onClick={navigateNext}>
+                </motion.button>
+                <motion.button
+                  type="button"
+                  aria-label="Next period"
+                  onClick={navigateNext}
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.94 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                >
                   <ChevronRight size={16} />
-                </button>
+                </motion.button>
               </div>
 
               <div className="lp-dropdown-wrap" ref={viewWrapRef}>
@@ -811,6 +846,22 @@ export default function LandingPage() {
                   utilizationMode === "hours"
                     ? `${hours.toFixed(hours % 1 ? 1 : 0)}h`
                     : `${pct}%`;
+                const nCols = scheduleModel.columnCount;
+                const rowSegments = allocations
+                  .filter((a) => allocationHasPerson(a, p.id))
+                  .flatMap((a) =>
+                    layoutsForAllocation(a, scheduleModel, viewMode).map((lay, occIdx) => ({
+                      a,
+                      lay,
+                      occIdx,
+                      start: lay.start,
+                      span: lay.span,
+                    }))
+                  );
+                assignAllocationStackLevels(rowSegments);
+                const allocLaneCount = rowSegments.length
+                  ? Math.max(...rowSegments.map((s) => s.stack)) + 1
+                  : 1;
                 return (
                   <div key={p.id} className="lp-sched-row">
                     <div className="lp-sched-person">
@@ -864,7 +915,10 @@ export default function LandingPage() {
                       </div>
                     </div>
                     <div className="lp-sched-timeline">
-                      <div className="lp-grid-stack">
+                      <div
+                        className="lp-grid-stack"
+                        style={{ ["--lp-alloc-lane-count"]: allocLaneCount }}
+                      >
                         <div
                           className="lp-grid-week-lanes"
                           style={{ gridTemplateColumns: gridTemplate }}
@@ -877,7 +931,9 @@ export default function LandingPage() {
                                 "lp-week-lane" +
                                 (viewMode !== "day" && slot.weekParity ? " lp-week-lane-b" : "") +
                                 (viewMode !== "day" && !slot.weekParity ? " lp-week-lane-a" : "") +
-                                (viewMode !== "day" && slot.weekBlockStart ? " lp-week-lane-block-start" : "") +
+                                (viewMode !== "day" && slot.weekBlockStart
+                                  ? " lp-week-lane-block-start"
+                                  : "") +
                                 (viewMode !== "day" && slot.weekBlockEnd ? " lp-week-lane-block-end" : "")
                               }
                             />
@@ -889,34 +945,35 @@ export default function LandingPage() {
                             gridTemplateColumns: gridTemplate,
                           }}
                         >
-                          {allocations
-                            .filter((a) => allocationHasPerson(a, p.id))
-                            .flatMap((a) =>
-                              layoutsForAllocation(a, scheduleModel, viewMode).map((lay, occIdx) => {
-                                const n = scheduleModel.columnCount;
-                                const left = (lay.start / n) * 100;
-                                const width = (lay.span / n) * 100;
-                                const { label, sub } = allocationDisplay(a);
-                                const z = 12 + occIdx;
-                                return (
-                                  <button
-                                    key={`${a.id}-occ-${occIdx}`}
-                                    type="button"
-                                    className={`${blockClassForColor(a.colorKey)} lp-block-alloc`}
-                                    style={{
-                                      left: `${left}%`,
-                                      width: `${width}%`,
-                                      zIndex: z,
-                                    }}
-                                    onClick={() => openAllocationDetail(a)}
-                                  >
-                                    {label}
-                                    <br />
-                                    {sub}
-                                  </button>
-                                );
-                              })
-                            )}
+                          {rowSegments.map((seg) => {
+                            const left = (seg.lay.start / nCols) * 100;
+                            const width = (seg.lay.span / nCols) * 100;
+                            const { label, sub } = allocationDisplay(seg.a);
+                            const z = 12 + seg.stack * 20 + seg.occIdx;
+                            const barColor = colorForAllocationBar(seg.a, projects);
+                            const fg = contrastingTextColor(barColor);
+                            return (
+                              <button
+                                key={`${seg.a.id}-occ-${seg.occIdx}`}
+                                type="button"
+                                className="lp-block lp-block-alloc lp-block-alloc-project"
+                                style={{
+                                  left: `${left}%`,
+                                  width: `${width}%`,
+                                  zIndex: z,
+                                  ["--alloc-stack"]: seg.stack,
+                                  background: barColor,
+                                  color: fg,
+                                }}
+                                aria-label={allocationAriaLabel(seg.a)}
+                                onClick={() => openAllocationDetail(seg.a)}
+                              >
+                                {label}
+                                <br />
+                                {sub}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
@@ -945,8 +1002,8 @@ export default function LandingPage() {
         setRoles={setRoles}
         depts={depts}
         setDepts={setDepts}
-        tagOpts={tagOpts}
-        setTagOpts={setTagOpts}
+        tagOpts={peopleTagOpts}
+        setTagOpts={setPeopleTagOpts}
         t={t}
       />
 
@@ -956,8 +1013,9 @@ export default function LandingPage() {
         onCreate={handleCreateAllocation}
         people={schedulePeople}
         preselectPerson={allocPreselectPerson}
-        projects={allocationProjects}
-        onAddProject={handleAddAllocationProject}
+        projects={allocationProjectOptions}
+        projectRegistry={projects}
+        onAddProject={addAllocationProjectLabel}
         t={t}
       />
 
@@ -966,6 +1024,7 @@ export default function LandingPage() {
         allocation={selectedAllocation}
         assigneeNames={selectedAssigneeNames}
         onClose={closeAllocationDetail}
+        onDelete={handleDeleteAllocation}
         t={t}
       />
 

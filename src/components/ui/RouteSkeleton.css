@@ -1,0 +1,95 @@
+.route-skeleton {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  background: var(--route-sk-bg, #0b0e14);
+}
+
+:root[data-theme="light"] .route-skeleton {
+  --route-sk-bg: #f5f6f8;
+  --route-sk-shimmer: rgba(0, 0, 0, 0.06);
+}
+
+.route-skeleton-nav {
+  width: 76px;
+  flex-shrink: 0;
+  padding: 16px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+:root[data-theme="light"] .route-skeleton-nav {
+  border-right-color: #e4e7ed;
+}
+
+.route-skeleton-logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+}
+
+.route-skeleton-nav-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.route-skeleton-nav-dot {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+.route-skeleton-main {
+  flex: 1;
+  min-width: 0;
+  padding: 24px 36px;
+}
+
+.route-skeleton-title {
+  height: 32px;
+  width: 180px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.route-skeleton-bar {
+  height: 40px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  max-width: 480px;
+}
+
+.route-skeleton-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.route-skeleton-row {
+  height: 52px;
+  border-radius: 10px;
+}
+
+.route-skeleton-pulse {
+  background: linear-gradient(
+    90deg,
+    var(--route-sk-shimmer, rgba(255, 255, 255, 0.04)) 0%,
+    rgba(255, 255, 255, 0.09) 50%,
+    var(--route-sk-shimmer, rgba(255, 255, 255, 0.04)) 100%
+  );
+  background-size: 200% 100%;
+  animation: routeSk 1.1s ease-in-out infinite;
+}
+
+@keyframes routeSk {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
