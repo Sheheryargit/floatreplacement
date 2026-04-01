@@ -413,9 +413,9 @@ export function PersonModal({ open, onClose, onSave, onArchive, editPerson, role
   return (
     <div onClick={(e) => { if(ref.current&&!ref.current.contains(e.target)) onClose(); }}
       style={{ position:"fixed",inset:0,background:t.overlay,zIndex:200,display:"flex",alignItems:"flex-start",justifyContent:"center",paddingTop:48,backdropFilter:"blur(6px)",animation:"fadeIn 0.2s ease-out" }}>
-      <div ref={ref} onClick={(e)=>e.stopPropagation()} style={{
-        background:t.surfRaised,borderRadius:16,width:620,maxHeight:"calc(100vh - 96px)",
-        display:"flex",flexDirection:"column",boxShadow:t.shadow,border:`1px solid ${t.border}`,
+      <div className="float-premium-modal" ref={ref} onClick={(e)=>e.stopPropagation()} style={{
+        background:t.surfRaised,width:620,maxHeight:"calc(100vh - 96px)",
+        display:"flex",flexDirection:"column",
         animation:"modalScale 0.25s ease-out",transition:"background 0.35s",
       }}>
         {/* Header */}

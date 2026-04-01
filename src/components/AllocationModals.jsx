@@ -125,6 +125,8 @@ export function CreateAllocationModal({
   projects,
   projectRegistry = [],
   onAddProject,
+  editAllocation,
+  onEditAllocation,
   t,
 }) {
   const hoursMode = "Hours";
@@ -155,6 +157,22 @@ export function CreateAllocationModal({
 
   useEffect(() => {
     if (!open) return;
+    if (editAllocation) {
+      setStartDate(editAllocation.startDate || "");
+      setEndDate(editAllocation.endDate || "");
+      setHoursPerDay(editAllocation.hoursPerDay ? String(editAllocation.hoursPerDay) : "7.5");
+      setProject(editAllocation.project || "");
+      setNotes(editAllocation.notes || "");
+      setRepeatId(editAllocation.repeatId || "none");
+      setActiveTab(editAllocation.isLeave ? "leave" : "allocation");
+      if (editAllocation.isLeave) {
+        setLeaveType(editAllocation.leaveType || "");
+        setLeaveNotes(editAllocation.notes || "");
+      }
+      setAssignedIds(editAllocation.personIds || (editAllocation.personId != null ? [editAllocation.personId] : []));
+      return;
+    }
+
     let iso;
     if (preselectDate) {
       iso = preselectDate;
@@ -185,7 +203,7 @@ export function CreateAllocationModal({
     if (preselectPerson) setAssignedIds([preselectPerson.id]);
     else if (people[0]) setAssignedIds([people[0].id]);
     else setAssignedIds([]);
-  }, [open, preselectPerson, preselectDate, people, projects]);
+  }, [open, preselectPerson, preselectDate, people, projects, editAllocation]);
 
   useEffect(() => {
     function onDoc(e) {
@@ -249,11 +267,28 @@ export function CreateAllocationModal({
 
   if (!open) return null;
 
-  const submit = () => {
-    if (activeTab === "leave") {
+  const handleSave = () => {
+    if (activeTab === "allocation") {
+      if (assignedIds.length === 0 || !startDate || !endDate || !project) return;
+      const payload = {
+        personIds: assignedIds,
+        startDate,
+        endDate,
+        hoursPerDay: parseFloat(hoursPerDay, 10) || 0,
+        totalHours,
+        workingDays,
+        project,
+        notes: notes.trim(),
+        repeatId,
+      };
+      if (editAllocation && onEditAllocation) {
+        onEditAllocation(payload, editAllocation.id);
+      } else {
+        onCreate(payload);
+      }
+    } else {
       if (assignedIds.length === 0 || !startDate || !endDate) return;
-      const handler = onCreateLeave || onCreate;
-      handler({
+      const payload = {
         personIds: assignedIds,
         startDate,
         endDate,
@@ -265,22 +300,13 @@ export function CreateAllocationModal({
         repeatId: "none",
         isLeave: true,
         leaveType,
-      });
-      onClose();
-      return;
+      };
+      if (editAllocation && onEditAllocation) {
+        onEditAllocation(payload, editAllocation.id);
+      } else {
+        onCreateLeave(payload);
+      }
     }
-    if (assignedIds.length === 0 || !startDate || !endDate || !project) return;
-    onCreate({
-      personIds: assignedIds,
-      startDate,
-      endDate,
-      hoursPerDay: parseFloat(hoursPerDay, 10) || 0,
-      totalHours,
-      workingDays,
-      project,
-      notes: notes.trim(),
-      repeatId,
-    });
     onClose();
   };
 
@@ -290,13 +316,19 @@ export function CreateAllocationModal({
     <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="lpam-overlay-radix" />
-        <Dialog.Content className="lpam-modal lpam-create" style={{ background: t.surface, borderColor: t.border, color: t.text }}>
+        <Dialog.Content 
+          className="lpam-modal lpam-create float-premium-modal" 
+          style={{ 
+            background: t.surface, 
+            color: t.text 
+          }}
+        >
           <Dialog.Description className="lpam-sr-only">
             Set hours, dates, project, and assign people for a new allocation or leave.
           </Dialog.Description>
         <div className="lpam-head">
           <Dialog.Title asChild>
-            <h2 className="lpam-title">{activeTab === "leave" ? "Leave" : "Allocation"}</h2>
+            <h2 className="lpam-title">{editAllocation ? "Edit" : (activeTab === "leave" ? "Leave" : "Allocation")}</h2>
           </Dialog.Title>
           <Dialog.Close asChild>
             <button type="button" className="lpam-icon-close" aria-label="Close">
@@ -321,8 +353,8 @@ export function CreateAllocationModal({
             type="button"
             className={"lpam-tab" + (activeTab === "leave" ? " lpam-tab-active" : "")}
             style={{
-              color: activeTab === "leave" ? t.accent : t.textSoft,
-              borderBottomColor: activeTab === "leave" ? t.accent : "transparent",
+              color: activeTab === "leave" ? "#8c9fbe" : t.textSoft,
+              borderBottomColor: activeTab === "leave" ? "#8c9fbe" : "transparent",
             }}
             onClick={() => setActiveTab("leave")}
           >
@@ -333,7 +365,7 @@ export function CreateAllocationModal({
 
         {activeTab === "allocation" ? (
           <>
-        <div className="lpam-panel" style={{ background: t.surfRaised, borderColor: t.border }}>
+        <div className="lpam-panel" style={{ background: t.surface, borderColor: t.borderIn || t.border, boxShadow: "0 2px 6px rgba(0,0,0,0.02)" }}>
           <div className="lpam-row lpam-row-split">
             <div className="lpam-field">
               <label className="lpam-label">Type</label>
@@ -353,7 +385,7 @@ export function CreateAllocationModal({
                   onChange={(e) => setHoursPerDay(e.target.value)}
                   className="lpam-input lpam-input-sm"
                   style={{
-                    borderColor: t.border,
+                    borderColor: t.borderIn || t.border,
                     background: t.bg,
                     color: t.text,
                   }}
@@ -370,7 +402,7 @@ export function CreateAllocationModal({
               </div>
             </div>
           </div>
-          <p className="lpam-duration" style={{ color: t.textSoft }}>
+          <p className="lpam-duration" style={{ color: t.textSoft, marginTop: "8px" }}>
             Duration: {workingDays === 1 ? "1 working day" : `${workingDays} working days`}
           </p>
           <div className="lpam-dates">
@@ -379,7 +411,7 @@ export function CreateAllocationModal({
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               className="lpam-input lpam-date"
-              style={{ borderColor: t.border, background: t.bg, color: t.text }}
+              style={{ borderColor: t.borderIn || t.border, background: t.bg, color: t.text }}
             />
             <ArrowLeftRight size={16} className="lpam-date-arrow" style={{ color: t.textMuted }} />
             <input
@@ -387,7 +419,7 @@ export function CreateAllocationModal({
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
               className="lpam-input lpam-date"
-              style={{ borderColor: t.border, background: t.bg, color: t.text }}
+              style={{ borderColor: t.borderIn || t.border, background: t.bg, color: t.text }}
             />
           </div>
           <div className="lpam-links">
@@ -457,7 +489,7 @@ export function CreateAllocationModal({
             <button
               type="button"
               className="lpam-input lpam-project-trigger"
-              style={{ borderColor: t.border, background: t.bg, color: t.text }}
+              style={{ borderColor: t.borderIn || t.border, background: t.surface, color: t.text, boxShadow: "0 1px 3px rgba(0,0,0,0.02)" }}
               aria-expanded={projectOpen}
               onClick={() => {
                 setProjectOpen((o) => !o);
@@ -570,19 +602,19 @@ export function CreateAllocationModal({
             Notes
           </label>
           <textarea
+            className="lpam-textarea"
+            rows={4}
+            placeholder="Add details specific to this allocation"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Add details specific to this allocation"
-            rows={4}
-            className="lpam-textarea"
-            style={{ borderColor: t.border, background: t.bg, color: t.text }}
+            style={{ borderColor: "transparent", background: t.surface, color: t.text, boxShadow: "0 2px 6px rgba(0,0,0,0.06)" }}
           />
         </div>
           </>
         ) : (
           /* ───── LEAVE TAB CONTENT ───── */
           <>
-            <div className="lpam-panel lpam-panel-leave" style={{ background: t.surfRaised, borderColor: t.border }}>
+            <div className="lpam-panel lpam-panel-leave" style={{ background: t.surface, borderColor: t.borderIn || t.border, boxShadow: "0 2px 6px rgba(0,0,0,0.02)" }}>
               <div className="lpam-leave-icon-row">
                 <div className="lpam-leave-icon-circle" style={{ background: `${t.accent}18` }}>
                   <Palmtree size={22} style={{ color: t.accent }} />
@@ -593,8 +625,8 @@ export function CreateAllocationModal({
                 <div className="lpam-dropdown-wrap lpam-dropdown-full" ref={leaveTypeWrapRef}>
                   <button
                     type="button"
-                    className="lpam-input lpam-project-trigger"
-                    style={{ borderColor: t.border, background: t.bg, color: t.text }}
+                    className="lpam-input lpam-assignee-trigger"
+                    style={{ borderColor: t.borderIn || t.border, background: t.surface, color: t.text, boxShadow: "0 1px 3px rgba(0,0,0,0.02)" }}
                     aria-expanded={leaveTypeOpen}
                     onClick={() => setLeaveTypeOpen((o) => !o)}
                   >
@@ -645,7 +677,7 @@ export function CreateAllocationModal({
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                   className="lpam-input lpam-date"
-                  style={{ borderColor: t.border, background: t.bg, color: t.text }}
+                  style={{ borderColor: t.borderIn || t.border, background: t.bg, color: t.text }}
                 />
                 <ArrowLeftRight size={16} className="lpam-date-arrow" style={{ color: t.textMuted }} />
                 <input
@@ -653,7 +685,7 @@ export function CreateAllocationModal({
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                   className="lpam-input lpam-date"
-                  style={{ borderColor: t.border, background: t.bg, color: t.text }}
+                  style={{ borderColor: "transparent", background: t.bg, color: t.text, boxShadow: "0 2px 6px rgba(0,0,0,0.06)" }}
                 />
               </div>
             </div>
@@ -663,24 +695,24 @@ export function CreateAllocationModal({
                 Notes
               </label>
               <textarea
+                className="lpam-textarea"
+                rows={4}
+                placeholder="Add details specific to this leave"
                 value={leaveNotes}
                 onChange={(e) => setLeaveNotes(e.target.value)}
-                placeholder="Add optional notes for this leave entry"
-                rows={3}
-                className="lpam-textarea"
-                style={{ borderColor: t.border, background: t.bg, color: t.text }}
+                style={{ borderColor: "transparent", background: t.surface, color: t.text, boxShadow: "0 2px 6px rgba(0,0,0,0.06)" }}
               />
             </div>
           </>
         )}
 
-        <div className="lpam-field">
+        <div className="lpam-field lpam-field-assign">
           <label className="lpam-label" style={{ color: t.textMuted }}>
             Assigned to
           </label>
           <div
-            className="lpam-assign-box"
-            style={{ borderColor: t.border, background: t.bg }}
+            className="lpam-assign-wrap"
+            style={{ borderColor: "transparent", background: t.surface, color: t.text, boxShadow: "0 2px 6px rgba(0,0,0,0.06)" }}
             ref={assignWrapRef}
           >
             <div className="lpam-assign-chips">
@@ -729,23 +761,26 @@ export function CreateAllocationModal({
         </div>
 
         <div className="lpam-footer">
-          <button
-            type="button"
-            className={"lpam-btn lpam-btn-primary" + (activeTab === "leave" ? " lpam-btn-leave" : "")}
-            style={{ background: activeTab === "leave" ? "#7c8a9e" : t.accent, color: activeTab === "leave" ? "#fff" : t.accentTxt }}
-            onClick={submit}
-          >
-            {activeTab === "leave" ? "Create leave" : "Create allocation"}
-          </button>
-          <Dialog.Close asChild>
+          <div className="lpam-create-actions">
             <button
               type="button"
-              className="lpam-btn lpam-btn-secondary"
-              style={{ borderColor: t.border, background: t.btnSec, color: t.textSoft }}
+              className={"lpam-btn lpam-btn-primary" + (activeTab === "leave" ? " lpam-btn-leave" : "")}
+              onClick={handleSave}
+              disabled={workingDays <= 0 || (activeTab === "allocation" && parseFloat(hoursPerDay) <= 0)}
+              style={{ background: activeTab === "leave" ? "#8c9fbe" : t.accent, borderColor: "transparent", color: "#fff" }}
             >
-              Cancel
+              {editAllocation ? "Save changes" : (activeTab === "leave" ? "Create leave" : "Create allocation")}
             </button>
-          </Dialog.Close>
+            <Dialog.Close asChild>
+              <button
+                type="button"
+                className="lpam-btn lpam-btn-secondary"
+                style={{ borderColor: t.border, background: t.btnSec || "#f3f4f6", color: t.textSoft }}
+              >
+                Cancel
+              </button>
+            </Dialog.Close>
+          </div>
         </div>
         </Dialog.Content>
       </Dialog.Portal>
@@ -753,7 +788,7 @@ export function CreateAllocationModal({
   );
 }
 
-export function AllocationDetailModal({ open, allocation, assigneeNames, onClose, onDelete, t }) {
+export function AllocationDetailModal({ open, allocation, assigneeNames, onClose, onDelete, onEditClick, t }) {
   if (!open || !allocation) return null;
 
   const isLeave = !!allocation.isLeave;
@@ -773,8 +808,8 @@ export function AllocationDetailModal({ open, allocation, assigneeNames, onClose
       <Dialog.Portal>
         <Dialog.Overlay className="lpam-overlay-radix" />
         <Dialog.Content
-          className="lpam-modal lpam-detail"
-          style={{ background: t.surface, borderColor: t.border, color: t.text }}
+          className="lpam-modal lpam-detail float-premium-modal"
+          style={{ background: t.surface, color: t.text }}
         >
           <Dialog.Description className="lpam-sr-only">
             {isLeave
@@ -889,20 +924,36 @@ export function AllocationDetailModal({ open, allocation, assigneeNames, onClose
               Updated by {allocation.updatedBy} · {formatAllocDate(allocation.updatedAt)}
             </span>
           </div>
-          <div className="lpam-detail-actions">
+          <div className="lpam-detail-actions" style={{ display: "flex", gap: "10px" }}>
             {onDelete ? (
               <button
                 type="button"
-                className="lpam-btn lpam-btn-secondary lpam-btn-danger"
+                className="lpam-btn lpam-btn-secondary"
                 style={{
                   background: t.dangerSoft,
-                  borderColor: t.danger,
+                  borderColor: "transparent",
                   color: t.danger,
                 }}
-                onClick={handleDelete}
+                onClick={() => {
+                  onDelete(allocation);
+                  onClose();
+                }}
               >
-                <Trash2 size={16} strokeWidth={2} aria-hidden />
-                {isLeave ? "Delete leave" : "Delete allocation"}
+                Delete
+              </button>
+            ) : null}
+            {onEditClick ? (
+              <button
+                type="button"
+                className={"lpam-btn lpam-btn-primary" + (isLeave ? " lpam-btn-leave" : "")}
+                style={{
+                  background: isLeave ? "#8c9fbe" : t.accent,
+                  borderColor: "transparent",
+                  color: "#fff",
+                }}
+                onClick={onEditClick}
+              >
+                Edit
               </button>
             ) : null}
           </div>

@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useEffect, useCallback } from "react";
+import { useMemo, useState, useRef, useEffect, useCallback, memo, useLayoutEffect } from "react";
 import {
   ChevronDown,
   Filter,
@@ -16,9 +16,12 @@ import {
   Rows3,
   Maximize2,
   Check,
+  FolderPlus,
+  CalendarPlus,
 } from "lucide-react";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useAppData } from "../context/AppDataContext.jsx";
+import { ProjectModal } from "./ProjectsPage.jsx";
 import PersonModal, {
   T,
   useToasts,
@@ -103,6 +106,10 @@ function weekMondayKey(dt) {
 
 function formatDayMonth(dt) {
   return dt.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
+}
+
+function formatDayMonthYear(dt) {
+  return dt.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
 }
 
 /** All Mon–Fri dates inside calendar month (y, mo). */
@@ -269,78 +276,76 @@ function allocationAriaLabel(alloc) {
   return `${alloc.project}, ${hStr} hours per day, ${range}. Open allocation details.`;
 }
 
-function buildScheduleModel(viewMode, anchorDate) {
+function buildScheduleModel(viewMode, anchorDate, offsets = { prev: 0, next: 0 }) {
   const d = new Date(anchorDate);
   const y = d.getFullYear();
   const mo = d.getMonth();
 
   if (viewMode === "day") {
-    const cols = 12;
-    const anchorKey = dateKeyLocal(d);
-    const slots = Array.from({ length: cols }, (_, i) => {
-      const h = 8 + i * 2;
-      return {
-        main: `${String(h).padStart(2, "0")}:00`,
-        sub: null,
-        weekParity: 0,
-        weekBlockStart: false,
-        weekBlockEnd: false,
-        dateKey: anchorKey,
-      };
-    });
-    const title = d.toLocaleDateString("en-AU", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
+    const colsPerDay = 12;
+    const slots = [];
+    let title = "";
+    
+    for (let o = -offsets.prev; o <= offsets.next; o++) {
+      const dt = addWeekdays(d, o);
+      if (o === 0) {
+        title = dt.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+      }
+      const anchorKey = dateKeyLocal(dt);
+      
+      for (let i = 0; i < colsPerDay; i++) {
+        const rawH = 8 + i * 2;
+        const h = rawH >= 24 ? rawH - 24 : rawH;
+        slots.push({
+          main: `${String(h).padStart(2, "0")}:00`,
+          sub: null,
+          weekParity: o % 2 === 0 ? 0 : 1,
+          weekBlockStart: i === 0,
+          weekBlockEnd: i === colsPerDay - 1,
+          dateKey: anchorKey,
+        });
+      }
+    }
+
     return {
-      columnCount: cols,
+      columnCount: slots.length,
       bandTitle: title,
       bandSpans: null,
-      slots,
-      anchorDateKey: anchorKey,
-    };
-  }
-
-  if (viewMode === "week") {
-    const dates = weekdaysInAnchorWeek(d);
-    const bandLabel = `${formatDayMonth(dates[0])} – ${formatDayMonth(dates[4])}`;
-    const slots = dates.map((dt, i) => ({
-      main: String(dt.getDate()),
-      sub: dt.toLocaleDateString("en-AU", { weekday: "short" }),
-      weekParity: 0,
-      weekBlockStart: i === 0,
-      weekBlockEnd: i === dates.length - 1,
-      dateKey: dateKeyLocal(dt),
-    }));
-    return {
-      columnCount: 5,
-      bandTitle: bandLabel,
-      bandSpans: [{ span: 5, label: bandLabel, weekParity: 0 }],
       slots,
       anchorDateKey: dateKeyLocal(d),
     };
   }
 
-  const dates = weekdaysInMonth(y, mo);
-  const bandTitle = d.toLocaleDateString("en-AU", { month: "long", year: "numeric" });
+  let dates = [];
+  let bandTitle = "";
+
+  if (viewMode === "week") {
+    for (let o = -offsets.prev; o <= offsets.next; o++) {
+      const wStart = addDays(startOfWeekMonday(d), 7 * o);
+      const wDates = [0, 1, 2, 3, 4].map((i) => addDays(wStart, i));
+      dates.push(...wDates);
+      if (o === 0) {
+        bandTitle = `${formatDayMonth(wDates[0])} – ${formatDayMonthYear(wDates[4])}`;
+      }
+    }
+  } else {
+    for (let o = -offsets.prev; o <= offsets.next; o++) {
+      const targetMonth = new Date(y, mo + o, 1);
+      dates.push(...weekdaysInMonth(targetMonth.getFullYear(), targetMonth.getMonth()));
+      if (o === 0) {
+        bandTitle = targetMonth.toLocaleDateString("en-AU", { month: "long", year: "numeric" });
+      }
+    }
+  }
 
   if (dates.length === 0) {
     const fallbackKey = dateKeyLocal(d);
     return {
       columnCount: 1,
-      bandTitle,
+      bandTitle: bandTitle || "—",
       bandSpans: [{ span: 1, label: "—", weekParity: 0 }],
       slots: [
-        {
-          main: "—",
-          sub: "",
-          weekParity: 0,
-          weekBlockStart: true,
-          weekBlockEnd: true,
-          dateKey: fallbackKey,
-        },
+        { main: "—", sub: "", weekParity: 0, weekBlockStart: true, weekBlockEnd: true, dateKey: fallbackKey },
       ],
       anchorDateKey: fallbackKey,
     };
@@ -375,7 +380,7 @@ function buildScheduleModel(viewMode, anchorDate) {
     const span = j - i;
     bandSpans.push({
       span,
-      label: `${formatDayMonth(dates[i])} – ${formatDayMonth(dates[j - 1])}`,
+      label: `${formatDayMonth(dates[i])} – ${formatDayMonthYear(dates[j - 1])}`,
       weekParity: slots[i].weekParity,
     });
     i = j;
@@ -402,6 +407,193 @@ function mockPersonHours(personId) {
   return base + (Math.abs(h) % 100) / 100;
 }
 
+const timelineRowEqual = (prev, next) => {
+  if (prev.p !== next.p) return false;
+  if (prev.viewMode !== next.viewMode) return false;
+  if (prev.utilizationMode !== next.utilizationMode) return false;
+  if (prev.gridTemplate !== next.gridTemplate) return false;
+  if (prev.scheduleModel !== next.scheduleModel) return false;
+  if (prev.projects !== next.projects) return false;
+  
+  const prevAlloc = prev.allocations.filter((a) => allocationHasPerson(a, prev.p.id));
+  const nextAlloc = next.allocations.filter((a) => allocationHasPerson(a, next.p.id));
+  
+  if (prevAlloc.length !== nextAlloc.length) return false;
+  for (let idx = 0; idx < prevAlloc.length; idx++) {
+    if (prevAlloc[idx] !== nextAlloc[idx]) return false;
+  }
+  return true;
+};
+
+const TimelineRow = memo(function TimelineRow({
+  p,
+  i,
+  allocations,
+  projects,
+  scheduleModel,
+  viewMode,
+  utilizationMode,
+  gridTemplate,
+  nCols,
+  openEdit,
+  openCreateAllocation,
+  openAllocationDetail,
+  handleTimelineClick
+}) {
+  const hours = mockPersonHours(p.id);
+  const pct = Math.min(100, Math.round((hours / 160) * 100));
+  const right =
+    utilizationMode === "hours" ? `${hours.toFixed(hours % 1 ? 1 : 0)}h` : `${pct}%`;
+
+  const rowSegments = allocations
+    .filter((a) => allocationHasPerson(a, p.id))
+    .flatMap((a) =>
+      layoutsForAllocation(a, scheduleModel, viewMode).map((lay, occIdx) => ({
+        a,
+        lay,
+        occIdx,
+        start: lay.start,
+        span: lay.span,
+      }))
+    );
+  assignAllocationStackLevels(rowSegments);
+  const allocLaneCount = rowSegments.length ? Math.max(...rowSegments.map((s) => s.stack)) + 1 : 1;
+
+  return (
+    <div key={p.id} className="lp-sched-row" style={{ ["--animation-order"]: i }}>
+      <div className="lp-sched-person">
+        <div className="lp-person-row-shell">
+          <div className="lp-person-row-cluster">
+            <button type="button" className="lp-person-row lp-person-row-main" onClick={() => openEdit(p)}>
+              <div className="lp-avatar" style={{ background: avGrad(p.name) }}>
+                {ini(p.name)}
+              </div>
+              <div className="lp-person-meta">
+                <div className="lp-person-name">{p.name}</div>
+                <div className="lp-person-sub">
+                  {p.role !== "—" ? `${p.role} · ` : ""}
+                  {p.department || "—"}
+                </div>
+                {p.tags.length > 0 && (
+                  <div className="lp-person-tags">
+                    {p.tags.slice(0, 2).map((tag) => (
+                      <span key={tag} className="lp-tag">{tag}</span>
+                    ))}
+                    {p.tags.length > 2 && <span className="lp-tag lp-tag-more">+{p.tags.length - 2}</span>}
+                  </div>
+                )}
+              </div>
+            </button>
+            <button
+              type="button"
+              className="lp-person-add-alloc"
+              title="Add allocation"
+              aria-label={`Add allocation for ${p.name}`}
+              onClick={() => openCreateAllocation(p)}
+            >
+              <Plus size={12} strokeWidth={2} />
+            </button>
+          </div>
+          <button type="button" className="lp-person-row lp-person-hours-hit" onClick={() => openEdit(p)}>
+            <span className="lp-person-hours">{right}</span>
+          </button>
+        </div>
+      </div>
+      <div className="lp-sched-timeline">
+        <div className="lp-grid-stack" style={{ ["--lp-alloc-lane-count"]: allocLaneCount }}>
+          <div className="lp-grid-week-lanes" style={{ gridTemplateColumns: gridTemplate }} aria-hidden>
+            {scheduleModel.slots.map((slot, idx) => (
+              <div
+                key={`lane-${p.id}-${idx}`}
+                className={
+                  "lp-week-lane" +
+                  (viewMode !== "day" && slot.weekParity ? " lp-week-lane-b" : "") +
+                  (viewMode !== "day" && !slot.weekParity ? " lp-week-lane-a" : "") +
+                  (viewMode !== "day" && slot.weekBlockStart ? " lp-week-lane-block-start" : "") +
+                  (viewMode !== "day" && slot.weekBlockEnd ? " lp-week-lane-block-end" : "")
+                }
+              />
+            ))}
+          </div>
+          <div
+            className="lp-grid-row"
+            style={{ gridTemplateColumns: gridTemplate, cursor: "pointer", padding: "12px 0", alignContent: "start" }}
+            onClick={(e) => handleTimelineClick(e, p, nCols)}
+          >
+            <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "10px", width: "100%" }}>
+              {Array.from({ length: allocLaneCount }).map((_, stackIdx) => {
+                const laneSegs = rowSegments
+                  .filter((s) => s.stack === stackIdx)
+                  .sort((a, b) => a.lay.start - b.lay.start);
+
+                if (laneSegs.length === 0) return null;
+
+                return (
+                  <div key={stackIdx} style={{ display: "flex", width: "100%", position: "relative" }}>
+                    {laneSegs.map((seg, idx) => {
+                      const prevEnd = idx === 0 ? 0 : laneSegs[idx - 1].lay.start + laneSegs[idx - 1].lay.span;
+                      const marginLeft = ((seg.lay.start - prevEnd) / nCols) * 100;
+                      const width = (seg.lay.span / nCols) * 100;
+                      const z = 12 + seg.stack * 20 + seg.occIdx;
+
+                      const baseStyle = {
+                        position: "relative",
+                        top: "auto",
+                        left: "auto",
+                        marginLeft: `${marginLeft}%`,
+                        width: `${width}%`,
+                        flexShrink: 0,
+                        zIndex: z,
+                        marginTop: 0,
+                      };
+
+                      if (seg.a.isLeave) {
+                        const lbl = seg.a.leaveType ? leaveLabel(seg.a.leaveType) : "Leave";
+                        return (
+                          <button
+                            key={`${seg.a.id}-occ-${seg.occIdx}`}
+                            type="button"
+                            className="lp-block lp-block-alloc lp-block-leave"
+                            style={baseStyle}
+                            aria-label={allocationAriaLabel(seg.a)}
+                            onClick={(e) => { e.stopPropagation(); openAllocationDetail(seg.a); }}
+                          >
+                            <span className="lp-leave-label">{lbl}</span>
+                          </button>
+                        );
+                      }
+
+                      const { projectName, projectCode, hoursLabel } = allocationDisplay(seg.a);
+                      const barColor = colorForAllocationBar(seg.a, projects);
+                      const fg = contrastingTextColor(barColor);
+                      return (
+                        <button
+                          key={`${seg.a.id}-occ-${seg.occIdx}`}
+                          type="button"
+                          className="lp-block lp-block-alloc lp-block-alloc-project"
+                          style={{ ...baseStyle, background: barColor, color: fg }}
+                          aria-label={allocationAriaLabel(seg.a)}
+                          onClick={(e) => { e.stopPropagation(); openAllocationDetail(seg.a); }}
+                        >
+                          <span className="lp-alloc-top">
+                            <span className="lp-alloc-name">{projectName}</span>
+                            {projectCode && <span className="lp-alloc-code">{projectCode}</span>}
+                          </span>
+                          <span className="lp-alloc-hours">{hoursLabel}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}, timelineRowEqual);
+
 export default function LandingPage() {
   const { theme, toggleTheme } = useAppTheme();
   const t = T[theme];
@@ -418,9 +610,15 @@ export default function LandingPage() {
     allocations,
     setAllocations,
     projects,
+    setProjects,
+    clients,
+    setClients,
+    projectTagOpts,
+    setProjectTagOpts,
     allocationProjectOptions,
     addAllocationProjectLabel,
     getNextPersonId,
+    getNextProjectId,
   } = useAppData();
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -431,10 +629,24 @@ export default function LandingPage() {
   const [density, setDensity] = useState("comfortable");
   const [utilizationMode, setUtilizationMode] = useState("hours");
 
+  const [timelineOffsets, setTimelineOffsets] = useState({ prev: 1, next: 2 });
+  const prevOffsets = useRef(timelineOffsets);
+  const prevColCount = useRef(0);
+  const scheduleViewportRef = useRef(null);
+  const lastAnchorKey = useRef(null);
+
+  // Reset infinite scroll chunks if jumping across large dates/views
+  useEffect(() => {
+    setTimelineOffsets({ prev: 1, next: 2 });
+  }, [anchorDate, viewMode]);
+
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const [densityOpen, setDensityOpen] = useState(false);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [projectCreateOpen, setProjectCreateOpen] = useState(false);
 
   const [allocCreateOpen, setAllocCreateOpen] = useState(false);
+  const [allocEditing, setAllocEditing] = useState(null);
   const [allocPreselectPerson, setAllocPreselectPerson] = useState(null);
   const [allocPreselectDate, setAllocPreselectDate] = useState(null);
   const [allocDetailOpen, setAllocDetailOpen] = useState(false);
@@ -442,18 +654,25 @@ export default function LandingPage() {
 
   const viewWrapRef = useRef(null);
   const densityWrapRef = useRef(null);
+  const addWrapRef = useRef(null);
   const { ts, add: toast } = useToasts();
 
   useEffect(() => {
     function onDoc(e) {
       if (viewWrapRef.current && !viewWrapRef.current.contains(e.target)) setViewMenuOpen(false);
       if (densityWrapRef.current && !densityWrapRef.current.contains(e.target)) setDensityOpen(false);
+      if (addWrapRef.current && !addWrapRef.current.contains(e.target)) setAddMenuOpen(false);
     }
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  const scheduleModel = useMemo(() => buildScheduleModel(viewMode, anchorDate), [viewMode, anchorDate]);
+  const scheduleModel = useMemo(
+    () => buildScheduleModel(viewMode, anchorDate, timelineOffsets),
+    [viewMode, anchorDate, timelineOffsets]
+  );
+
+  const todayDateKey = useMemo(() => dateKeyLocal(new Date()), []);
 
   const schedulePeople = useMemo(() => people.filter((p) => !p.archived), [people]);
 
@@ -469,15 +688,21 @@ export default function LandingPage() {
     if (viewMode === "day") setAnchorDate((d) => addWeekdays(d, -1));
     else if (viewMode === "week") setAnchorDate((d) => addDays(startOfWeekMonday(d), -7));
     else setAnchorDate((d) => addMonths(d, -1));
+    lastAnchorKey.current = null;
   }, [viewMode]);
 
   const navigateNext = useCallback(() => {
     if (viewMode === "day") setAnchorDate((d) => addWeekdays(d, 1));
     else if (viewMode === "week") setAnchorDate((d) => addDays(startOfWeekMonday(d), 7));
     else setAnchorDate((d) => addMonths(d, 1));
+    lastAnchorKey.current = null;
   }, [viewMode]);
 
-  const goToday = useCallback(() => setAnchorDate(new Date()), []);
+  const goToday = useCallback(() => {
+    setAnchorDate(new Date());
+    setTimelineOffsets({ prev: 1, next: 2 });
+    lastAnchorKey.current = null;
+  }, []);
 
   const openAdd = () => {
     setEditingPerson(null);
@@ -485,6 +710,7 @@ export default function LandingPage() {
   };
 
   const openCreateAllocation = useCallback((person, date) => {
+    setAllocEditing(null);
     setAllocPreselectPerson(person ?? null);
     setAllocPreselectDate(date ?? null);
     setAllocCreateOpen(true);
@@ -492,6 +718,7 @@ export default function LandingPage() {
 
   const closeCreateAllocation = useCallback(() => {
     setAllocCreateOpen(false);
+    setAllocEditing(null);
     setAllocPreselectPerson(null);
     setAllocPreselectDate(null);
   }, []);
@@ -556,6 +783,53 @@ export default function LandingPage() {
         ];
       });
       toast(payload.isLeave ? "Leave created" : "Allocation created", "success");
+    },
+    [toast, setAllocations, projects, allocations, people]
+  );
+
+  const handleEditAllocation = useCallback(
+    (payload, id) => {
+      // ── Block allocation if any assigned person is on leave during these dates ──
+      if (!payload.isLeave) {
+        const pStart = payload.startDate;
+        const pEnd = payload.endDate;
+        for (const pid of payload.personIds) {
+          const leaveConflict = allocations.find(
+            (a) =>
+              a.id !== id &&
+              a.isLeave &&
+              allocationHasPerson(a, pid) &&
+              a.startDate <= pEnd &&
+              a.endDate >= pStart
+          );
+          if (leaveConflict) {
+            const personName = people.find((p) => p.id === pid)?.name || "This person";
+            const leaveTypeName = leaveConflict.leaveType
+              ? (leaveConflict.project || "Leave")
+              : "Leave";
+            toast(
+              `Cannot allocate ${personName} — they are on ${leaveTypeName} (${leaveConflict.startDate} to ${leaveConflict.endDate})`,
+              "danger"
+            );
+            return;
+          }
+        }
+      }
+
+      const projectColor = payload.isLeave ? undefined : resolveColorForProjectLabel(payload.project, projects);
+      setAllocations((prev) =>
+        prev.map((a) => {
+          if (a.id !== id) return a;
+          return {
+            ...a,
+            ...payload,
+            updatedBy: "You",
+            updatedAt: new Date().toISOString(),
+            projectColor,
+          };
+        })
+      );
+      toast(payload.isLeave ? "Leave updated" : "Allocation updated", "success");
     },
     [toast, setAllocations, projects, allocations, people]
   );
@@ -628,10 +902,49 @@ export default function LandingPage() {
 
   const viewLabel = VIEW_OPTIONS.find((v) => v.id === viewMode)?.label ?? "Months";
 
-  /** Minimum column width (px) per view — keeps timeline readable and scrolls horizontally when needed */
-  const colMinPx = viewMode === "day" ? 52 : viewMode === "week" ? 72 : 36;
+  const colMinPx = viewMode === "day" ? 120 : viewMode === "week" ? 150 : 105;
   const gridTemplate = `repeat(${scheduleModel.columnCount}, minmax(${colMinPx}px, 1fr))`;
   const timelineMinWidthPx = scheduleModel.columnCount * colMinPx;
+
+  // Inject timeline columns and maintain perfect scroll locks
+  useLayoutEffect(() => {
+    if (!scheduleViewportRef.current || scheduleModel.columnCount === 0) return;
+    const el = scheduleViewportRef.current;
+    
+    // 1. Initial/Anchor jump: if the anchor date completely changed (e.g. clicked < > Next/Prev)
+    if (scheduleModel.anchorDateKey !== lastAnchorKey.current) {
+       const slotIdx = scheduleModel.slots.findIndex(s => s.dateKey >= scheduleModel.anchorDateKey);
+       if (slotIdx >= 0) {
+          el.scrollLeft = slotIdx * colMinPx;
+       }
+       lastAnchorKey.current = scheduleModel.anchorDateKey;
+    } 
+    // 2. Endless scroll jump: if we just dynamically added months to the PAST (left)
+    else if (prevColCount.current > 0 && scheduleModel.columnCount > prevColCount.current) {
+      if (timelineOffsets.prev > prevOffsets.current.prev) {
+        const addedCols = scheduleModel.columnCount - prevColCount.current;
+        el.scrollLeft += addedCols * colMinPx;
+      }
+    }
+    
+    prevColCount.current = scheduleModel.columnCount;
+    prevOffsets.current = timelineOffsets;
+  }, [scheduleModel, timelineOffsets, colMinPx]);
+
+  const handleTimelineScroll = useCallback((e) => {
+    const el = e.target;
+    const thresholdBase = 250;
+    
+    // Left endless load
+    if (el.scrollLeft < thresholdBase) {
+      setTimelineOffsets((o) => (o.prev < 36 ? { ...o, prev: o.prev + 1 } : o));
+    }
+    
+    // Right endless load
+    if (el.scrollLeft + el.clientWidth > el.scrollWidth - thresholdBase) {
+      setTimelineOffsets((o) => (o.next < 36 ? { ...o, next: o.next + 1 } : o));
+    }
+  }, []);
 
   return (
     <div
@@ -659,34 +972,35 @@ export default function LandingPage() {
               </button>
             </div>
             <div className="lp-toolbar-right">
-              <div className="lp-date-nav">
+              <div className="lp-date-pill-group">
                 <motion.button
                   type="button"
+                  className="lp-pill-arrow"
                   aria-label="Previous period"
                   onClick={navigatePrev}
-                  whileHover={{ scale: 1.04 }}
-                  whileTap={{ scale: 0.94 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
                   <ChevronLeft size={16} />
                 </motion.button>
+                <div className="lp-pill-divider" />
                 <motion.button
                   type="button"
-                  className="lp-today"
+                  className="lp-pill-today"
                   onClick={goToday}
-                  whileHover={{ scale: 1.03 }}
+                  whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.96 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
                 >
                   Today
                 </motion.button>
+                <div className="lp-pill-divider" />
                 <motion.button
                   type="button"
+                  className="lp-pill-arrow"
                   aria-label="Next period"
                   onClick={navigateNext}
-                  whileHover={{ scale: 1.04 }}
-                  whileTap={{ scale: 0.94 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
                   <ChevronRight size={16} />
                 </motion.button>
@@ -718,6 +1032,8 @@ export default function LandingPage() {
                         onClick={() => {
                           setViewMode(opt.id);
                           setViewMenuOpen(false);
+                          setTimelineOffsets({ prev: 1, next: 2 });
+                          lastAnchorKey.current = null;
                         }}
                       >
                         {opt.label}
@@ -793,14 +1109,65 @@ export default function LandingPage() {
               <button type="button" className="lp-icon-btn" aria-label="Share">
                 <Share size={18} />
               </button>
-              <button
-                type="button"
-                className="lp-btn-primary"
-                aria-label="Add allocation"
-                onClick={() => openCreateAllocation(null)}
-              >
-                <Plus size={18} strokeWidth={2.5} />
-              </button>
+              
+              <div className="lp-dropdown-wrap" ref={addWrapRef}>
+                <button
+                  type="button"
+                  className="lp-btn-primary"
+                  aria-label="Add new"
+                  aria-expanded={addMenuOpen}
+                  onClick={() => {
+                    setAddMenuOpen((o) => !o);
+                    setViewMenuOpen(false);
+                    setDensityOpen(false);
+                  }}
+                  style={{
+                    transform: addMenuOpen ? "rotate(45deg)" : "none",
+                    transition: "transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28)",
+                  }}
+                >
+                  <Plus size={18} strokeWidth={2.5} />
+                </button>
+                {addMenuOpen && (
+                  <div className="lp-popover lp-popover-add" style={{ right: 0, minWidth: "200px", zIndex: 100 }}>
+                    <div className="lp-popover-title">Create New</div>
+                    <button
+                      type="button"
+                      className="lp-popover-item"
+                      onClick={() => {
+                        setAddMenuOpen(false);
+                        openAdd();
+                      }}
+                    >
+                      <UserPlus size={16} strokeWidth={1.8} className="lp-popover-icon" />
+                      Person
+                    </button>
+                    <button
+                      type="button"
+                      className="lp-popover-item"
+                      onClick={() => {
+                        setAddMenuOpen(false);
+                        setProjectCreateOpen(true);
+                      }}
+                    >
+                      <FolderPlus size={16} strokeWidth={1.8} className="lp-popover-icon" />
+                      Project
+                    </button>
+                    <div className="lp-popover-divider" style={{ margin: "6px 0", height: "1px", background: "var(--border)" }} />
+                    <button
+                      type="button"
+                      className="lp-popover-item"
+                      onClick={() => {
+                        setAddMenuOpen(false);
+                        openCreateAllocation(null);
+                      }}
+                    >
+                      <CalendarPlus size={16} strokeWidth={1.8} className="lp-popover-icon" />
+                      Allocation
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -828,6 +1195,8 @@ export default function LandingPage() {
         <div className="lp-schedule">
           <div
             className="lp-schedule-viewport"
+            ref={scheduleViewportRef}
+            onScroll={handleTimelineScroll}
             style={{
               "--lp-cols": scheduleModel.columnCount,
               "--lp-col-min": `${colMinPx}px`,
@@ -875,193 +1244,51 @@ export default function LandingPage() {
                         gridTemplateColumns: gridTemplate,
                       }}
                     >
-                      {scheduleModel.slots.map((slot, i) => (
-                        <div
-                          key={`slot-${i}-${slot.main}`}
-                          className={
-                            "lp-day-cell" +
-                            (viewMode !== "day" && slot.weekParity ? " lp-day-week-b" : "") +
-                            (viewMode !== "day" && !slot.weekParity ? " lp-day-week-a" : "") +
-                            (viewMode !== "day" && slot.weekBlockStart ? " lp-day-week-start" : "") +
-                            (viewMode !== "day" && slot.weekBlockEnd ? " lp-day-week-end" : "")
-                          }
-                        >
-                          <span className="lp-day-main">{slot.main}</span>
-                          {slot.sub ? <span className="lp-day-sub">{slot.sub}</span> : null}
-                        </div>
-                      ))}
+                      {scheduleModel.slots.map((slot, i) => {
+                        const isToday = slot.dateKey === todayDateKey;
+                        return (
+                          <div
+                            key={`slot-${i}-${slot.main}`}
+                            className={
+                              "lp-day-cell" +
+                              (isToday ? " lp-day-is-today" : "") +
+                              (viewMode !== "day" && slot.weekParity ? " lp-day-week-b" : "") +
+                              (viewMode !== "day" && !slot.weekParity ? " lp-day-week-a" : "") +
+                              (viewMode !== "day" && slot.weekBlockStart ? " lp-day-week-start" : "") +
+                              (viewMode !== "day" && slot.weekBlockEnd ? " lp-day-week-end" : "")
+                            }
+                          >
+                            <span className="lp-day-main">
+                               {isToday && <span className="lp-today-grid-dot" />}
+                               {slot.main}
+                            </span>
+                            {slot.sub ? <span className="lp-day-sub">{slot.sub}</span> : null}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
               </div>
 
-              {schedulePeople.map((p, i) => {
-                const hours = mockPersonHours(p.id);
-                const pct = Math.min(100, Math.round((hours / 160) * 100));
-                const right =
-                  utilizationMode === "hours"
-                    ? `${hours.toFixed(hours % 1 ? 1 : 0)}h`
-                    : `${pct}%`;
-                const nCols = scheduleModel.columnCount;
-                const rowSegments = allocations
-                  .filter((a) => allocationHasPerson(a, p.id))
-                  .flatMap((a) =>
-                    layoutsForAllocation(a, scheduleModel, viewMode).map((lay, occIdx) => ({
-                      a,
-                      lay,
-                      occIdx,
-                      start: lay.start,
-                      span: lay.span,
-                    }))
-                  );
-                assignAllocationStackLevels(rowSegments);
-                const allocLaneCount = rowSegments.length
-                  ? Math.max(...rowSegments.map((s) => s.stack)) + 1
-                  : 1;
-                return (
-                  <div key={p.id} className="lp-sched-row" style={{ ["--animation-order"]: i }}>
-                    <div className="lp-sched-person">
-                      <div className="lp-person-row-shell">
-                        <div className="lp-person-row-cluster">
-                          <button
-                            type="button"
-                            className="lp-person-row lp-person-row-main"
-                            onClick={() => openEdit(p)}
-                          >
-                            <div className="lp-avatar" style={{ background: avGrad(p.name) }}>
-                              {ini(p.name)}
-                            </div>
-                            <div className="lp-person-meta">
-                              <div className="lp-person-name">{p.name}</div>
-                              <div className="lp-person-sub">
-                                {p.role !== "—" ? `${p.role} · ` : ""}
-                                {p.department || "—"}
-                              </div>
-                              {p.tags.length > 0 && (
-                                <div className="lp-person-tags">
-                                  {p.tags.slice(0, 2).map((tag) => (
-                                    <span key={tag} className="lp-tag">
-                                      {tag}
-                                    </span>
-                                  ))}
-                                  {p.tags.length > 2 && (
-                                    <span className="lp-tag lp-tag-more">+{p.tags.length - 2}</span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </button>
-                          <button
-                            type="button"
-                            className="lp-person-add-alloc"
-                            title="Add allocation"
-                            aria-label={`Add allocation for ${p.name}`}
-                            onClick={() => openCreateAllocation(p)}
-                          >
-                            <Plus size={12} strokeWidth={2} />
-                          </button>
-                        </div>
-                        <button
-                          type="button"
-                          className="lp-person-row lp-person-hours-hit"
-                          onClick={() => openEdit(p)}
-                        >
-                          <span className="lp-person-hours">{right}</span>
-                        </button>
-                      </div>
-                    </div>
-                    <div className="lp-sched-timeline">
-                      <div
-                        className="lp-grid-stack"
-                        style={{ ["--lp-alloc-lane-count"]: allocLaneCount }}
-                      >
-                        <div
-                          className="lp-grid-week-lanes"
-                          style={{ gridTemplateColumns: gridTemplate }}
-                          aria-hidden
-                        >
-                          {scheduleModel.slots.map((slot, i) => (
-                            <div
-                              key={`lane-${p.id}-${i}`}
-                              className={
-                                "lp-week-lane" +
-                                (viewMode !== "day" && slot.weekParity ? " lp-week-lane-b" : "") +
-                                (viewMode !== "day" && !slot.weekParity ? " lp-week-lane-a" : "") +
-                                (viewMode !== "day" && slot.weekBlockStart
-                                  ? " lp-week-lane-block-start"
-                                  : "") +
-                                (viewMode !== "day" && slot.weekBlockEnd ? " lp-week-lane-block-end" : "")
-                              }
-                            />
-                          ))}
-                        </div>
-                        <div
-                          className="lp-grid-row"
-                          style={{
-                            gridTemplateColumns: gridTemplate,
-                            cursor: "pointer",
-                          }}
-                          onClick={(e) => handleTimelineClick(e, p, nCols)}
-                        >
-                          {rowSegments.map((seg) => {
-                            const left = (seg.lay.start / nCols) * 100;
-                            const width = (seg.lay.span / nCols) * 100;
-                            const z = 12 + seg.stack * 20 + seg.occIdx;
-
-                            if (seg.a.isLeave) {
-                              const lbl = seg.a.leaveType ? leaveLabel(seg.a.leaveType) : "Leave";
-                              return (
-                                <button
-                                  key={`${seg.a.id}-occ-${seg.occIdx}`}
-                                  type="button"
-                                  className="lp-block lp-block-alloc lp-block-leave"
-                                  style={{
-                                    left: `${left}%`,
-                                    width: `${width}%`,
-                                    zIndex: z,
-                                    ["--alloc-stack"]: seg.stack,
-                                  }}
-                                  aria-label={allocationAriaLabel(seg.a)}
-                                  onClick={() => openAllocationDetail(seg.a)}
-                                >
-                                  <span className="lp-leave-label">{lbl}</span>
-                                </button>
-                              );
-                            }
-
-                            const { projectName, projectCode, hoursLabel } = allocationDisplay(seg.a);
-                            const barColor = colorForAllocationBar(seg.a, projects);
-                            const fg = contrastingTextColor(barColor);
-                            return (
-                              <button
-                                key={`${seg.a.id}-occ-${seg.occIdx}`}
-                                type="button"
-                                className="lp-block lp-block-alloc lp-block-alloc-project"
-                                style={{
-                                  left: `${left}%`,
-                                  width: `${width}%`,
-                                  zIndex: z,
-                                  ["--alloc-stack"]: seg.stack,
-                                  background: barColor,
-                                  color: fg,
-                                }}
-                                aria-label={allocationAriaLabel(seg.a)}
-                                onClick={() => openAllocationDetail(seg.a)}
-                              >
-                                <span className="lp-alloc-top">
-                                  <span className="lp-alloc-name">{projectName}</span>
-                                  {projectCode && <span className="lp-alloc-code">{projectCode}</span>}
-                                </span>
-                                <span className="lp-alloc-hours">{hoursLabel}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              {schedulePeople.map((p, i) => (
+                <TimelineRow
+                  key={p.id}
+                  p={p}
+                  i={i}
+                  allocations={allocations}
+                  projects={projects}
+                  scheduleModel={scheduleModel}
+                  viewMode={viewMode}
+                  utilizationMode={utilizationMode}
+                  gridTemplate={gridTemplate}
+                  nCols={scheduleModel.columnCount}
+                  openEdit={openEdit}
+                  openCreateAllocation={openCreateAllocation}
+                  openAllocationDetail={openAllocationDetail}
+                  handleTimelineClick={handleTimelineClick}
+                />
+              ))}
             </div>
           </div>
         </div>
@@ -1097,6 +1324,8 @@ export default function LandingPage() {
         people={schedulePeople}
         preselectPerson={allocPreselectPerson}
         preselectDate={allocPreselectDate}
+        editAllocation={allocEditing}
+        onEditAllocation={handleEditAllocation}
         projects={allocationProjectOptions}
         projectRegistry={projects}
         onAddProject={addAllocationProjectLabel}
@@ -1109,6 +1338,30 @@ export default function LandingPage() {
         assigneeNames={selectedAssigneeNames}
         onClose={closeAllocationDetail}
         onDelete={handleDeleteAllocation}
+        onEditClick={selectedAllocation ? () => {
+          setAllocEditing(selectedAllocation);
+          setAllocDetailOpen(false);
+          setAllocCreateOpen(true);
+        } : undefined}
+        t={t}
+      />
+
+      <ProjectModal
+        open={projectCreateOpen}
+        onClose={() => setProjectCreateOpen(false)}
+        onSave={(form) => {
+          const clean = { ...form };
+          delete clean._colorOpen;
+          setProjects([...projects, { ...clean, id: getNextProjectId(), archived: false }].sort((a,b)=>a.name.localeCompare(b.name)));
+          toast(`Project "${form.name}" created!`, "success");
+          setProjectCreateOpen(false);
+        }}
+        people={people}
+        clients={clients}
+        setClients={setClients}
+        tagOpts={projectTagOpts}
+        setTagOpts={setProjectTagOpts}
+        getNextProjectId={getNextProjectId}
         t={t}
       />
 

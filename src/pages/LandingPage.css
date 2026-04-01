@@ -59,6 +59,32 @@
   transition: background 0.35s ease, color 0.35s ease;
 }
 
+.float-premium-modal {
+  position: relative;
+  border-radius: 17px !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.12) inset !important;
+  z-index: 10;
+}
+
+.float-premium-modal::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 18px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+.lp-root[data-theme="light"] .float-premium-modal::before {
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+@keyframes modalScale {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @keyframes rowSlideUp {
   from {
     opacity: 0;
@@ -595,6 +621,94 @@
   color: var(--accent-txt);
 }
 
+.lp-date-pill-group {
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.lp-pill-arrow {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: background 0.15s, color 0.15s;
+}
+
+.lp-pill-arrow:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.lp-pill-today {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  transition: background 0.15s;
+}
+
+.lp-pill-today:hover {
+  background: var(--bg);
+}
+
+.lp-pill-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+}
+
+.lp-day-main {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.lp-today-grid-dot {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  background-color: var(--ui-danger, #ff4d4f);
+  border-radius: 50%;
+  z-index: -1;
+}
+
+.lp-today-grid-dot::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 50%;
+  background-color: var(--ui-danger, #ff4d4f);
+  opacity: 0.4;
+  animation: gridDotPulse 2s infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes gridDotPulse {
+  0% { transform: scale(1); opacity: 0.6; }
+  70% { transform: scale(1.6); opacity: 0; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+.lp-day-is-today .lp-day-main {
+  color: #fff;
+  font-weight: 600;
+}
+
 .lp-icon-btn {
   background: transparent;
   border: none;
@@ -1010,6 +1124,7 @@
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
@@ -1020,6 +1135,7 @@
   line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -1378,7 +1494,7 @@ button.lp-block.lp-block-alloc {
   min-height: var(--lp-block-max-h, 58px);
   height: auto;
   max-height: none;
-  min-width: 72px;
+  min-width: 0;
   bottom: auto;
   box-sizing: border-box;
   display: flex;

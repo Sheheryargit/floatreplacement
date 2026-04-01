@@ -218,7 +218,7 @@ const Lbl=t=>({fontSize:13,color:t.textMuted,fontWeight:600,whiteSpace:"nowrap"}
 
 const defProject={name:"",code:"",owner:"sy",stage:"draft",billable:true,client:"",tags:[],startDate:"",endDate:"",notes:"",teamIds:[],managerEdit:false,color:"#6c8cff"};
 
-function ProjectModal({open,onClose,onSave,onArchive,editProject,people,clients,setClients,tagOpts,setTagOpts,getNextProjectId,t}){
+export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,clients,setClients,tagOpts,setTagOpts,getNextProjectId,t}){
   const[form,setForm]=useState(null);const ref=useRef(null);const isEdit=!!editProject;
   useEffect(()=>{if(!open)return;if(editProject)setForm({...editProject,teamIds:[...(editProject.teamIds||[])]});else setForm({...defProject,color:colorForNewProjectId(getNextProjectId())});},[open,editProject?.id,getNextProjectId]);
   if(!open||!form)return null;
@@ -228,7 +228,7 @@ function ProjectModal({open,onClose,onSave,onArchive,editProject,people,clients,
 
   return(
     <div onClick={e=>{if(ref.current&&!ref.current.contains(e.target))onClose();}} style={{position:"fixed",inset:0,background:t.overlay,zIndex:200,display:"flex",alignItems:"flex-start",justifyContent:"center",paddingTop:40,backdropFilter:"blur(6px)",animation:"fadeIn 0.2s ease-out"}}>
-      <div ref={ref} onClick={e=>e.stopPropagation()} style={{background:t.surfRaised,borderRadius:16,width:640,maxHeight:"calc(100vh - 80px)",display:"flex",flexDirection:"column",boxShadow:t.shadow,border:`1px solid ${t.border}`,animation:"modalScale 0.25s ease-out"}}>
+      <div className="float-premium-modal" ref={ref} onClick={e=>e.stopPropagation()} style={{background:t.surfRaised,width:640,maxHeight:"calc(100vh - 80px)",display:"flex",flexDirection:"column",animation:"modalScale 0.25s ease-out"}}>
 
         {/* Header */}
         <div style={{padding:"24px 32px 20px",flexShrink:0,borderBottom:`1px solid ${t.border}`}}>

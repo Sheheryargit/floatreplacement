@@ -1,12 +1,5 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import {
   PEOPLE_SEED,
   SEED_ROLES,
@@ -39,170 +32,86 @@ function cloneProjects() {
   }));
 }
 
-function loadPersisted() {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const d = JSON.parse(raw);
-    if (d.v !== STORAGE_VERSION) return null;
-    return d;
-  } catch {
-    return null;
-  }
-}
+export const useAppStore = create(
+  persist(
+    (set, get) => ({
+      people: clonePeople(),
+      projects: cloneProjects().map((p) => {
+        const label = projectToAllocationLabel({ ...p, id: p.id });
+        const hasHex =
+          p.color && typeof p.color === "string" && /^#([0-9A-Fa-f]{6})$/.test(p.color.trim());
+        return {
+          ...p,
+          color: hasHex ? p.color.trim() : resolveColorForProjectLabel(label, []),
+        };
+      }),
+      roles: [...SEED_ROLES],
+      depts: [...SEED_DEPTS],
+      peopleTagOpts: [...SEED_TAGS],
+      clients: [...SEED_CLIENTS],
+      projectTagOpts: [...SEED_PROJECT_TAGS],
+      allocations: [],
+      extraAllocationLabels: [...ALLOCATION_PROJECT_SEED],
 
-const AppDataContext = createContext(null);
+      setPeople: (val) => set({ people: typeof val === "function" ? val(get().people) : val }),
+      setProjects: (val) => set({ projects: typeof val === "function" ? val(get().projects) : val }),
+      setRoles: (val) => set({ roles: typeof val === "function" ? val(get().roles) : val }),
+      setDepts: (val) => set({ depts: typeof val === "function" ? val(get().depts) : val }),
+      setPeopleTagOpts: (val) => set({ peopleTagOpts: typeof val === "function" ? val(get().peopleTagOpts) : val }),
+      setClients: (val) => set({ clients: typeof val === "function" ? val(get().clients) : val }),
+      setProjectTagOpts: (val) => set({ projectTagOpts: typeof val === "function" ? val(get().projectTagOpts) : val }),
+      setAllocations: (val) => set({ allocations: typeof val === "function" ? val(get().allocations) : val }),
+      setExtraAllocationLabels: (val) => set({ extraAllocationLabels: typeof val === "function" ? val(get().extraAllocationLabels) : val }),
 
-function buildInitialState() {
-  const stored = loadPersisted();
-  return {
-    people: stored?.people?.length
-      ? stored.people.map((p) => ({ ...p, tags: [...(p.tags || [])] }))
-      : clonePeople(),
-    projects: stored?.projects?.length
-      ? stored.projects.map((p) => {
-          const label = projectToAllocationLabel({ ...p, id: p.id });
-          const hasHex =
-            p.color && typeof p.color === "string" && /^#([0-9A-Fa-f]{6})$/.test(p.color.trim());
-          return {
-            ...p,
-            tags: [...(p.tags || [])],
-            teamIds: [...(p.teamIds || [])],
-            color: hasHex ? p.color.trim() : resolveColorForProjectLabel(label, []),
-          };
-        })
-      : cloneProjects(),
-    roles: stored?.roles?.length ? [...stored.roles] : [...SEED_ROLES],
-    depts: stored?.depts?.length ? [...stored.depts] : [...SEED_DEPTS],
-    peopleTagOpts: stored?.peopleTagOpts?.length ? [...stored.peopleTagOpts] : [...SEED_TAGS],
-    clients: stored?.clients?.length ? [...stored.clients] : [...SEED_CLIENTS],
-    projectTagOpts: stored?.projectTagOpts?.length
-      ? [...stored.projectTagOpts]
-      : [...SEED_PROJECT_TAGS],
-    allocations: Array.isArray(stored?.allocations) ? stored.allocations : [],
-    extraAllocationLabels: stored?.extraAllocationLabels?.length
-      ? [...stored.extraAllocationLabels]
-      : [...ALLOCATION_PROJECT_SEED],
-  };
-}
+      getNextPersonId: () => {
+        const { people } = get();
+        return people.reduce((m, p) => Math.max(m, Number(p.id) || 0), 0) + 1;
+      },
+      getNextProjectId: () => {
+        const { projects } = get();
+        return projects.reduce((m, p) => Math.max(m, Number(p.id) || 0), 0) + 1;
+      },
 
-export function AppDataProvider({ children }) {
-  const initialRef = useRef(null);
-  if (initialRef.current === null) {
-    initialRef.current = buildInitialState();
-  }
-  const init = initialRef.current;
+      addAllocationProjectLabel: (line) => {
+        const t = line.trim();
+        if (!t) return;
+        set((state) => ({
+          extraAllocationLabels: state.extraAllocationLabels.includes(t)
+            ? state.extraAllocationLabels
+            : [...state.extraAllocationLabels, t],
+        }));
+      },
 
-  const [people, setPeople] = useState(init.people);
-  const [projects, setProjects] = useState(init.projects);
-  const [roles, setRoles] = useState(init.roles);
-  const [depts, setDepts] = useState(init.depts);
-  const [peopleTagOpts, setPeopleTagOpts] = useState(init.peopleTagOpts);
-  const [clients, setClients] = useState(init.clients);
-  const [projectTagOpts, setProjectTagOpts] = useState(init.projectTagOpts);
-  const [allocations, setAllocations] = useState(init.allocations);
-  const [extraAllocationLabels, setExtraAllocationLabels] = useState(init.extraAllocationLabels);
-
-  useEffect(() => {
-    const payload = {
-      v: STORAGE_VERSION,
-      people,
-      projects,
-      roles,
-      depts,
-      peopleTagOpts,
-      clients,
-      projectTagOpts,
-      allocations,
-      extraAllocationLabels,
-    };
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    } catch {
-      /* quota / private mode */
-    }
-  }, [
-    people,
-    projects,
-    roles,
-    depts,
-    peopleTagOpts,
-    clients,
-    projectTagOpts,
-    allocations,
-    extraAllocationLabels,
-  ]);
-
-  const getNextPersonId = useCallback(() => {
-    const max = people.reduce((m, p) => Math.max(m, Number(p.id) || 0), 0);
-    return max + 1;
-  }, [people]);
-
-  const getNextProjectId = useCallback(() => {
-    const max = projects.reduce((m, p) => Math.max(m, Number(p.id) || 0), 0);
-    return max + 1;
-  }, [projects]);
-
-  const allocationProjectOptions = useMemo(() => {
-    const fromProjects = projects.map(projectToAllocationLabel);
-    const set = new Set([...fromProjects, ...extraAllocationLabels]);
-    return [...set].sort((a, b) => a.localeCompare(b));
-  }, [projects, extraAllocationLabels]);
-
-  const addAllocationProjectLabel = useCallback((line) => {
-    const t = line.trim();
-    if (!t) return;
-    setExtraAllocationLabels((prev) => (prev.includes(t) ? prev : [...prev, t]));
-  }, []);
-
-  const value = useMemo(
-    () => ({
-      people,
-      setPeople,
-      projects,
-      setProjects,
-      roles,
-      setRoles,
-      depts,
-      setDepts,
-      peopleTagOpts,
-      setPeopleTagOpts,
-      clients,
-      setClients,
-      projectTagOpts,
-      setProjectTagOpts,
-      allocations,
-      setAllocations,
-      extraAllocationLabels,
-      setExtraAllocationLabels,
-      allocationProjectOptions,
-      addAllocationProjectLabel,
-      getNextPersonId,
-      getNextProjectId,
     }),
-    [
-      people,
-      projects,
-      roles,
-      depts,
-      peopleTagOpts,
-      clients,
-      projectTagOpts,
-      allocations,
-      extraAllocationLabels,
-      allocationProjectOptions,
-      addAllocationProjectLabel,
-      getNextPersonId,
-      getNextProjectId,
-    ]
-  );
+    {
+      name: STORAGE_KEY,
+      version: STORAGE_VERSION,
+      migrate: (persistedState, version) => {
+        if (version === 0) {
+          return persistedState;
+        }
+        return persistedState;
+      },
+    }
+  )
+);
 
-  return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;
-}
+// Derived selector hooks for efficient rendering
+export const useAppData = () => {
+    // Legacy support for destructuring. Caution: triggers re-render on *any* store change in components using this.
+    const store = useAppStore();
+    return {
+      ...store,
+      allocationProjectOptions: Array.from(
+        new Set([
+          ...store.projects.map(projectToAllocationLabel),
+          ...store.extraAllocationLabels,
+        ])
+      ).sort((a, b) => a.localeCompare(b)),
+    };
+};
 
-export function useAppData() {
-  const ctx = useContext(AppDataContext);
-  if (!ctx) throw new Error("useAppData must be used within AppDataProvider");
-  return ctx;
+// No-op provider wrapper to avoid breaking App.jsx
+export function AppDataProvider({ children }) {
+  return <>{children}</>;
 }
