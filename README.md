@@ -7,15 +7,23 @@ Internal rebuild of a Float-style **resource scheduling** and **project** platfo
 | Path | Purpose |
 |------|---------|
 | `index.html` | Vite entry HTML |
-| `src/main.jsx` | React bootstrap |
-| `src/App.jsx` | `react-router-dom` routes |
-| `src/pages/LandingPage.jsx` | Schedule landing (static mock; interactive timeline later) + `LandingPage.css` |
-| `src/pages/PeoplePage.jsx` | People directory and person modal |
-| `src/pages/ProjectsPage.jsx` | Projects table and project modal |
 | `vite.config.js` | Vite + React; `@` → `src/` |
 | `jsconfig.json` | Editor path hints for `@/` imports |
+| `vercel.json` | SPA rewrites for client-side routes |
+| `src/main.jsx` | React bootstrap |
+| `src/App.jsx` | `react-router-dom` routes, lazy pages, toasts |
+| `src/pages/` | Route screens (`LandingPage`, `PeoplePage`, `ProjectsPage`, `LoginPage`, `SettingsPage`) + co-located CSS |
+| `src/components/` | Shared UI (modals, command palette, nav, `ui/`) |
+| `src/context/` | Theme, auth, app data (Zustand-backed workspace) |
+| `src/lib/` | Supabase client + API modules |
+| `src/utils/` | Pure helpers (sort, colors, filters, leave visuals) |
+| `src/data/` | Seed / static data |
+| `supabase/` | Migrations and local Supabase config |
+| `scripts/` | Helper scripts (e.g. `push-github.sh`) |
+| `docs/` | Extra notes (`TECH-STACK.md`) |
+| `.vscode/floatreplacement.code-workspace` | Optional VS Code multi-root workspace (opens repo root) |
 
-**Routes:** `/` schedule shell, `/people` people UI, `/projects` projects UI. Sidebar items use `NavLink` so Schedule / People / Projects stay in sync across pages.
+**Routes:** `/` schedule, `/people`, `/projects`, `/settings`. Sidebar uses `NavLink` across pages.
 
 ## Scripts
 
@@ -57,7 +65,3 @@ The script pushes and then resets the remote URL so the token is not left in `.g
 2. Framework: **Vite**; build `npm run build`, output `dist`.
 
 Client-side routes use `vercel.json` rewrites so `/people` and `/projects` work on refresh.
-
-## Note on `front-end/`
-
-Earlier prototypes lived under `front-end/`. Source of truth is now `src/pages/`. Add new screens under `src/pages/` or `src/features/` as the app grows.

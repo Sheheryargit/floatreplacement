@@ -1,6 +1,8 @@
 import { supabase, isSupabaseConfigured } from "../supabase.js";
+import { legacyHolidaysToRegion, regionToLegacyHolidays } from "../../constants/auHolidayRegions.js";
 
 function personToRow(p) {
+  const region = p.publicHolidayRegion ?? legacyHolidaysToRegion(p.holidays);
   return {
     id: Number(p.id),
     name: p.name,
@@ -16,7 +18,8 @@ function personToRow(p) {
     end_date: p.endDate ?? "",
     work_type: p.workType ?? "Full-time",
     notes: p.notes ?? "",
-    holidays: p.holidays ?? "None",
+    public_holiday_region: region,
+    holidays: regionToLegacyHolidays(region),
     archived: !!p.archived,
     updated_at: new Date().toISOString(),
   };
@@ -24,6 +27,10 @@ function personToRow(p) {
 
 export function rowToPerson(row) {
   if (!row) return null;
+  const region =
+    row.public_holiday_region != null && String(row.public_holiday_region).trim() !== ""
+      ? String(row.public_holiday_region).trim()
+      : legacyHolidaysToRegion(row.holidays);
   return {
     id: Number(row.id),
     name: row.name,
@@ -39,7 +46,8 @@ export function rowToPerson(row) {
     endDate: row.end_date ?? "",
     workType: row.work_type ?? "Full-time",
     notes: row.notes ?? "",
-    holidays: row.holidays ?? "None",
+    publicHolidayRegion: region,
+    holidays: regionToLegacyHolidays(region),
     archived: !!row.archived,
   };
 }

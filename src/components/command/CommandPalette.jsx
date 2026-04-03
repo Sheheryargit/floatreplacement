@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Search,
   CalendarDays,
@@ -195,22 +196,33 @@ export default function CommandPalette() {
     return () => window.removeEventListener("keydown", onNav);
   }, [open, hi, selectables, run]);
 
-  if (!open) return null;
-
   const activeId = selectables[hi]?.id;
 
   return createPortal(
-    <div
-      className="alloc8-cmd-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Command palette"
-      data-theme={theme}
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) setOpen(false);
-      }}
-    >
-      <div className="alloc8-cmd">
+    <AnimatePresence>
+      {open ? (
+        <motion.div
+          key="alloc8-cmd"
+          className="alloc8-cmd-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Command palette"
+          data-theme={theme}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2, ease: [0.45, 0, 0.55, 1] }}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setOpen(false);
+          }}
+        >
+          <motion.div
+            className="alloc8-cmd"
+            initial={{ opacity: 0, y: 14, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.99 }}
+            transition={{ duration: 0.26, ease: [0.45, 0, 0.55, 1] }}
+          >
         <div className="alloc8-cmd-search">
           <Search size={18} strokeWidth={2} aria-hidden />
           <input
@@ -259,8 +271,10 @@ export default function CommandPalette() {
             })
           )}
         </div>
-      </div>
-    </div>,
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>,
     document.body
   );
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Users,
+  User,
   Plus,
   Download,
   Trash2,
@@ -14,10 +15,16 @@ import {
   Shield,
   Archive,
   ArchiveRestore,
+  Filter,
+  Mail,
+  Building2,
+  Tag,
+  Clock,
 } from "lucide-react";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useAppData } from "../context/AppDataContext.jsx";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
+import { Button } from "../components/ui/Button.jsx";
 import PersonModal, {
   T,
   Confirm,
@@ -45,6 +52,19 @@ function allocationHasPerson(a, pid) {
 function shortenAllocLabel(s, maxLen) {
   if (!s) return "";
   return s.length > maxLen ? `${s.slice(0, maxLen - 1)}…` : s;
+}
+
+const DEPT_EMPTY = "__dept_empty__";
+const PERSON_TYPES = ["Employee", "Contractor", "Placeholder"];
+const WORK_TYPES = ["Full-time", "Part-time"];
+const ACCESS_FILTER_OPTS = [
+  { value: "—", label: "No access" },
+  { value: "Member", label: "Member" },
+  { value: "Manager", label: "Manager" },
+];
+
+function toggleArr(list, v) {
+  return list.includes(v) ? list.filter((x) => x !== v) : [...list, v];
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -88,9 +108,29 @@ export default function PeoplePage() {
   const [sortOpen,setSortOpen]=useState(false);
   const sortWrapRef=useRef(null);
 
+  const filterWrapRef = useRef(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [nestOpen, setNestOpen] = useState({
+    people: false,
+    login: true,
+    org: true,
+    profile: true,
+  });
+  const [filterPersonSearch, setFilterPersonSearch] = useState("");
+  const [advPersonIds, setAdvPersonIds] = useState([]);
+  const [advDepartments, setAdvDepartments] = useState([]);
+  const [advRoles, setAdvRoles] = useState([]);
+  const [advTags, setAdvTags] = useState([]);
+  const [advTypes, setAdvTypes] = useState([]);
+  const [advAccess, setAdvAccess] = useState([]);
+  const [advWorkTypes, setAdvWorkTypes] = useState([]);
+  const [advEmailMode, setAdvEmailMode] = useState("any");
+  const [advEmailContains, setAdvEmailContains] = useState("");
+
   const [allocCreateOpen, setAllocCreateOpen] = useState(false);
   const [allocPreselectPerson, setAllocPreselectPerson] = useState(null);
   const [allocPreselectProject, setAllocPreselectProject] = useState(null);
+  const [allocDefaultTab, setAllocDefaultTab] = useState("allocation");
 
   const schedulePeople = useMemo(
     () => [...people].filter((p) => !p.archived).sort((a, b) => a.name.localeCompare(b.name)),
@@ -98,8 +138,16 @@ export default function PeoplePage() {
   );
 
   const openCreateAllocationForPersonProject = useCallback((person, projectLabel) => {
+    setAllocDefaultTab("allocation");
     setAllocPreselectPerson(person ?? null);
     setAllocPreselectProject(projectLabel != null ? String(projectLabel).trim() || null : null);
+    setAllocCreateOpen(true);
+  }, []);
+
+  const openCreateLeaveForPerson = useCallback((person) => {
+    setAllocDefaultTab("leave");
+    setAllocPreselectPerson(person ?? null);
+    setAllocPreselectProject(null);
     setAllocCreateOpen(true);
   }, []);
 
@@ -107,6 +155,7 @@ export default function PeoplePage() {
     setAllocCreateOpen(false);
     setAllocPreselectPerson(null);
     setAllocPreselectProject(null);
+    setAllocDefaultTab("allocation");
   }, []);
 
   const handleCreateAllocation = useCallback(
@@ -160,18 +209,167 @@ export default function PeoplePage() {
 
   useEffect(()=>{ setMounted(true); },[]);
 
+  useEffect(() => {
+    setAdvPersonIds([]);
+    setFilterPersonSearch("");
+  }, [viewTab]);
+
+  const peopleInTab = useMemo(() => {
+    const isArch = viewTab === "archived";
+    return people.filter((p) => p.archived === isArch);
+  }, [people, viewTab]);
+
+  const departmentOptions = useMemo(() => {
+    const set = new Set();
+    for (const p of peopleInTab) {
+      const d = (p.department || "").trim();
+      if (d) set.add(d);
+    }
+    for (const d of depts) if (d && String(d).trim()) set.add(String(d).trim());
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [peopleInTab, depts]);
+
+  const hasNoDept = useMemo(
+    () => peopleInTab.some((p) => !(p.department || "").trim()),
+    [peopleInTab]
+  );
+
+  const roleOptions = useMemo(() => {
+    const set = new Set();
+    for (const p of peopleInTab) {
+      if (p.role) set.add(p.role);
+    }
+    for (const r of roles) if (r) set.add(r);
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [peopleInTab, roles]);
+
+  const tagOptions = useMemo(() => {
+    const set = new Set(peopleTagOpts);
+    for (const p of peopleInTab) (p.tags || []).forEach((tg) => set.add(tg));
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [peopleInTab, peopleTagOpts]);
+
+  const advActiveCount = useMemo(() => {
+    let n = 0;
+    if (advPersonIds.length) n++;
+    if (advEmailMode !== "any") n++;
+    if (advEmailContains.trim()) n++;
+    if (advDepartments.length) n++;
+    if (advRoles.length) n++;
+    if (advTags.length) n++;
+    if (advTypes.length) n++;
+    if (advAccess.length) n++;
+    if (advWorkTypes.length) n++;
+    return n;
+  }, [
+    advPersonIds,
+    advEmailMode,
+    advEmailContains,
+    advDepartments,
+    advRoles,
+    advTags,
+    advTypes,
+    advAccess,
+    advWorkTypes,
+  ]);
+
+  const peoplePickerList = useMemo(() => {
+    const q = filterPersonSearch.trim().toLowerCase();
+    const sorted = [...peopleInTab].sort((a, b) => a.name.localeCompare(b.name));
+    if (!q) return sorted;
+    return sorted.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.email || "").toLowerCase().includes(q)
+    );
+  }, [peopleInTab, filterPersonSearch]);
+
   const filtered = useMemo(() => {
-    const isArch = viewTab==="archived";
+    const isArch = viewTab === "archived";
     return people.filter((p) => {
       if (p.archived !== isArch) return false;
-      if (!search) return true;
-      const s=search.toLowerCase();
-      const role = (p.role || "").toLowerCase();
-      const dept = (p.department || "").toLowerCase();
-      const tags = p.tags || [];
-      return p.name.toLowerCase().includes(s)||role.includes(s)||dept.includes(s)||tags.some((tg)=>String(tg).toLowerCase().includes(s));
+
+      if (search) {
+        const s = search.toLowerCase();
+        const role = (p.role || "").toLowerCase();
+        const dept = (p.department || "").toLowerCase();
+        const tags = p.tags || [];
+        const email = (p.email || "").toLowerCase();
+        const type = (p.type || "").toLowerCase();
+        const wt = (p.workType || "").toLowerCase();
+        const acc = (p.access || "").toLowerCase();
+        const nm = p.name.toLowerCase();
+        const matchText =
+          nm.includes(s) ||
+          role.includes(s) ||
+          dept.includes(s) ||
+          email.includes(s) ||
+          type.includes(s) ||
+          wt.includes(s) ||
+          acc.includes(s) ||
+          tags.some((tg) => String(tg).toLowerCase().includes(s));
+        if (!matchText) return false;
+      }
+
+      if (advPersonIds.length && !advPersonIds.includes(p.id)) return false;
+
+      const em = (p.email || "").trim();
+      if (advEmailMode === "has" && !em) return false;
+      if (advEmailMode === "missing" && em) return false;
+      if (advEmailContains.trim()) {
+        if (!em.toLowerCase().includes(advEmailContains.trim().toLowerCase())) return false;
+      }
+
+      if (advDepartments.length) {
+        const d = (p.department || "").trim();
+        const ok = advDepartments.some((key) => {
+          if (key === DEPT_EMPTY) return !d;
+          return d === key;
+        });
+        if (!ok) return false;
+      }
+
+      if (advRoles.length) {
+        const r = p.role || "—";
+        if (!advRoles.includes(r)) return false;
+      }
+
+      if (advTags.length) {
+        const tags = p.tags || [];
+        if (!advTags.some((tg) => tags.includes(tg))) return false;
+      }
+
+      if (advTypes.length) {
+        const ty = p.type || "Employee";
+        if (!advTypes.includes(ty)) return false;
+      }
+
+      if (advAccess.length) {
+        const a = p.access || "—";
+        if (!advAccess.includes(a)) return false;
+      }
+
+      if (advWorkTypes.length) {
+        const w = p.workType || "Full-time";
+        if (!advWorkTypes.includes(w)) return false;
+      }
+
+      return true;
     });
-  }, [people,search,viewTab]);
+  }, [
+    people,
+    search,
+    viewTab,
+    advPersonIds,
+    advEmailMode,
+    advEmailContains,
+    advDepartments,
+    advRoles,
+    advTags,
+    advTypes,
+    advAccess,
+    advWorkTypes,
+  ]);
 
   const peopleOrderMap = useMemo(() => {
     const m = new Map();
@@ -199,6 +397,32 @@ export default function PeoplePage() {
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  useEffect(() => {
+    if (!filterOpen) return;
+    const h = (e) => {
+      if (filterWrapRef.current && !filterWrapRef.current.contains(e.target)) setFilterOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [filterOpen]);
+
+  const clearAdvFilters = useCallback(() => {
+    setAdvPersonIds([]);
+    setAdvDepartments([]);
+    setAdvRoles([]);
+    setAdvTags([]);
+    setAdvTypes([]);
+    setAdvAccess([]);
+    setAdvWorkTypes([]);
+    setAdvEmailMode("any");
+    setAdvEmailContains("");
+    setFilterPersonSearch("");
+  }, []);
+
+  const nestToggle = useCallback((key) => {
+    setNestOpen((o) => ({ ...o, [key]: !o[key] }));
   }, []);
 
   const activeCount = people.filter((p)=>!p.archived).length;
@@ -249,24 +473,276 @@ export default function PeoplePage() {
         {/* Header */}
         <header className="people-page-header" style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8 }}>
           <h1 style={{ fontSize:26,fontWeight:700,margin:0,letterSpacing:-0.5 }}>People</h1>
-          <div style={{ display:"flex",gap:8,alignItems:"center" }}>
+          <div style={{ display:"flex",gap:8,alignItems:"center",flexWrap:"wrap" }}>
             <div style={{ position:"relative" }}>
               <Search size={15} style={{ position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:t.textMuted }}/>
-              <input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Search people…"
-                style={{ width:search?240:180,background:t.surface,border:`1.5px solid ${t.borderIn}`,borderRadius:8,padding:"8px 12px 8px 34px",color:t.text,fontSize:13,outline:"none",transition:"all 0.25s" }}
-                onFocus={(e)=>{ e.target.style.width="240px"; e.target.style.borderColor=t.focus; e.target.style.boxShadow=`0 0 0 3px ${t.accentGlow}`; }}
-                onBlur={(e)=>{ if(!search) e.target.style.width="180px"; e.target.style.borderColor=t.borderIn; e.target.style.boxShadow="none"; }}/>
+              <input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Search name, email, role, department, tags…"
+                style={{ width:search?260:200,background:t.surface,border:`1.5px solid ${t.borderIn}`,borderRadius:8,padding:"8px 12px 8px 34px",color:t.text,fontSize:13,outline:"none",transition:"all 0.25s" }}
+                onFocus={(e)=>{ e.target.style.width="280px"; e.target.style.borderColor=t.focus; e.target.style.boxShadow=`0 0 0 3px ${t.accentGlow}`; }}
+                onBlur={(e)=>{ if(!search) e.target.style.width="200px"; e.target.style.borderColor=t.borderIn; e.target.style.boxShadow="none"; }}/>
               {search&&<X size={14} style={{ position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",color:t.textMuted,cursor:"pointer" }} onClick={()=>setSearch("")}/>}
             </div>
-            <button style={{ background:t.btnSec,border:`1px solid ${t.border}`,borderRadius:8,color:t.btnSecTxt,padding:"8px 16px",cursor:"pointer",fontSize:13,fontWeight:500,display:"flex",alignItems:"center",gap:7,transition:"all 0.15s" }}
-              onMouseEnter={(e)=>e.currentTarget.style.background=t.btnSecHov} onMouseLeave={(e)=>e.currentTarget.style.background=t.btnSec}>
-              <Download size={14}/> Import
-            </button>
-            <button onClick={openAdd} style={{ background:t.accent,border:"none",borderRadius:8,color:t.accentTxt,padding:"8px 18px",cursor:"pointer",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:7,transition:"all 0.15s",boxShadow:`0 2px 12px ${t.accent}30` }}
-              onMouseEnter={(e)=>{ e.currentTarget.style.background=t.accentHov; e.currentTarget.style.transform="translateY(-1px)"; }}
-              onMouseLeave={(e)=>{ e.currentTarget.style.background=t.accent; e.currentTarget.style.transform="none"; }}>
-              <UserPlus size={14}/> Add person
-            </button>
+
+            <div ref={filterWrapRef} className="people-filter-wrap">
+              <button
+                type="button"
+                onClick={() => setFilterOpen((o) => !o)}
+                style={{
+                  display:"flex",alignItems:"center",gap:8,padding:"8px 14px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:600,
+                  background:advActiveCount ? t.accentGlow : t.btnSec,
+                  border:`1px solid ${advActiveCount ? `${t.accent}55` : t.border}`,
+                  color:advActiveCount ? t.accent : t.textSoft,
+                  transition:"all 0.15s",
+                }}
+              >
+                <Filter size={14} strokeWidth={2.25} />
+                Filters
+                {advActiveCount > 0 && (
+                  <span style={{
+                    minWidth:20,height:20,padding:"0 6px",borderRadius:999,background:t.accent,color:t.accentTxt,
+                    fontSize:11,fontWeight:700,display:"inline-flex",alignItems:"center",justifyContent:"center",
+                  }}>{advActiveCount}</span>
+                )}
+                <ChevronDown size={14} style={{ color:t.textMuted,transform:filterOpen ? "rotate(180deg)" : "none",transition:"transform 0.2s" }} />
+              </button>
+
+              {filterOpen && (
+                <div
+                  className="people-filter-panel"
+                  style={{
+                    position:"absolute",top:"calc(100% + 8px)",right:0,zIndex:130,
+                    width:"min(360px, calc(100vw - 48px))",
+                    maxHeight:"min(72vh, 520px)",
+                    background:t.surfRaised,border:`1px solid ${t.border}`,borderRadius:12,
+                    boxShadow:"0 16px 48px rgba(0,0,0,0.28)",display:"flex",flexDirection:"column",overflow:"hidden",
+                  }}
+                >
+                  <div style={{ padding:"12px 14px",borderBottom:`1px solid ${t.borderSub}`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexShrink:0 }}>
+                    <span style={{ fontWeight:700,fontSize:13,color:t.text }}>Filter people</span>
+                    <button type="button" onClick={clearAdvFilters} disabled={advActiveCount === 0}
+                      style={{
+                        fontSize:12,fontWeight:600,cursor:advActiveCount ? "pointer" : "default",
+                        background:"transparent",border:"none",color:advActiveCount ? t.accent : t.textDim,padding:"4px 8px",borderRadius:6,
+                      }}>Clear all</button>
+                  </div>
+
+                  <div style={{ overflowY:"auto",flex:1,minHeight:0,paddingBottom:8,
+                    ["--people-filter-border"]: t.border,
+                    ["--people-filter-nested-bg"]: mode === "dark" ? "rgba(0,0,0,0.18)" : "#f0f2f8",
+                    ["--people-filter-text"]: t.text,
+                    ["--people-filter-row-hov"]: t.tabHovBg,
+                  }}>
+
+                    {/* People */}
+                    <div style={{ borderBottom:`1px solid ${t.borderSub}` }}>
+                      <button type="button" onClick={() => nestToggle("people")}
+                        style={{ width:"100%",display:"flex",alignItems:"center",gap:8,padding:"10px 14px",background:"transparent",border:"none",cursor:"pointer",color:t.text,fontWeight:600,fontSize:13,textAlign:"left" }}>
+                        <ChevronDown size={14} style={{ color:t.textMuted,flexShrink:0,transform:nestOpen.people ? "rotate(0deg)" : "rotate(-90deg)",transition:"transform 0.2s" }} />
+                        <User size={14} style={{ color:t.accent,flexShrink:0 }} />
+                        By person
+                      </button>
+                      {nestOpen.people && (
+                        <div className="people-filter-nest-body" style={{ padding:"0 14px 12px 36px" }}>
+                          <div style={{ position:"relative" }}>
+                            <Search size={13} style={{ position:"absolute",left:9,top:"50%",transform:"translateY(-50%)",color:t.textMuted }} />
+                            <input value={filterPersonSearch} onChange={(e) => setFilterPersonSearch(e.target.value)} placeholder="Find in this list…"
+                              style={{ width:"100%",background:t.surfAlt,border:`1px solid ${t.borderIn}`,borderRadius:8,padding:"7px 10px 7px 30px",color:t.text,fontSize:12,outline:"none" }} />
+                          </div>
+                          <p style={{ margin:0,fontSize:11,color:t.textMuted,lineHeight:1.4 }}>Show only selected people. Leave none selected to include everyone.</p>
+                          <div className="people-filter-people-scroll">
+                            {peoplePickerList.map((p) => {
+                              const on = advPersonIds.includes(p.id);
+                              return (
+                                <label key={p.id}>
+                                  <input type="checkbox" checked={on} onChange={() => setAdvPersonIds((ids) => toggleArr(ids, p.id))} style={{ accentColor:t.chk,width:14,height:14,flexShrink:0 }} />
+                                  <span style={{ overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1 }}>{p.name}</span>
+                                  <span style={{ color:t.textDim,fontSize:11,flexShrink:0,maxWidth:120,overflow:"hidden",textOverflow:"ellipsis" }}>{(p.email || "").split("@")[0]}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Login / email */}
+                    <div style={{ borderBottom:`1px solid ${t.borderSub}` }}>
+                      <button type="button" onClick={() => nestToggle("login")}
+                        style={{ width:"100%",display:"flex",alignItems:"center",gap:8,padding:"10px 14px",background:"transparent",border:"none",cursor:"pointer",color:t.text,fontWeight:600,fontSize:13,textAlign:"left" }}>
+                        <ChevronDown size={14} style={{ color:t.textMuted,flexShrink:0,transform:nestOpen.login ? "rotate(0deg)" : "rotate(-90deg)",transition:"transform 0.2s" }} />
+                        <Mail size={14} style={{ color:t.accent,flexShrink:0 }} />
+                        Login and email
+                      </button>
+                      {nestOpen.login && (
+                        <div className="people-filter-nest-body" style={{ padding:"0 14px 12px 36px" }}>
+                          <div style={{ display:"flex",flexWrap:"wrap",gap:6 }}>
+                            {[
+                              { id:"any", label:"Any" },
+                              { id:"has", label:"Has email" },
+                              { id:"missing", label:"No email" },
+                            ].map((opt) => {
+                              const active = advEmailMode === opt.id;
+                              return (
+                                <button key={opt.id} type="button" onClick={() => setAdvEmailMode(opt.id)}
+                                  style={{
+                                    padding:"6px 12px",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",
+                                    border:`1px solid ${active ? t.accent : t.border}`,
+                                    background:active ? t.accentGlow : t.surfAlt,color:active ? t.accent : t.textSoft,
+                                  }}>{opt.label}</button>
+                              );
+                            })}
+                          </div>
+                          <div>
+                            <label style={{ fontSize:11,fontWeight:600,color:t.textMuted,display:"block",marginBottom:4 }}>Email contains</label>
+                            <input value={advEmailContains} onChange={(e) => setAdvEmailContains(e.target.value)} placeholder="e.g. company.com"
+                              style={{ width:"100%",background:t.surfAlt,border:`1px solid ${t.borderIn}`,borderRadius:8,padding:"8px 10px",color:t.text,fontSize:12,outline:"none" }} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Organization */}
+                    <div style={{ borderBottom:`1px solid ${t.borderSub}` }}>
+                      <button type="button" onClick={() => nestToggle("org")}
+                        style={{ width:"100%",display:"flex",alignItems:"center",gap:8,padding:"10px 14px",background:"transparent",border:"none",cursor:"pointer",color:t.text,fontWeight:600,fontSize:13,textAlign:"left" }}>
+                        <ChevronDown size={14} style={{ color:t.textMuted,flexShrink:0,transform:nestOpen.org ? "rotate(0deg)" : "rotate(-90deg)",transition:"transform 0.2s" }} />
+                        <Building2 size={14} style={{ color:t.accent,flexShrink:0 }} />
+                        Organization
+                      </button>
+                      {nestOpen.org && (
+                        <div className="people-filter-nest-body" style={{ padding:"0 14px 12px 36px" }}>
+                          <div>
+                            <span style={{ fontSize:11,fontWeight:600,color:t.textMuted }}>Department</span>
+                            <div className="people-filter-chip-row" style={{ marginTop:6 }}>
+                              {hasNoDept && (
+                                <button type="button" onClick={() => setAdvDepartments((x) => toggleArr(x, DEPT_EMPTY))}
+                                  style={{
+                                    padding:"5px 10px",borderRadius:8,fontSize:11,fontWeight:600,cursor:"pointer",
+                                    border:`1px solid ${advDepartments.includes(DEPT_EMPTY) ? t.accent : t.border}`,
+                                    background:advDepartments.includes(DEPT_EMPTY) ? t.accentGlow : t.surfAlt,
+                                    color:advDepartments.includes(DEPT_EMPTY) ? t.accent : t.textSoft,
+                                  }}>No department</button>
+                              )}
+                              {departmentOptions.map((d) => {
+                                const on = advDepartments.includes(d);
+                                return (
+                                  <button key={d} type="button" onClick={() => setAdvDepartments((x) => toggleArr(x, d))}
+                                    style={{
+                                      padding:"5px 10px",borderRadius:8,fontSize:11,fontWeight:600,cursor:"pointer",maxWidth:"100%",
+                                      border:`1px solid ${on ? t.accent : t.border}`,background:on ? t.accentGlow : t.surfAlt,color:on ? t.accent : t.textSoft,
+                                      overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
+                                    }} title={d}>{d}</button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          <div>
+                            <span style={{ fontSize:11,fontWeight:600,color:t.textMuted }}>Role</span>
+                            <div className="people-filter-chip-row" style={{ marginTop:6 }}>
+                              {roleOptions.map((r) => {
+                                const on = advRoles.includes(r);
+                                return (
+                                  <button key={r} type="button" onClick={() => setAdvRoles((x) => toggleArr(x, r))}
+                                    style={{
+                                      padding:"5px 10px",borderRadius:8,fontSize:11,fontWeight:600,cursor:"pointer",maxWidth:"100%",
+                                      border:`1px solid ${on ? t.accent : t.border}`,background:on ? t.accentGlow : t.surfAlt,color:on ? t.accent : t.textSoft,
+                                      overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
+                                    }} title={r === "—" ? "No role" : r}>{r === "—" ? "No role" : r}</button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Profile */}
+                    <div>
+                      <button type="button" onClick={() => nestToggle("profile")}
+                        style={{ width:"100%",display:"flex",alignItems:"center",gap:8,padding:"10px 14px",background:"transparent",border:"none",cursor:"pointer",color:t.text,fontWeight:600,fontSize:13,textAlign:"left" }}>
+                        <ChevronDown size={14} style={{ color:t.textMuted,flexShrink:0,transform:nestOpen.profile ? "rotate(0deg)" : "rotate(-90deg)",transition:"transform 0.2s" }} />
+                        <Tag size={14} style={{ color:t.accent,flexShrink:0 }} />
+                        Tags, type, and access
+                      </button>
+                      {nestOpen.profile && (
+                        <div className="people-filter-nest-body" style={{ padding:"0 14px 12px 36px" }}>
+                          <div>
+                            <span style={{ fontSize:11,fontWeight:600,color:t.textMuted }}>Tags</span>
+                            <div className="people-filter-chip-row" style={{ marginTop:6 }}>
+                              {tagOptions.length === 0 && <span style={{ fontSize:12,color:t.textDim }}>No tags in this view</span>}
+                              {tagOptions.map((tg) => {
+                                const on = advTags.includes(tg);
+                                return (
+                                  <button key={tg} type="button" onClick={() => setAdvTags((x) => toggleArr(x, tg))}
+                                    style={{
+                                      padding:"5px 10px",borderRadius:8,fontSize:11,fontWeight:600,cursor:"pointer",maxWidth:"100%",
+                                      border:`1px solid ${on ? t.accent : t.border}`,background:on ? t.accentGlow : t.surfAlt,color:on ? t.accent : t.textSoft,
+                                      overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
+                                    }} title={tg}>{tg}</button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          <div>
+                            <span style={{ fontSize:11,fontWeight:600,color:t.textMuted }}>Type</span>
+                            <div className="people-filter-chip-row" style={{ marginTop:6 }}>
+                              {PERSON_TYPES.map((ty) => {
+                                const on = advTypes.includes(ty);
+                                return (
+                                  <button key={ty} type="button" onClick={() => setAdvTypes((x) => toggleArr(x, ty))}
+                                    style={{
+                                      padding:"5px 10px",borderRadius:8,fontSize:11,fontWeight:600,cursor:"pointer",
+                                      border:`1px solid ${on ? t.accent : t.border}`,background:on ? t.accentGlow : t.surfAlt,color:on ? t.accent : t.textSoft,
+                                    }}>{ty}</button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          <div>
+                            <span style={{ fontSize:11,fontWeight:600,color:t.textMuted }}>Access</span>
+                            <div className="people-filter-chip-row" style={{ marginTop:6 }}>
+                              {ACCESS_FILTER_OPTS.map((a) => {
+                                const on = advAccess.includes(a.value);
+                                return (
+                                  <button key={a.value} type="button" onClick={() => setAdvAccess((x) => toggleArr(x, a.value))}
+                                    style={{
+                                      padding:"5px 10px",borderRadius:8,fontSize:11,fontWeight:600,cursor:"pointer",
+                                      border:`1px solid ${on ? t.accent : t.border}`,background:on ? t.accentGlow : t.surfAlt,color:on ? t.accent : t.textSoft,
+                                    }}>{a.label}</button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          <div>
+                            <span style={{ fontSize:11,fontWeight:600,color:t.textMuted,display:"flex",alignItems:"center",gap:4 }}>
+                              <Clock size={12} style={{ opacity:0.85 }} /> Work arrangement
+                            </span>
+                            <div className="people-filter-chip-row" style={{ marginTop:6 }}>
+                              {WORK_TYPES.map((w) => {
+                                const on = advWorkTypes.includes(w);
+                                return (
+                                  <button key={w} type="button" onClick={() => setAdvWorkTypes((x) => toggleArr(x, w))}
+                                    style={{
+                                      padding:"5px 10px",borderRadius:8,fontSize:11,fontWeight:600,cursor:"pointer",
+                                      border:`1px solid ${on ? t.accent : t.border}`,background:on ? t.accentGlow : t.surfAlt,color:on ? t.accent : t.textSoft,
+                                    }}>{w}</button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <Button type="button" variant="secondary" size="md" style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <Download size={14} /> Import
+            </Button>
+            <Button type="button" variant="primary" size="md" onClick={openAdd} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <UserPlus size={14} /> Add person
+            </Button>
           </div>
         </header>
 
@@ -329,14 +805,16 @@ export default function PeoplePage() {
               )}
             </div>
           {selected.size>0 && (
-            <button onClick={()=>setConfirmDel(true)} style={{
-              background:t.dangerSoft,border:`1.5px solid ${t.danger}40`,borderRadius:8,color:t.danger,
-              padding:"8px 18px",cursor:"pointer",fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:7,transition:"all 0.15s",animation:"fadeSlideIn 0.2s ease-out",
-            }}
-              onMouseEnter={(e)=>{ e.currentTarget.style.background=t.danger; e.currentTarget.style.color=t.dangerTxt; }}
-              onMouseLeave={(e)=>{ e.currentTarget.style.background=t.dangerSoft; e.currentTarget.style.color=t.danger; }}>
-              <Trash2 size={14}/> Delete {selected.size} selected
-            </button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="md"
+              onClick={() => setConfirmDel(true)}
+              className="alloc8-btn-enter"
+              style={{ display: "flex", alignItems: "center", gap: 7 }}
+            >
+              <Trash2 size={14} /> Delete {selected.size} selected
+            </Button>
           )}
           </div>
         </div>
@@ -407,7 +885,7 @@ export default function PeoplePage() {
                 <tr><td colSpan={8} style={{ textAlign:"center",padding:"56px 20px" }}>
                   {viewTab==="archived"
                     ? <><Archive size={32} style={{ color:t.textDim,marginBottom:12 }}/><div style={{ color:t.textMuted,fontSize:15,fontWeight:600 }}>No archived people</div><div style={{ color:t.textDim,fontSize:13,marginTop:4 }}>Archived team members will appear here</div></>
-                    : <><Search size={32} style={{ color:t.textDim,marginBottom:12 }}/><div style={{ color:t.textMuted,fontSize:15,fontWeight:600 }}>{search?"No people match your search":"No people yet"}</div><div style={{ color:t.textDim,fontSize:13,marginTop:4 }}>{search?"Try a different search term":"Click \"Add person\" to get started"}</div></>
+                    : <><Search size={32} style={{ color:t.textDim,marginBottom:12 }}/><div style={{ color:t.textMuted,fontSize:15,fontWeight:600 }}>{search||advActiveCount?"No people match filters":"No people yet"}</div><div style={{ color:t.textDim,fontSize:13,marginTop:4 }}>{search||advActiveCount?"Try adjusting search or open Filters to clear criteria":"Click \"Add person\" to get started"}</div></>
                   }
                 </td></tr>
               )}
@@ -429,6 +907,7 @@ export default function PeoplePage() {
         onOpenCreateAllocation={({ person, projectLabel }) =>
           openCreateAllocationForPersonProject(person, projectLabel)
         }
+        onOpenCreateLeave={(person) => openCreateLeaveForPerson(person)}
         tagTheme={mode}
       />
 
@@ -441,6 +920,7 @@ export default function PeoplePage() {
         preselectPerson={allocPreselectPerson}
         preselectDate={null}
         preselectProject={allocPreselectProject}
+        defaultTab={allocDefaultTab}
         projects={allocationProjectOptions}
         projectRegistry={projects}
         onAddProject={addAllocationProjectLabel}

@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useAppData } from "../context/AppDataContext.jsx";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
+import { Button } from "../components/ui/Button.jsx";
+import { FloatSelect, FloatPersonPicker } from "../components/ui/FloatSelect.jsx";
 import { PROJECT_COLOR_PALETTE, colorForNewProjectId, avatarGradientFromName } from "../utils/projectColors.js";
 import { tagChromaProps } from "../utils/tagChroma.js";
 import { toast } from "sonner";
@@ -16,14 +18,12 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
-  Check,
   AlertTriangle,
   Pencil,
   Save,
   Archive,
   ArchiveRestore,
   MoreHorizontal,
-  UserPlus,
   Tag,
   Mail,
   Circle,
@@ -79,44 +79,17 @@ function Confirm({open,onYes,onNo,title,desc,yesLabel,yesIcon:YI,yesDanger,t}){
         <div><div style={{fontWeight:700,color:t.text,fontSize:16}}>{title}</div><div style={{color:t.textMuted,fontSize:13,marginTop:2}}>This action cannot be undone.</div></div>
       </div>
       <p style={{color:t.textSoft,fontSize:14,lineHeight:1.6,margin:"0 0 24px"}}>{desc}</p>
-      <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-        <button onClick={onNo} style={{background:t.btnSec,border:`1px solid ${t.border}`,borderRadius:8,color:t.btnSecTxt,padding:"9px 20px",cursor:"pointer",fontSize:13,fontWeight:600}}>Cancel</button>
-        <button type="button" onClick={onYes} style={{background:yesDanger?t.danger:t.warn,border:`1px solid ${yesDanger?t.dangerHov:t.warnHov}55`,borderRadius:10,color:yesDanger?t.dangerTxt:t.warnTxt,padding:"9px 20px",cursor:"pointer",fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:6,transition:"box-shadow 0.22s cubic-bezier(0.22,1,0.36,1), transform 0.18s ease, filter 0.18s ease",boxShadow:yesDanger?t.dangerGlow:t.warnGlow}} onMouseEnter={e=>{e.currentTarget.style.filter="brightness(1.06)";e.currentTarget.style.transform="translateY(-1px)";}} onMouseLeave={e=>{e.currentTarget.style.filter="";e.currentTarget.style.transform="";}}>{YI&&<YI size={14}/>} {yesLabel}</button>
+      <div style={{display:"flex",gap:10,justifyContent:"flex-end",flexWrap:"wrap"}}>
+        <Button type="button" variant="secondary" size="md" onClick={onNo}>Cancel</Button>
+        <Button type="button" variant={yesDanger ? "destructive" : "warning"} size="md" onClick={onYes} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {YI ? <YI size={14} /> : null} {yesLabel}
+        </Button>
       </div>
     </div>
   </div>);
 }
 
-/* ═══════════════════ SEARCHABLE DROPDOWN ═══════════════════ */
-function CDropdown({value,onChange,options,placeholder,renderOption,t}){
-  const[open,setOpen]=useState(false);const[q,setQ]=useState("");
-  const ref=useRef(null);const ir=useRef(null);
-  useEffect(()=>{const h=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);};document.addEventListener("mousedown",h);return()=>document.removeEventListener("mousedown",h);},[]);
-  useEffect(()=>{if(open&&ir.current)ir.current.focus();},[open]);
-  const lbls=options.map(o=>typeof o==="string"?o:o.label);
-  const filt=lbls.filter(l=>l.toLowerCase().includes(q.toLowerCase()));
-  const canC=q.trim()&&!lbls.some(l=>l.toLowerCase()===q.trim().toLowerCase());
-  const pick=v=>{onChange(v);setOpen(false);setQ("");};
-  return(<div ref={ref} style={{position:"relative"}}>
-    <div onClick={()=>setOpen(!open)} style={{background:t.surfAlt,border:`1.5px solid ${open?t.focus:t.borderIn}`,borderRadius:8,padding:"10px 14px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",color:value&&value!==placeholder?t.text:t.textMuted,fontSize:14,transition:"border-color 0.2s,box-shadow 0.2s",boxShadow:open?`0 0 0 3px ${t.accentGlow}`:"none"}}>
-      <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{value||placeholder}</span>
-      <ChevronDown size={14} style={{color:t.textMuted,transform:open?"rotate(180deg)":"none",transition:"transform 0.2s",flexShrink:0}}/>
-    </div>
-    {open&&(<div style={{position:"absolute",top:"calc(100% + 6px)",left:0,right:0,zIndex:140,background:t.surfRaised,border:`1px solid ${t.border}`,borderRadius:10,boxShadow:`0 12px 40px rgba(0,0,0,0.25)`,overflow:"hidden",animation:"dropIn 0.18s ease-out"}}>
-      <div style={{padding:8,borderBottom:`1px solid ${t.border}`}}>
-        <div style={{position:"relative"}}><Search size={14} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:t.textMuted}}/><input ref={ir} value={q} onChange={e=>setQ(e.target.value)} placeholder="Search or create…" style={{width:"100%",background:t.surfAlt,border:`1px solid ${t.borderIn}`,borderRadius:6,padding:"8px 10px 8px 32px",color:t.text,fontSize:13,outline:"none"}} onKeyDown={e=>{if(e.key==="Enter"&&canC)pick(q.trim());}}/></div>
-      </div>
-      <div style={{maxHeight:220,overflowY:"auto"}}>
-        {canC&&<div onClick={()=>pick(q.trim())} style={{padding:"10px 14px",cursor:"pointer",color:t.accent,fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:8,transition:"background 0.1s"}} onMouseEnter={e=>e.currentTarget.style.background=t.accentGlow} onMouseLeave={e=>e.currentTarget.style.background="transparent"}><Plus size={14}/> Create "{q.trim()}"</div>}
-        {filt.map((lbl,i)=>{const raw=options.find(o=>(typeof o==="string"?o:o.label)===lbl);const val=typeof raw==="string"?raw:(raw.value||raw.label);const act=value===lbl||value===val;return(
-          <div key={i} onClick={()=>pick(val)} style={{padding:renderOption?"10px 14px":"9px 14px",cursor:"pointer",color:t.text,fontSize:14,background:act?t.accentGlow:"transparent",display:"flex",alignItems:"center",justifyContent:"space-between",transition:"background 0.1s"}} onMouseEnter={e=>{if(!act)e.currentTarget.style.background=t.rowHov;}} onMouseLeave={e=>e.currentTarget.style.background=act?t.accentGlow:"transparent"}>
-            <div style={{flex:1,minWidth:0}}>{renderOption?renderOption(raw,t):lbl}</div>{act&&<Check size={14} style={{color:t.accent,flexShrink:0,marginLeft:8}}/>}
-          </div>);})}
-        {filt.length===0&&!canC&&<div style={{padding:14,color:t.textMuted,fontSize:13,textAlign:"center"}}>No results</div>}
-      </div>
-    </div>)}
-  </div>);
-}
+const CLIENT_NONE = "__client_none__";
 
 /* ═══════════════════ TAG INPUT ═══════════════════ */
 function CTagInput({tags,setTags,options,t,tagIsDark}){
@@ -129,40 +102,11 @@ function CTagInput({tags,setTags,options,t,tagIsDark}){
   return(<div ref={ref} style={{position:"relative"}}>
     <div onClick={()=>{setOpen(true);setTimeout(()=>ir.current?.focus(),0);}} style={{background:t.surfAlt,border:`1.5px solid ${open?t.focus:t.borderIn}`,borderRadius:8,padding:"7px 10px",cursor:"text",minHeight:44,display:"flex",flexWrap:"wrap",gap:6,alignItems:"center",transition:"border-color 0.2s,box-shadow 0.2s",boxShadow:open?`0 0 0 3px ${t.accentGlow}`:"none"}}>
       {tags.map(tag=>{const tp=tagChromaProps(tag,tagIsDark);return(<span key={tag} className={tp.className} style={{...tp.style,animation:"chipIn 0.2s ease-out"}}><Tag size={10} strokeWidth={2.25} aria-hidden/> {tag}<X size={12} className="float-tag-dismiss" aria-label={`Remove ${tag}`} onClick={e=>{e.stopPropagation();setTags(tags.filter(x=>x!==tag));}}/></span>);})}
-      <input ref={ir} value={q} onChange={e=>setQ(e.target.value)} onFocus={()=>setOpen(true)} onKeyDown={e=>{if((e.key===" "||e.key==="Enter")&&q.trim()){e.preventDefault();add(q);}else if(e.key==="Backspace"&&!q&&tags.length)setTags(tags.slice(0,-1));}} placeholder={tags.length===0?"Type and press space…":""} style={{background:"transparent",border:"none",outline:"none",flex:1,minWidth:120,color:t.text,fontSize:13,padding:"4px 0"}}/>
+      <input ref={ir} value={q} onChange={e=>setQ(e.target.value)} onFocus={()=>setOpen(true)} onKeyDown={e=>{if((e.key===" "||e.key==="Enter")&&q.trim()){e.preventDefault();add(q);}else if(e.key==="Backspace"&&!q&&tags.length)setTags(tags.slice(0,-1));}} placeholder={tags.length===0?"Type a tag, then press Space or Enter…":""} style={{background:"transparent",border:"none",outline:"none",flex:1,minWidth:120,color:t.text,fontSize:13,padding:"4px 0"}}/>
     </div>
     {open&&(avail.length>0||canC)&&(<div style={{position:"absolute",top:"calc(100% + 6px)",left:0,right:0,zIndex:140,background:t.surfRaised,border:`1px solid ${t.border}`,borderRadius:10,maxHeight:180,overflowY:"auto",boxShadow:`0 12px 40px rgba(0,0,0,0.25)`,animation:"dropIn 0.18s ease-out"}}>
-      {canC&&<div onClick={()=>add(q)} style={{padding:"9px 14px",cursor:"pointer",color:t.accent,fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background=t.accentGlow} onMouseLeave={e=>e.currentTarget.style.background="transparent"}><Plus size={14}/> Create "{q.trim()}"</div>}
+      {canC&&<div onClick={()=>add(q)} style={{padding:"9px 14px",cursor:"pointer",color:t.accent,fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background=t.accentGlow} onMouseLeave={e=>e.currentTarget.style.background="transparent"}><Plus size={14}/> Create &lsquo;{q.trim()}&rsquo;</div>}
       {avail.map(o=>(<div key={o} onClick={()=>add(o)} style={{padding:"9px 14px",cursor:"pointer",color:t.text,fontSize:13,transition:"background 0.1s"}} onMouseEnter={e=>e.currentTarget.style.background=t.rowHov} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{o}</div>))}
-    </div>)}
-  </div>);
-}
-
-/* ═══════════════════ TEAM MEMBER SEARCH DROPDOWN ═══════════════════ */
-function TeamMemberDropdown({people,teamIds,onAdd,t}){
-  const[open,setOpen]=useState(false);const[q,setQ]=useState("");
-  const ref=useRef(null);const ir=useRef(null);
-  useEffect(()=>{const h=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);};document.addEventListener("mousedown",h);return()=>document.removeEventListener("mousedown",h);},[]);
-  useEffect(()=>{if(open&&ir.current)ir.current.focus();},[open]);
-  const available=people.filter(p=>!p.archived&&!teamIds.includes(p.id));
-  const filtered=available.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||(p.role||"").toLowerCase().includes(q.toLowerCase())||(p.department||"").toLowerCase().includes(q.toLowerCase()));
-  return(<div ref={ref} style={{position:"relative"}}>
-    <div onClick={()=>setOpen(!open)} style={{background:t.surfAlt,border:`1.5px solid ${open?t.focus:t.borderIn}`,borderRadius:8,padding:"10px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:8,color:t.textMuted,fontSize:14,transition:"border-color 0.2s,box-shadow 0.2s",boxShadow:open?`0 0 0 3px ${t.accentGlow}`:"none"}}>
-      <UserPlus size={15} style={{color:t.accent,flexShrink:0}}/><span>Add team member…</span>
-      <ChevronDown size={14} style={{marginLeft:"auto",color:t.textMuted,transform:open?"rotate(180deg)":"none",transition:"transform 0.2s"}}/>
-    </div>
-    {open&&(<div style={{position:"absolute",bottom:"calc(100% + 6px)",left:0,right:0,zIndex:140,background:t.surfRaised,border:`1px solid ${t.border}`,borderRadius:10,boxShadow:`0 12px 40px rgba(0,0,0,0.25)`,overflow:"hidden",animation:"dropUp 0.18s ease-out",display:"flex",flexDirection:"column"}}>
-      <div style={{maxHeight:240,overflowY:"auto",order:1}}>
-        {filtered.length===0&&<div style={{padding:16,textAlign:"center",color:t.textMuted,fontSize:13}}>{available.length===0?"All people have been added":"No results found"}</div>}
-        {filtered.map(p=>(<div key={p.id} onClick={()=>{onAdd(p.id);setQ("");setOpen(false);}} style={{padding:"10px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:10,transition:"background 0.1s"}} onMouseEnter={e=>e.currentTarget.style.background=t.rowHov} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-          <div style={{width:30,height:30,borderRadius:8,background:avGrad(p.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff",flexShrink:0}}>{ini(p.name)}</div>
-          <div style={{flex:1,minWidth:0}}><div style={{fontWeight:600,fontSize:13,color:t.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div><div style={{fontSize:11,color:t.textMuted,display:"flex",alignItems:"center",gap:4}}>{p.role!=="—"&&<span>{p.role}</span>}{p.role!=="—"&&p.department&&<span style={{color:t.textDim}}>·</span>}{p.department&&<span>{p.department}</span>}</div></div>
-          <Plus size={14} style={{color:t.accent,flexShrink:0}}/>
-        </div>))}
-      </div>
-      <div style={{padding:8,borderTop:`1px solid ${t.border}`,order:2}}>
-        <div style={{position:"relative"}}><Search size={14} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:t.textMuted}}/><input ref={ir} value={q} onChange={e=>setQ(e.target.value)} placeholder="Search by name, role, or department…" style={{width:"100%",background:t.surfAlt,border:`1px solid ${t.borderIn}`,borderRadius:6,padding:"8px 10px 8px 32px",color:t.text,fontSize:13,outline:"none"}}/></div>
-      </div>
     </div>)}
   </div>);
 }
@@ -191,12 +135,12 @@ function RowActions({project,onEdit,onArchive,onDelete,t}){
     <button onClick={e=>{e.stopPropagation();setOpen(!open);}} style={{background:"transparent",border:"none",cursor:"pointer",color:t.textMuted,padding:6,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.background=t.accentGlow;e.currentTarget.style.color=t.accent;}} onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=t.textMuted;}}><MoreHorizontal size={16}/></button>
     {open&&(<>
       <div onClick={e=>{e.stopPropagation();setOpen(false);}} style={{position:"fixed",inset:0,zIndex:99}}/>
-      <div style={{position:"absolute",right:0,top:"100%",marginTop:4,zIndex:100,background:t.bg==="#0b0e14"?"#111627":"#ffffff",border:`1.5px solid ${t.accent}30`,borderRadius:10,boxShadow:`0 12px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.3)`,minWidth:190,overflow:"hidden",animation:"dropIn 0.15s ease-out"}}>
+      <div style={{position:"absolute",right:0,top:"100%",marginTop:4,zIndex:100,background:t.bg==="#0f1117"||t.bg==="#0b0e14"?"#111627":"#ffffff",border:`1.5px solid ${t.accent}30`,borderRadius:10,boxShadow:`0 12px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.3)`,minWidth:190,overflow:"hidden",animation:"dropIn 0.15s ease-out"}}>
       {[
         {icon:Pencil,label:"Edit project",action:()=>{onEdit();setOpen(false);},color:t.text},
         {icon:project.archived?ArchiveRestore:Archive,label:project.archived?"Restore":"Archive",action:()=>{onArchive();setOpen(false);},color:t.warn},
         {icon:Trash2,label:"Delete",action:()=>{onDelete();setOpen(false);},color:t.danger},
-      ].map((item,i)=>(<div key={i} onClick={e=>{e.stopPropagation();item.action();}} style={{padding:"11px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontSize:13,fontWeight:500,color:item.color,transition:"background 0.12s",borderBottom:i<2?`1px solid ${t.bg==="#0b0e14"?"#1a2030":"#e4e7ed"}`:"none"}} onMouseEnter={e=>e.currentTarget.style.background=t.bg==="#0b0e14"?"#1a2236":"#f0f2f5"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}><item.icon size={15}/> {item.label}</div>))}
+      ].map((item,i)=>(<div key={i} onClick={e=>{e.stopPropagation();item.action();}} style={{padding:"11px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontSize:13,fontWeight:500,color:item.color,transition:"background 0.12s",borderBottom:i<2?`1px solid ${t.bg==="#0f1117"||t.bg==="#0b0e14"?"#1a2030":"#e4e7ed"}`:"none"}} onMouseEnter={e=>e.currentTarget.style.background=t.bg==="#0f1117"||t.bg==="#0b0e14"?"#1a2236":"#f0f2f5"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}><item.icon size={15}/> {item.label}</div>))}
       </div>
     </>)}
   </div>);
@@ -213,11 +157,21 @@ export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,c
   if(!open||!form)return null;
   const upd=p=>setForm({...form,...p});
   const save=()=>{if(!form.name.trim())return;onSave(form);};
-  const stageObj=STAGES.find(s=>s.value===form.stage)||STAGES[0];
 
   return(
-    <div className="float-modal-overlay-dim" onClick={e=>{if(ref.current&&!ref.current.contains(e.target))onClose();}} style={{position:"fixed",inset:0,background:t.overlay,zIndex:200,display:"flex",alignItems:"flex-start",justifyContent:"center",paddingTop:40,animation:"fadeIn 0.22s var(--ds-ease-out, ease-out)"}}>
-      <div className="float-premium-modal float-modal-panel-enter" ref={ref} onClick={e=>e.stopPropagation()} style={{background:t.surfRaised,width:640,maxHeight:"calc(100vh - 80px)",display:"flex",flexDirection:"column"}}>
+    <div className="float-modal-overlay-dim" onClick={e=>{if(ref.current&&!ref.current.contains(e.target))onClose();}} style={{
+      position:"fixed",inset:0,background:t.overlay,zIndex:200,
+      display:"flex",alignItems:"center",justifyContent:"center",
+      padding:"max(16px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px))",
+      overflowY:"auto",
+      WebkitOverflowScrolling:"touch",
+      animation:"fadeIn 0.22s var(--ds-ease-out, ease-out)",
+    }}>
+      <div className="float-premium-modal float-modal-panel-enter" ref={ref} onClick={e=>e.stopPropagation()} style={{
+        background:t.surfRaised,width:"min(640px, 100%)",maxWidth:"100%",
+        maxHeight:"min(calc(100vh - 32px), calc(100dvh - 32px))",
+        display:"flex",flexDirection:"column",minHeight:0,overflow:"hidden",
+      }}>
 
         {/* Header */}
         <div style={{padding:"24px 32px 20px",flexShrink:0,borderBottom:`1px solid ${t.border}`}}>
@@ -238,12 +192,28 @@ export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,c
             <input value={form.code} onChange={e=>upd({code:e.target.value})} placeholder="Add project code" style={{background:t.surfAlt,border:`1.5px solid ${t.borderIn}`,borderRadius:8,padding:"10px 14px",color:t.text,fontSize:14,outline:"none",fontFamily:"'DM Mono', monospace"}}/>
 
             <label style={Lbl(t)}><span style={{display:"inline-flex",alignItems:"center",gap:6}}><User size={14}/> Owner</span></label>
-            <CDropdown t={t} value={SEED_OWNERS.find(o=>o.id===form.owner)?.name||""} onChange={v=>{const o=SEED_OWNERS.find(x=>x.name===v);if(o)upd({owner:o.id});}} options={SEED_OWNERS.map(o=>o.name)} placeholder="Select owner"
-              renderOption={(name,t)=>{const o=SEED_OWNERS.find(x=>x.name===name);return o?(<div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:26,height:26,borderRadius:7,background:avGrad(o.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff"}}>{o.initials}</div><span style={{fontWeight:500}}>{o.name}</span></div>):name;}}/>
+            <FloatSelect
+              t={t}
+              value={form.owner}
+              onChange={(id)=>{const o=SEED_OWNERS.find(x=>x.id===id);if(o)upd({owner:o.id});}}
+              options={SEED_OWNERS.map((o)=>({ label:o.name, value:o.id, raw:o }))}
+              placeholder="Select owner"
+              creatable={false}
+              searchPlaceholder="Search owners…"
+              renderOption={(o,th)=>o?(<div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:26,height:26,borderRadius:7,background:avGrad(o.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff"}}>{o.initials}</div><span style={{fontWeight:500,color:th.text}}>{o.name}</span></div>):null}
+            />
 
             <label style={Lbl(t)}><span style={{display:"inline-flex",alignItems:"center",gap:6}}><Circle size={14}/> Stage</span></label>
-            <CDropdown t={t} value={stageObj.label} onChange={v=>{const s=STAGES.find(x=>x.label===v);if(s)upd({stage:s.value});}} options={STAGES.map(s=>s.label)} placeholder="Draft"
-              renderOption={(label,t)=>{const s=STAGES.find(x=>x.label===label);return s?(<div style={{display:"flex",alignItems:"flex-start",gap:10}}><Circle size={14} fill={s.color} stroke={s.color} style={{flexShrink:0,marginTop:3}}/><div><div style={{fontWeight:600,color:t.text}}>{s.label}</div><div style={{fontSize:12,color:t.textMuted,marginTop:1,lineHeight:1.3}}>{s.desc}</div></div></div>):label;}}/>
+            <FloatSelect
+              t={t}
+              value={form.stage}
+              onChange={(v)=>{const s=STAGES.find(x=>x.value===v);if(s)upd({stage:s.value});}}
+              options={STAGES.map((s)=>({ label:s.label, value:s.value, raw:s }))}
+              placeholder="Select stage"
+              creatable={false}
+              searchPlaceholder="Search stages…"
+              renderOption={(s,th)=>s?(<div style={{display:"flex",alignItems:"flex-start",gap:10}}><Circle size={14} fill={s.color} stroke={s.color} style={{flexShrink:0,marginTop:3}}/><div><div style={{fontWeight:600,color:th.text}}>{s.label}</div><div style={{fontSize:12,color:th.textMuted,marginTop:1,lineHeight:1.3}}>{s.desc}</div></div></div>):null}
+            />
 
             <label style={Lbl(t)}><span style={{display:"inline-flex",alignItems:"center",gap:6}}><FileText size={14}/> Billable</span></label>
             <div style={{display:"flex",gap:0}}>
@@ -251,7 +221,14 @@ export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,c
             </div>
 
             <label style={Lbl(t)}><span style={{display:"inline-flex",alignItems:"center",gap:6}}><Briefcase size={14}/> Client</span></label>
-            <CDropdown t={t} value={form.client||"Empty"} onChange={v=>{if(v!=="Empty"&&!clients.includes(v))setClients([...clients,v]);upd({client:v==="Empty"?"":v});}} options={["Empty",...clients]} placeholder="Empty"/>
+            <FloatSelect
+              t={t}
+              value={form.client?form.client:CLIENT_NONE}
+              onChange={(v)=>{if(v!==CLIENT_NONE&&!clients.includes(v))setClients([...clients,v]);upd({client:v===CLIENT_NONE?"":v});}}
+              options={[{label:"No client",value:CLIENT_NONE},...clients.map((c)=>({label:c,value:c}))]}
+              placeholder="Select client"
+              searchPlaceholder="Search clients or type to add new…"
+            />
 
             <label style={Lbl(t)}><span style={{display:"inline-flex",alignItems:"center",gap:6}}><Tag size={14}/> Tags</span></label>
             <CTagInput t={t} tagIsDark={tagIsDark} tags={form.tags} setTags={nt=>{const n=nt.filter(x=>!tagOpts.includes(x));if(n.length)setTagOpts([...tagOpts,...n]);upd({tags:nt});}} options={tagOpts}/>
@@ -286,21 +263,32 @@ export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,c
                   <button onClick={()=>upd({teamIds:form.teamIds.filter(id=>id!==pid)})} style={{background:"transparent",border:"none",cursor:"pointer",color:t.textMuted,padding:6,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.background=t.dangerSoft;e.currentTarget.style.color=t.danger;}} onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=t.textMuted;}}><UserMinus size={15}/></button>
                 </div>);})}
               <div style={{marginTop:form.teamIds.length>0?6:0}}>
-                <TeamMemberDropdown people={people} teamIds={form.teamIds} onAdd={id=>upd({teamIds:[...form.teamIds,id]})} t={t}/>
+                <FloatPersonPicker
+                  t={t}
+                  people={people}
+                  excludeIds={form.teamIds}
+                  onPick={(id)=>upd({teamIds:[...form.teamIds,id]})}
+                  placement="above"
+                  placeholder="Add team member"
+                  emptyAllMessage="Everyone available is already on this team."
+                  emptyFilterMessage="No people match your search."
+                />
               </div>
             </div>
           </Section>
         </div>
 
         {/* Footer */}
-        <div style={{padding:"16px 32px 24px",flexShrink:0,display:"flex",alignItems:"center",gap:10,borderTop:`1px solid ${t.border}`}}>
-          <button onClick={save} disabled={!form.name.trim()} style={{background:t.accent,border:"none",borderRadius:8,color:t.accentTxt,padding:"10px 26px",cursor:form.name.trim()?"pointer":"default",fontSize:14,fontWeight:700,opacity:form.name.trim()?1:0.35,transition:"all 0.2s",boxShadow:form.name.trim()?`0 2px 12px ${t.accent}30`:"none",display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>{if(form.name.trim()){e.currentTarget.style.background=t.accentHov;e.currentTarget.style.transform="translateY(-1px)";}}} onMouseLeave={e=>{e.currentTarget.style.background=t.accent;e.currentTarget.style.transform="none";}}>
+        <div style={{padding:"16px 32px 24px",flexShrink:0,display:"flex",alignItems:"center",gap:10,borderTop:`1px solid ${t.border}`,flexWrap:"wrap"}}>
+          <Button type="button" variant="primary" size="md" onClick={save} disabled={!form.name.trim()} style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {isEdit?<><Save size={15}/> Save changes</>:<><FolderOpen size={15}/> Create project</>}
-          </button>
-          <button onClick={onClose} style={{background:t.btnSec,border:`1px solid ${t.border}`,borderRadius:8,color:t.btnSecTxt,padding:"10px 24px",cursor:"pointer",fontSize:14,fontWeight:600,transition:"all 0.15s"}} onMouseEnter={e=>e.currentTarget.style.background=t.btnSecHov} onMouseLeave={e=>e.currentTarget.style.background=t.btnSec}>Cancel</button>
-          {isEdit&&(<button onClick={onArchive} style={{marginLeft:"auto",background:t.warnSoft,border:`1px solid ${t.warn}30`,borderRadius:8,color:t.warn,padding:"10px 18px",cursor:"pointer",fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:6,transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.background=t.warn;e.currentTarget.style.color="#fff";}} onMouseLeave={e=>{e.currentTarget.style.background=t.warnSoft;e.currentTarget.style.color=t.warn;}}>
-            {editProject?.archived?<><ArchiveRestore size={14}/> Restore</>:<><Archive size={14}/> Archive</>}
-          </button>)}
+          </Button>
+          <Button type="button" variant="secondary" size="md" onClick={onClose}>Cancel</Button>
+          {isEdit&&(
+            <Button type="button" variant="warning" size="md" onClick={onArchive} style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+              {editProject?.archived?<><ArchiveRestore size={14}/> Restore</>:<><Archive size={14}/> Archive</>}
+            </Button>
+          )}
         </div>
       </div>
     </div>
@@ -357,8 +345,8 @@ export default function ProjectsPage(){
           <h1 style={{fontSize:26,fontWeight:700,margin:0,letterSpacing:-0.5}}>Projects</h1>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
             <div style={{position:"relative"}}><Search size={15} style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:t.textMuted}}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search projects…" style={{width:search?240:180,background:t.surface,border:`1.5px solid ${t.borderIn}`,borderRadius:8,padding:"8px 12px 8px 34px",color:t.text,fontSize:13,outline:"none",transition:"all 0.25s"}} onFocus={e=>{e.target.style.width="240px";e.target.style.borderColor=t.focus;e.target.style.boxShadow=`0 0 0 3px ${t.accentGlow}`;}} onBlur={e=>{if(!search)e.target.style.width="180px";e.target.style.borderColor=t.borderIn;e.target.style.boxShadow="none";}}/>{search&&<X size={14} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",color:t.textMuted,cursor:"pointer"}} onClick={()=>setSearch("")}/>}</div>
-            <button style={{background:t.btnSec,border:`1px solid ${t.border}`,borderRadius:8,color:t.btnSecTxt,padding:"8px 16px",cursor:"pointer",fontSize:13,fontWeight:500,display:"flex",alignItems:"center",gap:7,transition:"all 0.15s"}} onMouseEnter={e=>e.currentTarget.style.background=t.btnSecHov} onMouseLeave={e=>e.currentTarget.style.background=t.btnSec}><Download size={14}/> Import</button>
-            <button onClick={openAdd} style={{background:t.accent,border:"none",borderRadius:8,color:t.accentTxt,padding:"8px 18px",cursor:"pointer",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:7,transition:"all 0.15s",boxShadow:`0 2px 12px ${t.accent}30`}} onMouseEnter={e=>{e.currentTarget.style.background=t.accentHov;e.currentTarget.style.transform="translateY(-1px)";}} onMouseLeave={e=>{e.currentTarget.style.background=t.accent;e.currentTarget.style.transform="none";}}><Plus size={14}/> Add project</button>
+            <Button type="button" variant="secondary" size="md" style={{ display: "flex", alignItems: "center", gap: 7 }}><Download size={14}/> Import</Button>
+            <Button type="button" variant="primary" size="md" onClick={openAdd} style={{ display: "flex", alignItems: "center", gap: 7 }}><Plus size={14}/> Add project</Button>
           </div>
         </header>
 
@@ -367,7 +355,11 @@ export default function ProjectsPage(){
           <div style={{display:"flex",gap:2,background:t.surfAlt,borderRadius:10,padding:3,border:`1px solid ${t.border}`}}>
             {[{key:"active",label:"Active",count:activeCount,icon:FolderOpen},{key:"archived",label:"Archived",count:archivedCount,icon:Archive}].map(vt=>{const Icon=vt.icon;const active=viewTab===vt.key;return(<button key={vt.key} onClick={()=>{setViewTab(vt.key);setSelected(new Set());}} style={{padding:"8px 18px",fontSize:13,fontWeight:active?700:500,cursor:"pointer",background:active?t.surface:"transparent",border:active?`1px solid ${t.border}`:"1px solid transparent",color:active?t.text:t.textMuted,borderRadius:8,display:"flex",alignItems:"center",gap:7,transition:"all 0.2s",boxShadow:active?"0 1px 3px rgba(0,0,0,0.06)":"none"}} onMouseEnter={e=>{if(!active)e.currentTarget.style.color=t.textSoft;}} onMouseLeave={e=>{if(!active)e.currentTarget.style.color=t.textMuted;}}><Icon size={14}/> {vt.label}<span style={{background:active?t.accentGlow:t.surfAlt,color:active?t.accent:t.textDim,borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700,marginLeft:2}}>{vt.count}</span></button>);})}
           </div>
-          {selected.size>0&&(<button onClick={()=>setConfirmDel(true)} style={{background:t.dangerSoft,border:`1.5px solid ${t.danger}40`,borderRadius:8,color:t.danger,padding:"8px 18px",cursor:"pointer",fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:7,transition:"all 0.15s",animation:"fadeSlideIn 0.2s ease-out"}} onMouseEnter={e=>{e.currentTarget.style.background=t.danger;e.currentTarget.style.color=t.dangerTxt;}} onMouseLeave={e=>{e.currentTarget.style.background=t.dangerSoft;e.currentTarget.style.color=t.danger;}}><Trash2 size={14}/> Delete {selected.size} selected</button>)}
+          {selected.size>0&&(
+            <Button type="button" variant="destructive" size="md" onClick={()=>setConfirmDel(true)} className="alloc8-btn-enter" style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <Trash2 size={14}/> Delete {selected.size} selected
+            </Button>
+          )}
         </div>
 
         {/* Table */}

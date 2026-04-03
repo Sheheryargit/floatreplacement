@@ -1,0 +1,306 @@
+{
+  "AU-ACT": [
+    {
+      "date": "2025-03-10",
+      "name": "Canberra Day",
+      "localName": "Canberra Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-04-19",
+      "name": "Holy Saturday",
+      "localName": "Easter Eve",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "localName": "Easter Sunday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-06-02",
+      "name": "Reconciliation Day",
+      "localName": "Reconciliation Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-06-09",
+      "name": "King's Birthday",
+      "localName": "King's Birthday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-10-06",
+      "name": "Labour Day",
+      "localName": "Labour Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "AU-NSW": [
+    {
+      "date": "2025-04-19",
+      "name": "Holy Saturday",
+      "localName": "Easter Eve",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "localName": "Easter Sunday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-06-09",
+      "name": "King's Birthday",
+      "localName": "King's Birthday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-10-06",
+      "name": "Labour Day",
+      "localName": "Labour Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "AU-NT": [
+    {
+      "date": "2025-04-19",
+      "name": "Holy Saturday",
+      "localName": "Easter Eve",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "localName": "Easter Sunday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-05-05",
+      "name": "May Day",
+      "localName": "May Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-06-09",
+      "name": "King's Birthday",
+      "localName": "King's Birthday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-08-04",
+      "name": "Picnic Day",
+      "localName": "Picnic Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "AU-QLD": [
+    {
+      "date": "2025-04-19",
+      "name": "Holy Saturday",
+      "localName": "Easter Eve",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "localName": "Easter Sunday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-05-05",
+      "name": "Labour Day",
+      "localName": "Labour Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-10-06",
+      "name": "King's Birthday",
+      "localName": "King's Birthday",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "AU-SA": [
+    {
+      "date": "2025-03-10",
+      "name": "Adelaide Cup Day",
+      "localName": "Adelaide Cup Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-04-19",
+      "name": "Holy Saturday",
+      "localName": "Easter Eve",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "localName": "Easter Sunday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-06-09",
+      "name": "King's Birthday",
+      "localName": "King's Birthday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-10-06",
+      "name": "Labour Day",
+      "localName": "Labour Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "AU-TAS": [
+    {
+      "date": "2025-03-10",
+      "name": "Eight Hours Day",
+      "localName": "Eight Hours Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-06-09",
+      "name": "King's Birthday",
+      "localName": "King's Birthday",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "AU-VIC": [
+    {
+      "date": "2025-03-10",
+      "name": "Labour Day",
+      "localName": "Labour Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-04-19",
+      "name": "Holy Saturday",
+      "localName": "Easter Eve",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "localName": "Easter Sunday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-06-09",
+      "name": "King's Birthday",
+      "localName": "King's Birthday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-09-26",
+      "name": "Friday before AFL Grand Final",
+      "localName": "Friday before AFL Grand Final",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-11-04",
+      "name": "Melbourne Cup",
+      "localName": "Melbourne Cup",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "AU-WA": [
+    {
+      "date": "2025-03-03",
+      "name": "Labour Day",
+      "localName": "Labour Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "localName": "Easter Sunday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-06-02",
+      "name": "Western Australia Day",
+      "localName": "Western Australia Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2025-09-29",
+      "name": "King's Birthday",
+      "localName": "King's Birthday",
+      "types": [
+        "Public"
+      ]
+    }
+  ]
+}

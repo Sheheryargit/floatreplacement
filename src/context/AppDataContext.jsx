@@ -24,6 +24,11 @@ import * as allocationsApi from "../lib/api/allocations.js";
 import * as lookupsApi from "../lib/api/lookups.js";
 import { isSupabaseConfigured } from "../lib/supabase.js";
 import * as workspaceSettingsApi from "../lib/api/workspaceSettings.js";
+import {
+  migrateFilterRulesFromLegacyTags,
+  normalizeFilterRules,
+  deriveLegacyTagFilterFromRules,
+} from "../utils/scheduleAllocationFilter.js";
 
 const LEGACY_STORAGE_KEY = "float-workspace-v1";
 
@@ -74,6 +79,7 @@ function buildInitialSlices() {
       extraAllocationLabels: [...ALLOCATION_PROJECT_SEED],
       starredPeopleTags: [],
       schedulePeopleTagFilter: [],
+      scheduleFilterRules: [],
     };
   }
 
@@ -89,6 +95,7 @@ function buildInitialSlices() {
     extraAllocationLabels: [...ALLOCATION_PROJECT_SEED],
     starredPeopleTags: [],
     schedulePeopleTagFilter: [],
+    scheduleFilterRules: [],
   };
 }
 
@@ -102,6 +109,15 @@ const seedFallbacks = {
 };
 
 function mergeRemoteWorkspace(remote) {
+  const fromJson = normalizeFilterRules(remote.scheduleAllocationFilter);
+  const scheduleFilterRules =
+    fromJson.length > 0
+      ? fromJson
+      : migrateFilterRulesFromLegacyTags(
+          Array.isArray(remote.schedulePeopleTagFilter) ? remote.schedulePeopleTagFilter : []
+        );
+  const schedulePeopleTagFilter = deriveLegacyTagFilterFromRules(scheduleFilterRules);
+
   useAppStore.setState({
     people: remote.people,
     projects: remote.projects,
@@ -115,9 +131,8 @@ function mergeRemoteWorkspace(remote) {
       ...new Set([...seedFallbacks.extraAllocationLabels, ...remote.extraAllocationLabels]),
     ],
     starredPeopleTags: Array.isArray(remote.starredPeopleTags) ? [...remote.starredPeopleTags] : [],
-    schedulePeopleTagFilter: Array.isArray(remote.schedulePeopleTagFilter)
-      ? [...remote.schedulePeopleTagFilter]
-      : [],
+    schedulePeopleTagFilter,
+    scheduleFilterRules,
   });
 }
 
@@ -197,21 +212,51 @@ export const useAppStore = create((set, get) => ({
         workspaceSettingsApi.upsertWorkspaceSettings({
           starredPeopleTags: next,
           schedulePeopleTagFilter: state.schedulePeopleTagFilter,
+          scheduleAllocationFilter: normalizeFilterRules(state.scheduleFilterRules),
         })
       );
       return { starredPeopleTags: next };
     }),
 
-  setSchedulePeopleTagFilter: (val) =>
+  setScheduleFilterRules: (val) =>
     set((state) => {
-      const next = typeof val === "function" ? val(state.schedulePeopleTagFilter) : val;
+      const next = typeof val === "function" ? val(state.scheduleFilterRules) : val;
+      const norm = normalizeFilterRules(next);
+      const legacyTags = deriveLegacyTagFilterFromRules(norm);
       dbSync(() =>
         workspaceSettingsApi.upsertWorkspaceSettings({
           starredPeopleTags: state.starredPeopleTags,
-          schedulePeopleTagFilter: next,
+          schedulePeopleTagFilter: legacyTags,
+          scheduleAllocationFilter: norm,
         })
       );
-      return { schedulePeopleTagFilter: next };
+      return { scheduleFilterRules: norm, schedulePeopleTagFilter: legacyTags };
+    }),
+
+  setSchedulePeopleTagFilter: (val) =>
+    set((state) => {
+      const tagNext = typeof val === "function" ? val(state.schedulePeopleTagFilter) : val;
+      const base = normalizeFilterRules(state.scheduleFilterRules).filter((r) => r.field !== "person_tag");
+      const merged =
+        tagNext.length > 0
+          ? [
+              ...base,
+              {
+                id: "person-tag",
+                field: "person_tag",
+                op: "in",
+                values: [...tagNext].sort((a, b) => a.localeCompare(b)),
+              },
+            ]
+          : base;
+      dbSync(() =>
+        workspaceSettingsApi.upsertWorkspaceSettings({
+          starredPeopleTags: state.starredPeopleTags,
+          schedulePeopleTagFilter: tagNext,
+          scheduleAllocationFilter: merged,
+        })
+      );
+      return { schedulePeopleTagFilter: tagNext, scheduleFilterRules: merged };
     }),
 }));
 
@@ -270,8 +315,10 @@ export function useAppData() {
       setExtraAllocationLabels: s.setExtraAllocationLabels,
       starredPeopleTags: s.starredPeopleTags,
       schedulePeopleTagFilter: s.schedulePeopleTagFilter,
+      scheduleFilterRules: s.scheduleFilterRules,
       setStarredPeopleTags: s.setStarredPeopleTags,
       setSchedulePeopleTagFilter: s.setSchedulePeopleTagFilter,
+      setScheduleFilterRules: s.setScheduleFilterRules,
       getNextPersonId: s.getNextPersonId,
       getNextProjectId: s.getNextProjectId,
       addAllocationProjectLabel: s.addAllocationProjectLabel,

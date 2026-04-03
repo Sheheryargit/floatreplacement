@@ -181,7 +181,7 @@ export function DepartmentSelector({ t, value, onChange, depts, setDepts }) {
   };
 
   const glassBg =
-    t.bg === "#0b0e14"
+    t.bg === "#0b0e14" || t.bg === "#0f1117"
       ? "rgba(22, 26, 38, 0.82)"
       : "rgba(255, 255, 255, 0.86)";
 

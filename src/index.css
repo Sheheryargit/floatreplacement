@@ -15,6 +15,12 @@ html {
     color var(--duration-theme, 0.2s) ease;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 body {
   height: 100%;
   margin: 0;
@@ -108,6 +114,21 @@ body {
 }
 
 /* Schedule view switch toast — teal glass */
+@keyframes alloc8-enter-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.alloc8-btn-enter {
+  animation: alloc8-enter-up 0.26s var(--ease-ui-in-out, ease-in-out) both;
+}
+
 .float-schedule-view-toast {
   background: linear-gradient(
     135deg,

@@ -1,0 +1,140 @@
+/* Shared combobox / dropdown shell — modals & forms */
+
+.float-select {
+  position: relative;
+  width: 100%;
+}
+
+.float-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: var(--radius-input, 8px);
+  cursor: pointer;
+  font-size: 14px;
+  font-family: var(--font-body, inherit);
+  text-align: left;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.float-select-trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.float-select-trigger-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.float-select-trigger[data-placeholder="true"] .float-select-trigger-label {
+  opacity: 0.72;
+}
+
+.float-select-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  max-height: min(320px, 52vh);
+  border-radius: var(--radius-lg, 12px);
+  border: 1px solid var(--float-select-border, rgba(255, 255, 255, 0.1));
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 20px 56px rgba(0, 0, 0, 0.42),
+    0 0 40px color-mix(in srgb, var(--color-brand, #00c2a8) 6%, transparent);
+  overflow: hidden;
+}
+
+.float-select-panel--above {
+  bottom: calc(100% + 6px);
+}
+
+.float-select-panel--below {
+  top: calc(100% + 6px);
+}
+
+.float-select-search {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--float-select-border, rgba(255, 255, 255, 0.08));
+}
+
+.float-select-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  font-family: var(--font-body, inherit);
+}
+
+.float-select-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px;
+  overscroll-behavior: contain;
+}
+
+.float-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: calc(100% - 8px);
+  margin: 0 4px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: var(--radius-button, 8px);
+  background: transparent;
+  font-size: 14px;
+  font-family: var(--font-body, inherit);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.18s var(--ease-ui-in-out, ease-in-out),
+    transform 0.18s var(--ease-ui-in-out, ease-in-out);
+}
+
+.float-select-option:active {
+  transform: scale(0.99);
+}
+
+.float-select-option--create {
+  font-weight: 600;
+  font-style: italic;
+}
+
+.float-select-option-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.float-select-empty {
+  padding: 16px 14px;
+  font-size: 13px;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .float-select-option:active {
+    transform: none;
+  }
+}

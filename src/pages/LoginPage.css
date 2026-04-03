@@ -159,7 +159,9 @@
 
 .login-page-input:focus {
   border-color: color-mix(in srgb, var(--color-brand) 55%, var(--color-border));
-  box-shadow: 0 0 0 3px var(--color-brand-dim);
+  box-shadow:
+    0 0 0 3px var(--color-brand-dim),
+    0 0 28px color-mix(in srgb, var(--color-brand) 22%, transparent);
   background: color-mix(in srgb, var(--color-bg) 80%, transparent);
 }
 
@@ -197,6 +199,8 @@
 }
 
 .login-page-submit {
+  position: relative;
+  overflow: hidden;
   width: 100%;
   padding: 14px 20px;
   border: none;
@@ -207,22 +211,28 @@
   letter-spacing: 0.02em;
   cursor: pointer;
   color: #061210;
-  background: linear-gradient(135deg, var(--color-brand-light) 0%, var(--color-brand) 100%);
-  box-shadow: 0 0 20px var(--color-brand-dim);
+  background: linear-gradient(135deg, var(--color-brand-light) 0%, var(--color-brand) 52%, color-mix(in srgb, var(--color-brand) 85%, #0a1620) 100%);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-brand-light) 40%, transparent) inset,
+    0 0 24px var(--color-brand-dim),
+    0 8px 28px color-mix(in srgb, var(--color-brand) 18%, transparent);
   transition:
-    transform var(--duration-fast) ease,
-    box-shadow var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-ui-in-out, ease-in-out),
+    box-shadow var(--duration-normal) var(--ease-ui-in-out, ease-in-out),
     filter var(--duration-fast) ease;
 }
 
 .login-page-submit:hover:not(:disabled) {
-  filter: brightness(1.06);
-  transform: translateY(-1px);
-  box-shadow: 0 0 28px color-mix(in srgb, var(--color-brand) 35%, transparent);
+  filter: brightness(1.05);
+  transform: translateY(-1px) scale(1.005);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-brand-light) 55%, transparent) inset,
+    0 0 36px color-mix(in srgb, var(--color-brand) 38%, transparent),
+    0 12px 36px color-mix(in srgb, var(--color-brand) 22%, transparent);
 }
 
 .login-page-submit:active:not(:disabled) {
-  transform: translateY(0);
+  transform: scale(0.98);
 }
 
 .login-page-submit:disabled {
@@ -281,6 +291,10 @@
 
 .login-page[data-theme="light"] .login-page-input {
   background: #ffffff;
+}
+
+.login-page[data-theme="light"] .login-page-submit {
+  color: #fff;
 }
 
 @media (max-width: 480px) {

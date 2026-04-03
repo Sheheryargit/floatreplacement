@@ -66,5 +66,8 @@ export async function loadWorkspaceFromSupabase() {
     extraAllocationLabels,
     starredPeopleTags: workspaceSettings.starredPeopleTags,
     schedulePeopleTagFilter: workspaceSettings.schedulePeopleTagFilter,
+    scheduleAllocationFilter: Array.isArray(workspaceSettings.scheduleAllocationFilter)
+      ? workspaceSettings.scheduleAllocationFilter
+      : [],
   };
 }

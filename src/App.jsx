@@ -7,6 +7,7 @@ import { AppDialogProvider } from "./context/AppDialogContext.jsx";
 import { SlapAnimationProvider } from "./context/SlapAnimationContext.jsx";
 import { AppDataProvider, useAppStore } from "./context/AppDataContext.jsx";
 import AnimatedAppLoader from "./components/ui/AnimatedAppLoader.jsx";
+import RouteSkeleton from "./components/ui/RouteSkeleton.jsx";
 import PageTransition from "./components/ui/PageTransition.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import CommandPalette from "./components/command/CommandPalette.jsx";
@@ -63,7 +64,7 @@ function AnimatedRoutes() {
   const element = useRoutes(routes, location);
 
   return (
-    <Suspense fallback={<AnimatedAppLoader />}>
+    <Suspense fallback={<RouteSkeleton />}>
       <AnimatePresence mode="wait">
         {element && cloneElement(element, { key: location.pathname })}
       </AnimatePresence>
@@ -101,8 +102,8 @@ function ThemedToaster() {
   return (
     <Toaster
       theme={theme}
-      position="bottom-right"
-      offset={16}
+      position="top-right"
+      offset={{ top: 16, right: 16 }}
       richColors
       closeButton
       expand
@@ -113,19 +114,20 @@ function ThemedToaster() {
           toast: "alloc8-toast",
         },
         style: {
-          borderRadius: "12px",
+          borderRadius: "14px",
           fontSize: "13.5px",
           fontWeight: 600,
           fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif",
-          backdropFilter: "blur(16px)",
+          backdropFilter: "blur(20px) saturate(1.2)",
+          WebkitBackdropFilter: "blur(20px) saturate(1.2)",
           boxShadow:
             theme === "light"
-              ? "0 8px 32px rgba(15,23,42,0.1), 0 2px 8px rgba(0,0,0,0.06)"
-              : "0 8px 32px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.2)",
+              ? "0 12px 40px rgba(15,23,42,0.12), 0 0 0 1px rgba(0,0,0,0.04), 0 4px 16px rgba(0,194,168,0.06)"
+              : "0 16px 48px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06), 0 0 40px rgba(0,194,168,0.08)",
           border:
             theme === "light"
               ? "1px solid rgba(0,0,0,0.06)"
-              : "1px solid rgba(255,255,255,0.08)",
+              : "1px solid rgba(255,255,255,0.1)",
           padding: "14px 18px",
         },
       }}

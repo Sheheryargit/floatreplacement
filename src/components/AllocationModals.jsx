@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from "framer-motion";
 import { X, ChevronDown, ArrowLeftRight, Zap, Trash2, Palmtree } from "lucide-react";
 import { resolveColorForProjectLabel } from "../utils/projectColors.js";
+import { normalizeLeaveTypeId, leaveAccentTheme, leavePanelStyleVars } from "../utils/leaveVisuals.js";
 import "./AllocationModals.css";
 
 export const ALLOCATION_PROJECT_SEED = [
@@ -128,8 +130,10 @@ export function CreateAllocationModal({
   onAddProject,
   editAllocation,
   onEditAllocation,
+  defaultTab = "allocation",
   t,
 }) {
+  const reduceMotion = useReducedMotion();
   const hoursMode = "Hours";
   const [activeTab, setActiveTab] = useState("allocation");
   const [hoursPerDay, setHoursPerDay] = useState("7.5");
@@ -167,7 +171,7 @@ export function CreateAllocationModal({
       setRepeatId(editAllocation.repeatId || "none");
       setActiveTab(editAllocation.isLeave ? "leave" : "allocation");
       if (editAllocation.isLeave) {
-        setLeaveType(editAllocation.leaveType || "");
+        setLeaveType(editAllocation.leaveType || "annual");
         setLeaveNotes(editAllocation.notes || "");
       }
       setAssignedIds(editAllocation.personIds || (editAllocation.personId != null ? [editAllocation.personId] : []));
@@ -199,14 +203,14 @@ export function CreateAllocationModal({
     setProjectOpen(false);
     setProjectCreateMode(false);
     setNewProjectLine("");
-    setActiveTab("allocation");
+    setActiveTab(defaultTab === "leave" ? "leave" : "allocation");
     setLeaveType("annual");
     setLeaveTypeOpen(false);
     setLeaveNotes("");
     if (preselectPerson) setAssignedIds([preselectPerson.id]);
     else if (people[0]) setAssignedIds([people[0].id]);
     else setAssignedIds([]);
-  }, [open, preselectPerson, preselectDate, preselectProject, people, projects, editAllocation]);
+  }, [open, preselectPerson, preselectDate, preselectProject, people, projects, editAllocation, defaultTab]);
 
   useEffect(() => {
     function onDoc(e) {
@@ -268,6 +272,8 @@ export function CreateAllocationModal({
     setProjectOpen(false);
   }, [newProjectLine, onAddProject]);
 
+  const leaveAccent = useMemo(() => leaveAccentTheme(leaveType), [leaveType]);
+
   if (!open) return null;
 
   const handleSave = () => {
@@ -315,6 +321,8 @@ export function CreateAllocationModal({
 
   const repeatOptionLabel = repeatLabel(repeatId);
 
+  const leaveTypeNorm = normalizeLeaveTypeId(leaveType);
+
   return (
     <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
       <Dialog.Portal>
@@ -340,34 +348,61 @@ export function CreateAllocationModal({
           </Dialog.Close>
         </div>
 
-        <div className="lpam-tabs" style={{ borderColor: t.border }}>
-          <button
-            type="button"
-            className={"lpam-tab" + (activeTab === "allocation" ? " lpam-tab-active" : "")}
-            style={{
-              color: activeTab === "allocation" ? t.accent : t.textSoft,
-              borderBottomColor: activeTab === "allocation" ? t.accent : "transparent",
-            }}
-            onClick={() => setActiveTab("allocation")}
-          >
-            Allocation
-          </button>
-          <button
-            type="button"
-            className={"lpam-tab" + (activeTab === "leave" ? " lpam-tab-active" : "")}
-            style={{
-              color: activeTab === "leave" ? "#8c9fbe" : t.textSoft,
-              borderBottomColor: activeTab === "leave" ? "#8c9fbe" : "transparent",
-            }}
-            onClick={() => setActiveTab("leave")}
-          >
-            <Palmtree size={14} style={{ marginRight: 5 }} />
-            Leave
-          </button>
-        </div>
+        <LayoutGroup id="lpam-create-tabs">
+          <div className="lpam-tabs lpam-tabs--motion" style={{ borderColor: t.border }}>
+            <button
+              type="button"
+              className={"lpam-tab" + (activeTab === "allocation" ? " lpam-tab-active" : "")}
+              style={{
+                color: activeTab === "allocation" ? t.accent : t.textSoft,
+                borderBottomColor: "transparent",
+                position: "relative",
+              }}
+              onClick={() => setActiveTab("allocation")}
+            >
+              Allocation
+              {activeTab === "allocation" ? (
+                <motion.span
+                  layoutId="lpam-create-tab-line"
+                  className="lpam-tab-line"
+                  style={{ background: t.accent }}
+                  transition={{ type: "spring", stiffness: 400, damping: 34 }}
+                />
+              ) : null}
+            </button>
+            <button
+              type="button"
+              className={"lpam-tab" + (activeTab === "leave" ? " lpam-tab-active" : "")}
+              style={{
+                color: activeTab === "leave" ? leaveAccent.solid : t.textSoft,
+                borderBottomColor: "transparent",
+                position: "relative",
+              }}
+              onClick={() => setActiveTab("leave")}
+            >
+              <Palmtree size={14} style={{ marginRight: 5 }} />
+              Leave
+              {activeTab === "leave" ? (
+                <motion.span
+                  layoutId="lpam-create-tab-line"
+                  className="lpam-tab-line"
+                  style={{ background: leaveAccent.solid }}
+                  transition={{ type: "spring", stiffness: 400, damping: 34 }}
+                />
+              ) : null}
+            </button>
+          </div>
+        </LayoutGroup>
 
+        <div className="lpam-modal-body">
+        <AnimatePresence mode="wait">
         {activeTab === "allocation" ? (
-          <>
+          <motion.div
+            key="lpam-body-alloc"
+            initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0, transition: { duration: 0.26, ease: [0.45, 0, 0.55, 1] } }}
+            exit={reduceMotion ? undefined : { opacity: 0, y: -8, transition: { duration: 0.18 } }}
+          >
         <div className="lpam-panel" style={{ background: t.surface, borderColor: t.borderIn || t.border, boxShadow: "0 2px 6px rgba(0,0,0,0.02)" }}>
           <div className="lpam-row lpam-row-split">
             <div className="lpam-field">
@@ -613,16 +648,39 @@ export function CreateAllocationModal({
             style={{ borderColor: "transparent", background: t.surface, color: t.text, boxShadow: "0 2px 6px rgba(0,0,0,0.06)" }}
           />
         </div>
-          </>
+          </motion.div>
         ) : (
-          /* ───── LEAVE TAB CONTENT ───── */
-          <>
-            <div className="lpam-panel lpam-panel-leave" style={{ background: t.surface, borderColor: t.borderIn || t.border, boxShadow: "0 2px 6px rgba(0,0,0,0.02)" }}>
+          <motion.div
+            key="lpam-body-leave"
+            initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0, transition: { duration: 0.26, ease: [0.45, 0, 0.55, 1] } }}
+            exit={reduceMotion ? undefined : { opacity: 0, y: -8, transition: { duration: 0.18 } }}
+          >
+            <div
+              className={"lpam-panel lpam-panel-leave lpam-panel-leave--" + leaveTypeNorm}
+              style={{
+                background: t.surface,
+                borderColor: t.borderIn || t.border,
+                boxShadow: "0 2px 6px rgba(0,0,0,0.02)",
+                ...leavePanelStyleVars(leaveType),
+              }}
+            >
               <div className="lpam-leave-icon-row">
-                <div className="lpam-leave-icon-circle" style={{ background: `${t.accent}18` }}>
-                  <Palmtree size={22} style={{ color: t.accent }} />
-                </div>
+                <motion.div
+                  className="lpam-leave-icon-circle"
+                  style={{ background: leaveAccent.soft }}
+                  animate={reduceMotion ? undefined : { scale: [1, 1.04, 1] }}
+                  transition={{ duration: 0.45, ease: [0.45, 0, 0.55, 1] }}
+                  key={leaveTypeNorm}
+                >
+                  <Palmtree size={22} style={{ color: leaveAccent.solid }} />
+                </motion.div>
               </div>
+              {leaveType === "annual" ? (
+                <p className="lpam-leave-hint" style={{ color: t.textMuted }}>
+                  Paid time off — appears on the schedule with a teal pattern so it stays distinct from other leave types.
+                </p>
+              ) : null}
               <div className="lpam-field">
                 <label className="lpam-label" style={{ color: t.textMuted }}>Leave type</label>
                 <div className="lpam-dropdown-wrap lpam-dropdown-full" ref={leaveTypeWrapRef}>
@@ -635,39 +693,54 @@ export function CreateAllocationModal({
                   >
                     <span className="lpam-project-trigger-inner">
                       <span
-                        className="lpam-leave-swatch"
+                        className={"lpam-leave-swatch lpam-leave-swatch--" + leaveTypeNorm}
                         aria-hidden
                       />
                       <span className="lpam-project-trigger-text">{leaveLabel(leaveType)}</span>
                     </span>
                     <ChevronDown size={16} style={{ color: t.textMuted }} />
                   </button>
-                  {leaveTypeOpen && (
-                    <div
-                      className="lpam-menu lpam-menu-project"
-                      style={{ background: t.surface, borderColor: t.border }}
-                      role="listbox"
-                    >
-                      {LEAVE_TYPES.map((lt) => (
-                        <button
-                          key={lt.id}
-                          type="button"
-                          role="option"
-                          className={"lpam-menu-item" + (leaveType === lt.id ? " lpam-menu-item-active" : "")}
-                          style={{ color: t.text }}
-                          onClick={() => {
-                            setLeaveType(lt.id);
-                            setLeaveTypeOpen(false);
-                          }}
-                        >
-                          <span className="lpam-menu-item-inner">
-                            <span className="lpam-leave-swatch" aria-hidden />
-                            <span className="lpam-menu-item-label">{lt.label}</span>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  <AnimatePresence>
+                    {leaveTypeOpen ? (
+                      <motion.div
+                        key="leave-type-menu"
+                        className="lpam-menu lpam-menu-project lpam-menu-leave-types"
+                        style={{ background: t.surface, borderColor: t.border }}
+                        role="listbox"
+                        initial={reduceMotion ? false : { opacity: 0, y: -6, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.22, ease: [0.45, 0, 0.55, 1] } }}
+                        exit={reduceMotion ? undefined : { opacity: 0, y: -4, scale: 0.99, transition: { duration: 0.15 } }}
+                      >
+                        {LEAVE_TYPES.map((lt, li) => {
+                          const n = normalizeLeaveTypeId(lt.id);
+                          return (
+                            <motion.button
+                              key={lt.id}
+                              type="button"
+                              role="option"
+                              className={"lpam-menu-item" + (leaveType === lt.id ? " lpam-menu-item-active" : "")}
+                              style={{ color: t.text }}
+                              initial={reduceMotion ? false : { opacity: 0, x: -8 }}
+                              animate={{
+                                opacity: 1,
+                                x: 0,
+                                transition: { delay: reduceMotion ? 0 : li * 0.035, duration: 0.2 },
+                              }}
+                              onClick={() => {
+                                setLeaveType(lt.id);
+                                setLeaveTypeOpen(false);
+                              }}
+                            >
+                              <span className="lpam-menu-item-inner">
+                                <span className={"lpam-leave-swatch lpam-leave-swatch--" + n} aria-hidden />
+                                <span className="lpam-menu-item-label">{lt.label}</span>
+                              </span>
+                            </motion.button>
+                          );
+                        })}
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
                 </div>
               </div>
 
@@ -706,8 +779,9 @@ export function CreateAllocationModal({
                 style={{ borderColor: "transparent", background: t.surface, color: t.text, boxShadow: "0 2px 6px rgba(0,0,0,0.06)" }}
               />
             </div>
-          </>
+          </motion.div>
         )}
+        </AnimatePresence>
 
         <div className="lpam-field lpam-field-assign">
           <label className="lpam-label" style={{ color: t.textMuted }}>
@@ -762,18 +836,31 @@ export function CreateAllocationModal({
             )}
           </div>
         </div>
+        </div>
 
         <div className="lpam-footer">
           <div className="lpam-create-actions">
-            <button
+            <motion.button
               type="button"
               className={"lpam-btn lpam-btn-primary" + (activeTab === "leave" ? " lpam-btn-leave" : "")}
               onClick={handleSave}
               disabled={workingDays <= 0 || (activeTab === "allocation" && parseFloat(hoursPerDay) <= 0)}
-              style={{ background: activeTab === "leave" ? "#8c9fbe" : t.accent, borderColor: "transparent", color: "#fff" }}
+              style={{
+                background:
+                  activeTab === "leave"
+                    ? `linear-gradient(145deg, ${leaveAccent.solid}, color-mix(in srgb, ${leaveAccent.solid} 75%, #0f172a))`
+                    : t.accent,
+                borderColor: "transparent",
+                color: "#fff",
+                boxShadow:
+                  activeTab === "leave"
+                    ? `0 6px 28px ${leaveAccent.glow}`
+                    : undefined,
+              }}
+              whileTap={reduceMotion || workingDays <= 0 ? undefined : { scale: 0.98 }}
             >
               {editAllocation ? "Save changes" : (activeTab === "leave" ? "Create leave" : "Create allocation")}
-            </button>
+            </motion.button>
             <Dialog.Close asChild>
               <button
                 type="button"
@@ -795,6 +882,7 @@ export function AllocationDetailModal({ open, allocation, assigneeNames, onClose
   if (!open || !allocation) return null;
 
   const isLeave = !!allocation.isLeave;
+  const detailLeaveAccent = isLeave ? leaveAccentTheme(allocation.leaveType) : null;
   const wd = allocation.workingDays ?? countWorkingDaysBetween(allocation.startDate, allocation.endDate);
   const repeatText = allocation.repeatId && allocation.repeatId !== "none" ? repeatLabel(allocation.repeatId) : null;
 
@@ -830,6 +918,7 @@ export function AllocationDetailModal({ open, allocation, assigneeNames, onClose
           </Dialog.Close>
         </div>
 
+        <div className="lpam-modal-body">
         {isLeave ? (
           /* ── Leave detail layout ─────────── */
           <>
@@ -838,7 +927,10 @@ export function AllocationDetailModal({ open, allocation, assigneeNames, onClose
                 Leave type
               </div>
               <div className="lpam-detail-project" style={{ color: t.text, display: "flex", alignItems: "center", gap: 10 }}>
-                <span className="lpam-leave-swatch" aria-hidden />
+                <span
+                  className={"lpam-leave-swatch lpam-leave-swatch--" + normalizeLeaveTypeId(allocation.leaveType)}
+                  aria-hidden
+                />
                 {allocation.leaveType ? leaveLabel(allocation.leaveType) : allocation.project}
               </div>
             </div>
@@ -919,6 +1011,7 @@ export function AllocationDetailModal({ open, allocation, assigneeNames, onClose
           </div>
           <div className="lpam-detail-value lpam-detail-value-sm">{assigneeNames || "—"}</div>
         </div>
+        </div>
 
         <div className="lpam-detail-foot">
           <div className="lpam-meta" style={{ color: t.textMuted }}>
@@ -960,9 +1053,12 @@ export function AllocationDetailModal({ open, allocation, assigneeNames, onClose
                 type="button"
                 className={"lpam-btn lpam-btn-primary" + (isLeave ? " lpam-btn-leave" : "")}
                 style={{
-                  background: isLeave ? "#8c9fbe" : t.accent,
+                  background: isLeave && detailLeaveAccent
+                    ? `linear-gradient(145deg, ${detailLeaveAccent.solid}, color-mix(in srgb, ${detailLeaveAccent.solid} 72%, #0f172a))`
+                    : t.accent,
                   borderColor: "transparent",
                   color: "#fff",
+                  boxShadow: isLeave && detailLeaveAccent ? `0 6px 24px ${detailLeaveAccent.glow}` : undefined,
                 }}
                 onClick={onEditClick}
               >

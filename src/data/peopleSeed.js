@@ -27,6 +27,7 @@ function personFromRow(id, name, role, department) {
     workType: "Full-time",
     notes: "",
     holidays: "None",
+    publicHolidayRegion: "None",
     email: emailFromName(name),
     archived: false,
   };

@@ -1,16 +1,14 @@
 import { useMemo } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { PAGE_VARIANTS, PAGE_VARIANT_SIMPLE } from "./routeTransitionPresets.js";
+import { PAGE_VARIANT_FADE_SLIDE, PAGE_VARIANT_SIMPLE } from "./routeTransitionPresets.js";
 
-/**
- * Wraps a route screen. Random preset is fixed for this mount so exit animation stays consistent.
- */
+/** Wraps a route screen — same enter/exit curve every navigation (no random presets). */
 export default function PageTransition({ children }) {
   const reduceMotion = useReducedMotion();
-  const preset = useMemo(() => {
-    if (reduceMotion) return PAGE_VARIANT_SIMPLE;
-    return PAGE_VARIANTS[Math.floor(Math.random() * PAGE_VARIANTS.length)];
-  }, [reduceMotion]);
+  const preset = useMemo(
+    () => (reduceMotion ? PAGE_VARIANT_SIMPLE : PAGE_VARIANT_FADE_SLIDE),
+    [reduceMotion]
+  );
 
   return (
     <motion.div

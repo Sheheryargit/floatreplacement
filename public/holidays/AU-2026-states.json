@@ -1,0 +1,306 @@
+{
+  "AU-ACT": [
+    {
+      "date": "2026-03-09",
+      "name": "Canberra Day",
+      "localName": "Canberra Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-04",
+      "name": "Holy Saturday",
+      "localName": "Easter Eve",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-05",
+      "name": "Easter Sunday",
+      "localName": "Easter Sunday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-06-01",
+      "name": "Reconciliation Day",
+      "localName": "Reconciliation Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-06-08",
+      "name": "King's Birthday",
+      "localName": "King's Birthday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-10-05",
+      "name": "Labour Day",
+      "localName": "Labour Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "AU-NSW": [
+    {
+      "date": "2026-04-04",
+      "name": "Holy Saturday",
+      "localName": "Easter Eve",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-05",
+      "name": "Easter Sunday",
+      "localName": "Easter Sunday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-06-08",
+      "name": "King's Birthday",
+      "localName": "King's Birthday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-10-05",
+      "name": "Labour Day",
+      "localName": "Labour Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "AU-NT": [
+    {
+      "date": "2026-04-04",
+      "name": "Holy Saturday",
+      "localName": "Easter Eve",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-05",
+      "name": "Easter Sunday",
+      "localName": "Easter Sunday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-05-04",
+      "name": "May Day",
+      "localName": "May Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-06-08",
+      "name": "King's Birthday",
+      "localName": "King's Birthday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-08-03",
+      "name": "Picnic Day",
+      "localName": "Picnic Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "AU-QLD": [
+    {
+      "date": "2026-04-04",
+      "name": "Holy Saturday",
+      "localName": "Easter Eve",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-05",
+      "name": "Easter Sunday",
+      "localName": "Easter Sunday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-05-04",
+      "name": "Labour Day",
+      "localName": "Labour Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-10-05",
+      "name": "King's Birthday",
+      "localName": "King's Birthday",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "AU-SA": [
+    {
+      "date": "2026-03-09",
+      "name": "Adelaide Cup Day",
+      "localName": "Adelaide Cup Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-04",
+      "name": "Holy Saturday",
+      "localName": "Easter Eve",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-05",
+      "name": "Easter Sunday",
+      "localName": "Easter Sunday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-06-08",
+      "name": "King's Birthday",
+      "localName": "King's Birthday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-10-05",
+      "name": "Labour Day",
+      "localName": "Labour Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "AU-TAS": [
+    {
+      "date": "2026-03-09",
+      "name": "Eight Hours Day",
+      "localName": "Eight Hours Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-06-08",
+      "name": "King's Birthday",
+      "localName": "King's Birthday",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "AU-VIC": [
+    {
+      "date": "2026-03-09",
+      "name": "Labour Day",
+      "localName": "Labour Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-04",
+      "name": "Holy Saturday",
+      "localName": "Easter Eve",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-05",
+      "name": "Easter Sunday",
+      "localName": "Easter Sunday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-06-08",
+      "name": "King's Birthday",
+      "localName": "King's Birthday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-11-03",
+      "name": "Melbourne Cup",
+      "localName": "Melbourne Cup",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "AU-WA": [
+    {
+      "date": "2026-03-02",
+      "name": "Labour Day",
+      "localName": "Labour Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-05",
+      "name": "Easter Sunday",
+      "localName": "Easter Sunday",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-27",
+      "name": "Anzac Day",
+      "localName": "Anzac Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-06-01",
+      "name": "Western Australia Day",
+      "localName": "Western Australia Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-09-28",
+      "name": "King's Birthday",
+      "localName": "King's Birthday",
+      "types": [
+        "Public"
+      ]
+    }
+  ]
+}

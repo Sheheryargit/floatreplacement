@@ -18,9 +18,19 @@ import {
   FolderPlus,
   CalendarPlus,
   Star,
-  Tag,
   X,
   ArrowDownUp,
+  Repeat2,
+  StickyNote,
+  Filter,
+  Palmtree,
+  HeartPulse,
+  User,
+  Baby,
+  Flower2,
+  Wallet,
+  Landmark,
+  Umbrella,
 } from "lucide-react";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useAppData } from "../context/AppDataContext.jsx";
@@ -38,19 +48,48 @@ import {
   advanceRepeatWindow,
   leaveLabel,
 } from "../components/AllocationModals.jsx";
+import { ScheduleAllocationFilterMenu } from "../components/ScheduleAllocationFilterMenu.jsx";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
 import {
   colorForAllocationBar,
   contrastingTextColor,
   resolveColorForProjectLabel,
+  projectToAllocationLabel,
 } from "../utils/projectColors.js";
 import { tagChromaProps } from "../utils/tagChroma.js";
 import {
   SCHEDULE_SORT_OPTIONS,
   comparePeopleForScheduleSort,
 } from "../utils/peopleSort.js";
-import { motion } from "framer-motion";
+import {
+  personMatchesScheduleFilter,
+  countActiveFilterRules,
+} from "../utils/scheduleAllocationFilter.js";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import {
+  normalizeLeaveTypeId,
+  leaveTimelineIconKey,
+  leaveSpansToday,
+  buildLeaveHoverTitle,
+} from "../utils/leaveVisuals.js";
 import "./LandingPage.css";
+
+const LEAVE_LUCIDE = {
+  palmtree: Palmtree,
+  heartpulse: HeartPulse,
+  user: User,
+  baby: Baby,
+  flower2: Flower2,
+  wallet: Wallet,
+  landmark: Landmark,
+  umbrella: Umbrella,
+};
+
+function LeaveTimelineGlyph({ leaveTypeId, className }) {
+  const key = leaveTimelineIconKey(leaveTypeId);
+  const Ic = LEAVE_LUCIDE[key] || Palmtree;
+  return <Ic className={className} size={15} strokeWidth={2.25} aria-hidden />;
+}
 
 const VIEW_OPTIONS = [
   { id: "day", label: "Days" },
@@ -583,6 +622,7 @@ const timelineRowEqual = (prev, next) => {
   if (prev.gridTemplate !== next.gridTemplate) return false;
   if (prev.scheduleModel !== next.scheduleModel) return false;
   if (prev.projects !== next.projects) return false;
+  if (prev.projectByLabel !== next.projectByLabel) return false;
 
   const prevAlloc = prev.allocations.filter((a) => allocationHasPerson(a, prev.p.id));
   const nextAlloc = next.allocations.filter((a) => allocationHasPerson(a, next.p.id));
@@ -620,13 +660,18 @@ function mixRgbHex(hex, target, amount) {
   return `#${clampByte(R).toString(16).padStart(2, "0")}${clampByte(G).toString(16).padStart(2, "0")}${clampByte(B).toString(16).padStart(2, "0")}`;
 }
 
-/** Gradient fill + rim light + depth-appropriate shadow for schedule blocks. */
-function allocationBarSurfaceStyles(barColor, hours, theme) {
+/** Matches `STAGES` in ProjectsPage (visual accent only). */
+const PROJECT_STAGE_TOP = {
+  draft: "#636d84",
+  tentative: "#f59e0b",
+  confirmed: "#34d399",
+  completed: "#4fc3f7",
+  cancelled: "#ff4d6a",
+};
+
+function allocationBarChromeStyles(barColor, hours, theme) {
   const light = theme === "light";
-  const hi = mixRgbHex(barColor, 255, light ? 0.42 : 0.28);
-  const lo = mixRgbHex(barColor, 0, light ? 0.18 : 0.32);
   const rim = mixRgbHex(barColor, 255, light ? 0.55 : 0.22);
-  const background = `linear-gradient(168deg, ${hi} 0%, ${barColor} 38%, ${lo} 100%)`;
   const hnorm = Math.min(1, Math.max(0, hours) / BAR_H_NORM);
   const sheen = light
     ? "inset 0 1px 0 rgba(255,255,255,0.55), inset 0 -1px 0 rgba(0,0,0,0.06)"
@@ -634,10 +679,43 @@ function allocationBarSurfaceStyles(barColor, hours, theme) {
   const edge = light ? "rgba(15,22,40,0.1)" : "rgba(0,0,0,0.42)";
   const glow = `0 0 0 1px ${edge}, 0 4px ${14 + hnorm * 16}px ${hexToRgba(barColor, light ? 0.2 + hnorm * 0.12 : 0.32 + hnorm * 0.12)}, 0 ${18 + hnorm * 14}px ${40 + hnorm * 28}px ${hexToRgba(barColor, light ? 0.09 + hnorm * 0.07 : 0.16)}`;
   return {
-    background,
     boxShadow: `${sheen}, ${glow}`,
     border: `1px solid ${hexToRgba(rim, light ? 0.45 : 0.38)}`,
   };
+}
+
+/** Softer interior wash behind text (rail carries saturated accent). */
+function allocationBarInnerWash(barColor, theme) {
+  const light = theme === "light";
+  const hi = mixRgbHex(barColor, 255, light ? 0.62 : 0.38);
+  const mid = mixRgbHex(barColor, light ? 255 : 0, light ? 0.28 : 0.22);
+  const lo = mixRgbHex(barColor, 0, light ? 0.14 : 0.4);
+  return `linear-gradient(168deg, ${hi} 0%, ${mid} 42%, ${lo} 100%)`;
+}
+
+function allocationBarBorderRadiusPx(widthPct) {
+  if (widthPct < 4) return 6;
+  if (widthPct < 9) return 8;
+  if (widthPct < 16) return 10;
+  return 12;
+}
+
+function allocationCompactInitials(projectName, projectCode) {
+  const code = (projectCode || "").trim();
+  if (code.length >= 2) return code.slice(0, 2).toUpperCase();
+  const parts = (projectName || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
+  if (parts.length === 1 && parts[0].length >= 2) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0]?.[0] || "?").toUpperCase();
+}
+
+function buildWorkAllocationTitle(alloc, projectName, hoursLabel) {
+  const bits = [alloc.project || projectName, hoursLabel ? `${hoursLabel}/day` : ""];
+  if (alloc.startDate === alloc.endDate) bits.push(alloc.startDate);
+  else bits.push(`${alloc.startDate} → ${alloc.endDate}`);
+  const n = (alloc.notes || "").trim();
+  if (n) bits.push(n.length > 120 ? `${n.slice(0, 120)}…` : n);
+  return bits.filter(Boolean).join(" · ");
 }
 
 const TimelineRow = memo(function TimelineRow({
@@ -654,10 +732,13 @@ const TimelineRow = memo(function TimelineRow({
   openEdit,
   openCreateAllocation,
   openAllocationDetail,
-  handleTimelineClick
+  handleTimelineClick,
+  todayDateKey,
+  projectByLabel,
 }) {
   const { theme } = useAppTheme();
   const t = T[theme];
+  const reduceMotion = useReducedMotion();
   const allocViewMode = scheduleModel.aggregateAllSlots ? "week" : viewMode;
   const hours = computePersonHoursInView(p.id, allocations, scheduleModel, viewMode, anchorDate);
   const visibleDays = Math.max(1, visibleDateKeysForHours(scheduleModel, viewMode, anchorDate).length);
@@ -792,46 +873,73 @@ const TimelineRow = memo(function TimelineRow({
                 zIndex: 1,
               }}
             >
-              {leaveSegments.map((seg) => {
-                // Day view: leave covers the entire day, so span all columns
-                // Week/Month view: use the integer column positions from layoutAllocation
-                const isDay = allocViewMode === "day";
-                const colStart = isDay ? 1 : Math.max(1, Math.round(seg.lay.start) + 1);
-                const colSpan = isDay ? nCols : Math.max(1, Math.round(seg.lay.span));
-                const lbl = seg.a.leaveType ? leaveLabel(seg.a.leaveType) : "Leave";
-                return (
-                  <button
-                    key={`${seg.a.id}-occ-${seg.occIdx}`}
-                    type="button"
-                    style={{
-                      gridColumn: `${colStart} / span ${colSpan}`,
-                      gridRow: 1,
-                      alignSelf: "stretch",
-                      pointerEvents: "auto",
-                      border: "none",
-                      margin: 0,
-                      borderRadius: 0,
-                      backgroundColor: t.surface,
-                      backgroundImage: theme === "light"
-                        ? "repeating-linear-gradient(-45deg, rgba(140, 150, 170, 0.25), rgba(140, 150, 170, 0.25) 4px, rgba(100, 115, 140, 0.05) 4px, rgba(100, 115, 140, 0.05) 9px)"
-                        : "repeating-linear-gradient(-45deg, rgba(140, 150, 170, 0.35), rgba(140, 150, 170, 0.35) 4px, rgba(100, 115, 140, 0.12) 4px, rgba(100, 115, 140, 0.12) 9px)",
-                      display: "flex",
-                      alignItems: "flex-start",
-                      justifyContent: "flex-start",
-                      padding: "18px 12px",
-                      cursor: "pointer",
-                      boxShadow: "inset 0 0 0 1px rgba(140, 155, 175, 0.12)",
-                      minHeight: "100%",
-                    }}
-                    aria-label={allocationAriaLabel(seg.a)}
-                    onClick={(e) => { e.stopPropagation(); openAllocationDetail(seg.a); }}
-                  >
-                    <span style={{ fontWeight: 700, fontSize: "12px", color: t.text }}>
-                      {lbl}
-                    </span>
-                  </button>
-                );
-              })}
+              <AnimatePresence initial={false}>
+                {leaveSegments.map((seg, segIdx) => {
+                  const isDay = allocViewMode === "day";
+                  const colStart = isDay ? 1 : Math.max(1, Math.round(seg.lay.start) + 1);
+                  const colSpan = isDay ? nCols : Math.max(1, Math.round(seg.lay.span));
+                  const lbl = seg.a.leaveType ? leaveLabel(seg.a.leaveType) : "Leave";
+                  const typeId = normalizeLeaveTypeId(seg.a.leaveType);
+                  const onToday = leaveSpansToday(seg.a, todayDateKey);
+                  const dateLine =
+                    seg.a.startDate === seg.a.endDate
+                      ? seg.a.startDate
+                      : `${seg.a.startDate} → ${seg.a.endDate}`;
+                  const hoverTitle = buildLeaveHoverTitle(seg.a, leaveLabel);
+                  return (
+                    <motion.button
+                      key={`${seg.a.id}-occ-${seg.occIdx}`}
+                      type="button"
+                      layout={false}
+                      className={
+                        "lp-leave-block lp-leave-block--" +
+                        typeId +
+                        (onToday ? " lp-leave-block--today" : "")
+                      }
+                      style={{
+                        gridColumn: `${colStart} / span ${colSpan}`,
+                        gridRow: 1,
+                        alignSelf: "stretch",
+                        pointerEvents: "auto",
+                      }}
+                      aria-label={allocationAriaLabel(seg.a)}
+                      title={hoverTitle}
+                      initial={
+                        reduceMotion
+                          ? false
+                          : { opacity: 0, y: -8, scale: 0.97 }
+                      }
+                      animate={{
+                        opacity: 1,
+                        y: 0,
+                        scale: 1,
+                        transition: {
+                          delay: reduceMotion ? 0 : segIdx * 0.045,
+                          duration: 0.28,
+                          ease: [0.45, 0, 0.55, 1],
+                        },
+                      }}
+                      exit={
+                        reduceMotion
+                          ? { opacity: 0 }
+                          : { opacity: 0, y: -6, scale: 0.98, transition: { duration: 0.2 } }
+                      }
+                      whileHover={reduceMotion ? undefined : { scale: 1.015 }}
+                      whileTap={reduceMotion ? undefined : { scale: 0.99 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openAllocationDetail(seg.a);
+                      }}
+                    >
+                      <LeaveTimelineGlyph leaveTypeId={seg.a.leaveType} className="lp-leave-block__icon" />
+                      <span className="lp-leave-block__label">
+                        <span>{lbl}</span>
+                        <span className="lp-leave-block__dates">{dateLine}</span>
+                      </span>
+                    </motion.button>
+                  );
+                })}
+              </AnimatePresence>
             </div>
           )}
 
@@ -859,14 +967,14 @@ const TimelineRow = memo(function TimelineRow({
                 return (
                   <div
                     key={stackIdx}
-                    className="lp-alloc-lane"
+                    className={"lp-alloc-lane" + (stackIdx % 2 ? " lp-alloc-lane--stripe" : "")}
                     style={{
                       position: "relative",
                       width: "100%",
                       minHeight: `${laneMinH}px`,
                     }}
                   >
-                    {laneSegs.map((seg) => {
+                    {laneSegs.map((seg, segJ) => {
                       const colStartFrac = seg.lay.start / nCols;
                       const colWidthFrac = seg.lay.span / nCols;
                       const leftPct = colStartFrac * 100;
@@ -874,12 +982,36 @@ const TimelineRow = memo(function TimelineRow({
                       const z = 20 + seg.stack * 20 + seg.occIdx + Math.floor(seg.lay.start);
 
                       const h = Math.max(0, parseFloat(seg.a.hoursPerDay) || 0);
+                      const hnorm = Math.min(1, Math.max(0, h) / BAR_H_NORM);
                       const calculatedHeight = allocationBarHeightPx(seg.a);
 
                       const { projectName, projectCode, hoursLabel } = allocationDisplay(seg.a);
                       const barColor = colorForAllocationBar(seg.a, projects);
                       const fg = contrastingTextColor(barColor);
-                      const surface = allocationBarSurfaceStyles(barColor, h, theme);
+                      const chrome = allocationBarChromeStyles(barColor, h, theme);
+                      const innerWash = allocationBarInnerWash(barColor, theme);
+                      const reg = projectByLabel.get((seg.a.project || "").trim()) ?? null;
+                      const stageKey = reg?.stage && PROJECT_STAGE_TOP[reg.stage] ? reg.stage : null;
+                      const stageTop = stageKey ? PROJECT_STAGE_TOP[stageKey] : null;
+                      const billTint =
+                        reg && typeof reg.billable === "boolean"
+                          ? reg.billable
+                            ? "var(--lp-alloc-bill-yes, #22c55e)"
+                            : "var(--lp-alloc-bill-no, #f59e0b)"
+                          : null;
+                      const topAccent = stageTop || billTint;
+
+                      const brPx = allocationBarBorderRadiusPx(widthPct);
+                      const micro = widthPct < 5.5;
+                      const compactInitials = allocationCompactInitials(projectName, projectCode);
+                      const hoursFontW = 600 + Math.round(hnorm * 220);
+                      const clampedHw = Math.min(820, Math.max(600, hoursFontW));
+
+                      const repeatOn = (seg.a.repeatId ?? "none") !== "none";
+                      const hasNotes = Boolean((seg.a.notes || "").trim());
+                      const tip = buildWorkAllocationTitle(seg.a, projectName, hoursLabel);
+
+                      const enterDelayMs = reduceMotion ? 0 : Math.min(i, 28) * 22 + stackIdx * 10 + segJ * 38;
 
                       const baseStyle = {
                         position: "absolute",
@@ -888,30 +1020,97 @@ const TimelineRow = memo(function TimelineRow({
                         top: 0,
                         zIndex: z,
                         minHeight: `${calculatedHeight}px`,
+                        padding: 0,
                         display: "flex",
                         flexDirection: "column",
-                        justifyContent: "flex-start",
+                        overflow: "hidden",
                         pointerEvents: "auto",
                         boxSizing: "border-box",
-                        ...surface,
+                        background: "transparent",
+                        borderRadius: `${brPx}px`,
+                        ...chrome,
+                        color: fg,
                         transition:
                           "min-height 0.35s cubic-bezier(0.22, 1, 0.36, 1), left 0.35s cubic-bezier(0.22, 1, 0.36, 1), width 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease, transform 0.2s ease, filter 0.2s ease",
+                        animationDelay: enterDelayMs ? `${enterDelayMs}ms` : undefined,
                       };
 
                       return (
                         <button
                           key={seg.segKey}
                           type="button"
-                          className="lp-block lp-block-alloc lp-block-alloc-project"
-                          style={{ ...baseStyle, color: fg }}
+                          className={
+                            "lp-block lp-block-alloc lp-block-alloc-project lp-alloc-bar" +
+                            (micro ? " lp-alloc-bar--micro" : "") +
+                            (allocViewMode === "day" ? " lp-alloc-bar--day" : "")
+                          }
+                          style={baseStyle}
                           aria-label={allocationAriaLabel(seg.a)}
-                          onClick={(e) => { e.stopPropagation(); openAllocationDetail(seg.a); }}
+                          title={tip}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openAllocationDetail(seg.a);
+                          }}
                         >
-                          <span className="lp-alloc-top">
-                            <span className="lp-alloc-name">{projectName}</span>
-                            {projectCode && <span className="lp-alloc-code">{projectCode}</span>}
+                          {topAccent ? (
+                            <span
+                              className="lp-alloc-bar__stage-top"
+                              style={{ background: topAccent }}
+                              aria-hidden
+                            />
+                          ) : null}
+                          <span className="lp-alloc-bar__rail" style={{ backgroundColor: barColor }} aria-hidden />
+                          <span className="lp-alloc-bar__underlay" style={{ background: innerWash }} aria-hidden />
+                          <span
+                            className="lp-alloc-bar__load"
+                            style={{
+                              background: `linear-gradient(to top, ${hexToRgba(barColor, theme === "light" ? 0.42 : 0.5)}, ${hexToRgba(barColor, 0)})`,
+                              height: `${hnorm * 100}%`,
+                            }}
+                            aria-hidden
+                          />
+                          <span className="lp-alloc-bar__body">
+                            {micro ? (
+                              <>
+                                <span className="lp-alloc-bar__micro-row">
+                                  <span className="lp-alloc-micro-initials">{compactInitials}</span>
+                                  <span className="lp-alloc-bar__micro-icons">
+                                    {repeatOn ? (
+                                      <Repeat2 size={11} strokeWidth={2.25} className="lp-alloc-bar__ic" aria-hidden />
+                                    ) : null}
+                                    {hasNotes ? (
+                                      <StickyNote size={11} strokeWidth={2.25} className="lp-alloc-bar__ic" aria-hidden />
+                                    ) : null}
+                                  </span>
+                                </span>
+                                <span className="lp-alloc-hours" style={{ fontWeight: clampedHw }}>
+                                  {hoursLabel}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="lp-alloc-top">
+                                  <span className="lp-alloc-name">{projectName}</span>
+                                  {projectCode ? (
+                                    <span className="lp-alloc-code-chip">{projectCode}</span>
+                                  ) : null}
+                                </span>
+                                <span className="lp-alloc-bar__row-foot">
+                                  <span className="lp-alloc-hours" style={{ fontWeight: clampedHw }}>
+                                    {hoursLabel}
+                                  </span>
+                                  <span className="lp-alloc-bar__icons">
+                                    {repeatOn ? (
+                                      <Repeat2 size={12} strokeWidth={2.25} className="lp-alloc-bar__ic" aria-hidden />
+                                    ) : null}
+                                    {hasNotes ? (
+                                      <StickyNote size={12} strokeWidth={2.25} className="lp-alloc-bar__ic" aria-hidden />
+                                    ) : null}
+                                  </span>
+                                </span>
+                              </>
+                            )}
                           </span>
-                          <span className="lp-alloc-hours">{hoursLabel}</span>
                         </button>
                       );
                     })}
@@ -952,9 +1151,9 @@ export default function LandingPage() {
     getNextPersonId,
     getNextProjectId,
     starredPeopleTags,
-    schedulePeopleTagFilter,
+    scheduleFilterRules,
     setStarredPeopleTags,
-    setSchedulePeopleTagFilter,
+    setScheduleFilterRules,
     syncPersonCreate,
     syncPersonUpdate,
     syncProjectCreate,
@@ -995,16 +1194,17 @@ export default function LandingPage() {
   const [allocPreselectPerson, setAllocPreselectPerson] = useState(null);
   const [allocPreselectDate, setAllocPreselectDate] = useState(null);
   const [allocPreselectProject, setAllocPreselectProject] = useState(null);
+  const [allocDefaultTab, setAllocDefaultTab] = useState("allocation");
   const [allocDetailOpen, setAllocDetailOpen] = useState(false);
   const [selectedAllocation, setSelectedAllocation] = useState(null);
 
   const viewWrapRef = useRef(null);
   const densityWrapRef = useRef(null);
   const addWrapRef = useRef(null);
-  const tagFilterWrapRef = useRef(null);
+  const scheduleFilterWrapRef = useRef(null);
   const starredWrapRef = useRef(null);
 
-  const [tagFilterOpen, setTagFilterOpen] = useState(false);
+  const [scheduleFilterOpen, setScheduleFilterOpen] = useState(false);
   const [starredPopoverOpen, setStarredPopoverOpen] = useState(false);
 
   useEffect(() => {
@@ -1012,7 +1212,8 @@ export default function LandingPage() {
       if (viewWrapRef.current && !viewWrapRef.current.contains(e.target)) setViewMenuOpen(false);
       if (densityWrapRef.current && !densityWrapRef.current.contains(e.target)) setDensityOpen(false);
       if (addWrapRef.current && !addWrapRef.current.contains(e.target)) setAddMenuOpen(false);
-      if (tagFilterWrapRef.current && !tagFilterWrapRef.current.contains(e.target)) setTagFilterOpen(false);
+      if (scheduleFilterWrapRef.current && !scheduleFilterWrapRef.current.contains(e.target))
+        setScheduleFilterOpen(false);
       if (starredWrapRef.current && !starredWrapRef.current.contains(e.target)) setStarredPopoverOpen(false);
       if (timeRangeWrapRef.current && !timeRangeWrapRef.current.contains(e.target)) setTimeRangeOpen(false);
       if (sortWrapRef.current && !sortWrapRef.current.contains(e.target)) setSortOpen(false);
@@ -1030,14 +1231,6 @@ export default function LandingPage() {
 
   const todayDateKey = useMemo(() => dateKeyLocal(new Date()), []);
 
-  const allScheduleTags = useMemo(() => {
-    const s = new Set(peopleTagOpts);
-    for (const p of people) {
-      for (const t of p.tags || []) s.add(t);
-    }
-    return Array.from(s).sort((a, b) => a.localeCompare(b));
-  }, [people, peopleTagOpts]);
-
   const peopleOrderMap = useMemo(() => {
     const m = new Map();
     let idx = 0;
@@ -1047,12 +1240,20 @@ export default function LandingPage() {
     return m;
   }, [people]);
 
+  const scheduleVisibleKeys = useMemo(
+    () => visibleDateKeysForHours(scheduleModel, viewMode, anchorDate),
+    [scheduleModel, viewMode, anchorDate]
+  );
+
   const schedulePeople = useMemo(() => {
     let list = people.filter((p) => !p.archived);
-    if (schedulePeopleTagFilter.length > 0) {
-      const need = new Set(schedulePeopleTagFilter);
-      list = list.filter((p) => (p.tags || []).some((t) => need.has(t)));
-    }
+    list = list.filter((p) =>
+      personMatchesScheduleFilter(p, scheduleFilterRules, {
+        allocations,
+        projects,
+        visibleKeys: scheduleVisibleKeys,
+      })
+    );
     const hoursMap = new Map();
     for (const p of list) {
       hoursMap.set(
@@ -1065,29 +1266,26 @@ export default function LandingPage() {
     );
   }, [
     people,
-    schedulePeopleTagFilter,
+    scheduleFilterRules,
+    scheduleVisibleKeys,
     scheduleSort,
     peopleOrderMap,
     allocations,
+    projects,
     scheduleModel,
     viewMode,
     anchorDate,
   ]);
 
-  const toggleScheduleFilterTag = useCallback((tag) => {
-    setSchedulePeopleTagFilter((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag].sort((a, b) => a.localeCompare(b))
-    );
-  }, [setSchedulePeopleTagFilter]);
+  const projectByLabel = useMemo(() => {
+    const m = new Map();
+    for (const p of projects) {
+      m.set(projectToAllocationLabel(p), p);
+    }
+    return m;
+  }, [projects]);
 
-  const clearScheduleFilter = useCallback(() => {
-    setSchedulePeopleTagFilter([]);
-  }, [setSchedulePeopleTagFilter]);
-
-  const applyStarredToScheduleFilter = useCallback(() => {
-    setSchedulePeopleTagFilter([...starredPeopleTags].sort((a, b) => a.localeCompare(b)));
-    setTagFilterOpen(false);
-  }, [starredPeopleTags, setSchedulePeopleTagFilter]);
+  const scheduleFilterActiveCount = countActiveFilterRules(scheduleFilterRules);
 
   const toggleStarredPeopleTag = useCallback(
     (tag) => {
@@ -1247,6 +1445,7 @@ export default function LandingPage() {
 
   const openCreateAllocation = useCallback((person, date) => {
     setAllocEditing(null);
+    setAllocDefaultTab("allocation");
     setAllocPreselectPerson(person ?? null);
     setAllocPreselectDate(date ?? null);
     setAllocPreselectProject(null);
@@ -1255,9 +1454,23 @@ export default function LandingPage() {
 
   const openCreateAllocationForPersonProject = useCallback((person, projectLabel) => {
     setAllocEditing(null);
+    setAllocDefaultTab("allocation");
     setAllocPreselectPerson(person ?? null);
     setAllocPreselectDate(null);
     setAllocPreselectProject(projectLabel != null ? String(projectLabel).trim() || null : null);
+    setAllocCreateOpen(true);
+  }, []);
+
+  const openCreateLeaveForPerson = useCallback((person) => {
+    setAllocEditing(null);
+    setAllocDefaultTab("leave");
+    setAllocPreselectPerson(person ?? null);
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    setAllocPreselectDate(`${y}-${m}-${day}`);
+    setAllocPreselectProject(null);
     setAllocCreateOpen(true);
   }, []);
 
@@ -1267,13 +1480,14 @@ export default function LandingPage() {
     setAllocPreselectPerson(null);
     setAllocPreselectDate(null);
     setAllocPreselectProject(null);
+    setAllocDefaultTab("allocation");
   }, []);
 
   /** Click on empty timeline space → open allocation modal with person + date */
   const handleTimelineClick = useCallback(
     (e, person, nCols) => {
       // Don't open if user clicked on an existing allocation block
-      if (e.target.closest(".lp-block")) return;
+      if (e.target.closest(".lp-block") || e.target.closest(".lp-leave-block")) return;
       const row = e.currentTarget;
       const rect = row.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -1424,10 +1638,10 @@ export default function LandingPage() {
       .join(", ");
   }, [selectedAllocation, people]);
 
-  const openEdit = (person) => {
+  const openEdit = useCallback((person) => {
     setEditingPerson(person);
     setModalOpen(true);
-  };
+  }, []);
 
   const handleModalSave = (form) => {
     if (editingPerson) {
@@ -1525,85 +1739,47 @@ export default function LandingPage() {
           <div className="lp-page-title-row">
             <div className="lp-schedule-title-cluster">
               <div className="lp-schedule-tag-dd-group">
-                <div className="lp-dropdown-wrap" ref={tagFilterWrapRef}>
+                <div className="lp-dropdown-wrap" ref={scheduleFilterWrapRef}>
                   <button
                     type="button"
                     className={
                       "lp-pill lp-pill-btn lp-tag-dd-trigger" +
-                      (schedulePeopleTagFilter.length > 0 ? " lp-tag-dd-trigger-active" : "")
+                      (scheduleFilterActiveCount > 0 ? " lp-tag-dd-trigger-active" : "")
                     }
-                    aria-expanded={tagFilterOpen}
-                    aria-haspopup="listbox"
-                    aria-label="Filter people by tags"
+                    aria-expanded={scheduleFilterOpen}
+                    aria-haspopup="dialog"
+                    aria-label="Filter schedule by people and allocations"
                     onClick={() => {
-                      setTagFilterOpen((o) => !o);
+                      setScheduleFilterOpen((o) => !o);
                       setStarredPopoverOpen(false);
                       setViewMenuOpen(false);
                       setDensityOpen(false);
                       setAddMenuOpen(false);
                     }}
                   >
-                    <Tag size={14} strokeWidth={2} />
-                    {schedulePeopleTagFilter.length === 0
-                      ? "All tags"
-                      : `${schedulePeopleTagFilter.length} tag${schedulePeopleTagFilter.length === 1 ? "" : "s"}`}
+                    <Filter size={14} strokeWidth={2.25} />
+                    Filter
+                    {scheduleFilterActiveCount > 0 ? (
+                      <span className="lp-schedule-filter-trigger-badge">{scheduleFilterActiveCount}</span>
+                    ) : null}
                     <ChevronDown size={14} />
                   </button>
-                  {tagFilterOpen && (
-                    <div className="lp-popover lp-popover-tags" role="listbox">
-                      <div className="lp-popover-title">Filter by tags</div>
-                      <p className="lp-tag-dd-hint">
-                        Check tags to filter the schedule. Use ★ to save a tag — it then appears under Starred tags.
-                      </p>
-                      <div className="lp-tag-check-scroll">
-                        {allScheduleTags.length === 0 ? (
-                          <p className="lp-tag-dd-empty">No tags yet — add tags to people in the directory.</p>
-                        ) : (
-                          allScheduleTags.map((tag) => {
-                            const isStarred = starredPeopleTags.includes(tag);
-                            return (
-                              <div key={tag} className="lp-tag-filter-row">
-                                <label className="lp-tag-filter-check">
-                                  <input
-                                    type="checkbox"
-                                    checked={schedulePeopleTagFilter.includes(tag)}
-                                    onChange={() => toggleScheduleFilterTag(tag)}
-                                  />
-                                  <span className="lp-tag-filter-name">{tag}</span>
-                                </label>
-                                <button
-                                  type="button"
-                                  className={"lp-tag-row-star" + (isStarred ? " lp-tag-row-star-on" : "")}
-                                  aria-label={isStarred ? `Remove ${tag} from starred` : `Star ${tag}`}
-                                  title={isStarred ? "Remove from starred" : "Add to starred"}
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    toggleStarredPeopleTag(tag);
-                                  }}
-                                >
-                                  <Star size={16} strokeWidth={2} fill={isStarred ? "currentColor" : "none"} />
-                                </button>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                      <div className="lp-popover-divider lp-tag-dd-actions-divider" />
-                      <div className="lp-tag-dd-actions">
-                        <button type="button" className="lp-tag-dd-link" onClick={clearScheduleFilter}>
-                          <X size={14} /> Clear filter
-                        </button>
-                        <button
-                          type="button"
-                          className="lp-tag-dd-link lp-tag-dd-link-accent"
-                          disabled={starredPeopleTags.length === 0}
-                          onClick={applyStarredToScheduleFilter}
-                        >
-                          <Star size={14} /> Use starred tags
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <ScheduleAllocationFilterMenu
+                    open={scheduleFilterOpen}
+                    onRequestClose={() => setScheduleFilterOpen(false)}
+                    rules={scheduleFilterRules}
+                    setRules={setScheduleFilterRules}
+                    people={people}
+                    projects={projects}
+                    depts={depts}
+                    roles={roles}
+                    clients={clients}
+                    peopleTagOpts={peopleTagOpts}
+                    projectTagOpts={projectTagOpts}
+                    allocationProjectOptions={allocationProjectOptions}
+                    starredPeopleTags={starredPeopleTags}
+                    toggleStarredPeopleTag={toggleStarredPeopleTag}
+                  />
                 </div>
 
                 <div className="lp-dropdown-wrap" ref={starredWrapRef}>
@@ -1618,7 +1794,7 @@ export default function LandingPage() {
                     aria-label="Star tags for quick filtering"
                     onClick={() => {
                       setStarredPopoverOpen((o) => !o);
-                      setTagFilterOpen(false);
+                      setScheduleFilterOpen(false);
                       setViewMenuOpen(false);
                       setDensityOpen(false);
                       setAddMenuOpen(false);
@@ -1638,11 +1814,13 @@ export default function LandingPage() {
                     <div className="lp-popover lp-popover-tags" role="listbox">
                       <div className="lp-popover-title">Starred tags</div>
                       <p className="lp-tag-dd-hint">
-                        Tags you ★ in the filter appear here. Click a row to remove from starred.
+                        Tags you ★ under Filter → Person tag appear here. Click a row to remove from starred.
                       </p>
                       <div className="lp-tag-check-scroll">
                         {starredPeopleTags.length === 0 ? (
-                          <p className="lp-tag-dd-empty">No starred tags yet. Open the filter and click ★ on any tag.</p>
+                          <p className="lp-tag-dd-empty">
+                            No starred tags yet. Open Filter, choose Person tag, then click ★ on any tag.
+                          </p>
                         ) : (
                           [...starredPeopleTags].sort((a, b) => a.localeCompare(b)).map((tag) => (
                             <button
@@ -1891,7 +2069,7 @@ export default function LandingPage() {
                   onClick={() => {
                     setSortOpen((o) => !o);
                     setTimeRangeOpen(false);
-                    setTagFilterOpen(false);
+                    setScheduleFilterOpen(false);
                     setStarredPopoverOpen(false);
                     setViewMenuOpen(false);
                     setDensityOpen(false);
@@ -1942,7 +2120,7 @@ export default function LandingPage() {
                     });
                     setTimeRangeOpen((o) => !o);
                     setSortOpen(false);
-                    setTagFilterOpen(false);
+                    setScheduleFilterOpen(false);
                     setStarredPopoverOpen(false);
                     setViewMenuOpen(false);
                     setDensityOpen(false);
@@ -2159,6 +2337,8 @@ export default function LandingPage() {
                   openCreateAllocation={openCreateAllocation}
                   openAllocationDetail={openAllocationDetail}
                   handleTimelineClick={handleTimelineClick}
+                  todayDateKey={todayDateKey}
+                  projectByLabel={projectByLabel}
                 />
               ))}
             </motion.div>
@@ -2194,6 +2374,7 @@ export default function LandingPage() {
         onOpenCreateAllocation={({ person, projectLabel }) =>
           openCreateAllocationForPersonProject(person, projectLabel)
         }
+        onOpenCreateLeave={(person) => openCreateLeaveForPerson(person)}
         tagTheme={theme}
       />
 
@@ -2206,6 +2387,7 @@ export default function LandingPage() {
         preselectPerson={allocPreselectPerson}
         preselectDate={allocPreselectDate}
         preselectProject={allocPreselectProject}
+        defaultTab={allocDefaultTab}
         editAllocation={allocEditing}
         onEditAllocation={handleEditAllocation}
         projects={allocationProjectOptions}

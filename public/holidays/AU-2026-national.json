@@ -1,0 +1,58 @@
+[
+  {
+    "date": "2026-01-01",
+    "name": "New Year's Day",
+    "localName": "New Year's Day",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2026-01-26",
+    "name": "Australia Day",
+    "localName": "Australia Day",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2026-04-03",
+    "name": "Good Friday",
+    "localName": "Good Friday",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2026-04-06",
+    "name": "Easter Monday",
+    "localName": "Easter Monday",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2026-04-25",
+    "name": "Anzac Day",
+    "localName": "Anzac Day",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2026-12-25",
+    "name": "Christmas Day",
+    "localName": "Christmas Day",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2026-12-28",
+    "name": "St. Stephen's Day",
+    "localName": "Boxing Day",
+    "types": [
+      "Public"
+    ]
+  }
+]

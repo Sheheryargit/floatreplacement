@@ -1,17 +1,27 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Users, FolderOpen, BarChart3, CalendarDays, ClipboardList,
-  Plus, Download, Trash2, Search, X, ChevronRight, ChevronDown,
+  Plus, Download, Trash2, X, ChevronRight,
   Sun, Moon, Check, AlertTriangle, UserPlus, Shield, Clock,
-  Palmtree, Briefcase, Tag, Building2, DollarSign, Mail, Info,
+  Palmtree, Briefcase, Tag, Building2, DollarSign, Mail, Info, Calendar,
   Archive, ArchiveRestore, Save, MoreHorizontal, Pencil, CircleAlert,
 } from "lucide-react";
+import { Button } from "./ui/Button.jsx";
 import { tagChromaProps } from "../utils/tagChroma.js";
 import { projectToAllocationLabel, avatarGradientFromName } from "../utils/projectColors.js";
 import { toast } from "sonner";
 import { SEED_DEPTS } from "../constants/departments.js";
 import { PEOPLE_SEED } from "../data/peopleSeed.js";
 import { DepartmentSelector } from "./DepartmentSelector.jsx";
+import { FloatSelect } from "./ui/FloatSelect.jsx";
+import {
+  AU_PUBLIC_HOLIDAY_REGION_OPTIONS,
+  legacyHolidaysToRegion,
+  regionToLegacyHolidays,
+} from "../constants/auHolidayRegions.js";
+import { leaveLabel } from "./AllocationModals.jsx";
+import { leaveAccentTheme, isoDateLocal } from "../utils/leaveVisuals.js";
 
 /* ═══════════════════ DATA ═══════════════════ */
 const SEED_ROLES = [
@@ -35,7 +45,6 @@ const ACCESS_OPTS = [
   { value:"member", label:"Member", desc:"Can view Schedule and optionally manage their own tasks and/or time off", icon:Users },
   { value:"manager", label:"Manager", desc:"Can manage specific Departments, People, and/or Projects", icon:Briefcase },
 ];
-const AU_HOLIDAYS = ["Australia — National","Australia — ACT","Australia — NSW","Australia — NT","Australia — QLD","Australia — SA","Australia — TAS","Australia — VIC","Australia — WA"];
 const MODAL_TABS = [
   { key:"info", label:"Info", icon:Info },
   { key:"access", label:"Access", icon:Shield },
@@ -59,17 +68,21 @@ const personToForm = (p) => ({
   department:p.department||"No department", tags:[...p.tags], type:p.type||"Employee",
   access: ACCESS_OPTS.find((a)=>a.label===p.access)?.value || "none",
   startDate:p.startDate||"2026-01-01", endDate:p.endDate||"", workType:p.workType||"Full-time",
-  notes:p.notes||"", holidays:p.holidays||"None",
+  notes:p.notes||"",
+  publicHolidayRegion: p.publicHolidayRegion ?? legacyHolidaysToRegion(p.holidays),
 });
 const formToPerson = (form, id, archived) => {
   const al = ACCESS_OPTS.find((a)=>a.value===form.access)?.label||"—";
+  const region = form.publicHolidayRegion ?? legacyHolidaysToRegion(form.holidays);
   return {
     id, name:form.name, email:form.email, role:form.role==="No role"?"—":form.role,
     department:form.department==="No department"?"":form.department,
     access:form.access==="none"?"—":al, tags:[...form.tags], type:form.type,
     costRate:form.costRate, billRate:form.billRate, startDate:form.startDate,
     endDate:form.endDate, workType:form.workType, notes:form.notes,
-    holidays:form.holidays, archived:!!archived,
+    publicHolidayRegion: region,
+    holidays: regionToLegacyHolidays(region),
+    archived:!!archived,
   };
 };
 
@@ -162,18 +175,19 @@ function Confirm({ open, onYes, onNo, title, desc, yesLabel, yesIcon:YI, yesDang
           </div>
         </div>
         <p style={{ color:t.textSoft,fontSize:14,lineHeight:1.6,margin:"0 0 24px" }}>{desc}</p>
-        <div style={{ display:"flex",gap:10,justifyContent:"flex-end" }}>
-          <button onClick={onNo} style={{ background:t.btnSec,border:`1px solid ${t.border}`,borderRadius:8,color:t.btnSecTxt,padding:"9px 20px",cursor:"pointer",fontSize:13,fontWeight:600 }}>Cancel</button>
-          <button onClick={onYes} style={{
-            background:yesDanger?t.danger:t.warn,border:`1px solid ${yesDanger?t.dangerHov:t.warnHov}55`,borderRadius:10,color:yesDanger?t.dangerTxt:t.warnTxt,
-            padding:"9px 20px",cursor:"pointer",fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:6,
-            transition:"box-shadow 0.22s cubic-bezier(0.22,1,0.36,1), transform 0.18s ease, filter 0.18s ease",
-            boxShadow:yesDanger?t.dangerGlow:t.warnGlow,
-          }}
-            onMouseEnter={(e) => { e.currentTarget.style.filter="brightness(1.06)"; e.currentTarget.style.transform="translateY(-1px)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.filter=""; e.currentTarget.style.transform=""; }}>
-            {YI && <YI size={14}/>} {yesLabel}
-          </button>
+        <div style={{ display:"flex",gap:10,justifyContent:"flex-end",flexWrap:"wrap" }}>
+          <Button type="button" variant="secondary" size="md" onClick={onNo}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant={yesDanger ? "destructive" : "warning"}
+            size="md"
+            onClick={onYes}
+            style={{ display: "flex", alignItems: "center", gap: 6 }}
+          >
+            {YI ? <YI size={14} /> : null} {yesLabel}
+          </Button>
         </div>
       </div>
     </div>
@@ -187,17 +201,21 @@ function RowActions({ person, onEdit, onArchive, onDelete, t }) {
   useEffect(() => { const h=(e)=>{ if(ref.current&&!ref.current.contains(e.target)) setOpen(false); }; document.addEventListener("mousedown",h); return ()=>document.removeEventListener("mousedown",h); },[]);
   return (
     <div ref={ref} style={{ position:"relative", zIndex: open ? 50 : 1 }}>
-      <button onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-        style={{ background:"transparent",border:"none",cursor:"pointer",color:t.textMuted,padding:4,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s" }}
-        onMouseEnter={(e)=>{ e.currentTarget.style.background=t.accentGlow; e.currentTarget.style.color=t.accent; }}
-        onMouseLeave={(e)=>{ e.currentTarget.style.background="transparent"; e.currentTarget.style.color=t.textMuted; }}>
-        <MoreHorizontal size={16}/>
+      <button
+        type="button"
+        className="alloc8-icon-btn"
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="Row actions"
+      >
+        <MoreHorizontal size={16} />
       </button>
       {open && (<>
         <div onClick={(e)=>{ e.stopPropagation(); setOpen(false); }} style={{ position:"fixed",inset:0,zIndex:99 }}/>
         <div style={{
           position:"absolute",right:0,top:"100%",marginTop:4,zIndex:100,
-          background:t.bg==="#0b0e14"?"#111627":"#ffffff",border:`1.5px solid ${t.accent}30`,borderRadius:10,
+          background:t.bg==="#0f1117"||t.bg==="#0b0e14"?"#111627":"#ffffff",border:`1.5px solid ${t.accent}30`,borderRadius:10,
           boxShadow:`0 12px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.3)`,minWidth:190,overflow:"hidden",animation:"dropIn 0.15s ease-out",
         }}>
           {[
@@ -206,81 +224,14 @@ function RowActions({ person, onEdit, onArchive, onDelete, t }) {
             { icon:Trash2, label:"Delete", action:()=>{ onDelete(); setOpen(false); }, color:t.danger },
           ].map((item,i) => (
             <div key={i} onClick={(e)=>{ e.stopPropagation(); item.action(); }}
-              style={{ padding:"11px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontSize:13,fontWeight:500,color:item.color,transition:"background 0.12s",borderBottom:i<2?`1px solid ${t.bg==="#0b0e14"?"#1a2030":"#e4e7ed"}`:"none" }}
-              onMouseEnter={(e)=>e.currentTarget.style.background=t.bg==="#0b0e14"?"#1a2236":"#f0f2f5"}
+              style={{ padding:"11px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontSize:13,fontWeight:500,color:item.color,transition:"background 0.12s",borderBottom:i<2?`1px solid ${t.bg==="#0f1117"||t.bg==="#0b0e14"?"#1a2030":"#e4e7ed"}`:"none" }}
+              onMouseEnter={(e)=>e.currentTarget.style.background=t.bg==="#0f1117"||t.bg==="#0b0e14"?"#1a2236":"#f0f2f5"}
               onMouseLeave={(e)=>e.currentTarget.style.background="transparent"}>
               <item.icon size={14}/> {item.label}
             </div>
           ))}
         </div>
       </>)}
-    </div>
-  );
-}
-
-/* ═══════════════════ CREATABLE DROPDOWN ═══════════════════ */
-function CDropdown({ value, onChange, options, placeholder, renderOption, t, menuOpenKey = 0 }) {
-  const [open,setOpen]=useState(false);
-  const [q,setQ]=useState("");
-  const ref=useRef(null);
-  const ir=useRef(null);
-  const lastMenuKick = useRef(0);
-  useEffect(()=>{ const h=(e)=>{ if(ref.current&&!ref.current.contains(e.target)) setOpen(false); }; document.addEventListener("mousedown",h); return ()=>document.removeEventListener("mousedown",h); },[]);
-  useEffect(()=>{ if(open&&ir.current) ir.current.focus(); },[open]);
-  useEffect(() => {
-    if (menuOpenKey > lastMenuKick.current) {
-      lastMenuKick.current = menuOpenKey;
-      setOpen(true);
-    }
-  }, [menuOpenKey]);
-  const lbls=options.map((o)=>typeof o==="string"?o:o.label);
-  const filt=lbls.filter((l)=>l.toLowerCase().includes(q.toLowerCase()));
-  const canC=q.trim()&&!lbls.some((l)=>l.toLowerCase()===q.trim().toLowerCase());
-  const pick=(v)=>{ onChange(v); setOpen(false); setQ(""); };
-  return (
-    <div ref={ref} style={{ position:"relative" }}>
-      <div onClick={()=>setOpen(!open)} style={{
-        background:t.surfAlt,border:`1.5px solid ${open?t.focus:t.borderIn}`,borderRadius:8,padding:"10px 14px",cursor:"pointer",
-        display:"flex",justifyContent:"space-between",alignItems:"center",
-        color:value&&value!==placeholder?t.text:t.textMuted,fontSize:14,transition:"border-color 0.2s,box-shadow 0.2s",
-        boxShadow:open?`0 0 0 3px ${t.accentGlow}`:"none",
-      }}>
-        <span style={{ overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1 }}>{value||placeholder}</span>
-        <ChevronDown size={14} style={{ color:t.textMuted,transform:open?"rotate(180deg)":"none",transition:"transform 0.2s",flexShrink:0 }}/>
-      </div>
-      {open && (
-        <div style={{ position:"absolute",top:"calc(100% + 6px)",left:0,right:0,zIndex:140,background:t.surfRaised,border:`1px solid ${t.border}`,borderRadius:10,boxShadow:`0 12px 40px rgba(0,0,0,0.25)`,overflow:"hidden",animation:"dropIn 0.18s ease-out" }}>
-          <div style={{ padding:8,borderBottom:`1px solid ${t.border}` }}>
-            <div style={{ position:"relative" }}>
-              <Search size={14} style={{ position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:t.textMuted }}/>
-              <input ref={ir} value={q} onChange={(e)=>setQ(e.target.value)} placeholder="Search or create…"
-                style={{ width:"100%",background:t.surfAlt,border:`1px solid ${t.borderIn}`,borderRadius:6,padding:"8px 10px 8px 32px",color:t.text,fontSize:13,outline:"none" }}
-                onKeyDown={(e)=>{ if(e.key==="Enter"&&canC) pick(q.trim()); }}/>
-            </div>
-          </div>
-          <div style={{ maxHeight:210,overflowY:"auto" }}>
-            {canC && (
-              <div onClick={()=>pick(q.trim())} style={{ padding:"10px 14px",cursor:"pointer",color:t.accent,fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:8,transition:"background 0.1s" }}
-                onMouseEnter={(e)=>e.currentTarget.style.background=t.accentGlow} onMouseLeave={(e)=>e.currentTarget.style.background="transparent"}>
-                <Plus size={14}/> Create "{q.trim()}"
-              </div>
-            )}
-            {filt.map((lbl,i)=>{
-              const raw=options.find((o)=>(typeof o==="string"?o:o.label)===lbl);
-              const val=typeof raw==="string"?raw:(raw.value||raw.label);
-              const act=value===lbl||value===val;
-              return (
-                <div key={i} onClick={()=>pick(val)} style={{ padding:renderOption?"10px 14px":"9px 14px",cursor:"pointer",color:t.text,fontSize:14,background:act?t.accentGlow:"transparent",display:"flex",alignItems:"center",justifyContent:"space-between",transition:"background 0.1s" }}
-                  onMouseEnter={(e)=>{ if(!act) e.currentTarget.style.background=t.rowHov; }} onMouseLeave={(e)=>e.currentTarget.style.background=act?t.accentGlow:"transparent"}>
-                  <div style={{ flex:1,minWidth:0 }}>{renderOption?renderOption(raw,t):lbl}</div>
-                  {act && <Check size={14} style={{ color:t.accent,flexShrink:0,marginLeft:8 }}/>}
-                </div>
-              );
-            })}
-            {filt.length===0&&!canC && <div style={{ padding:14,color:t.textMuted,fontSize:13,textAlign:"center" }}>No results</div>}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -310,7 +261,7 @@ function CTagInput({ tags, setTags, options, t, tagIsDark }) {
         })}
         <input ref={ir} value={q} onChange={(e)=>setQ(e.target.value)} onFocus={()=>setOpen(true)}
           onKeyDown={(e)=>{ if((e.key===" "||e.key==="Enter")&&q.trim()){ e.preventDefault(); add(q); } else if(e.key==="Backspace"&&!q&&tags.length) setTags(tags.slice(0,-1)); }}
-          placeholder={tags.length===0?"Type and press space to add…":""} style={{ background:"transparent",border:"none",outline:"none",flex:1,minWidth:140,color:t.text,fontSize:13,padding:"4px 0" }}/>
+          placeholder={tags.length===0?"Type a tag, then press Space or Enter…":""} style={{ background:"transparent",border:"none",outline:"none",flex:1,minWidth:140,color:t.text,fontSize:13,padding:"4px 0" }}/>
       </div>
       {open&&(avail.length>0||canC) && (
         <div style={{ position:"absolute",top:"calc(100% + 6px)",left:0,right:0,zIndex:140,background:t.surfRaised,border:`1px solid ${t.border}`,borderRadius:10,maxHeight:180,overflowY:"auto",boxShadow:`0 12px 40px rgba(0,0,0,0.25)`,animation:"dropIn 0.18s ease-out" }}>
@@ -340,7 +291,14 @@ function InfoTab({ form,setForm,roles,setRoles,depts,setDepts,tagOpts,setTagOpts
     <div style={{ display:"flex",flexDirection:"column",gap:22 }}>
       <div style={{ background:t.surfAlt,borderRadius:10,padding:20,display:"flex",flexDirection:"column",gap:18,border:`1px solid ${t.borderSub}` }}>
         <div><label style={Lbl(t)}>Role</label>
-          <CDropdown t={t} value={form.role} placeholder="No role" onChange={(v)=>{ if(v!=="No role"&&!roles.includes(v)) setRoles([...roles,v]); setForm({...form,role:v}); }} options={["No role",...roles]}/></div>
+          <FloatSelect
+            t={t}
+            value={form.role}
+            placeholder="Select role"
+            searchPlaceholder="Search roles or type to add new…"
+            onChange={(v)=>{ if(v!=="No role"&&!roles.includes(v)) setRoles([...roles,v]); setForm({...form,role:v}); }}
+            options={["No role",...roles]}
+          /></div>
         <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
           {[["Cost rate","costRate"],["Bill rate","billRate"]].map(([lbl,key])=>(
             <div key={key}><label style={Lbl(t)}>{lbl}</label>
@@ -364,15 +322,31 @@ function InfoTab({ form,setForm,roles,setRoles,depts,setDepts,tagOpts,setTagOpts
       <div><label style={Lbl(t)}>Tags</label>
         <CTagInput t={t} tagIsDark={tagIsDark} tags={form.tags} setTags={(nt)=>{ const n=nt.filter((x)=>!tagOpts.includes(x)); if(n.length) setTagOpts([...tagOpts,...n]); setForm({...form,tags:nt}); }} options={tagOpts}/></div>
       <div><label style={Lbl(t)}>Type</label>
-        <CDropdown t={t} value={form.type} onChange={(v)=>setForm({...form,type:v})} options={TYPES} placeholder="Employee"/></div>
+        <FloatSelect
+          t={t}
+          value={form.type}
+          onChange={(v)=>setForm({...form,type:v})}
+          options={TYPES}
+          placeholder="Select type"
+          creatable={false}
+          searchPlaceholder="Search types…"
+        /></div>
     </div>
   );
 }
 
 function AccessTab({ form,setForm,t }) {
   return (<div><label style={Lbl(t)}>Access level</label>
-    <CDropdown t={t} value={ACCESS_OPTS.find((a)=>a.value===form.access)?.label||"No access rights"} onChange={(v)=>setForm({...form,access:v})} options={ACCESS_OPTS} placeholder="No access rights"
-      renderOption={(opt,t)=>(<div style={{ display:"flex",alignItems:"flex-start",gap:10 }}><div style={{ width:32,height:32,borderRadius:8,background:t.accentGlow,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2 }}><opt.icon size={16} style={{ color:t.accent }}/></div><div><div style={{ fontWeight:600,color:t.text,fontSize:14 }}>{opt.label}</div>{opt.desc&&<div style={{ fontSize:12,color:t.textMuted,marginTop:2,lineHeight:1.4 }}>{opt.desc}</div>}</div></div>)}/>
+    <FloatSelect
+      t={t}
+      value={form.access}
+      onChange={(v)=>setForm({...form,access:v})}
+      options={ACCESS_OPTS}
+      placeholder="Select access level"
+      creatable={false}
+      searchPlaceholder="Search access levels…"
+      renderOption={(opt, th)=>(<div style={{ display:"flex",alignItems:"flex-start",gap:10 }}><div style={{ width:32,height:32,borderRadius:8,background:th.accentGlow,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2 }}><opt.icon size={16} style={{ color:th.accent }}/></div><div><div style={{ fontWeight:600,color:th.text,fontSize:14 }}>{opt.label}</div>{opt.desc?(<div style={{ fontSize:12,color:th.textMuted,marginTop:2,lineHeight:1.4 }}>{opt.desc}</div>):null}</div></div>)}
+    />
   </div>);
 }
 
@@ -396,8 +370,141 @@ function AvailabilityTab({ form,setForm,t }) {
   );
 }
 
-function TimeOffTab({ form,setForm,t }) {
-  return (<div><label style={Lbl(t)}>Public holidays region</label><CDropdown t={t} value={form.holidays} onChange={(v)=>setForm({...form,holidays:v})} options={["None",...AU_HOLIDAYS]} placeholder="Select region"/></div>);
+function TimeOffTab({ form, setForm, t, editPerson, allocations = [], onOpenCreateLeave }) {
+  const todayIso = useMemo(() => isoDateLocal(), []);
+
+  const upcomingLeave = useMemo(() => {
+    const pid = editPerson?.id;
+    if (pid == null) return [];
+    return allocations
+      .filter(
+        (a) =>
+          a.isLeave &&
+          allocationHasPerson(a, pid) &&
+          typeof a.endDate === "string" &&
+          a.endDate >= todayIso
+      )
+      .sort((a, b) => (a.startDate || "").localeCompare(b.startDate || ""))
+      .slice(0, 14);
+  }, [allocations, editPerson?.id, todayIso]);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+      {editPerson && onOpenCreateLeave ? (
+        <motion.button
+          type="button"
+          onClick={() => onOpenCreateLeave(editPerson)}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.98 }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            padding: "12px 18px",
+            borderRadius: 10,
+            border: `1px solid color-mix(in srgb, ${t.accent} 40%, ${t.border})`,
+            background: `linear-gradient(145deg, color-mix(in srgb, ${t.accent} 18%, transparent), color-mix(in srgb, ${t.accent} 8%, transparent))`,
+            color: t.accent,
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: "pointer",
+            fontFamily: "inherit",
+            boxShadow: `0 0 24px color-mix(in srgb, ${t.accent} 15%, transparent)`,
+          }}
+        >
+          <Palmtree size={18} strokeWidth={2.25} />
+          Log leave on schedule
+        </motion.button>
+      ) : null}
+
+      <div>
+        <label style={Lbl(t)}>Upcoming leave</label>
+        {!editPerson ? (
+          <p style={{ margin: 0, fontSize: 13, color: t.textDim, lineHeight: 1.5 }}>
+            Save this person first to see leave from the schedule here.
+          </p>
+        ) : upcomingLeave.length === 0 ? (
+          <div
+            style={{
+              padding: "20px 16px",
+              borderRadius: 10,
+              border: `1px dashed ${t.borderSub}`,
+              background: t.surfAlt,
+              textAlign: "center",
+            }}
+          >
+            <Calendar size={22} style={{ color: t.textDim, marginBottom: 8 }} />
+            <p style={{ margin: 0, fontSize: 13, color: t.textMuted, lineHeight: 1.45 }}>
+              No upcoming leave blocks yet. Use{" "}
+              <strong style={{ color: t.textSoft }}>Log leave on schedule</strong> or the Schedule view.
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <AnimatePresence initial={false}>
+              {upcomingLeave.map((a) => {
+                const accent = leaveAccentTheme(a.leaveType);
+                const title = a.leaveType ? leaveLabel(a.leaveType) : a.project || "Leave";
+                const range =
+                  a.startDate === a.endDate
+                    ? a.startDate
+                    : `${a.startDate} → ${a.endDate}`;
+                return (
+                  <motion.div
+                    key={a.id}
+                    layout
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0, transition: { duration: 0.22, ease: [0.45, 0, 0.55, 1] } }}
+                    exit={{ opacity: 0, height: 0, marginBottom: 0, transition: { duration: 0.18 } }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "12px 14px",
+                      borderRadius: 10,
+                      border: `1px solid color-mix(in srgb, ${accent.solid} 35%, ${t.border})`,
+                      background: `linear-gradient(135deg, color-mix(in srgb, ${accent.solid} 12%, ${t.surfAlt}), ${t.surfAlt})`,
+                      boxShadow: `0 0 20px color-mix(in srgb, ${accent.solid} 10%, transparent)`,
+                    }}
+                  >
+                    <span
+                      aria-hidden
+                      style={{
+                        width: 14,
+                        height: 14,
+                        borderRadius: 5,
+                        flexShrink: 0,
+                        background: `linear-gradient(145deg, ${accent.solid}, color-mix(in srgb, ${accent.solid} 65%, #0f172a))`,
+                        boxShadow: `0 0 0 2px ${accent.soft}, inset 0 1px 2px rgba(0,0,0,0.15)`,
+                      }}
+                    />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: t.text }}>{title}</div>
+                      <div style={{ fontSize: 12, color: t.textMuted, marginTop: 2 }}>{range}</div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        )}
+      </div>
+
+      <div>
+        <label style={Lbl(t)}>Public holidays region</label>
+        <FloatSelect
+          t={t}
+          value={form.publicHolidayRegion}
+          onChange={(v) => setForm({ ...form, publicHolidayRegion: v })}
+          options={AU_PUBLIC_HOLIDAY_REGION_OPTIONS}
+          placeholder="Select region"
+          creatable={false}
+          searchPlaceholder="Search regions…"
+        />
+      </div>
+    </div>
+  );
 }
 
 function ProjectsTab({
@@ -502,11 +609,13 @@ function ProjectsTab({
         {activeProjectLabels.length === 0 ? (
           <div style={{ fontSize:13,color:t.textDim,padding:"10px 0" }}>No active (non-archived) projects in the registry.</div>
         ) : (
-          <CDropdown
+          <FloatSelect
             key={pickKey}
             t={t}
             value=""
             placeholder="Choose a project to allocate…"
+            creatable={false}
+            searchPlaceholder="Search projects…"
             onChange={(v) => {
               setPickKey((k) => k + 1);
               onOpenCreateAllocation({ person: editPerson, projectLabel: v });
@@ -599,6 +708,7 @@ export function PersonModal({
   syncAllocationDelete,
   syncAllocationUpdate,
   onOpenCreateAllocation,
+  onOpenCreateLeave,
   tagTheme = "dark",
 }) {
   const tagIsDark = tagTheme === "dark";
@@ -614,7 +724,7 @@ export function PersonModal({
       setForm(editPerson ? personToForm(editPerson) : {
         name:"",email:"",role:"No role",costRate:"0",billRate:"0",
         department:"No department",tags:[],type:"Employee",access:"none",
-        startDate:"2026-01-01",endDate:"",workType:"Full-time",notes:"",holidays:"None",
+        startDate:"2026-01-01",endDate:"",workType:"Full-time",notes:"",publicHolidayRegion:"None",
       });
       setDirty(false);
     }
@@ -632,10 +742,19 @@ export function PersonModal({
 
   return (
     <div className="float-modal-overlay-dim" onClick={(e) => { if(ref.current&&!ref.current.contains(e.target)) onClose(); }}
-      style={{ position:"fixed",inset:0,background:t.overlay,zIndex:200,display:"flex",alignItems:"flex-start",justifyContent:"center",paddingTop:48,animation:"fadeIn 0.22s var(--ds-ease-out, ease-out)" }}>
+      style={{
+        position:"fixed",inset:0,background:t.overlay,zIndex:200,
+        display:"flex",alignItems:"center",justifyContent:"center",
+        padding:"max(16px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px))",
+        overflowY:"auto",
+        WebkitOverflowScrolling:"touch",
+        animation:"fadeIn 0.22s var(--ds-ease-out, ease-out)",
+      }}>
       <div className="float-premium-modal float-modal-panel-enter" ref={ref} onClick={(e)=>e.stopPropagation()} style={{
-        background:t.surfRaised,width:620,maxHeight:"calc(100vh - 96px)",
-        display:"flex",flexDirection:"column",transition:"background 0.35s",
+        background:t.surfRaised,width:"min(620px, 100%)",maxWidth:"100%",
+        maxHeight:"min(calc(100vh - 32px), calc(100dvh - 32px))",
+        display:"flex",flexDirection:"column",minHeight:0,overflow:"hidden",
+        transition:"background 0.35s",
       }}>
         {/* Header */}
         <div style={{ padding:"28px 32px 0",flexShrink:0 }}>
@@ -657,22 +776,40 @@ export function PersonModal({
           </div>
 
           {/* Tabs — fixed equal-width grid */}
-          <div style={{ display:"grid",gridTemplateColumns:`repeat(${MODAL_TABS.length}, 1fr)`,gap:4,marginTop:20,borderBottom:`2px solid ${t.border}`,paddingBottom:0 }}>
+          <div style={{ display:"grid",gridTemplateColumns:`repeat(${MODAL_TABS.length}, 1fr)`,gap:4,marginTop:20,borderBottom:`2px solid ${t.border}`,paddingBottom:0,position:"relative" }}>
             {MODAL_TABS.map((mt, i) => {
               const Icon = mt.icon;
               const active = tab === i;
               return (
-                <button key={mt.key} onClick={() => setTab(i)} style={{
+                <button key={mt.key} type="button" onClick={() => setTab(i)} style={{
+                  position:"relative",
                   padding:"10px 4px",fontSize:12,fontWeight:active?700:500,cursor:"pointer",
                   background:active?t.tabActiveBg:"transparent",border:"none",
                   color:active?t.accent:t.textMuted,
-                  borderBottom:active?`2px solid ${t.accent}`:"2px solid transparent",
-                  marginBottom:-2,transition:"all 0.2s",display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+                  marginBottom:-2,transition:"background 0.22s var(--ease-ui-in-out, ease-in-out), color 0.2s ease",display:"flex",alignItems:"center",justifyContent:"center",gap:6,
                   borderRadius:"8px 8px 0 0",whiteSpace:"nowrap",overflow:"hidden",
                 }}
                   onMouseEnter={(e) => { if(!active) e.currentTarget.style.background=t.tabHovBg; }}
-                  onMouseLeave={(e) => { if(!active) e.currentTarget.style.background=active?t.tabActiveBg:"transparent"; }}>
-                  <Icon size={14} style={{ flexShrink:0 }}/> <span style={{ overflow:"hidden",textOverflow:"ellipsis" }}>{mt.label}</span>
+                  onMouseLeave={(e) => { if(!active) e.currentTarget.style.background="transparent"; }}>
+                  {active ? (
+                    <motion.span
+                      layoutId="person-modal-tab-line"
+                      style={{
+                        position: "absolute",
+                        left: 6,
+                        right: 6,
+                        bottom: -2,
+                        height: 2,
+                        borderRadius: 2,
+                        background: t.accent,
+                        boxShadow: `0 0 14px color-mix(in srgb, ${t.accent} 55%, transparent)`,
+                        pointerEvents: "none",
+                      }}
+                      transition={{ type: "spring", stiffness: 380, damping: 34 }}
+                    />
+                  ) : null}
+                  <Icon size={14} style={{ flexShrink: 0, position: "relative", zIndex: 1 }} />{" "}
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", position: "relative", zIndex: 1 }}>{mt.label}</span>
                 </button>
               );
             })}
@@ -684,7 +821,16 @@ export function PersonModal({
           {tab===0 && <InfoTab form={form} setForm={setFormWrap} roles={roles} setRoles={setRoles} depts={depts} setDepts={setDepts} tagOpts={tagOpts} setTagOpts={setTagOpts} t={t} tagIsDark={tagIsDark} pickerKey={editPerson?.id ?? "new"}/>}
           {tab===1 && <AccessTab form={form} setForm={setFormWrap} t={t}/>}
           {tab===2 && <AvailabilityTab form={form} setForm={setFormWrap} t={t}/>}
-          {tab===3 && <TimeOffTab form={form} setForm={setFormWrap} t={t}/>}
+          {tab===3 && (
+            <TimeOffTab
+              form={form}
+              setForm={setFormWrap}
+              t={t}
+              editPerson={editPerson}
+              allocations={allocations}
+              onOpenCreateLeave={onOpenCreateLeave}
+            />
+          )}
           {tab===4 && (
             <ProjectsTab
               t={t}
@@ -700,29 +846,30 @@ export function PersonModal({
         </div>
 
         {/* Footer */}
-        <div style={{ padding:"16px 32px 24px",flexShrink:0,display:"flex",alignItems:"center",gap:10,borderTop:`1px solid ${t.border}` }}>
-          <button onClick={handleSave} disabled={!form.name.trim()} style={{
-            background:t.accent,border:"none",borderRadius:8,color:t.accentTxt,
-            padding:"10px 26px",cursor:form.name.trim()?"pointer":"default",fontSize:14,fontWeight:700,
-            opacity:form.name.trim()?1:0.35,transition:"all 0.2s",
-            boxShadow:form.name.trim()?`0 2px 12px ${t.accent}30`:"none",display:"flex",alignItems:"center",gap:8,
-          }}
-            onMouseEnter={(e) => { if(form.name.trim()) { e.currentTarget.style.background=t.accentHov; e.currentTarget.style.transform="translateY(-1px)"; }}}
-            onMouseLeave={(e) => { e.currentTarget.style.background=t.accent; e.currentTarget.style.transform="none"; }}>
+        <div style={{ padding:"16px 32px 24px",flexShrink:0,display:"flex",alignItems:"center",gap:10,borderTop:`1px solid ${t.border}`,flexWrap:"wrap" }}>
+          <Button
+            type="button"
+            variant="primary"
+            size="md"
+            onClick={handleSave}
+            disabled={!form.name.trim()}
+            style={{ display: "flex", alignItems: "center", gap: 8 }}
+          >
             {isEdit ? <><Save size={15}/> Save changes</> : <><UserPlus size={15}/> Add person</>}
-          </button>
-          <button onClick={onClose} style={{ background:t.btnSec,border:`1px solid ${t.border}`,borderRadius:8,color:t.btnSecTxt,padding:"10px 24px",cursor:"pointer",fontSize:14,fontWeight:600,transition:"all 0.15s" }}
-            onMouseEnter={(e) => e.currentTarget.style.background=t.btnSecHov}
-            onMouseLeave={(e) => e.currentTarget.style.background=t.btnSec}>Cancel</button>
+          </Button>
+          <Button type="button" variant="secondary" size="md" onClick={onClose}>
+            Cancel
+          </Button>
           {isEdit && (
-            <button onClick={onArchive} style={{
-              marginLeft:"auto",background:t.warnSoft,border:`1px solid ${t.warn}30`,borderRadius:8,color:t.warn,
-              padding:"10px 18px",cursor:"pointer",fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:6,transition:"all 0.15s",
-            }}
-              onMouseEnter={(e)=>{ e.currentTarget.style.background=t.warn; e.currentTarget.style.color="#fff"; }}
-              onMouseLeave={(e)=>{ e.currentTarget.style.background=t.warnSoft; e.currentTarget.style.color=t.warn; }}>
+            <Button
+              type="button"
+              variant="warning"
+              size="md"
+              onClick={onArchive}
+              style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}
+            >
               {editPerson?.archived ? <><ArchiveRestore size={14}/> Restore</> : <><Archive size={14}/> Archive</>}
-            </button>
+            </Button>
           )}
         </div>
       </div>

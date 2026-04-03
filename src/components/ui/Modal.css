@@ -11,13 +11,13 @@
   border: none;
   padding: 0;
   cursor: pointer;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
 }
 
 :root[data-theme="light"] .float-modal-backdrop {
-  background: rgba(15, 17, 23, 0.45);
+  background: rgba(15, 17, 23, 0.4);
 }
 
 .float-modal-center {
@@ -103,28 +103,5 @@
 
 .float-modal-cta {
   width: 100%;
-  padding: 12px 18px;
-  border-radius: var(--radius-button);
-  border: none;
-  font-size: 0.9rem;
-  font-weight: 600;
-  font-family: var(--font-body);
-  cursor: pointer;
-  color: #061210;
-  background: linear-gradient(135deg, var(--color-brand-light) 0%, var(--color-brand) 100%);
-  box-shadow: 0 0 16px var(--color-brand-dim);
-  transition:
-    transform var(--duration-fast) var(--ease-spring),
-    box-shadow var(--duration-normal) ease,
-    filter var(--duration-fast) ease;
-}
-
-.float-modal-cta:hover {
-  transform: translateY(-1px);
-  filter: brightness(1.05);
-  box-shadow: 0 0 20px color-mix(in srgb, var(--color-brand) 35%, transparent);
-}
-
-.float-modal-cta:active {
-  transform: translateY(0);
+  margin-top: 2px;
 }

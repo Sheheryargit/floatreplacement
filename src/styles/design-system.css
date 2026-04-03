@@ -59,12 +59,20 @@
 
   --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out-ui: cubic-bezier(0.22, 1, 0.36, 1);
+  /** Primary UI easing — ease-in-out for route & surface motion */
+  --ease-ui-in-out: cubic-bezier(0.45, 0, 0.55, 1);
   --duration-fast: 0.15s;
   --duration-normal: 0.2s;
   --duration-slow: 0.22s;
   --duration-theme: 0.2s;
 
   --ds-focus: var(--color-brand);
+
+  /* Layered depth (premium surfaces) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.38), 0 8px 24px rgba(0, 0, 0, 0.18);
+  --shadow-glow-brand: 0 0 32px color-mix(in srgb, var(--color-brand) 28%, transparent);
 
   color-scheme: dark;
 }
@@ -133,5 +141,14 @@ a:focus:not(:focus-visible) {
   }
   50% {
     opacity: 1;
+  }
+}
+
+@keyframes alloc8-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
   }
 }

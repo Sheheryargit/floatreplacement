@@ -226,11 +226,50 @@
   }
 }
 
+/* Icon-only control — tables, row menus */
+.alloc8-icon-btn {
+  appearance: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-muted, #7b82a0);
+  padding: 6px;
+  border-radius: var(--radius-button, 8px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background var(--ds-t-fast, 0.18s) var(--ds-ease-out, ease-out),
+    color var(--ds-t-fast, 0.18s) var(--ds-ease-out, ease-out),
+    box-shadow var(--ds-t-med, 0.26s) var(--ds-ease-out, ease-out),
+    transform var(--ds-t-fast, 0.18s) var(--ds-ease-out, ease-out);
+}
+
+.alloc8-icon-btn:hover {
+  color: var(--color-brand, #00c2a8);
+  background: color-mix(in srgb, var(--color-brand) 12%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-brand) 22%, transparent),
+    0 0 20px color-mix(in srgb, var(--color-brand) 12%, transparent);
+}
+
+.alloc8-icon-btn:active {
+  transform: scale(0.96);
+}
+
+.alloc8-icon-btn:focus-visible {
+  outline: 2px solid var(--ds-focus, var(--color-brand));
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .float-tag-chroma:hover {
     transform: none;
   }
   .float-modal-panel-enter {
     animation: none;
+  }
+  .alloc8-icon-btn:active {
+    transform: none;
   }
 }

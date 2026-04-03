@@ -60,3 +60,76 @@
   background: #ffffff;
   box-shadow: 0 1px 0 #e4e7ed;
 }
+
+/* Advanced filter popover (nested sections) */
+.people-filter-wrap {
+  position: relative;
+}
+
+.people-filter-panel {
+  animation: peopleFilterIn 0.18s ease-out;
+}
+
+@keyframes peopleFilterIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.people-filter-nest-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.people-filter-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.people-filter-people-scroll {
+  max-height: 168px;
+  overflow-y: auto;
+  border-radius: 8px;
+  border: 1px solid var(--people-filter-border, #2a2f45);
+  background: var(--people-filter-nested-bg, rgba(0, 0, 0, 0.12));
+}
+
+.people-filter-people-scroll label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--people-filter-text, #f0f2f8);
+  border-bottom: 1px solid var(--people-filter-border, #2a2f45);
+}
+
+.people-filter-people-scroll label:last-child {
+  border-bottom: none;
+}
+
+.people-filter-people-scroll label:hover {
+  background: var(--people-filter-row-hov, rgba(0, 194, 168, 0.06));
+}
+
+.people-page-root[data-theme="light"] .people-filter-people-scroll {
+  background: #f4f6fa;
+  border-color: #e0e4ef;
+}
+
+.people-page-root[data-theme="light"] .people-filter-people-scroll label {
+  color: #12151f;
+  border-color: #e8ebf0;
+}
+
+.people-page-root[data-theme="light"] .people-filter-people-scroll label:hover {
+  background: rgba(0, 168, 150, 0.08);
+}

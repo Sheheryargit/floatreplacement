@@ -1,0 +1,419 @@
+.lp-schedule-filter-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: min(340px, calc(100vw - 32px));
+  max-width: calc(100vw - 24px);
+  max-height: min(72vh, 560px);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  z-index: 70;
+  overflow: hidden;
+}
+
+.lp-root[data-theme="light"] .lp-schedule-filter-popover {
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12);
+}
+
+.lp-schedule-filter-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-sub);
+  flex-shrink: 0;
+}
+
+.lp-schedule-filter-head-icon {
+  color: var(--accent);
+}
+
+.lp-schedule-filter-head-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  flex: 1;
+}
+
+.lp-schedule-filter-badge {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-txt, #061210);
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lp-root[data-theme="light"] .lp-schedule-filter-badge {
+  color: var(--accent-txt, #fff);
+}
+
+.lp-schedule-filter-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-alt, rgba(0, 0, 0, 0.2));
+  flex-shrink: 0;
+}
+
+.lp-root[data-theme="light"] .lp-schedule-filter-search {
+  background: #f4f6fa;
+}
+
+.lp-schedule-filter-search svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.lp-schedule-filter-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+}
+
+.lp-schedule-filter-search-drill {
+  margin: 0 0 10px;
+  width: 100%;
+}
+
+.lp-schedule-filter-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 0 8px;
+}
+
+.lp-schedule-filter-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  padding: 10px 14px 6px;
+}
+
+.lp-schedule-filter-cat {
+  width: calc(100% - 16px);
+  margin: 0 8px 2px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: background 0.12s ease;
+}
+
+.lp-schedule-filter-cat:hover {
+  background: var(--accent-glow);
+}
+
+.lp-schedule-filter-cat-active .lp-schedule-filter-cat-label {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.lp-schedule-filter-cat-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.lp-schedule-filter-cat-active .lp-schedule-filter-cat-icon {
+  color: var(--accent);
+}
+
+.lp-schedule-filter-cat-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.lp-schedule-filter-cat-chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+.lp-schedule-filter-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--border-sub);
+  flex-shrink: 0;
+}
+
+.lp-schedule-filter-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.lp-schedule-filter-link:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.lp-schedule-filter-link-accent {
+  color: var(--accent);
+}
+
+/* Drill */
+.lp-schedule-filter-drill-top {
+  padding: 10px 12px 0;
+  border-bottom: 1px solid var(--border-sub);
+  flex-shrink: 0;
+}
+
+.lp-schedule-filter-drill-head-text {
+  margin-left: 36px;
+}
+
+.lp-schedule-filter-drill-top {
+  position: relative;
+}
+
+.lp-schedule-filter-back {
+  position: absolute;
+  left: 8px;
+  top: 12px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.lp-schedule-filter-back:hover {
+  background: var(--accent-glow);
+  color: var(--text);
+}
+
+.lp-schedule-filter-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.lp-schedule-filter-field-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--accent-glow);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.lp-schedule-filter-is-toggle {
+  display: inline-flex;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.lp-schedule-filter-is-toggle button {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.lp-schedule-filter-is-toggle button.active {
+  background: var(--accent-glow);
+  color: var(--accent);
+}
+
+.lp-schedule-filter-drill-list {
+  flex: 1;
+  min-height: 120px;
+  max-height: 42vh;
+  overflow-y: auto;
+  padding: 6px 8px 10px;
+}
+
+.lp-schedule-filter-hint {
+  margin: 0 8px 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.lp-schedule-filter-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.lp-schedule-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  margin: 0 4px 2px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+  transition: background 0.1s ease;
+}
+
+.lp-schedule-filter-row:hover {
+  background: var(--accent-glow);
+}
+
+.lp-schedule-filter-row-hook {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+
+.lp-schedule-filter-row-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lp-schedule-filter-row-star {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.lp-schedule-filter-row-star.on {
+  color: var(--accent);
+}
+
+.lp-schedule-filter-check {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.lp-schedule-filter-drill-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--border-sub);
+  flex-shrink: 0;
+}
+
+.lp-schedule-filter-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    transform 0.2s var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1)),
+    box-shadow 0.24s var(--ease-ui-in-out, ease-in-out),
+    filter 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.lp-schedule-filter-btn.secondary {
+  background: color-mix(in srgb, var(--surface-alt, var(--surface)) 80%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--text-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+}
+
+.lp-schedule-filter-btn.secondary:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.lp-schedule-filter-btn.primary {
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--accent) 105%, #fff) 0%,
+    var(--accent) 50%,
+    color-mix(in srgb, var(--accent) 85%, #0a1620) 100%
+  );
+  color: var(--accent-txt, #061210);
+  border: 1px solid transparent;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent) inset,
+    0 2px 14px color-mix(in srgb, var(--accent) 35%, transparent),
+    0 0 24px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.lp-schedule-filter-btn.primary:hover {
+  filter: brightness(1.04);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent) inset,
+    0 4px 20px color-mix(in srgb, var(--accent) 42%, transparent),
+    0 0 32px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.lp-schedule-filter-btn:active {
+  transform: scale(0.97);
+}
+
+.lp-root[data-theme="light"] .lp-schedule-filter-btn.primary {
+  color: #fff;
+}

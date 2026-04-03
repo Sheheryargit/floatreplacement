@@ -2,6 +2,7 @@ import { useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
+import { Button } from "./Button.jsx";
 import "./Modal.css";
 
 export function Modal({ title, message, onClose }) {
@@ -64,9 +65,9 @@ export function Modal({ title, message, onClose }) {
             {title}
           </h2>
           <p className="float-modal-message">{message}</p>
-          <button type="button" className="float-modal-cta" onClick={onClose}>
+          <Button type="button" variant="primary" size="lg" className="float-modal-cta" onClick={onClose}>
             Got it
-          </button>
+          </Button>
         </motion.div>
       </div>
     </motion.div>,
