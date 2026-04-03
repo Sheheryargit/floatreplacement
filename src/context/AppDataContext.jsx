@@ -18,6 +18,10 @@ import {
   resolveColorForProjectLabel,
 } from "../utils/projectColors.js";
 import { loadWorkspaceFromSupabase } from "../lib/api/loadWorkspace.js";
+import {
+  fetchPersonPublicHolidaysSafe,
+  resolvePublicHolidayAllocations,
+} from "../lib/api/publicHolidaySchedule.js";
 import * as peopleApi from "../lib/api/people.js";
 import * as projectsApi from "../lib/api/projects.js";
 import * as allocationsApi from "../lib/api/allocations.js";
@@ -71,6 +75,7 @@ function buildInitialSlices() {
         };
       }),
       allocations: [],
+      publicHolidayAllocations: [],
       roles: [...SEED_ROLES],
       depts: [...SEED_DEPTS],
       peopleTagOpts: [...SEED_TAGS],
@@ -87,6 +92,7 @@ function buildInitialSlices() {
     people: [],
     projects: [],
     allocations: [],
+    publicHolidayAllocations: [],
     roles: [...SEED_ROLES],
     depts: [...SEED_DEPTS],
     peopleTagOpts: [...SEED_TAGS],
@@ -122,6 +128,9 @@ function mergeRemoteWorkspace(remote) {
     people: remote.people,
     projects: remote.projects,
     allocations: remote.allocations,
+    publicHolidayAllocations: Array.isArray(remote.publicHolidayAllocations)
+      ? remote.publicHolidayAllocations
+      : [],
     roles: remote.roles.length ? remote.roles : [...seedFallbacks.roles],
     depts: remote.depts.length ? remote.depts : [...seedFallbacks.depts],
     clients: remote.clients.length ? remote.clients : [...seedFallbacks.clients],
@@ -134,6 +143,14 @@ function mergeRemoteWorkspace(remote) {
     schedulePeopleTagFilter,
     scheduleFilterRules,
   });
+}
+
+async function refreshPublicHolidayAllocationsInStore() {
+  if (!isSupabaseConfigured) return;
+  const { people } = useAppStore.getState();
+  const phResult = await fetchPersonPublicHolidaysSafe();
+  const publicHolidayAllocations = await resolvePublicHolidayAllocations(people, phResult);
+  useAppStore.setState({ publicHolidayAllocations });
 }
 
 export const useAppStore = create((set, get) => ({
@@ -183,6 +200,11 @@ export const useAppStore = create((set, get) => ({
       return { projectTagOpts: next };
     }),
   setAllocations: (val) => set({ allocations: typeof val === "function" ? val(get().allocations) : val }),
+  setPublicHolidayAllocations: (val) =>
+    set({
+      publicHolidayAllocations:
+        typeof val === "function" ? val(get().publicHolidayAllocations) : val,
+    }),
   setExtraAllocationLabels: (val) =>
     set({ extraAllocationLabels: typeof val === "function" ? val(get().extraAllocationLabels) : val }),
 
@@ -261,13 +283,22 @@ export const useAppStore = create((set, get) => ({
 }));
 
 export function syncPersonCreate(person) {
-  dbSync(() => peopleApi.createPerson(person));
+  dbSync(async () => {
+    await peopleApi.createPerson(person);
+    await refreshPublicHolidayAllocationsInStore();
+  });
 }
 export function syncPersonUpdate(person) {
-  dbSync(() => peopleApi.updatePerson(person));
+  dbSync(async () => {
+    await peopleApi.updatePerson(person);
+    await refreshPublicHolidayAllocationsInStore();
+  });
 }
 export function syncPeopleDelete(ids) {
-  dbSync(() => peopleApi.deletePeople(ids));
+  dbSync(async () => {
+    await peopleApi.deletePeople(ids);
+    await refreshPublicHolidayAllocationsInStore();
+  });
 }
 export function syncProjectCreate(project) {
   dbSync(() => projectsApi.createProject(project));
@@ -301,6 +332,8 @@ export function useAppData() {
       setProjects: s.setProjects,
       allocations: s.allocations,
       setAllocations: s.setAllocations,
+      publicHolidayAllocations: s.publicHolidayAllocations,
+      setPublicHolidayAllocations: s.setPublicHolidayAllocations,
       roles: s.roles,
       setRoles: s.setRoles,
       depts: s.depts,

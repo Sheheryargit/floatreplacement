@@ -40,7 +40,7 @@ import {
   comparePeopleForScheduleSort,
   personApproxTotalAllocatedHours,
 } from "../utils/peopleSort.js";
-import { CreateAllocationModal } from "../components/AllocationModals.jsx";
+import { CreateAllocationModal, leaveLabel } from "../components/AllocationModals.jsx";
 import { resolveColorForProjectLabel } from "../utils/projectColors.js";
 import "./PeoplePage.css";
 
@@ -88,6 +88,7 @@ export default function PeoplePage() {
     syncPersonUpdate,
     syncPeopleDelete,
     allocations,
+    publicHolidayAllocations,
     setAllocations,
     projects,
     allocationProjectOptions,
@@ -96,6 +97,11 @@ export default function PeoplePage() {
     syncAllocationUpdate,
     syncAllocationDelete,
   } = useAppData();
+
+  const scheduleAllocations = useMemo(
+    () => [...allocations, ...publicHolidayAllocations],
+    [allocations, publicHolidayAllocations]
+  );
 
   const [selected,setSelected]=useState(new Set());
   const [search,setSearch]=useState("");
@@ -164,7 +170,7 @@ export default function PeoplePage() {
         const pStart = payload.startDate;
         const pEnd = payload.endDate;
         for (const pid of payload.personIds) {
-          const leaveConflict = allocations.find(
+          const leaveConflict = scheduleAllocations.find(
             (a) =>
               a.isLeave &&
               allocationHasPerson(a, pid) &&
@@ -174,7 +180,7 @@ export default function PeoplePage() {
           if (leaveConflict) {
             const personName = people.find((p) => p.id === pid)?.name || "This person";
             const leaveTypeName = leaveConflict.leaveType
-              ? (leaveConflict.project || "Leave")
+              ? leaveLabel(leaveConflict.leaveType)
               : "Leave";
             toast.error(
               `Cannot allocate ${personName} — they are on ${leaveTypeName} (${leaveConflict.startDate} to ${leaveConflict.endDate})`
@@ -204,7 +210,7 @@ export default function PeoplePage() {
         duration: 2800,
       });
     },
-    [setAllocations, projects, allocations, people, syncAllocationCreate]
+    [setAllocations, projects, scheduleAllocations, people, syncAllocationCreate]
   );
 
   useEffect(()=>{ setMounted(true); },[]);

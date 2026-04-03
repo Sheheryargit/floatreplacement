@@ -1139,6 +1139,7 @@ export default function LandingPage() {
     peopleTagOpts,
     setPeopleTagOpts,
     allocations,
+    publicHolidayAllocations,
     setAllocations,
     projects,
     setProjects,
@@ -1161,6 +1162,11 @@ export default function LandingPage() {
     syncAllocationUpdate,
     syncAllocationDelete,
   } = useAppData();
+
+  const scheduleAllocations = useMemo(
+    () => [...allocations, ...publicHolidayAllocations],
+    [allocations, publicHolidayAllocations]
+  );
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState(null);
@@ -1249,7 +1255,7 @@ export default function LandingPage() {
     let list = people.filter((p) => !p.archived);
     list = list.filter((p) =>
       personMatchesScheduleFilter(p, scheduleFilterRules, {
-        allocations,
+        allocations: scheduleAllocations,
         projects,
         visibleKeys: scheduleVisibleKeys,
       })
@@ -1258,7 +1264,7 @@ export default function LandingPage() {
     for (const p of list) {
       hoursMap.set(
         p.id,
-        computePersonHoursInView(p.id, allocations, scheduleModel, viewMode, anchorDate)
+        computePersonHoursInView(p.id, scheduleAllocations, scheduleModel, viewMode, anchorDate)
       );
     }
     return [...list].sort((a, b) =>
@@ -1270,7 +1276,7 @@ export default function LandingPage() {
     scheduleVisibleKeys,
     scheduleSort,
     peopleOrderMap,
-    allocations,
+    scheduleAllocations,
     projects,
     scheduleModel,
     viewMode,
@@ -1304,10 +1310,10 @@ export default function LandingPage() {
   const totalHours = useMemo(() => {
     let s = 0;
     for (const p of schedulePeople) {
-      s += computePersonHoursInView(p.id, allocations, scheduleModel, viewMode, anchorDate);
+      s += computePersonHoursInView(p.id, scheduleAllocations, scheduleModel, viewMode, anchorDate);
     }
     return s;
-  }, [schedulePeople, allocations, scheduleModel, viewMode, anchorDate]);
+  }, [schedulePeople, scheduleAllocations, scheduleModel, viewMode, anchorDate]);
 
   const teamCapacityHours = useMemo(
     () => Math.max(STANDARD_DAY_HOURS, schedulePeople.length * visibleCapacityDays * STANDARD_DAY_HOURS),
@@ -1507,7 +1513,7 @@ export default function LandingPage() {
         const pStart = payload.startDate;
         const pEnd = payload.endDate;
         for (const pid of payload.personIds) {
-          const leaveConflict = allocations.find(
+          const leaveConflict = scheduleAllocations.find(
             (a) =>
               a.isLeave &&
               allocationHasPerson(a, pid) &&
@@ -1517,7 +1523,7 @@ export default function LandingPage() {
           if (leaveConflict) {
             const personName = people.find((p) => p.id === pid)?.name || "This person";
             const leaveTypeName = leaveConflict.leaveType
-              ? (leaveConflict.project || "Leave")
+              ? leaveLabel(leaveConflict.leaveType)
               : "Leave";
             toast.error(
               `Cannot allocate ${personName} — they are on ${leaveTypeName} (${leaveConflict.startDate} to ${leaveConflict.endDate})`
@@ -1548,7 +1554,7 @@ export default function LandingPage() {
         className: "float-schedule-view-toast",
       });
     },
-    [setAllocations, projects, allocations, people, syncAllocationCreate]
+    [setAllocations, projects, scheduleAllocations, people, syncAllocationCreate]
   );
 
   const handleEditAllocation = useCallback(
@@ -1558,7 +1564,7 @@ export default function LandingPage() {
         const pStart = payload.startDate;
         const pEnd = payload.endDate;
         for (const pid of payload.personIds) {
-          const leaveConflict = allocations.find(
+          const leaveConflict = scheduleAllocations.find(
             (a) =>
               a.id !== id &&
               a.isLeave &&
@@ -1569,7 +1575,7 @@ export default function LandingPage() {
           if (leaveConflict) {
             const personName = people.find((p) => p.id === pid)?.name || "This person";
             const leaveTypeName = leaveConflict.leaveType
-              ? (leaveConflict.project || "Leave")
+              ? leaveLabel(leaveConflict.leaveType)
               : "Leave";
             toast.error(
               `Cannot allocate ${personName} — they are on ${leaveTypeName} (${leaveConflict.startDate} to ${leaveConflict.endDate})`
@@ -1602,11 +1608,17 @@ export default function LandingPage() {
         className: "float-schedule-view-toast",
       });
     },
-    [setAllocations, projects, allocations, people, syncAllocationUpdate]
+    [setAllocations, projects, scheduleAllocations, people, syncAllocationUpdate]
   );
 
   const handleDeleteAllocation = useCallback(
     (alloc) => {
+      if (alloc?.syntheticPublicHoliday) {
+        toast.message("Public holidays follow the person’s region", {
+          description: "Change their region under Time off in the profile, or edit availability dates.",
+        });
+        return;
+      }
       setAllocations((prev) => prev.filter((a) => a.id !== alloc.id));
       syncAllocationDelete(alloc.id);
       toast.success("Allocation deleted");
@@ -2325,7 +2337,7 @@ export default function LandingPage() {
                   key={p.id}
                   p={p}
                   i={i}
-                  allocations={allocations}
+                  allocations={scheduleAllocations}
                   projects={projects}
                   scheduleModel={scheduleModel}
                   viewMode={viewMode}
@@ -2401,12 +2413,16 @@ export default function LandingPage() {
         allocation={selectedAllocation}
         assigneeNames={selectedAssigneeNames}
         onClose={closeAllocationDetail}
-        onDelete={handleDeleteAllocation}
-        onEditClick={selectedAllocation ? () => {
-          setAllocEditing(selectedAllocation);
-          setAllocDetailOpen(false);
-          setAllocCreateOpen(true);
-        } : undefined}
+        onDelete={selectedAllocation?.syntheticPublicHoliday ? undefined : handleDeleteAllocation}
+        onEditClick={
+          selectedAllocation && !selectedAllocation.syntheticPublicHoliday
+            ? () => {
+                setAllocEditing(selectedAllocation);
+                setAllocDetailOpen(false);
+                setAllocCreateOpen(true);
+              }
+            : undefined
+        }
         t={t}
       />
 
