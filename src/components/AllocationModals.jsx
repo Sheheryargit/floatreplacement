@@ -122,6 +122,7 @@ export function CreateAllocationModal({
   people,
   preselectPerson,
   preselectDate,
+  preselectProject,
   projects,
   projectRegistry = [],
   onAddProject,
@@ -187,7 +188,9 @@ export function CreateAllocationModal({
     setEndDate(iso);
     setHoursPerDay("7.5");
     const list = projects.length ? projects : ALLOCATION_PROJECT_SEED;
-    setProject(list[0] ?? "");
+    const pre = preselectProject != null ? String(preselectProject).trim() : "";
+    if (pre) setProject(pre);
+    else setProject(list[0] ?? "");
     setNotes("");
     setRepeatId("none");
     setRepeatOpen(false);
@@ -203,7 +206,7 @@ export function CreateAllocationModal({
     if (preselectPerson) setAssignedIds([preselectPerson.id]);
     else if (people[0]) setAssignedIds([people[0].id]);
     else setAssignedIds([]);
-  }, [open, preselectPerson, preselectDate, people, projects, editAllocation]);
+  }, [open, preselectPerson, preselectDate, preselectProject, people, projects, editAllocation]);
 
   useEffect(() => {
     function onDoc(e) {
@@ -931,8 +934,18 @@ export function AllocationDetailModal({ open, allocation, assigneeNames, onClose
                 className="lpam-btn lpam-btn-secondary"
                 style={{
                   background: t.dangerSoft,
-                  borderColor: "transparent",
+                  border: `1px solid color-mix(in srgb, ${t.danger} 35%, transparent)`,
                   color: t.danger,
+                  boxShadow: t.dangerGlow || "0 2px 14px rgba(244,63,94,0.15)",
+                  transition: "box-shadow 0.22s cubic-bezier(0.22,1,0.36,1), filter 0.18s ease, transform 0.18s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.filter = "brightness(1.05)";
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.filter = "";
+                  e.currentTarget.style.transform = "";
                 }}
                 onClick={() => {
                   onDelete(allocation);

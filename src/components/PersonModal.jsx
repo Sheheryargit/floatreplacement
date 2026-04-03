@@ -4,12 +4,25 @@ import {
   Plus, Download, Trash2, Search, X, ChevronRight, ChevronDown,
   Sun, Moon, Check, AlertTriangle, UserPlus, Shield, Clock,
   Palmtree, Briefcase, Tag, Building2, DollarSign, Mail, Info,
-  Archive, ArchiveRestore, Save, MoreHorizontal, Pencil
+  Archive, ArchiveRestore, Save, MoreHorizontal, Pencil, CircleAlert,
 } from "lucide-react";
+import { tagChromaProps } from "../utils/tagChroma.js";
+import { projectToAllocationLabel, avatarGradientFromName } from "../utils/projectColors.js";
+import { toast } from "sonner";
 
 /* ═══════════════════ DATA ═══════════════════ */
 const SEED_ROLES = ["Graduate","Consultant","Senior Consultant","Manager","Engineer","Senior Specialist Lead","Principal","Director"];
-const SEED_DEPTS = ["Fire Nation","Eaas","Sky","Transition","Anger Management","Azkaban","Sliced Secure","Hornets"];
+/** Canonical departments; extras may be added via + or “Create …” in the picker and sync to lookups. */
+const SEED_DEPTS = [
+  "BRI CBO C&E Cloud Transformation",
+  "BRI CBO C&E Integration Engineering",
+  "BRI CBO C&E Quality Engineering",
+  "CAN CBO C&E Quality Engineering",
+  "Deloitte India - Eaas",
+  "Eaas",
+  "Ninjas",
+  "Transition",
+];
 const SEED_TAGS = ["Azure",".NET","Cloud Secure","Data&AI","SDM","Firenation","UI and UX Design","service management","AWS Platform","Azkaban","Secure"];
 const TYPES = ["Employee","Contractor","Placeholder"];
 const ACCESS_OPTS = [
@@ -48,12 +61,7 @@ export function nextPersonId() {
 
 /* ═══════════════════ HELPERS ═══════════════════ */
 const ini = (n) => { if(!n) return ""; const p=n.trim().split(/\s+/); return p.length===1?(p[0][0]||"").toUpperCase():(p[0][0]+p[p.length-1][0]).toUpperCase(); };
-const avGrad = (n) => {
-  if(!n) return "linear-gradient(135deg,#3a3f4b,#2a2e38)";
-  let h=0; for(let i=0;i<n.length;i++) h=n.charCodeAt(i)+((h<<5)-h);
-  const ps=[["#667eea","#764ba2"],["#f093fb","#f5576c"],["#4facfe","#00f2fe"],["#43e97b","#38f9d7"],["#fa709a","#fee140"],["#a18cd1","#fbc2eb"],["#ffecd2","#fcb69f"],["#89f7fe","#66a6ff"],["#c471f5","#fa71cd"],["#48c6ef","#6f86d6"]];
-  const [a,b]=ps[Math.abs(h)%ps.length]; return `linear-gradient(135deg,${a},${b})`;
-};
+const avGrad = avatarGradientFromName;
 const personToForm = (p) => ({
   name:p.name, email:p.email||"", role:p.role==="—"?"No role":p.role,
   costRate:p.costRate||"0", billRate:p.billRate||"0",
@@ -84,9 +92,11 @@ const T = {
     sidebar:"#090c12",sidebarAct:"#141828",rowHov:"#151a26",
     tagBg:"#1c2640",tagTxt:"#8aa4ff",
     btnSec:"#1e2538",btnSecHov:"#252d3f",btnSecTxt:"#b0b8cc",
-    danger:"#ff4d6a",dangerHov:"#e8364f",dangerSoft:"rgba(255,77,106,0.1)",dangerTxt:"#fff",
-    success:"#34d399",successSoft:"rgba(52,211,153,0.1)",
-    warn:"#f59e0b",warnSoft:"rgba(245,158,11,0.1)",
+    danger:"#fb7185",dangerHov:"#f43f5e",dangerSoft:"rgba(251,113,133,0.16)",dangerTxt:"#fff",
+    dangerGlow:"0 4px 24px rgba(244,63,94,0.28)",
+    success:"#4ade80",successHov:"#22c55e",successSoft:"rgba(74,222,128,0.14)",successGlow:"0 4px 20px rgba(34,197,94,0.22)",
+    warn:"#fcd34d",warnHov:"#fbbf24",warnTxt:"#0f172a",warnSoft:"rgba(252,211,77,0.16)",warnGlow:"0 4px 20px rgba(251,191,36,0.2)",
+    info:"#a5b4fc",infoSoft:"rgba(165,180,252,0.14)",infoGlow:"0 4px 22px rgba(129,140,248,0.22)",
     overlay:"rgba(0,0,0,0.65)",shadow:"0 32px 100px rgba(0,0,0,0.6)",
     chk:"#6c8cff",scroll:"#252d3f",selRow:"#141a2e",focus:"#6c8cff",
     toastBg:"#171c27",toastBdr:"#1e2538",
@@ -100,9 +110,11 @@ const T = {
     sidebar:"#ffffff",sidebarAct:"#f0f1f5",rowHov:"#f8f9fb",
     tagBg:"#eef1f8",tagTxt:"#4a5da8",
     btnSec:"#eef0f4",btnSecHov:"#e2e5eb",btnSecTxt:"#3e4560",
-    danger:"#e8364f",dangerHov:"#d42a42",dangerSoft:"rgba(232,54,79,0.06)",dangerTxt:"#fff",
-    success:"#16a06a",successSoft:"rgba(22,160,106,0.06)",
-    warn:"#d97706",warnSoft:"rgba(217,119,6,0.06)",
+    danger:"#e11d48",dangerHov:"#be123c",dangerSoft:"rgba(225,29,72,0.1)",dangerTxt:"#fff",
+    dangerGlow:"0 4px 18px rgba(225,29,72,0.2)",
+    success:"#059669",successHov:"#047857",successSoft:"rgba(5,150,105,0.1)",successGlow:"0 4px 16px rgba(5,150,105,0.18)",
+    warn:"#d97706",warnHov:"#b45309",warnTxt:"#fff",warnSoft:"rgba(217,119,6,0.1)",warnGlow:"0 4px 16px rgba(217,119,6,0.16)",
+    info:"#4f46e5",infoSoft:"rgba(79,70,229,0.1)",infoGlow:"0 4px 18px rgba(79,70,229,0.15)",
     overlay:"rgba(15,18,28,0.35)",shadow:"0 32px 100px rgba(0,0,0,0.12)",
     chk:"#4f6ae6",scroll:"#d4d8e0",selRow:"#eef1fa",focus:"#4f6ae6",
     toastBg:"#ffffff",toastBdr:"#e4e7ed",
@@ -123,15 +135,15 @@ function useToasts() {
   return { ts, add };
 }
 function Toasts({ ts, t }) {
-  const icons = { success:Check, danger:Trash2, info:Info, warn:Archive };
-  const colors = { success:t.success, danger:t.danger, info:t.accent, warn:t.warn };
+  const icons = { success:Check, danger:CircleAlert, info:Info, warn:Archive };
+  const colors = { success:t.success, danger:t.danger, info:t.info ?? t.accent, warn:t.warn };
   return (
     <div style={{ position:"fixed",bottom:24,right:24,zIndex:999,display:"flex",flexDirection:"column-reverse",gap:8 }}>
-      {ts.map((x) => { const I=icons[x.type]||Info; return (
+      {ts.map((x) => { const I=icons[x.type]||Info; const glow=x.type==="success"?t.successGlow:x.type==="danger"?t.dangerGlow:x.type==="warn"?t.warnGlow:t.infoGlow; return (
         <div key={x.id} style={{
-          background:t.toastBg, border:`1px solid ${t.toastBdr}`, borderRadius:10,
+          background:t.toastBg, border:`1px solid ${t.toastBdr}`, borderRadius:12,
           padding:"12px 18px", display:"flex",alignItems:"center",gap:10,
-          boxShadow:`0 8px 30px rgba(0,0,0,0.18)`, minWidth:280, maxWidth:400,
+          boxShadow:`0 8px 30px rgba(0,0,0,0.14), ${glow||"none"}`, minWidth:280, maxWidth:400,
           animation:x.out?"toastOut 0.35s ease-in forwards":"toastIn 0.35s ease-out",
           borderLeft:`3px solid ${colors[x.type]}`,
         }}>
@@ -147,10 +159,10 @@ function Toasts({ ts, t }) {
 function Confirm({ open, onYes, onNo, title, desc, yesLabel, yesIcon:YI, yesDanger, t }) {
   if(!open) return null;
   return (
-    <div style={{ position:"fixed",inset:0,background:t.overlay,zIndex:350,display:"flex",alignItems:"center",justifyContent:"center",animation:"fadeIn 0.15s ease-out",backdropFilter:"blur(4px)" }} onClick={onNo}>
-      <div onClick={(e)=>e.stopPropagation()} style={{ background:t.surfRaised,borderRadius:14,padding:"28px 32px",width:420,border:`1px solid ${t.border}`,boxShadow:t.shadow,animation:"scaleIn 0.2s ease-out" }}>
+    <div className="float-modal-overlay-dim" style={{ position:"fixed",inset:0,background:t.overlay,zIndex:350,display:"flex",alignItems:"center",justifyContent:"center",animation:"fadeIn 0.2s var(--ds-ease-out, ease-out)" }} onClick={onNo}>
+      <div onClick={(e)=>e.stopPropagation()} className="float-modal-panel-enter" style={{ background:t.surfRaised,borderRadius:16,padding:"28px 32px",width:420,border:`1px solid ${t.border}`,boxShadow:`${t.shadow}, 0 0 0 1px rgba(255,255,255,0.04) inset` }}>
         <div style={{ display:"flex",alignItems:"center",gap:12,marginBottom:16 }}>
-          <div style={{ width:40,height:40,borderRadius:10,background:yesDanger?t.dangerSoft:t.warnSoft,display:"flex",alignItems:"center",justifyContent:"center" }}>
+          <div style={{ width:40,height:40,borderRadius:12,background:yesDanger?t.dangerSoft:t.warnSoft,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:yesDanger?t.dangerGlow:t.warnGlow }}>
             <AlertTriangle size={20} style={{ color:yesDanger?t.danger:t.warn }} />
           </div>
           <div>
@@ -162,11 +174,13 @@ function Confirm({ open, onYes, onNo, title, desc, yesLabel, yesIcon:YI, yesDang
         <div style={{ display:"flex",gap:10,justifyContent:"flex-end" }}>
           <button onClick={onNo} style={{ background:t.btnSec,border:`1px solid ${t.border}`,borderRadius:8,color:t.btnSecTxt,padding:"9px 20px",cursor:"pointer",fontSize:13,fontWeight:600 }}>Cancel</button>
           <button onClick={onYes} style={{
-            background:yesDanger?t.danger:t.warn,border:"none",borderRadius:8,color:yesDanger?t.dangerTxt:"#fff",
-            padding:"9px 20px",cursor:"pointer",fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:6,transition:"all 0.15s",
+            background:yesDanger?t.danger:t.warn,border:`1px solid ${yesDanger?t.dangerHov:t.warnHov}55`,borderRadius:10,color:yesDanger?t.dangerTxt:t.warnTxt,
+            padding:"9px 20px",cursor:"pointer",fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:6,
+            transition:"box-shadow 0.22s cubic-bezier(0.22,1,0.36,1), transform 0.18s ease, filter 0.18s ease",
+            boxShadow:yesDanger?t.dangerGlow:t.warnGlow,
           }}
-            onMouseEnter={(e) => e.currentTarget.style.opacity="0.85"}
-            onMouseLeave={(e) => e.currentTarget.style.opacity="1"}>
+            onMouseEnter={(e) => { e.currentTarget.style.filter="brightness(1.06)"; e.currentTarget.style.transform="translateY(-1px)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.filter=""; e.currentTarget.style.transform=""; }}>
             {YI && <YI size={14}/>} {yesLabel}
           </button>
         </div>
@@ -214,13 +228,20 @@ function RowActions({ person, onEdit, onArchive, onDelete, t }) {
 }
 
 /* ═══════════════════ CREATABLE DROPDOWN ═══════════════════ */
-function CDropdown({ value, onChange, options, placeholder, renderOption, t }) {
+function CDropdown({ value, onChange, options, placeholder, renderOption, t, menuOpenKey = 0 }) {
   const [open,setOpen]=useState(false);
   const [q,setQ]=useState("");
   const ref=useRef(null);
   const ir=useRef(null);
+  const lastMenuKick = useRef(0);
   useEffect(()=>{ const h=(e)=>{ if(ref.current&&!ref.current.contains(e.target)) setOpen(false); }; document.addEventListener("mousedown",h); return ()=>document.removeEventListener("mousedown",h); },[]);
   useEffect(()=>{ if(open&&ir.current) ir.current.focus(); },[open]);
+  useEffect(() => {
+    if (menuOpenKey > lastMenuKick.current) {
+      lastMenuKick.current = menuOpenKey;
+      setOpen(true);
+    }
+  }, [menuOpenKey]);
   const lbls=options.map((o)=>typeof o==="string"?o:o.label);
   const filt=lbls.filter((l)=>l.toLowerCase().includes(q.toLowerCase()));
   const canC=q.trim()&&!lbls.some((l)=>l.toLowerCase()===q.trim().toLowerCase());
@@ -274,7 +295,7 @@ function CDropdown({ value, onChange, options, placeholder, renderOption, t }) {
 }
 
 /* ═══════════════════ CREATABLE TAG INPUT ═══════════════════ */
-function CTagInput({ tags, setTags, options, t }) {
+function CTagInput({ tags, setTags, options, t, tagIsDark }) {
   const [open,setOpen]=useState(false);
   const [q,setQ]=useState("");
   const ref=useRef(null);
@@ -287,13 +308,15 @@ function CTagInput({ tags, setTags, options, t }) {
     <div ref={ref} style={{ position:"relative" }}>
       <div onClick={()=>{ setOpen(true); setTimeout(()=>ir.current?.focus(),0); }}
         style={{ background:t.surfAlt,border:`1.5px solid ${open?t.focus:t.borderIn}`,borderRadius:8,padding:"7px 10px",cursor:"text",minHeight:44,display:"flex",flexWrap:"wrap",gap:6,alignItems:"center",transition:"border-color 0.2s,box-shadow 0.2s",boxShadow:open?`0 0 0 3px ${t.accentGlow}`:"none" }}>
-        {tags.map((tag)=>(
-          <span key={tag} style={{ background:t.tagBg,color:t.tagTxt,borderRadius:6,padding:"4px 10px",fontSize:12,fontWeight:600,display:"inline-flex",alignItems:"center",gap:5,whiteSpace:"nowrap",animation:"chipIn 0.2s ease-out" }}>
-            <Tag size={10}/> {tag}
-            <X size={12} style={{ cursor:"pointer",opacity:0.6 }} onClick={(e)=>{ e.stopPropagation(); setTags(tags.filter((x)=>x!==tag)); }}
-              onMouseEnter={(e)=>e.currentTarget.style.opacity="1"} onMouseLeave={(e)=>e.currentTarget.style.opacity="0.6"}/>
+        {tags.map((tag) => {
+          const tp = tagChromaProps(tag, tagIsDark);
+          return (
+          <span key={tag} className={tp.className} style={{ ...tp.style, animation:"chipIn 0.2s ease-out" }}>
+            <Tag size={10} strokeWidth={2.25} aria-hidden /> {tag}
+            <X size={12} className="float-tag-dismiss" aria-label={`Remove ${tag}`} onClick={(e)=>{ e.stopPropagation(); setTags(tags.filter((x)=>x!==tag)); }} />
           </span>
-        ))}
+          );
+        })}
         <input ref={ir} value={q} onChange={(e)=>setQ(e.target.value)} onFocus={()=>setOpen(true)}
           onKeyDown={(e)=>{ if((e.key===" "||e.key==="Enter")&&q.trim()){ e.preventDefault(); add(q); } else if(e.key==="Backspace"&&!q&&tags.length) setTags(tags.slice(0,-1)); }}
           placeholder={tags.length===0?"Type and press space to add…":""} style={{ background:"transparent",border:"none",outline:"none",flex:1,minWidth:140,color:t.text,fontSize:13,padding:"4px 0" }}/>
@@ -316,7 +339,27 @@ function CTagInput({ tags, setTags, options, t }) {
 const Lbl = (t) => ({ display:"block",fontSize:11,color:t.textMuted,marginBottom:7,fontWeight:700,textTransform:"uppercase",letterSpacing:0.8 });
 const Inp = (t) => ({ background:t.surfAlt,border:`1.5px solid ${t.borderIn}`,borderRadius:8,padding:"10px 14px",color:t.text,fontSize:14,width:"100%",outline:"none" });
 
-function InfoTab({ form,setForm,roles,setRoles,depts,setDepts,tagOpts,setTagOpts,t }) {
+function mergeDepartmentOptions(depts, formDepartment) {
+  const s = new Set(SEED_DEPTS);
+  for (const d of depts) {
+    if (d && String(d).trim()) s.add(String(d).trim());
+  }
+  if (formDepartment && formDepartment !== "No department") s.add(String(formDepartment).trim());
+  const sorted = [...s].sort((a, b) => a.localeCompare(b));
+  return ["No department", ...sorted];
+}
+
+function allocationHasPerson(a, pid) {
+  if (Array.isArray(a.personIds) && a.personIds.length > 0) return a.personIds.includes(pid);
+  return a.personId === pid;
+}
+
+function InfoTab({ form,setForm,roles,setRoles,depts,setDepts,tagOpts,setTagOpts,t,tagIsDark }) {
+  const [deptMenuKick, setDeptMenuKick] = useState(0);
+  const deptOptions = useMemo(
+    () => mergeDepartmentOptions(depts, form.department),
+    [depts, form.department]
+  );
   return (
     <div style={{ display:"flex",flexDirection:"column",gap:22 }}>
       <div style={{ background:t.surfAlt,borderRadius:10,padding:20,display:"flex",flexDirection:"column",gap:18,border:`1px solid ${t.borderSub}` }}>
@@ -331,10 +374,55 @@ function InfoTab({ form,setForm,roles,setRoles,depts,setDepts,tagOpts,setTagOpts
           ))}
         </div>
       </div>
-      <div><label style={Lbl(t)}>Department</label>
-        <CDropdown t={t} value={form.department} placeholder="No department" onChange={(v)=>{ if(v!=="No department"&&!depts.includes(v)) setDepts([...depts,v]); setForm({...form,department:v}); }} options={["No department",...depts]}/></div>
+      <div>
+        <label style={Lbl(t)}>Department</label>
+        <div style={{ display:"flex",gap:8,alignItems:"stretch" }}>
+          <div style={{ flex:1,minWidth:0 }}>
+            <CDropdown
+              t={t}
+              menuOpenKey={deptMenuKick}
+              value={form.department}
+              placeholder="No department"
+              onChange={(v) => {
+                if (v !== "No department" && !depts.includes(v)) setDepts([...depts, v]);
+                setForm({ ...form, department: v });
+              }}
+              options={deptOptions}
+            />
+          </div>
+          <button
+            type="button"
+            aria-label="Add department"
+            title="Add department"
+            onClick={() => setDeptMenuKick((k) => k + 1)}
+            style={{
+              flexShrink:0,
+              width:44,
+              display:"flex",
+              alignItems:"center",
+              justifyContent:"center",
+              background:t.surfAlt,
+              border:`1.5px solid ${t.borderIn}`,
+              borderRadius:8,
+              cursor:"pointer",
+              color:t.accent,
+              transition:"border-color 0.2s, box-shadow 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = t.focus;
+              e.currentTarget.style.boxShadow = `0 0 0 3px ${t.accentGlow}`;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = t.borderIn;
+              e.currentTarget.style.boxShadow = "none";
+            }}
+          >
+            <Plus size={18} strokeWidth={2.25} />
+          </button>
+        </div>
+      </div>
       <div><label style={Lbl(t)}>Tags</label>
-        <CTagInput t={t} tags={form.tags} setTags={(nt)=>{ const n=nt.filter((x)=>!tagOpts.includes(x)); if(n.length) setTagOpts([...tagOpts,...n]); setForm({...form,tags:nt}); }} options={tagOpts}/></div>
+        <CTagInput t={t} tagIsDark={tagIsDark} tags={form.tags} setTags={(nt)=>{ const n=nt.filter((x)=>!tagOpts.includes(x)); if(n.length) setTagOpts([...tagOpts,...n]); setForm({...form,tags:nt}); }} options={tagOpts}/></div>
       <div><label style={Lbl(t)}>Type</label>
         <CDropdown t={t} value={form.type} onChange={(v)=>setForm({...form,type:v})} options={TYPES} placeholder="Employee"/></div>
     </div>
@@ -372,16 +460,208 @@ function TimeOffTab({ form,setForm,t }) {
   return (<div><label style={Lbl(t)}>Public holidays region</label><CDropdown t={t} value={form.holidays} onChange={(v)=>setForm({...form,holidays:v})} options={["None",...AU_HOLIDAYS]} placeholder="Select region"/></div>);
 }
 
-function ProjectsTab({ t }) {
-  return (<div style={{ textAlign:"center",padding:"52px 20px",color:t.textMuted }}>
-    <div style={{ width:56,height:56,borderRadius:14,background:t.accentGlow,display:"inline-flex",alignItems:"center",justifyContent:"center",marginBottom:14 }}><FolderOpen size={24} style={{ color:t.accent }}/></div>
-    <div style={{ fontSize:15,fontWeight:600,color:t.textSoft,marginBottom:4 }}>No projects assigned</div>
-    <div style={{ fontSize:13,color:t.textDim }}>Project assignment is coming soon.</div>
-  </div>);
+function ProjectsTab({
+  t,
+  editPerson,
+  projects = [],
+  allocations = [],
+  setAllocations,
+  syncAllocationDelete,
+  syncAllocationUpdate,
+  onOpenCreateAllocation,
+}) {
+  const [pickKey, setPickKey] = useState(0);
+  const personId = editPerson?.id;
+
+  const activeProjectLabels = useMemo(() => {
+    const rows = projects.filter((p) => !p.archived);
+    rows.sort((a, b) => projectToAllocationLabel(a).localeCompare(projectToAllocationLabel(b)));
+    return rows.map((p) => projectToAllocationLabel(p));
+  }, [projects]);
+
+  const assignedRows = useMemo(() => {
+    if (personId == null) return [];
+    const map = new Map();
+    for (const a of allocations) {
+      if (a.isLeave) continue;
+      if (!allocationHasPerson(a, personId)) continue;
+      const lab = (a.project || "").trim();
+      if (!lab) continue;
+      if (map.has(lab)) continue;
+      const proj = projects.find((pr) => projectToAllocationLabel(pr) === lab);
+      const display = proj ? projectToAllocationLabel(proj) : lab;
+      map.set(lab, display);
+    }
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [allocations, personId, projects]);
+
+  const canRemove =
+    typeof setAllocations === "function" &&
+    typeof syncAllocationDelete === "function" &&
+    typeof syncAllocationUpdate === "function";
+
+  const removePersonFromProjectLabel = (projectLabel) => {
+    if (!canRemove || personId == null) return;
+    const pl = (projectLabel || "").trim();
+    const affected = allocations.filter(
+      (a) => !a.isLeave && (a.project || "").trim() === pl && allocationHasPerson(a, personId)
+    );
+    if (affected.length === 0) return;
+    for (const a of affected) {
+      const ids =
+        Array.isArray(a.personIds) && a.personIds.length > 0
+          ? [...a.personIds]
+          : a.personId != null
+            ? [a.personId]
+            : [];
+      const nextIds = ids.filter((id) => id !== personId);
+      if (nextIds.length === 0) {
+        setAllocations((prev) => prev.filter((x) => x.id !== a.id));
+        queueMicrotask(() => syncAllocationDelete(a.id));
+      } else {
+        const merged = {
+          ...a,
+          personIds: nextIds,
+          personId: nextIds[0],
+          updatedBy: "You",
+          updatedAt: new Date().toISOString(),
+        };
+        setAllocations((prev) => prev.map((x) => (x.id === a.id ? merged : x)));
+        queueMicrotask(() => syncAllocationUpdate(merged));
+      }
+    }
+    toast.success("Schedule updated", { description: `Removed from ${pl}` });
+  };
+
+  if (!editPerson) {
+    return (
+      <div style={{ textAlign:"center",padding:"40px 20px",color:t.textMuted }}>
+        <div style={{ width:52,height:52,borderRadius:14,background:t.accentGlow,display:"inline-flex",alignItems:"center",justifyContent:"center",marginBottom:14 }}>
+          <FolderOpen size={22} style={{ color:t.accent }} />
+        </div>
+        <div style={{ fontSize:15,fontWeight:600,color:t.textSoft,marginBottom:6 }}>Save the person first</div>
+        <div style={{ fontSize:13,color:t.textDim,lineHeight:1.55,maxWidth:360,margin:"0 auto" }}>
+          Once they are in the directory, you can link them to projects here or from the Schedule.
+        </div>
+      </div>
+    );
+  }
+
+  if (!onOpenCreateAllocation) {
+    return (
+      <div style={{ textAlign:"center",padding:"40px 20px",color:t.textMuted }}>
+        <div style={{ fontSize:14,color:t.textSoft,lineHeight:1.55 }}>Project assignment from this screen is not available here. Open the Schedule to manage allocations.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display:"flex",flexDirection:"column",gap:22 }}>
+      <div>
+        <label style={Lbl(t)}>Active projects</label>
+        {activeProjectLabels.length === 0 ? (
+          <div style={{ fontSize:13,color:t.textDim,padding:"10px 0" }}>No active (non-archived) projects in the registry.</div>
+        ) : (
+          <CDropdown
+            key={pickKey}
+            t={t}
+            value=""
+            placeholder="Choose a project to allocate…"
+            onChange={(v) => {
+              setPickKey((k) => k + 1);
+              onOpenCreateAllocation({ person: editPerson, projectLabel: v });
+            }}
+            options={activeProjectLabels}
+          />
+        )}
+      </div>
+      <div>
+        <label style={Lbl(t)}>On schedule for this person</label>
+        {assignedRows.length === 0 ? (
+          <div style={{ fontSize:13,color:t.textDim,padding:"10px 0" }}>No project allocations yet.</div>
+        ) : (
+          <ul style={{ listStyle:"none",margin:0,padding:0,display:"flex",flexDirection:"column",gap:8 }}>
+            {assignedRows.map(([label, display]) => (
+              <li
+                key={label}
+                style={{
+                  display:"flex",
+                  alignItems:"center",
+                  justifyContent:"space-between",
+                  gap:12,
+                  background:t.surfAlt,
+                  border:`1px solid ${t.borderSub}`,
+                  borderRadius:10,
+                  padding:"10px 14px",
+                }}
+              >
+                <span style={{ fontSize:14,color:t.text,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",minWidth:0 }}>
+                  {display}
+                </span>
+                <button
+                  type="button"
+                  disabled={!canRemove}
+                  aria-label={`Remove ${display} from this person`}
+                  title={canRemove ? "Remove all schedule rows for this project" : ""}
+                  onClick={() => removePersonFromProjectLabel(label)}
+                  style={{
+                    flexShrink:0,
+                    background:canRemove ? t.btnSec : "transparent",
+                    border:`1px solid ${canRemove ? t.border : "transparent"}`,
+                    cursor:canRemove ? "pointer" : "not-allowed",
+                    color:canRemove ? t.textMuted : t.textDim,
+                    padding:6,
+                    borderRadius:8,
+                    display:"flex",
+                    alignItems:"center",
+                    justifyContent:"center",
+                    opacity:canRemove ? 1 : 0.45,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!canRemove) return;
+                    e.currentTarget.style.background = t.rowHov;
+                    e.currentTarget.style.color = t.danger;
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!canRemove) return;
+                    e.currentTarget.style.background = t.btnSec;
+                    e.currentTarget.style.color = t.textMuted;
+                  }}
+                >
+                  <X size={16} strokeWidth={2.25} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /* ═══════════════════ PERSON MODAL (Add + Edit) ═══════════════════ */
-export function PersonModal({ open, onClose, onSave, onArchive, editPerson, roles, setRoles, depts, setDepts, tagOpts, setTagOpts, t }) {
+export function PersonModal({
+  open,
+  onClose,
+  onSave,
+  onArchive,
+  editPerson,
+  roles,
+  setRoles,
+  depts,
+  setDepts,
+  tagOpts,
+  setTagOpts,
+  t,
+  projects = [],
+  allocations = [],
+  setAllocations,
+  syncAllocationDelete,
+  syncAllocationUpdate,
+  onOpenCreateAllocation,
+  tagTheme = "dark",
+}) {
+  const tagIsDark = tagTheme === "dark";
   const [tab, setTab] = useState(0);
   const [form, setForm] = useState(null);
   const [dirty, setDirty] = useState(false);
@@ -411,12 +691,11 @@ export function PersonModal({ open, onClose, onSave, onArchive, editPerson, role
   };
 
   return (
-    <div onClick={(e) => { if(ref.current&&!ref.current.contains(e.target)) onClose(); }}
-      style={{ position:"fixed",inset:0,background:t.overlay,zIndex:200,display:"flex",alignItems:"flex-start",justifyContent:"center",paddingTop:48,backdropFilter:"blur(6px)",animation:"fadeIn 0.2s ease-out" }}>
-      <div className="float-premium-modal" ref={ref} onClick={(e)=>e.stopPropagation()} style={{
+    <div className="float-modal-overlay-dim" onClick={(e) => { if(ref.current&&!ref.current.contains(e.target)) onClose(); }}
+      style={{ position:"fixed",inset:0,background:t.overlay,zIndex:200,display:"flex",alignItems:"flex-start",justifyContent:"center",paddingTop:48,animation:"fadeIn 0.22s var(--ds-ease-out, ease-out)" }}>
+      <div className="float-premium-modal float-modal-panel-enter" ref={ref} onClick={(e)=>e.stopPropagation()} style={{
         background:t.surfRaised,width:620,maxHeight:"calc(100vh - 96px)",
-        display:"flex",flexDirection:"column",
-        animation:"modalScale 0.25s ease-out",transition:"background 0.35s",
+        display:"flex",flexDirection:"column",transition:"background 0.35s",
       }}>
         {/* Header */}
         <div style={{ padding:"28px 32px 0",flexShrink:0 }}>
@@ -462,11 +741,22 @@ export function PersonModal({ open, onClose, onSave, onArchive, editPerson, role
 
         {/* Content — scrollable */}
         <div style={{ padding:"22px 32px 10px",overflowY:"auto",flex:1,minHeight:0 }}>
-          {tab===0 && <InfoTab form={form} setForm={setFormWrap} roles={roles} setRoles={setRoles} depts={depts} setDepts={setDepts} tagOpts={tagOpts} setTagOpts={setTagOpts} t={t}/>}
+          {tab===0 && <InfoTab form={form} setForm={setFormWrap} roles={roles} setRoles={setRoles} depts={depts} setDepts={setDepts} tagOpts={tagOpts} setTagOpts={setTagOpts} t={t} tagIsDark={tagIsDark}/>}
           {tab===1 && <AccessTab form={form} setForm={setFormWrap} t={t}/>}
           {tab===2 && <AvailabilityTab form={form} setForm={setFormWrap} t={t}/>}
           {tab===3 && <TimeOffTab form={form} setForm={setFormWrap} t={t}/>}
-          {tab===4 && <ProjectsTab t={t}/>}
+          {tab===4 && (
+            <ProjectsTab
+              t={t}
+              editPerson={editPerson}
+              projects={projects}
+              allocations={allocations}
+              setAllocations={setAllocations}
+              syncAllocationDelete={syncAllocationDelete}
+              syncAllocationUpdate={syncAllocationUpdate}
+              onOpenCreateAllocation={onOpenCreateAllocation}
+            />
+          )}
         </div>
 
         {/* Footer */}

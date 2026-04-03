@@ -1,8 +1,10 @@
-import { lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { lazy, Suspense, cloneElement } from "react";
+import { BrowserRouter, useLocation, useRoutes, Navigate } from "react-router-dom";
+import { AnimatePresence } from "framer-motion";
 import { ThemeProvider, useAppTheme } from "./context/ThemeContext.jsx";
 import { AppDataProvider, useAppStore } from "./context/AppDataContext.jsx";
-import RouteSkeleton from "./components/ui/RouteSkeleton.jsx";
+import AnimatedAppLoader from "./components/ui/AnimatedAppLoader.jsx";
+import PageTransition from "./components/ui/PageTransition.jsx";
 import { Toaster } from "sonner";
 
 const LandingPage = lazy(() => import("./pages/LandingPage.jsx"));
@@ -11,8 +13,48 @@ const ProjectsPage = lazy(() => import("./pages/ProjectsPage.jsx"));
 
 function WorkspaceReady({ children }) {
   const ready = useAppStore((s) => s.workspaceReady);
-  if (!ready) return <RouteSkeleton />;
+  if (!ready) return <AnimatedAppLoader />;
   return children;
+}
+
+function AnimatedRoutes() {
+  const location = useLocation();
+  const routes = [
+    {
+      path: "/",
+      element: (
+        <PageTransition>
+          <LandingPage />
+        </PageTransition>
+      ),
+    },
+    {
+      path: "/people",
+      element: (
+        <PageTransition>
+          <PeoplePage />
+        </PageTransition>
+      ),
+    },
+    {
+      path: "/projects",
+      element: (
+        <PageTransition>
+          <ProjectsPage />
+        </PageTransition>
+      ),
+    },
+    { path: "*", element: <Navigate to="/" replace /> },
+  ];
+  const element = useRoutes(routes, location);
+
+  return (
+    <Suspense fallback={<AnimatedAppLoader />}>
+      <AnimatePresence mode="wait">
+        {element && cloneElement(element, { key: location.pathname })}
+      </AnimatePresence>
+    </Suspense>
+  );
 }
 
 function ThemedToaster() {
@@ -51,13 +93,7 @@ export default function App() {
         <BrowserRouter>
           <WorkspaceReady>
             <div className="app-viewport">
-              <Suspense fallback={<RouteSkeleton />}>
-                <Routes>
-                  <Route path="/" element={<LandingPage />} />
-                  <Route path="/people" element={<PeoplePage />} />
-                  <Route path="/projects" element={<ProjectsPage />} />
-                </Routes>
-              </Suspense>
+              <AnimatedRoutes />
             </div>
             <ThemedToaster />
           </WorkspaceReady>

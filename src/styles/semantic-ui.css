@@ -1,0 +1,236 @@
+/**
+ * Semantic colors, tag chroma, and shared interaction polish.
+ * Relies on data-theme on documentElement (see ThemeContext).
+ */
+
+:root[data-theme="dark"] {
+  --ds-danger: #fb7185;
+  --ds-danger-strong: #f43f5e;
+  --ds-danger-muted: #fda4af;
+  --ds-danger-soft: rgba(251, 113, 133, 0.16);
+  --ds-danger-border: rgba(251, 113, 133, 0.38);
+  --ds-danger-glow: 0 4px 22px rgba(244, 63, 94, 0.28);
+
+  --ds-success: #4ade80;
+  --ds-success-strong: #22c55e;
+  --ds-success-soft: rgba(74, 222, 128, 0.14);
+  --ds-success-border: rgba(74, 222, 128, 0.4);
+  --ds-success-glow: 0 4px 20px rgba(34, 197, 94, 0.22);
+
+  --ds-warn: #fcd34d;
+  --ds-warn-strong: #fbbf24;
+  --ds-warn-soft: rgba(252, 211, 77, 0.16);
+  --ds-warn-border: rgba(252, 211, 77, 0.45);
+  --ds-warn-glow: 0 4px 20px rgba(251, 191, 36, 0.2);
+
+  --ds-info: #a5b4fc;
+  --ds-info-strong: #818cf8;
+  --ds-info-soft: rgba(165, 180, 252, 0.14);
+  --ds-info-glow: 0 4px 22px rgba(129, 140, 248, 0.22);
+
+  --ds-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ds-ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
+  --ds-t-fast: 0.18s;
+  --ds-t-med: 0.26s;
+}
+
+:root[data-theme="light"] {
+  --ds-danger: #e11d48;
+  --ds-danger-strong: #be123c;
+  --ds-danger-muted: #fb7185;
+  --ds-danger-soft: rgba(225, 29, 72, 0.08);
+  --ds-danger-border: rgba(225, 29, 72, 0.28);
+  --ds-danger-glow: 0 4px 18px rgba(225, 29, 72, 0.18);
+
+  --ds-success: #059669;
+  --ds-success-strong: #047857;
+  --ds-success-soft: rgba(5, 150, 105, 0.1);
+  --ds-success-border: rgba(5, 150, 105, 0.35);
+  --ds-success-glow: 0 4px 16px rgba(5, 150, 105, 0.18);
+
+  --ds-warn: #d97706;
+  --ds-warn-strong: #b45309;
+  --ds-warn-soft: rgba(217, 119, 6, 0.1);
+  --ds-warn-border: rgba(217, 119, 6, 0.35);
+  --ds-warn-glow: 0 4px 16px rgba(217, 119, 6, 0.16);
+
+  --ds-info: #4f46e5;
+  --ds-info-strong: #4338ca;
+  --ds-info-soft: rgba(79, 70, 229, 0.1);
+  --ds-info-glow: 0 4px 18px rgba(79, 70, 229, 0.15);
+
+  --ds-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ds-ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
+  --ds-t-fast: 0.18s;
+  --ds-t-med: 0.26s;
+}
+
+/* ── Contextual tag chroma (glass-lite) ───────────────────── */
+.float-tag-chroma {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: var(--radius-md, 10px);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition:
+    box-shadow var(--ds-t-med) var(--ds-ease-out),
+    transform var(--ds-t-fast) var(--ds-ease-out),
+    border-color var(--ds-t-fast) var(--ds-ease-in-out);
+}
+
+.float-tag-chroma:hover {
+  transform: translateY(-0.5px);
+}
+
+:root[data-theme="dark"] .float-tag-chroma--0 {
+  background: rgba(167, 139, 250, 0.2);
+  color: #e9d5ff;
+  border-color: rgba(167, 139, 250, 0.35);
+  box-shadow: 0 0 16px rgba(167, 139, 250, 0.12);
+}
+:root[data-theme="dark"] .float-tag-chroma--1 {
+  background: rgba(96, 165, 250, 0.18);
+  color: #bfdbfe;
+  border-color: rgba(96, 165, 250, 0.35);
+  box-shadow: 0 0 16px rgba(96, 165, 250, 0.12);
+}
+:root[data-theme="dark"] .float-tag-chroma--2 {
+  background: rgba(34, 211, 238, 0.14);
+  color: #a5f3fc;
+  border-color: rgba(34, 211, 238, 0.32);
+  box-shadow: 0 0 16px rgba(34, 211, 238, 0.1);
+}
+:root[data-theme="dark"] .float-tag-chroma--3 {
+  background: rgba(45, 212, 191, 0.16);
+  color: #99f6e4;
+  border-color: rgba(45, 212, 191, 0.32);
+  box-shadow: 0 0 16px rgba(45, 212, 191, 0.1);
+}
+:root[data-theme="dark"] .float-tag-chroma--4 {
+  background: rgba(251, 191, 36, 0.14);
+  color: #fde68a;
+  border-color: rgba(251, 191, 36, 0.38);
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.1);
+}
+:root[data-theme="dark"] .float-tag-chroma--5 {
+  background: rgba(251, 113, 133, 0.14);
+  color: #fecdd3;
+  border-color: rgba(251, 113, 133, 0.32);
+  box-shadow: 0 0 16px rgba(251, 113, 133, 0.1);
+}
+:root[data-theme="dark"] .float-tag-chroma--6 {
+  background: rgba(129, 140, 248, 0.18);
+  color: #c7d2fe;
+  border-color: rgba(129, 140, 248, 0.35);
+  box-shadow: 0 0 16px rgba(129, 140, 248, 0.12);
+}
+:root[data-theme="dark"] .float-tag-chroma--7 {
+  background: rgba(52, 211, 153, 0.14);
+  color: #a7f3d0;
+  border-color: rgba(52, 211, 153, 0.32);
+  box-shadow: 0 0 16px rgba(52, 211, 153, 0.1);
+}
+
+:root[data-theme="light"] .float-tag-chroma--0 {
+  background: rgba(139, 92, 246, 0.1);
+  color: #5b21b6;
+  border-color: rgba(139, 92, 246, 0.22);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}
+:root[data-theme="light"] .float-tag-chroma--1 {
+  background: rgba(59, 130, 246, 0.1);
+  color: #1e40af;
+  border-color: rgba(59, 130, 246, 0.22);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}
+:root[data-theme="light"] .float-tag-chroma--2 {
+  background: rgba(6, 182, 212, 0.1);
+  color: #0e7490;
+  border-color: rgba(6, 182, 212, 0.22);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}
+:root[data-theme="light"] .float-tag-chroma--3 {
+  background: rgba(20, 184, 166, 0.1);
+  color: #0f766e;
+  border-color: rgba(20, 184, 166, 0.22);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}
+:root[data-theme="light"] .float-tag-chroma--4 {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+  border-color: rgba(245, 158, 11, 0.28);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}
+:root[data-theme="light"] .float-tag-chroma--5 {
+  background: rgba(244, 63, 94, 0.08);
+  color: #be123c;
+  border-color: rgba(244, 63, 94, 0.2);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}
+:root[data-theme="light"] .float-tag-chroma--6 {
+  background: rgba(79, 70, 229, 0.1);
+  color: #3730a3;
+  border-color: rgba(79, 70, 229, 0.22);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}
+:root[data-theme="light"] .float-tag-chroma--7 {
+  background: rgba(16, 185, 129, 0.1);
+  color: #047857;
+  border-color: rgba(16, 185, 129, 0.22);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}
+
+.float-tag-chroma .float-tag-dismiss,
+.float-tag-dismiss {
+  cursor: pointer;
+  opacity: 0.55;
+  border-radius: var(--radius-sm, 6px);
+  transition:
+    opacity var(--ds-t-fast) var(--ds-ease-out),
+    color var(--ds-t-fast) var(--ds-ease-out),
+    background var(--ds-t-fast) var(--ds-ease-out);
+}
+
+.float-tag-chroma .float-tag-dismiss:hover,
+.float-tag-dismiss:hover {
+  opacity: 1;
+  color: var(--ds-danger-strong);
+  background: var(--ds-danger-soft);
+}
+
+/* ── Modal shell polish (used with float-premium-modal, overlays) ── */
+.float-modal-overlay-dim {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.float-modal-panel-enter {
+  animation: floatModalPanelIn 0.28s var(--ds-ease-out) forwards;
+}
+
+@keyframes floatModalPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .float-tag-chroma:hover {
+    transform: none;
+  }
+  .float-modal-panel-enter {
+    animation: none;
+  }
+}

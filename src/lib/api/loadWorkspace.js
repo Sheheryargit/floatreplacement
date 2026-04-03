@@ -11,6 +11,7 @@ import {
   fetchAllocationLabels,
 } from "./lookups.js";
 import { projectToAllocationLabel, resolveColorForProjectLabel } from "../../utils/projectColors.js";
+import { fetchWorkspaceSettings } from "./workspaceSettings.js";
 
 /**
  * Load full workspace from Supabase. Returns null if not configured.
@@ -29,6 +30,7 @@ export async function loadWorkspaceFromSupabase() {
     peopleTagOpts,
     projectTagOpts,
     extraAllocationLabels,
+    workspaceSettings,
   ] = await Promise.all([
     fetchPeople(),
     fetchProjects(),
@@ -39,6 +41,7 @@ export async function loadWorkspaceFromSupabase() {
     fetchPeopleTags(),
     fetchProjectTags(),
     fetchAllocationLabels(),
+    fetchWorkspaceSettings(),
   ]);
 
   const projects = projectsRaw.map((p) => {
@@ -61,5 +64,7 @@ export async function loadWorkspaceFromSupabase() {
     peopleTagOpts,
     projectTagOpts,
     extraAllocationLabels,
+    starredPeopleTags: workspaceSettings.starredPeopleTags,
+    schedulePeopleTagFilter: workspaceSettings.schedulePeopleTagFilter,
   };
 }

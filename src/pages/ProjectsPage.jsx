@@ -2,7 +2,8 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useAppData } from "../context/AppDataContext.jsx";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
-import { PROJECT_COLOR_PALETTE, colorForNewProjectId } from "../utils/projectColors.js";
+import { PROJECT_COLOR_PALETTE, colorForNewProjectId, avatarGradientFromName } from "../utils/projectColors.js";
+import { tagChromaProps } from "../utils/tagChroma.js";
 import { toast } from "sonner";
 import {
   Users,
@@ -58,29 +59,29 @@ const SEED_OWNERS = [
 
 /* ═══════════════════ HELPERS ═══════════════════ */
 const ini = (n) => { if(!n)return""; const p=n.trim().split(/\s+/); return p.length===1?(p[0][0]||"").toUpperCase():(p[0][0]+p[p.length-1][0]).toUpperCase(); };
-const avGrad = (n) => { if(!n)return"linear-gradient(135deg,#3a3f4b,#2a2e38)"; let h=0; for(let i=0;i<n.length;i++) h=n.charCodeAt(i)+((h<<5)-h); const ps=[["#667eea","#764ba2"],["#f093fb","#f5576c"],["#4facfe","#00f2fe"],["#43e97b","#38f9d7"],["#fa709a","#fee140"],["#a18cd1","#fbc2eb"],["#ffecd2","#fcb69f"],["#89f7fe","#66a6ff"],["#c471f5","#fa71cd"],["#48c6ef","#6f86d6"]]; const [a,b]=ps[Math.abs(h)%ps.length]; return `linear-gradient(135deg,${a},${b})`; };
+const avGrad = avatarGradientFromName;
 const fmtDate = (d) => { if(!d)return"—"; const dt=new Date(d); return dt.toLocaleDateString("en-AU",{day:"2-digit",month:"short",year:"numeric"}); };
 
 /* ═══════════════════ THEMES ═══════════════════ */
 const T = {
-  dark: { bg:"#0b0e14",surface:"#12161f",surfRaised:"#171c27",surfAlt:"#1a2030",border:"#1e2538",borderSub:"#252d3f",borderIn:"#2a3348",text:"#e8ecf4",textSoft:"#9ba4b8",textMuted:"#636d84",textDim:"#3d4660",accent:"#6c8cff",accentHov:"#8aa4ff",accentTxt:"#0b0e14",accentGlow:"rgba(108,140,255,0.12)",sidebar:"#090c12",sidebarAct:"#141828",rowHov:"#151a26",tagBg:"#1c2640",tagTxt:"#8aa4ff",btnSec:"#1e2538",btnSecHov:"#252d3f",btnSecTxt:"#b0b8cc",danger:"#ff4d6a",dangerHov:"#e8364f",dangerSoft:"rgba(255,77,106,0.1)",dangerTxt:"#fff",success:"#34d399",warn:"#f59e0b",warnSoft:"rgba(245,158,11,0.1)",overlay:"rgba(0,0,0,0.65)",shadow:"0 32px 100px rgba(0,0,0,0.6)",chk:"#6c8cff",scroll:"#252d3f",selRow:"#141a2e",focus:"#6c8cff",toastBg:"#171c27",toastBdr:"#1e2538",tabActiveBg:"rgba(108,140,255,0.1)",tabHovBg:"rgba(108,140,255,0.06)" },
-  light: { bg:"#f5f6f8",surface:"#ffffff",surfRaised:"#ffffff",surfAlt:"#f8f9fb",border:"#e4e7ed",borderSub:"#ebedf2",borderIn:"#d4d8e0",text:"#151922",textSoft:"#4a5168",textMuted:"#858da3",textDim:"#c0c4d0",accent:"#4f6ae6",accentHov:"#3a54d4",accentTxt:"#ffffff",accentGlow:"rgba(79,106,230,0.08)",sidebar:"#ffffff",sidebarAct:"#f0f1f5",rowHov:"#f8f9fb",tagBg:"#eef1f8",tagTxt:"#4a5da8",btnSec:"#eef0f4",btnSecHov:"#e2e5eb",btnSecTxt:"#3e4560",danger:"#e8364f",dangerHov:"#d42a42",dangerSoft:"rgba(232,54,79,0.06)",dangerTxt:"#fff",success:"#16a06a",warn:"#d97706",warnSoft:"rgba(217,119,6,0.06)",overlay:"rgba(15,18,28,0.35)",shadow:"0 32px 100px rgba(0,0,0,0.12)",chk:"#4f6ae6",scroll:"#d4d8e0",selRow:"#eef1fa",focus:"#4f6ae6",toastBg:"#ffffff",toastBdr:"#e4e7ed",tabActiveBg:"rgba(79,106,230,0.08)",tabHovBg:"rgba(79,106,230,0.04)" },
+  dark: { bg:"#0b0e14",surface:"#12161f",surfRaised:"#171c27",surfAlt:"#1a2030",border:"#1e2538",borderSub:"#252d3f",borderIn:"#2a3348",text:"#e8ecf4",textSoft:"#9ba4b8",textMuted:"#636d84",textDim:"#3d4660",accent:"#6c8cff",accentHov:"#8aa4ff",accentTxt:"#0b0e14",accentGlow:"rgba(108,140,255,0.12)",sidebar:"#090c12",sidebarAct:"#141828",rowHov:"#151a26",tagBg:"#1c2640",tagTxt:"#8aa4ff",btnSec:"#1e2538",btnSecHov:"#252d3f",btnSecTxt:"#b0b8cc",danger:"#fb7185",dangerHov:"#f43f5e",dangerSoft:"rgba(251,113,133,0.16)",dangerTxt:"#fff",dangerGlow:"0 4px 24px rgba(244,63,94,0.28)",success:"#4ade80",successHov:"#22c55e",successSoft:"rgba(74,222,128,0.14)",successGlow:"0 4px 20px rgba(34,197,94,0.22)",warn:"#fcd34d",warnHov:"#fbbf24",warnTxt:"#0f172a",warnSoft:"rgba(252,211,77,0.16)",warnGlow:"0 4px 20px rgba(251,191,36,0.2)",info:"#a5b4fc",infoSoft:"rgba(165,180,252,0.14)",overlay:"rgba(0,0,0,0.65)",shadow:"0 32px 100px rgba(0,0,0,0.6)",chk:"#6c8cff",scroll:"#252d3f",selRow:"#141a2e",focus:"#6c8cff",toastBg:"#171c27",toastBdr:"#1e2538",tabActiveBg:"rgba(108,140,255,0.1)",tabHovBg:"rgba(108,140,255,0.06)" },
+  light: { bg:"#f5f6f8",surface:"#ffffff",surfRaised:"#ffffff",surfAlt:"#f8f9fb",border:"#e4e7ed",borderSub:"#ebedf2",borderIn:"#d4d8e0",text:"#151922",textSoft:"#4a5168",textMuted:"#858da3",textDim:"#c0c4d0",accent:"#4f6ae6",accentHov:"#3a54d4",accentTxt:"#ffffff",accentGlow:"rgba(79,106,230,0.08)",sidebar:"#ffffff",sidebarAct:"#f0f1f5",rowHov:"#f8f9fb",tagBg:"#eef1f8",tagTxt:"#4a5da8",btnSec:"#eef0f4",btnSecHov:"#e2e5eb",btnSecTxt:"#3e4560",danger:"#e11d48",dangerHov:"#be123c",dangerSoft:"rgba(225,29,72,0.1)",dangerTxt:"#fff",dangerGlow:"0 4px 18px rgba(225,29,72,0.2)",success:"#059669",successHov:"#047857",successSoft:"rgba(5,150,105,0.1)",successGlow:"0 4px 16px rgba(5,150,105,0.18)",warn:"#d97706",warnHov:"#b45309",warnTxt:"#fff",warnSoft:"rgba(217,119,6,0.1)",warnGlow:"0 4px 16px rgba(217,119,6,0.16)",info:"#4f46e5",infoSoft:"rgba(79,70,229,0.1)",overlay:"rgba(15,18,28,0.35)",shadow:"0 32px 100px rgba(0,0,0,0.12)",chk:"#4f6ae6",scroll:"#d4d8e0",selRow:"#eef1fa",focus:"#4f6ae6",toastBg:"#ffffff",toastBdr:"#e4e7ed",tabActiveBg:"rgba(79,106,230,0.08)",tabHovBg:"rgba(79,106,230,0.04)" },
 };
 
 
 /* ═══════════════════ CONFIRM ═══════════════════ */
 function Confirm({open,onYes,onNo,title,desc,yesLabel,yesIcon:YI,yesDanger,t}){
   if(!open)return null;
-  return(<div style={{position:"fixed",inset:0,background:t.overlay,zIndex:350,display:"flex",alignItems:"center",justifyContent:"center",animation:"fadeIn 0.15s ease-out",backdropFilter:"blur(4px)"}} onClick={onNo}>
-    <div onClick={e=>e.stopPropagation()} style={{background:t.surfRaised,borderRadius:14,padding:"28px 32px",width:420,border:`1px solid ${t.border}`,boxShadow:t.shadow,animation:"scaleIn 0.2s ease-out"}}>
+  return(<div className="float-modal-overlay-dim" style={{position:"fixed",inset:0,background:t.overlay,zIndex:350,display:"flex",alignItems:"center",justifyContent:"center",animation:"fadeIn 0.2s var(--ds-ease-out, ease-out)"}} onClick={onNo}>
+    <div onClick={e=>e.stopPropagation()} className="float-modal-panel-enter" style={{background:t.surfRaised,borderRadius:16,padding:"28px 32px",width:420,border:`1px solid ${t.border}`,boxShadow:`${t.shadow}, 0 0 0 1px rgba(255,255,255,0.04) inset`}}>
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
-        <div style={{width:40,height:40,borderRadius:10,background:yesDanger?t.dangerSoft:t.warnSoft,display:"flex",alignItems:"center",justifyContent:"center"}}><AlertTriangle size={20} style={{color:yesDanger?t.danger:t.warn}}/></div>
+        <div style={{width:40,height:40,borderRadius:12,background:yesDanger?t.dangerSoft:t.warnSoft,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:yesDanger?t.dangerGlow:t.warnGlow}}><AlertTriangle size={20} style={{color:yesDanger?t.danger:t.warn}}/></div>
         <div><div style={{fontWeight:700,color:t.text,fontSize:16}}>{title}</div><div style={{color:t.textMuted,fontSize:13,marginTop:2}}>This action cannot be undone.</div></div>
       </div>
       <p style={{color:t.textSoft,fontSize:14,lineHeight:1.6,margin:"0 0 24px"}}>{desc}</p>
       <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
         <button onClick={onNo} style={{background:t.btnSec,border:`1px solid ${t.border}`,borderRadius:8,color:t.btnSecTxt,padding:"9px 20px",cursor:"pointer",fontSize:13,fontWeight:600}}>Cancel</button>
-        <button onClick={onYes} style={{background:yesDanger?t.danger:t.warn,border:"none",borderRadius:8,color:"#fff",padding:"9px 20px",cursor:"pointer",fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:6,transition:"all 0.15s"}} onMouseEnter={e=>e.currentTarget.style.opacity="0.85"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>{YI&&<YI size={14}/>} {yesLabel}</button>
+        <button type="button" onClick={onYes} style={{background:yesDanger?t.danger:t.warn,border:`1px solid ${yesDanger?t.dangerHov:t.warnHov}55`,borderRadius:10,color:yesDanger?t.dangerTxt:t.warnTxt,padding:"9px 20px",cursor:"pointer",fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:6,transition:"box-shadow 0.22s cubic-bezier(0.22,1,0.36,1), transform 0.18s ease, filter 0.18s ease",boxShadow:yesDanger?t.dangerGlow:t.warnGlow}} onMouseEnter={e=>{e.currentTarget.style.filter="brightness(1.06)";e.currentTarget.style.transform="translateY(-1px)";}} onMouseLeave={e=>{e.currentTarget.style.filter="";e.currentTarget.style.transform="";}}>{YI&&<YI size={14}/>} {yesLabel}</button>
       </div>
     </div>
   </div>);
@@ -118,7 +119,7 @@ function CDropdown({value,onChange,options,placeholder,renderOption,t}){
 }
 
 /* ═══════════════════ TAG INPUT ═══════════════════ */
-function CTagInput({tags,setTags,options,t}){
+function CTagInput({tags,setTags,options,t,tagIsDark}){
   const[open,setOpen]=useState(false);const[q,setQ]=useState("");
   const ref=useRef(null);const ir=useRef(null);
   useEffect(()=>{const h=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);};document.addEventListener("mousedown",h);return()=>document.removeEventListener("mousedown",h);},[]);
@@ -127,7 +128,7 @@ function CTagInput({tags,setTags,options,t}){
   const add=v=>{const s=v.trim();if(s&&!tags.includes(s))setTags([...tags,s]);setQ("");};
   return(<div ref={ref} style={{position:"relative"}}>
     <div onClick={()=>{setOpen(true);setTimeout(()=>ir.current?.focus(),0);}} style={{background:t.surfAlt,border:`1.5px solid ${open?t.focus:t.borderIn}`,borderRadius:8,padding:"7px 10px",cursor:"text",minHeight:44,display:"flex",flexWrap:"wrap",gap:6,alignItems:"center",transition:"border-color 0.2s,box-shadow 0.2s",boxShadow:open?`0 0 0 3px ${t.accentGlow}`:"none"}}>
-      {tags.map(tag=>(<span key={tag} style={{background:t.tagBg,color:t.tagTxt,borderRadius:6,padding:"4px 10px",fontSize:12,fontWeight:600,display:"inline-flex",alignItems:"center",gap:5,whiteSpace:"nowrap",animation:"chipIn 0.2s ease-out"}}><Tag size={10}/> {tag}<X size={12} style={{cursor:"pointer",opacity:0.6}} onClick={e=>{e.stopPropagation();setTags(tags.filter(x=>x!==tag));}} onMouseEnter={e=>e.currentTarget.style.opacity="1"} onMouseLeave={e=>e.currentTarget.style.opacity="0.6"}/></span>))}
+      {tags.map(tag=>{const tp=tagChromaProps(tag,tagIsDark);return(<span key={tag} className={tp.className} style={{...tp.style,animation:"chipIn 0.2s ease-out"}}><Tag size={10} strokeWidth={2.25} aria-hidden/> {tag}<X size={12} className="float-tag-dismiss" aria-label={`Remove ${tag}`} onClick={e=>{e.stopPropagation();setTags(tags.filter(x=>x!==tag));}}/></span>);})}
       <input ref={ir} value={q} onChange={e=>setQ(e.target.value)} onFocus={()=>setOpen(true)} onKeyDown={e=>{if((e.key===" "||e.key==="Enter")&&q.trim()){e.preventDefault();add(q);}else if(e.key==="Backspace"&&!q&&tags.length)setTags(tags.slice(0,-1));}} placeholder={tags.length===0?"Type and press space…":""} style={{background:"transparent",border:"none",outline:"none",flex:1,minWidth:120,color:t.text,fontSize:13,padding:"4px 0"}}/>
     </div>
     {open&&(avail.length>0||canC)&&(<div style={{position:"absolute",top:"calc(100% + 6px)",left:0,right:0,zIndex:140,background:t.surfRaised,border:`1px solid ${t.border}`,borderRadius:10,maxHeight:180,overflowY:"auto",boxShadow:`0 12px 40px rgba(0,0,0,0.25)`,animation:"dropIn 0.18s ease-out"}}>
@@ -206,7 +207,7 @@ const Lbl=t=>({fontSize:13,color:t.textMuted,fontWeight:600,whiteSpace:"nowrap"}
 
 const defProject={name:"",code:"",owner:"sy",stage:"draft",billable:true,client:"",tags:[],startDate:"",endDate:"",notes:"",teamIds:[],managerEdit:false,color:"#6c8cff"};
 
-export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,clients,setClients,tagOpts,setTagOpts,getNextProjectId,t}){
+export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,clients,setClients,tagOpts,setTagOpts,getNextProjectId,t,tagIsDark=true}){
   const[form,setForm]=useState(null);const ref=useRef(null);const isEdit=!!editProject;
   useEffect(()=>{if(!open)return;if(editProject)setForm({...editProject,teamIds:[...(editProject.teamIds||[])]});else setForm({...defProject,color:colorForNewProjectId(getNextProjectId())});},[open,editProject?.id,getNextProjectId]);
   if(!open||!form)return null;
@@ -215,15 +216,15 @@ export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,c
   const stageObj=STAGES.find(s=>s.value===form.stage)||STAGES[0];
 
   return(
-    <div onClick={e=>{if(ref.current&&!ref.current.contains(e.target))onClose();}} style={{position:"fixed",inset:0,background:t.overlay,zIndex:200,display:"flex",alignItems:"flex-start",justifyContent:"center",paddingTop:40,backdropFilter:"blur(6px)",animation:"fadeIn 0.2s ease-out"}}>
-      <div className="float-premium-modal" ref={ref} onClick={e=>e.stopPropagation()} style={{background:t.surfRaised,width:640,maxHeight:"calc(100vh - 80px)",display:"flex",flexDirection:"column",animation:"modalScale 0.25s ease-out"}}>
+    <div className="float-modal-overlay-dim" onClick={e=>{if(ref.current&&!ref.current.contains(e.target))onClose();}} style={{position:"fixed",inset:0,background:t.overlay,zIndex:200,display:"flex",alignItems:"flex-start",justifyContent:"center",paddingTop:40,animation:"fadeIn 0.22s var(--ds-ease-out, ease-out)"}}>
+      <div className="float-premium-modal float-modal-panel-enter" ref={ref} onClick={e=>e.stopPropagation()} style={{background:t.surfRaised,width:640,maxHeight:"calc(100vh - 80px)",display:"flex",flexDirection:"column"}}>
 
         {/* Header */}
         <div style={{padding:"24px 32px 20px",flexShrink:0,borderBottom:`1px solid ${t.border}`}}>
           <div style={{display:"flex",alignItems:"center",gap:14}}>
             <div style={{position:"relative"}}>
               <div style={{width:42,height:42,borderRadius:12,background:form.color,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 10px rgba(0,0,0,0.2)",transition:"transform 0.15s"}} onClick={()=>upd({_colorOpen:!form._colorOpen})} onMouseEnter={e=>e.currentTarget.style.transform="scale(1.08)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}><Palette size={16} style={{color:"#fff",opacity:0.8}}/></div>
-              {form._colorOpen&&<div style={{position:"absolute",top:"100%",left:0,marginTop:8,zIndex:150,background:t.surfRaised,border:`1px solid ${t.border}`,borderRadius:10,padding:10,display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,boxShadow:`0 12px 40px rgba(0,0,0,0.3)`,animation:"dropIn 0.15s ease-out"}}>{PROJECT_COLORS.map(c=>(<div key={c} onClick={()=>upd({color:c,_colorOpen:false})} style={{width:28,height:28,borderRadius:8,background:c,cursor:"pointer",border:form.color===c?`2.5px solid ${t.text}`:"2.5px solid transparent",transition:"transform 0.1s"}} onMouseEnter={e=>e.currentTarget.style.transform="scale(1.15)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}/>))}</div>}
+              {form._colorOpen&&<div style={{position:"absolute",top:"100%",left:0,marginTop:8,zIndex:150,background:t.surfRaised,border:`1px solid ${t.border}`,borderRadius:10,padding:10,display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,maxHeight:220,overflowY:"auto",boxShadow:`0 12px 40px rgba(0,0,0,0.3)`,animation:"dropIn 0.15s ease-out"}}>{PROJECT_COLORS.map(c=>(<div key={c} onClick={()=>upd({color:c,_colorOpen:false})} style={{width:28,height:28,borderRadius:8,background:c,cursor:"pointer",border:form.color===c?`2.5px solid ${t.text}`:"2.5px solid transparent",transition:"transform 0.1s"}} onMouseEnter={e=>e.currentTarget.style.transform="scale(1.15)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}/>))}</div>}
             </div>
             <input value={form.name} onChange={e=>upd({name:e.target.value})} placeholder="Project name" autoFocus={!isEdit} style={{background:"transparent",border:"none",outline:"none",fontSize:24,fontWeight:700,color:t.text,flex:1,padding:0,letterSpacing:-0.3}}/>
             <button onClick={onClose} style={{background:"transparent",border:"none",cursor:"pointer",color:t.textMuted,padding:6,borderRadius:8,transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.background=t.btnSecHov;e.currentTarget.style.color=t.text;}} onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=t.textMuted;}}><X size={18}/></button>
@@ -246,14 +247,14 @@ export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,c
 
             <label style={Lbl(t)}><span style={{display:"inline-flex",alignItems:"center",gap:6}}><FileText size={14}/> Billable</span></label>
             <div style={{display:"flex",gap:0}}>
-              {["Billable","Non-billable"].map((opt,i)=>{const active=(opt==="Billable"&&form.billable)||(opt==="Non-billable"&&!form.billable);return(<button key={opt} onClick={()=>upd({billable:opt==="Billable"})} style={{padding:"8px 20px",fontSize:13,cursor:"pointer",fontWeight:active?700:500,border:`1.5px solid ${active?t.accent:t.borderIn}`,borderRadius:i===0?"8px 0 0 8px":"0 8px 8px 0",background:active?t.accentGlow:t.surfAlt,color:active?t.accent:t.textSoft,transition:"all 0.15s",marginLeft:i===1?-1.5:0}}>{opt}</button>);})}
+              {["Billable","Non-billable"].map((opt,i)=>{const bill=opt==="Billable";const active=(bill&&form.billable)||(!bill&&!form.billable);const ok=bill&&active;const warn=!bill&&active;const borderC=ok?t.success:warn?t.warn:t.borderIn;return(<button key={opt} type="button" onClick={()=>upd({billable:bill})} style={{padding:"9px 20px",fontSize:13,cursor:"pointer",fontWeight:active?700:550,border:`1.5px solid ${borderC}`,borderRadius:i===0?"10px 0 0 10px":"0 10px 10px 0",background:ok?t.successSoft:warn?t.warnSoft:active?t.accentGlow:t.surfAlt,color:ok?t.successHov:warn?t.warnHov:active?t.accent:t.textSoft,transition:"box-shadow 0.22s cubic-bezier(0.22,1,0.36,1), background 0.2s ease, border-color 0.2s ease",marginLeft:i===1?-1.5:0,boxShadow:ok&&active?t.successGlow:warn&&active?t.warnGlow:"none"}}>{opt}</button>);})}
             </div>
 
             <label style={Lbl(t)}><span style={{display:"inline-flex",alignItems:"center",gap:6}}><Briefcase size={14}/> Client</span></label>
             <CDropdown t={t} value={form.client||"Empty"} onChange={v=>{if(v!=="Empty"&&!clients.includes(v))setClients([...clients,v]);upd({client:v==="Empty"?"":v});}} options={["Empty",...clients]} placeholder="Empty"/>
 
             <label style={Lbl(t)}><span style={{display:"inline-flex",alignItems:"center",gap:6}}><Tag size={14}/> Tags</span></label>
-            <CTagInput t={t} tags={form.tags} setTags={nt=>{const n=nt.filter(x=>!tagOpts.includes(x));if(n.length)setTagOpts([...tagOpts,...n]);upd({tags:nt});}} options={tagOpts}/>
+            <CTagInput t={t} tagIsDark={tagIsDark} tags={form.tags} setTags={nt=>{const n=nt.filter(x=>!tagOpts.includes(x));if(n.length)setTagOpts([...tagOpts,...n]);upd({tags:nt});}} options={tagOpts}/>
 
             <label style={Lbl(t)}><span style={{display:"inline-flex",alignItems:"center",gap:6}}><Calendar size={14}/> Dates</span></label>
             <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:8,alignItems:"center"}}>
@@ -384,7 +385,7 @@ export default function ProjectsPage(){
                   <td style={{padding:"12px 12px"}}><div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:4,height:28,borderRadius:2,background:p.color,flexShrink:0}}/><span style={{fontWeight:600,color:p.archived?t.textMuted:t.text,fontSize:14}}>{p.name}</span></div></td>
                   <td style={{padding:"12px 12px",color:p.code?t.textSoft:t.textDim,fontFamily:"'DM Mono', monospace",fontSize:12}}>{p.code||"—"}</td>
                   <td style={{padding:"12px 12px",color:t.textSoft,fontSize:13}}>{p.client||"—"}</td>
-                  <td style={{padding:"12px 12px"}}><div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{p.tags.slice(0,2).map((tag,j)=>(<span key={j} style={{background:t.tagBg,color:t.tagTxt,borderRadius:6,padding:"3px 9px",fontSize:11,fontWeight:600}}>{tag}</span>))}{p.tags.length>2&&<span style={{color:t.textMuted,fontSize:11,fontWeight:600}}>+{p.tags.length-2}</span>}</div></td>
+                  <td style={{padding:"12px 12px"}}><div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>{p.tags.slice(0,2).map((tag,j)=>{const tp=tagChromaProps(tag,mode==="dark");return <span key={j} className={tp.className} style={{...tp.style,fontSize:11}}>{tag}</span>;})}{p.tags.length>2&&<span style={{color:t.textMuted,fontSize:11,fontWeight:650}}>+{p.tags.length-2}</span>}</div></td>
                   <td style={{padding:"12px 12px"}}><div style={{display:"inline-flex",alignItems:"center",gap:6,background:t.tabActiveBg,borderRadius:6,padding:"4px 10px"}}><Circle size={8} fill={stg.color} stroke={stg.color}/><span style={{color:t.textSoft,fontSize:12,fontWeight:600}}>{stg.label}</span></div></td>
                   <td style={{padding:"12px 12px"}}>{teamPeople.length>0?(<div style={{display:"flex",alignItems:"center"}}>{teamPeople.slice(0,3).map((tp,j)=>(<div key={tp.id} style={{width:26,height:26,borderRadius:7,background:avGrad(tp.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:"#fff",marginLeft:j>0?-6:0,border:`2px solid ${t.surface}`,position:"relative",zIndex:3-j}} title={tp.name}>{ini(tp.name)}</div>))}{teamPeople.length>3&&<span style={{fontSize:11,color:t.textMuted,marginLeft:4,fontWeight:600}}>+{teamPeople.length-3}</span>}</div>):<span style={{color:t.textDim,fontSize:12}}>—</span>}</td>
                   <td style={{padding:"12px 12px",color:t.textSoft,fontSize:12,whiteSpace:"nowrap"}}>{fmtDate(p.startDate)}</td>
@@ -399,7 +400,7 @@ export default function ProjectsPage(){
         </div>
       </main>
 
-      <ProjectModal open={modalOpen} onClose={()=>{setModalOpen(false);setEditingProject(null);}} onSave={handleSave} onArchive={handleModalArchive} editProject={editingProject} people={people} clients={clients} setClients={setClients} tagOpts={projectTagOpts} setTagOpts={setProjectTagOpts} getNextProjectId={getNextProjectId} t={t}/>
+      <ProjectModal open={modalOpen} onClose={()=>{setModalOpen(false);setEditingProject(null);}} onSave={handleSave} onArchive={handleModalArchive} editProject={editingProject} people={people} clients={clients} setClients={setClients} tagOpts={projectTagOpts} setTagOpts={setProjectTagOpts} getNextProjectId={getNextProjectId} t={t} tagIsDark={mode==="dark"}/>
       <Confirm open={confirmDel} t={t} onYes={doDelete} onNo={()=>{setConfirmDel(false);setSelected(new Set());}} title="Confirm deletion" desc={<>You are about to permanently remove <strong style={{color:t.text}}>{selected.size} project{selected.size===1?"":"s"}</strong>.</>} yesLabel="Delete" yesIcon={Trash2} yesDanger/>
 
 

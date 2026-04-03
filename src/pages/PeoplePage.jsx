@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Users,
   Plus,
@@ -24,6 +24,19 @@ import PersonModal, {
   avGrad,
 } from "../components/PersonModal.jsx";
 import { toast } from "sonner";
+import { tagChromaProps } from "../utils/tagChroma.js";
+import { CreateAllocationModal } from "../components/AllocationModals.jsx";
+import { resolveColorForProjectLabel } from "../utils/projectColors.js";
+
+function allocationHasPerson(a, pid) {
+  if (Array.isArray(a.personIds) && a.personIds.length > 0) return a.personIds.includes(pid);
+  return a.personId === pid;
+}
+
+function shortenAllocLabel(s, maxLen) {
+  if (!s) return "";
+  return s.length > maxLen ? `${s.slice(0, maxLen - 1)}…` : s;
+}
 
 /* ═══════════════════════════════════════════════════════════
    APP
@@ -45,6 +58,14 @@ export default function PeoplePage() {
     syncPersonCreate,
     syncPersonUpdate,
     syncPeopleDelete,
+    allocations,
+    setAllocations,
+    projects,
+    allocationProjectOptions,
+    addAllocationProjectLabel,
+    syncAllocationCreate,
+    syncAllocationUpdate,
+    syncAllocationDelete,
   } = useAppData();
 
   const [selected,setSelected]=useState(new Set());
@@ -55,6 +76,75 @@ export default function PeoplePage() {
   const [confirmDel,setConfirmDel]=useState(false);
   const [mounted,setMounted]=useState(false);
 
+  const [allocCreateOpen, setAllocCreateOpen] = useState(false);
+  const [allocPreselectPerson, setAllocPreselectPerson] = useState(null);
+  const [allocPreselectProject, setAllocPreselectProject] = useState(null);
+
+  const schedulePeople = useMemo(
+    () => [...people].filter((p) => !p.archived).sort((a, b) => a.name.localeCompare(b.name)),
+    [people]
+  );
+
+  const openCreateAllocationForPersonProject = useCallback((person, projectLabel) => {
+    setAllocPreselectPerson(person ?? null);
+    setAllocPreselectProject(projectLabel != null ? String(projectLabel).trim() || null : null);
+    setAllocCreateOpen(true);
+  }, []);
+
+  const closeCreateAllocation = useCallback(() => {
+    setAllocCreateOpen(false);
+    setAllocPreselectPerson(null);
+    setAllocPreselectProject(null);
+  }, []);
+
+  const handleCreateAllocation = useCallback(
+    (payload) => {
+      if (!payload.isLeave) {
+        const pStart = payload.startDate;
+        const pEnd = payload.endDate;
+        for (const pid of payload.personIds) {
+          const leaveConflict = allocations.find(
+            (a) =>
+              a.isLeave &&
+              allocationHasPerson(a, pid) &&
+              a.startDate <= pEnd &&
+              a.endDate >= pStart
+          );
+          if (leaveConflict) {
+            const personName = people.find((p) => p.id === pid)?.name || "This person";
+            const leaveTypeName = leaveConflict.leaveType
+              ? (leaveConflict.project || "Leave")
+              : "Leave";
+            toast.error(
+              `Cannot allocate ${personName} — they are on ${leaveTypeName} (${leaveConflict.startDate} to ${leaveConflict.endDate})`
+            );
+            return;
+          }
+        }
+      }
+
+      const projectColor = resolveColorForProjectLabel(payload.project, projects);
+      setAllocations((prev) => {
+        const nextId = prev.reduce((m, a) => Math.max(m, Number(a.id) || 0), 0) + 1;
+        const created = {
+          id: nextId,
+          ...payload,
+          updatedBy: "You",
+          updatedAt: new Date().toISOString(),
+          projectColor,
+        };
+        queueMicrotask(() => syncAllocationCreate(created));
+        return [...prev, created];
+      });
+      toast.success(payload.isLeave ? "Leave saved" : "Allocation saved", {
+        description: payload.isLeave
+          ? `${payload.startDate} → ${payload.endDate}`
+          : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
+        duration: 2800,
+      });
+    },
+    [setAllocations, projects, allocations, people, syncAllocationCreate]
+  );
 
   useEffect(()=>{ setMounted(true); },[]);
 
@@ -212,8 +302,8 @@ export default function PeoplePage() {
                     </td>
                     <td style={{ padding:"12px 16px" }}>
                       <div style={{ display:"flex",gap:5,flexWrap:"wrap" }}>
-                        {p.tags.slice(0,3).map((tag,j)=>(<span key={j} style={{ background:t.tagBg,color:t.tagTxt,borderRadius:6,padding:"3px 9px",fontSize:11,fontWeight:600 }}>{tag}</span>))}
-                        {p.tags.length>3&&<span style={{ color:t.textMuted,fontSize:11,fontWeight:600,padding:"3px 4px" }}>+{p.tags.length-3}</span>}
+                        {p.tags.slice(0,3).map((tag,j)=>{ const tp=tagChromaProps(tag,mode==="dark"); return <span key={j} className={tp.className} style={{ ...tp.style,fontSize:11 }}>{tag}</span>; })}
+                        {p.tags.length>3&&<span style={{ color:t.textMuted,fontSize:11,fontWeight:650,padding:"3px 4px" }}>+{p.tags.length-3}</span>}
                       </div>
                     </td>
                     <td style={{ padding:"12px 16px",color:t.textSoft,fontWeight:500 }}>{p.type}</td>
@@ -243,7 +333,32 @@ export default function PeoplePage() {
         open={modalOpen} onClose={()=>{ setModalOpen(false); setEditingPerson(null); }}
         onSave={handleModalSave} onArchive={handleModalArchive}
         editPerson={editingPerson}
-        roles={roles} setRoles={setRoles} depts={depts} setDepts={setDepts} tagOpts={peopleTagOpts} setTagOpts={setPeopleTagOpts} t={t}/>
+        roles={roles} setRoles={setRoles} depts={depts} setDepts={setDepts} tagOpts={peopleTagOpts} setTagOpts={setPeopleTagOpts} t={t}
+        projects={projects}
+        allocations={allocations}
+        setAllocations={setAllocations}
+        syncAllocationDelete={syncAllocationDelete}
+        syncAllocationUpdate={syncAllocationUpdate}
+        onOpenCreateAllocation={({ person, projectLabel }) =>
+          openCreateAllocationForPersonProject(person, projectLabel)
+        }
+        tagTheme={mode}
+      />
+
+      <CreateAllocationModal
+        open={allocCreateOpen}
+        onClose={closeCreateAllocation}
+        onCreate={handleCreateAllocation}
+        onCreateLeave={handleCreateAllocation}
+        people={schedulePeople}
+        preselectPerson={allocPreselectPerson}
+        preselectDate={null}
+        preselectProject={allocPreselectProject}
+        projects={allocationProjectOptions}
+        projectRegistry={projects}
+        onAddProject={addAllocationProjectLabel}
+        t={t}
+      />
 
       <Confirm open={confirmDel} t={t} onYes={doDelete} onNo={()=>{ setConfirmDel(false); setSelected(new Set()); }}
         title="Confirm deletion" desc={<>You are about to permanently remove <strong style={{color:t.text}}>{selected.size} {selected.size===1?"person":"people"}</strong> from the directory.</>}

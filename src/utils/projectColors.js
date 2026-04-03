@@ -1,22 +1,58 @@
-/** Shared palette: project creation + allocations for labels without a registry match. */
-export const PROJECT_COLOR_PALETTE = [
-  "#6c8cff",
-  "#34d399",
-  "#f59e0b",
-  "#ff4d6a",
-  "#a78bfa",
-  "#f093fb",
-  "#4facfe",
-  "#fcb69f",
-  "#fa709a",
-  "#43e97b",
-  "#48c6ef",
-  "#667eea",
-  "#ff6b6b",
-  "#feca57",
-  "#54a0ff",
-  "#5f27cd",
-];
+/** Golden-angle hue stepping yields ~evenly spaced hues on the circle. */
+const GOLDEN_ANGLE = 137.508;
+const ALLOCATION_PALETTE_SIZE = 200;
+
+export function hashString(s) {
+  let h = 0;
+  const str = String(s ?? "");
+  for (let i = 0; i < str.length; i++) {
+    h = str.charCodeAt(i) + ((h << 5) - h);
+  }
+  return h >>> 0;
+}
+
+function hslToHex(h, s, l) {
+  const hh = ((h % 360) + 360) % 360;
+  const ss = s / 100;
+  const ll = l / 100;
+  const a = ss * Math.min(ll, 1 - ll);
+  const f = (n) => {
+    const k = (n + hh / 30) % 12;
+    const c = ll - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * c);
+  };
+  return `#${[f(0), f(8), f(4)].map((x) => x.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function buildGoldenPalette(count) {
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const hue = (i * GOLDEN_ANGLE) % 360;
+    const sat = 52 + (i % 7) * 3.15;
+    const light = 46 + (i % 6) * 2.1;
+    out.push(hslToHex(hue, sat, light));
+  }
+  return out;
+}
+
+/**
+ * Large palette: project picker + allocations for labels without a registry match.
+ * ~200 visually distinct hues (golden-angle spacing).
+ */
+export const PROJECT_COLOR_PALETTE = buildGoldenPalette(ALLOCATION_PALETTE_SIZE);
+
+/** Avatar / initials gradient: two distinct hues from the same large palette. */
+export function avatarGradientFromName(name) {
+  if (!name || !String(name).trim()) return "linear-gradient(135deg,#3a3f4b,#2a2e38)";
+  const h = hashString(`avatar:\x00${name}`);
+  const n = PROJECT_COLOR_PALETTE.length;
+  const i = h % n;
+  let j = (h >>> 11) % n;
+  if (j === i) j = (i + 37) % n;
+  const a = PROJECT_COLOR_PALETTE[i];
+  const b = PROJECT_COLOR_PALETTE[j];
+  return `linear-gradient(135deg,${a},${b})`;
+}
 
 export function projectToAllocationLabel(p) {
   const code = (p.code || "").trim();
@@ -25,15 +61,16 @@ export function projectToAllocationLabel(p) {
   return name || code || `Project #${p.id}`;
 }
 
-function hashString(s) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h = s.charCodeAt(i) + ((h << 5) - h);
-  }
-  return Math.abs(h);
+/** Distinct accent for tag chips (different salt than allocation hashing). */
+export function tagAccentHexFromLabel(label) {
+  const h = hashString(`tag:\x00${label}`);
+  const hue = (h % 360) + ((h >>> 10) % 24) * 0.35;
+  const sat = 56 + ((h >>> 6) % 17);
+  const light = 50 + ((h >>> 14) % 9);
+  return hslToHex(hue, sat, light);
 }
 
-/** Color for a schedule allocation label: registry project match, else stable hash into palette. */
+/** Color for a schedule allocation label: registry project match, else stable hash into large palette. */
 export function resolveColorForProjectLabel(label, projects) {
   const t = (label || "").trim();
   if (!t) return PROJECT_COLOR_PALETTE[0];

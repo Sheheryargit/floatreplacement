@@ -45,6 +45,11 @@ html {
   outline-offset: 2px;
 }
 
+/* Default focus when semantic tokens not yet themed */
+:root {
+  --ds-focus: #6366f1;
+}
+
 button:focus:not(:focus-visible),
 a:focus:not(:focus-visible) {
   outline: none;

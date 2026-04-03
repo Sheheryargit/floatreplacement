@@ -133,15 +133,17 @@
   align-items: center;
   justify-content: center;
   transition:
-    background var(--duration-fast) ease,
-    border-color var(--duration-fast) ease,
-    color var(--duration-fast) ease;
+    background var(--duration-fast, 0.15s) ease,
+    border-color var(--duration-fast, 0.15s) ease,
+    color var(--duration-fast, 0.15s) ease,
+    box-shadow var(--duration-normal, 0.22s) var(--ease-spring, ease);
 }
 
 .app-sidenav-theme:hover {
   background: var(--app-sidenav-hover);
   color: var(--app-accent);
   border-color: color-mix(in srgb, var(--app-accent) 35%, var(--app-border));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--app-accent) 22%, transparent);
 }
 
 @media (max-width: 640px) {

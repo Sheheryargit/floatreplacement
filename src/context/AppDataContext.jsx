@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 import {
   PEOPLE_SEED,
   SEED_ROLES,
@@ -22,6 +23,7 @@ import * as projectsApi from "../lib/api/projects.js";
 import * as allocationsApi from "../lib/api/allocations.js";
 import * as lookupsApi from "../lib/api/lookups.js";
 import { isSupabaseConfigured } from "../lib/supabase.js";
+import * as workspaceSettingsApi from "../lib/api/workspaceSettings.js";
 
 const LEGACY_STORAGE_KEY = "float-workspace-v1";
 
@@ -70,6 +72,8 @@ function buildInitialSlices() {
       clients: [...SEED_CLIENTS],
       projectTagOpts: [...SEED_PROJECT_TAGS],
       extraAllocationLabels: [...ALLOCATION_PROJECT_SEED],
+      starredPeopleTags: [],
+      schedulePeopleTagFilter: [],
     };
   }
 
@@ -83,6 +87,8 @@ function buildInitialSlices() {
     clients: [...SEED_CLIENTS],
     projectTagOpts: [...SEED_PROJECT_TAGS],
     extraAllocationLabels: [...ALLOCATION_PROJECT_SEED],
+    starredPeopleTags: [],
+    schedulePeopleTagFilter: [],
   };
 }
 
@@ -108,6 +114,10 @@ function mergeRemoteWorkspace(remote) {
     extraAllocationLabels: [
       ...new Set([...seedFallbacks.extraAllocationLabels, ...remote.extraAllocationLabels]),
     ],
+    starredPeopleTags: Array.isArray(remote.starredPeopleTags) ? [...remote.starredPeopleTags] : [],
+    schedulePeopleTagFilter: Array.isArray(remote.schedulePeopleTagFilter)
+      ? [...remote.schedulePeopleTagFilter]
+      : [],
   });
 }
 
@@ -179,6 +189,30 @@ export const useAppStore = create((set, get) => ({
       return { extraAllocationLabels: [...state.extraAllocationLabels, t] };
     });
   },
+
+  setStarredPeopleTags: (val) =>
+    set((state) => {
+      const next = typeof val === "function" ? val(state.starredPeopleTags) : val;
+      dbSync(() =>
+        workspaceSettingsApi.upsertWorkspaceSettings({
+          starredPeopleTags: next,
+          schedulePeopleTagFilter: state.schedulePeopleTagFilter,
+        })
+      );
+      return { starredPeopleTags: next };
+    }),
+
+  setSchedulePeopleTagFilter: (val) =>
+    set((state) => {
+      const next = typeof val === "function" ? val(state.schedulePeopleTagFilter) : val;
+      dbSync(() =>
+        workspaceSettingsApi.upsertWorkspaceSettings({
+          starredPeopleTags: state.starredPeopleTags,
+          schedulePeopleTagFilter: next,
+        })
+      );
+      return { schedulePeopleTagFilter: next };
+    }),
 }));
 
 export function syncPersonCreate(person) {
@@ -209,16 +243,56 @@ export function syncAllocationDelete(id) {
   dbSync(() => allocationsApi.deleteAllocation(id));
 }
 
-export const useAppData = () => {
-  const store = useAppStore();
+/**
+ * Shallow store slice so pages re-render only when fields they subscribe to change.
+ * `allocationProjectOptions` is memoized from `projects` + `extraAllocationLabels`.
+ */
+export function useAppData() {
+  const state = useAppStore(
+    useShallow((s) => ({
+      people: s.people,
+      setPeople: s.setPeople,
+      projects: s.projects,
+      setProjects: s.setProjects,
+      allocations: s.allocations,
+      setAllocations: s.setAllocations,
+      roles: s.roles,
+      setRoles: s.setRoles,
+      depts: s.depts,
+      setDepts: s.setDepts,
+      peopleTagOpts: s.peopleTagOpts,
+      setPeopleTagOpts: s.setPeopleTagOpts,
+      clients: s.clients,
+      setClients: s.setClients,
+      projectTagOpts: s.projectTagOpts,
+      setProjectTagOpts: s.setProjectTagOpts,
+      extraAllocationLabels: s.extraAllocationLabels,
+      setExtraAllocationLabels: s.setExtraAllocationLabels,
+      starredPeopleTags: s.starredPeopleTags,
+      schedulePeopleTagFilter: s.schedulePeopleTagFilter,
+      setStarredPeopleTags: s.setStarredPeopleTags,
+      setSchedulePeopleTagFilter: s.setSchedulePeopleTagFilter,
+      getNextPersonId: s.getNextPersonId,
+      getNextProjectId: s.getNextProjectId,
+      addAllocationProjectLabel: s.addAllocationProjectLabel,
+      workspaceReady: s.workspaceReady,
+    }))
+  );
+
+  const allocationProjectOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...state.projects.map(projectToAllocationLabel),
+          ...state.extraAllocationLabels,
+        ])
+      ).sort((a, b) => a.localeCompare(b)),
+    [state.projects, state.extraAllocationLabels]
+  );
+
   return {
-    ...store,
-    allocationProjectOptions: Array.from(
-      new Set([
-        ...store.projects.map(projectToAllocationLabel),
-        ...store.extraAllocationLabels,
-      ])
-    ).sort((a, b) => a.localeCompare(b)),
+    ...state,
+    allocationProjectOptions,
     syncPersonCreate,
     syncPersonUpdate,
     syncPeopleDelete,
@@ -229,7 +303,7 @@ export const useAppData = () => {
     syncAllocationUpdate,
     syncAllocationDelete,
   };
-};
+}
 
 export function AppDataProvider({ children }) {
   useEffect(() => {
