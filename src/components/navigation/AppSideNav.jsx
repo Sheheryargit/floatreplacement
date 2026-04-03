@@ -1,14 +1,18 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
   CalendarDays,
   ClipboardList,
   Users,
   FolderOpen,
   BarChart3,
-  Sun,
-  Moon,
+  Settings,
+  HelpCircle,
+  Bell,
+  User,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { useAppDialog } from "../../context/AppDialogContext.jsx";
+import { useSlapAnimation } from "../../context/SlapAnimationContext.jsx";
 import "./AppSideNav.css";
 
 const NAV = [
@@ -19,8 +23,37 @@ const NAV = [
   { to: null, icon: BarChart3, label: "Report", soon: true },
 ];
 
-export default function AppSideNav({ theme, onToggleTheme }) {
-  const isDark = theme === "dark";
+const V2_MODAL = {
+  title: "🚧 Not ready yet",
+  message:
+    "This feature is part of Version 2 release.\nContact Sheher on Slack if needed.",
+};
+
+export default function AppSideNav() {
+  const navigate = useNavigate();
+  const { openDialog } = useAppDialog();
+  const { triggerSlap } = useSlapAnimation();
+
+  const slapThenDialog = (opts) => {
+    void (async () => {
+      await triggerSlap();
+      openDialog(opts);
+    })();
+  };
+
+  const onSoon = () => slapThenDialog(V2_MODAL);
+
+  const onHelp = () =>
+    slapThenDialog({
+      title: "😂 Need help?",
+      message: "Contact Sheher on Slack.",
+    });
+
+  const onNotifications = () =>
+    slapThenDialog({
+      title: "🚧 Notifications are part of Version 2.",
+      message: "Contact Sheher on Slack.",
+    });
 
   return (
     <aside className="app-sidenav" aria-label="Primary navigation">
@@ -39,58 +72,96 @@ export default function AppSideNav({ theme, onToggleTheme }) {
       <nav className="app-sidenav-links">
         {NAV.map((item) => {
           const Icon = item.icon;
-          if (item.to) {
+          if (item.soon) {
             return (
-              <NavLink
+              <motion.button
                 key={item.label}
-                to={item.to}
-                end={!!item.end}
-                className={({ isActive }) =>
-                  "app-sidenav-item" + (isActive ? " app-sidenav-item--active" : "")
-                }
+                type="button"
+                className="app-sidenav-item app-sidenav-item--soon"
+                title="Version 2 — tap for details"
+                onClick={onSoon}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                transition={{ type: "spring", stiffness: 420, damping: 28 }}
               >
-                {({ isActive }) => (
-                  <>
-                    {isActive ? (
-                      <motion.span
-                        layoutId="sidenav-pip"
-                        className="app-sidenav-pip"
-                        transition={{ type: "spring", stiffness: 380, damping: 32 }}
-                      />
-                    ) : null}
-                    <Icon size={19} strokeWidth={isActive ? 2.2 : 1.85} aria-hidden />
-                    <span className="app-sidenav-label">{item.label}</span>
-                  </>
-                )}
-              </NavLink>
+                <Icon size={19} strokeWidth={1.75} aria-hidden />
+                <span className="app-sidenav-label">{item.label}</span>
+              </motion.button>
             );
           }
           return (
-            <span
+            <NavLink
               key={item.label}
-              className="app-sidenav-item app-sidenav-item--disabled"
-              title="Coming soon"
+              to={item.to}
+              end={!!item.end}
+              className={({ isActive }) =>
+                "app-sidenav-item" + (isActive ? " app-sidenav-item--active" : "")
+              }
             >
-              <Icon size={19} strokeWidth={1.75} aria-hidden />
-              <span className="app-sidenav-label">{item.label}</span>
-            </span>
+              {({ isActive }) => (
+                <>
+                  {isActive ? (
+                    <motion.span
+                      layoutId="sidenav-pip"
+                      className="app-sidenav-pip"
+                      transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                    />
+                  ) : null}
+                  <Icon size={19} strokeWidth={isActive ? 2.2 : 1.85} aria-hidden />
+                  <span className="app-sidenav-label">{item.label}</span>
+                </>
+              )}
+            </NavLink>
           );
         })}
       </nav>
 
       <div className="app-sidenav-spacer" />
 
-      <motion.button
-        type="button"
-        className="app-sidenav-theme"
-        title={isDark ? "Light mode" : "Dark mode"}
-        onClick={onToggleTheme}
-        whileHover={{ scale: 1.06 }}
-        whileTap={{ scale: 0.94 }}
-        transition={{ type: "spring", stiffness: 400, damping: 22 }}
-      >
-        {isDark ? <Sun size={16} strokeWidth={2} aria-hidden /> : <Moon size={16} strokeWidth={2} aria-hidden />}
-      </motion.button>
+      <div className="app-sidenav-footer" role="group" aria-label="Account and help">
+        <NavLink
+          to="/settings"
+          className={({ isActive }) =>
+            "app-sidenav-foot-btn" + (isActive ? " app-sidenav-foot-btn--active" : "")
+          }
+          title="Settings"
+        >
+          <Settings size={18} strokeWidth={1.9} aria-hidden />
+        </NavLink>
+        <motion.button
+          type="button"
+          className="app-sidenav-foot-btn"
+          title="Need help?"
+          onClick={onHelp}
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.94 }}
+        >
+          <HelpCircle size={18} strokeWidth={1.9} aria-hidden />
+        </motion.button>
+        <motion.button
+          type="button"
+          className="app-sidenav-foot-btn app-sidenav-foot-btn--muted"
+          title="Notifications — Version 2"
+          onClick={onNotifications}
+          whileHover={{ scale: 1.06 }}
+          whileTap={{ scale: 0.94 }}
+        >
+          <Bell size={18} strokeWidth={1.9} aria-hidden />
+        </motion.button>
+        <motion.button
+          type="button"
+          className="app-sidenav-avatar"
+          title="Profile"
+          onClick={() => navigate("/settings#profile")}
+          whileHover={{ scale: 1.06 }}
+          whileTap={{ scale: 0.94 }}
+        >
+          <span className="app-sidenav-avatar-letter" aria-hidden>
+            S
+          </span>
+          <span className="visually-hidden">Open profile</span>
+        </motion.button>
+      </div>
     </aside>
   );
 }

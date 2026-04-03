@@ -1,0 +1,139 @@
+.settings-root {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  background: var(--settings-bg, #0b0e14);
+  color: var(--settings-fg, #f1f5f9);
+  transition:
+    background var(--duration-slow) ease,
+    color var(--duration-slow) ease;
+}
+
+:root[data-theme="light"] .settings-root {
+  --settings-bg: #f6f7f9;
+  --settings-fg: #0f172a;
+}
+
+.settings-main {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: var(--space-8) var(--space-8) var(--space-10);
+  max-width: 720px;
+}
+
+.settings-hero {
+  margin-bottom: var(--space-8);
+}
+
+.settings-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #a5b4fc;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(129, 140, 248, 0.25);
+  margin-bottom: var(--space-4);
+  box-shadow: 0 0 24px rgba(99, 102, 241, 0.12);
+}
+
+:root[data-theme="light"] .settings-hero-badge {
+  color: #4338ca;
+  background: rgba(79, 70, 229, 0.08);
+  border-color: rgba(79, 70, 229, 0.2);
+}
+
+.settings-title {
+  margin: 0;
+  font-size: clamp(1.75rem, 3vw, 2.1rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.settings-lede {
+  margin: var(--space-3) 0 0;
+  font-size: 0.95rem;
+  color: #94a3b8;
+  max-width: 42ch;
+  line-height: 1.5;
+}
+
+:root[data-theme="light"] .settings-lede {
+  color: #64748b;
+}
+
+.settings-section {
+  margin-bottom: var(--space-8);
+}
+
+.settings-h2 {
+  margin: 0 0 var(--space-2);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.settings-section-desc {
+  margin: 0 0 var(--space-4);
+  font-size: 0.85rem;
+  color: #64748b;
+  line-height: 1.45;
+  max-width: 52ch;
+}
+
+.settings-card {
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+
+.settings-card--glow {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+:root[data-theme="light"] .settings-card--glow {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.05) inset,
+    0 12px 32px rgba(15, 23, 42, 0.06);
+}
+
+.settings-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.settings-stack .float-settings-item--dim {
+  cursor: pointer;
+}
+
+.settings-stack .float-settings-item--dim:hover {
+  opacity: 0.85;
+}
+
+/* Theme row: label left, control right */
+.settings-card .float-settings-item {
+  align-items: center;
+}
+
+.settings-card .float-settings-item-trail {
+  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  .settings-main {
+    padding: var(--space-6) var(--space-4) var(--space-8);
+  }
+}

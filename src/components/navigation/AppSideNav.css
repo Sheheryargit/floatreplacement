@@ -112,6 +112,21 @@
   cursor: not-allowed;
 }
 
+/* Soon: looks disabled but stays clickable (slap + V2 modal) */
+.app-sidenav-item--soon {
+  appearance: none;
+  font: inherit;
+  border: none;
+  opacity: 0.48;
+  cursor: pointer;
+  color: var(--app-sidenav-muted);
+}
+
+.app-sidenav-item--soon:hover {
+  opacity: 0.72;
+  color: var(--app-text-soft, #9ca3af);
+}
+
 .app-sidenav-label {
   line-height: 1.15;
 }
@@ -121,29 +136,95 @@
   min-height: var(--space-2);
 }
 
-.app-sidenav-theme {
+.app-sidenav-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding-top: var(--space-2);
+}
+
+.app-sidenav-foot-btn {
   width: 40px;
   height: 40px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--app-border);
+  border: 1px solid transparent;
   background: transparent;
   color: var(--app-sidenav-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  text-decoration: none;
   transition:
-    background var(--duration-fast, 0.15s) ease,
-    border-color var(--duration-fast, 0.15s) ease,
-    color var(--duration-fast, 0.15s) ease,
-    box-shadow var(--duration-normal, 0.22s) var(--ease-spring, ease);
+    background var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    box-shadow var(--duration-normal) var(--ease-spring);
 }
 
-.app-sidenav-theme:hover {
+.app-sidenav-foot-btn:hover {
   background: var(--app-sidenav-hover);
   color: var(--app-accent);
+  border-color: color-mix(in srgb, var(--app-accent) 28%, var(--app-border));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--app-accent) 18%, transparent);
+}
+
+.app-sidenav-foot-btn--active {
+  color: var(--app-accent);
+  background: var(--app-sidenav-active-bg);
   border-color: color-mix(in srgb, var(--app-accent) 35%, var(--app-border));
-  box-shadow: 0 0 18px color-mix(in srgb, var(--app-accent) 22%, transparent);
+}
+
+.app-sidenav-foot-btn--muted {
+  opacity: 0.42;
+}
+
+.app-sidenav-foot-btn--muted:hover {
+  opacity: 0.75;
+}
+
+.app-sidenav-avatar {
+  width: 40px;
+  height: 40px;
+  margin-top: 2px;
+  border-radius: 999px;
+  border: 1px solid var(--app-border);
+  background: linear-gradient(145deg, #334155 0%, #1e293b 100%);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  transition:
+    border-color var(--duration-fast) ease,
+    box-shadow var(--duration-normal) var(--ease-spring),
+    transform var(--duration-fast) ease;
+}
+
+.app-sidenav-avatar:hover {
+  border-color: color-mix(in srgb, var(--app-accent) 45%, var(--app-border));
+  box-shadow: 0 0 20px color-mix(in srgb, var(--app-accent) 22%, transparent);
+}
+
+.app-sidenav-avatar-letter {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: -0.02em;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 @media (max-width: 640px) {

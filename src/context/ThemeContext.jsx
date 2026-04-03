@@ -1,52 +1,94 @@
-import { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 
 const STORAGE_KEY = "float-replacement-theme";
 
 const ThemeContext = createContext(null);
 
-function readStoredTheme() {
+function getSystemTheme() {
+  if (typeof window === "undefined") return "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+/** @returns {"system" | "dark" | "light"} */
+function readStoredPreference() {
   try {
     const s = localStorage.getItem(STORAGE_KEY);
-    if (s === "dark" || s === "light") return s;
+    if (s === "system" || s === "dark" || s === "light") return s;
   } catch {
     /* ignore */
   }
-  return "light";
+  return "system";
 }
 
-function syncThemeDom(theme) {
+function resolveTheme(preference) {
+  if (preference === "system") return getSystemTheme();
+  return preference;
+}
+
+function syncThemeDom(resolved) {
   if (typeof document === "undefined") return;
-  document.documentElement.dataset.theme = theme;
-  document.documentElement.style.colorScheme = theme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.theme = resolved;
+  document.documentElement.style.colorScheme = resolved === "dark" ? "dark" : "light";
 }
 
 export function ThemeProvider({ children }) {
-  const [theme, setThemeState] = useState(() => {
-    const t = readStoredTheme();
-    if (typeof document !== "undefined") syncThemeDom(t);
-    return t;
-  });
+  const [themePreference, setThemePreferenceState] = useState(() => readStoredPreference());
+
+  const resolvedTheme = useMemo(
+    () => resolveTheme(themePreference),
+    [themePreference]
+  );
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, theme);
+      localStorage.setItem(STORAGE_KEY, themePreference);
     } catch {
       /* ignore */
     }
-    syncThemeDom(theme);
-  }, [theme]);
+    syncThemeDom(resolvedTheme);
+  }, [themePreference, resolvedTheme]);
 
-  const setTheme = useCallback((next) => {
-    setThemeState((prev) => (typeof next === "function" ? next(prev) : next));
+  useEffect(() => {
+    if (themePreference !== "system") return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => {
+      syncThemeDom(getSystemTheme());
+    };
+    mq.addEventListener("change", onChange);
+    syncThemeDom(resolveTheme("system"));
+    return () => mq.removeEventListener("change", onChange);
+  }, [themePreference]);
+
+  const setThemePreference = useCallback((next) => {
+    setThemePreferenceState((prev) =>
+      typeof next === "function" ? next(prev) : next
+    );
   }, []);
 
+  /** Legacy: flip between explicit light/dark (does not use system). */
   const toggleTheme = useCallback(() => {
-    setThemeState((x) => (x === "dark" ? "light" : "dark"));
+    setThemePreferenceState((prev) => {
+      const r = resolveTheme(prev);
+      return r === "dark" ? "light" : "dark";
+    });
   }, []);
 
   const value = useMemo(
-    () => ({ theme, setTheme, toggleTheme }),
-    [theme, setTheme, toggleTheme]
+    () => ({
+      /** Resolved appearance: "dark" | "light" */
+      theme: resolvedTheme,
+      themePreference,
+      setThemePreference,
+      toggleTheme,
+    }),
+    [resolvedTheme, themePreference, setThemePreference, toggleTheme]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

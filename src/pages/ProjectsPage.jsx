@@ -311,7 +311,7 @@ export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,c
    APP
    ═══════════════════════════════════════════════════════════ */
 export default function ProjectsPage(){
-  const { theme: mode, toggleTheme } = useAppTheme();
+  const { theme: mode } = useAppTheme();
   const t=T[mode];
   const{
     people,
@@ -350,7 +350,7 @@ export default function ProjectsPage(){
 
   return(
     <div style={{display:"flex",minHeight:"100vh",background:t.bg,color:t.text,fontFamily:"var(--font-sans, Inter, system-ui, sans-serif)",fontSize:14,transition:"background 0.35s ease,color 0.35s ease"}}>
-      <AppSideNav theme={mode} onToggleTheme={toggleTheme} />
+      <AppSideNav />
 
       <main style={{flex:1,minWidth:0,padding:"24px 36px"}}>
         <header style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>

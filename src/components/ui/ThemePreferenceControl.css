@@ -1,0 +1,74 @@
+.float-theme-seg {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: var(--radius-xl);
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 2px;
+  position: relative;
+}
+
+:root[data-theme="light"] .float-theme-seg {
+  background: rgba(15, 23, 42, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.float-theme-seg-btn {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: color var(--duration-fast) ease;
+}
+
+:root[data-theme="light"] .float-theme-seg-btn {
+  color: #64748b;
+}
+
+.float-theme-seg-btn--active {
+  color: #e2e8f0;
+}
+
+:root[data-theme="light"] .float-theme-seg-btn--active {
+  color: #1e293b;
+}
+
+.float-theme-seg-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.35) 0%, rgba(139, 92, 246, 0.28) 100%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+    0 4px 18px rgba(99, 102, 241, 0.25);
+  z-index: -1;
+}
+
+.float-theme-seg-ic {
+  position: relative;
+  z-index: 1;
+}
+
+.float-theme-seg-lbl {
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 520px) {
+  .float-theme-seg-lbl {
+    display: none;
+  }
+  .float-theme-seg-btn {
+    padding: 8px 12px;
+  }
+}

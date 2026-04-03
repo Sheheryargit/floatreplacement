@@ -20,6 +20,7 @@ import {
   Star,
   Tag,
   X,
+  ArrowDownUp,
 } from "lucide-react";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useAppData } from "../context/AppDataContext.jsx";
@@ -44,6 +45,10 @@ import {
   resolveColorForProjectLabel,
 } from "../utils/projectColors.js";
 import { tagChromaProps } from "../utils/tagChroma.js";
+import {
+  SCHEDULE_SORT_OPTIONS,
+  comparePeopleForScheduleSort,
+} from "../utils/peopleSort.js";
 import { motion } from "framer-motion";
 import "./LandingPage.css";
 
@@ -51,6 +56,16 @@ const VIEW_OPTIONS = [
   { id: "day", label: "Days" },
   { id: "week", label: "Weeks" },
   { id: "month", label: "Months" },
+];
+
+const TIME_RANGE_PRESETS = [
+  { id: "this_week", label: "This week" },
+  { id: "next_week", label: "Next week" },
+  { id: "last_week", label: "Last week" },
+  { id: "this_month", label: "This month" },
+  { id: "next_month", label: "Next month" },
+  { id: "last_month", label: "Last month" },
+  { id: "custom", label: "Custom" },
 ];
 
 const DENSITY_OPTIONS = [
@@ -74,14 +89,14 @@ function addDays(d, n) {
   return x;
 }
 
+/** Move by whole calendar months; anchor stays on the 1st so Jan 31 → +1 → Feb 1 (not March). */
 function addMonths(d, n) {
-  const x = new Date(d);
-  x.setMonth(x.getMonth() + n);
-  return x;
+  return new Date(d.getFullYear(), d.getMonth() + n, 1);
 }
 
-function daysInMonth(y, m) {
-  return new Date(y, m + 1, 0).getDate();
+/** Days in month; `month` is 1–12 (January = 1). */
+function daysInMonth(y, month) {
+  return new Date(y, month, 0).getDate();
 }
 
 function isWeekendDate(dt) {
@@ -101,9 +116,9 @@ function addWeekdays(date, delta) {
   return x;
 }
 
+/** ISO date key for the Monday of the week containing `dt` (must match `dateKeyLocal` padding for comparisons). */
 function weekMondayKey(dt) {
-  const m = startOfWeekMonday(dt);
-  return `${m.getFullYear()}-${m.getMonth()}-${m.getDate()}`;
+  return dateKeyLocal(startOfWeekMonday(dt));
 }
 
 function formatDayMonth(dt) {
@@ -114,12 +129,12 @@ function formatDayMonthYear(dt) {
   return dt.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
 }
 
-/** All Mon–Fri dates inside calendar month (y, mo). */
-function weekdaysInMonth(y, mo) {
-  const dim = daysInMonth(y, mo);
+/** All Mon–Fri dates inside calendar month (y, month) with month 1–12. */
+function weekdaysInMonth(y, month) {
+  const dim = daysInMonth(y, month);
   const out = [];
   for (let day = 1; day <= dim; day++) {
-    const dt = new Date(y, mo, day);
+    const dt = new Date(y, month - 1, day);
     if (!isWeekendDate(dt)) out.push(dt);
   }
   return out;
@@ -134,9 +149,9 @@ function weekdaysInAnchorWeek(d) {
 function dateKeyLocal(dt) {
   const x = new Date(dt);
   const y = x.getFullYear();
-  const m = String(x.getMonth() + 1).padStart(2, "0");
+  const mo = String(x.getMonth() + 1).padStart(2, "0");
   const day = String(x.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return `${y}-${mo}-${day}`;
 }
 
 /** Day grid: 12 columns, each column = 2 hours starting at 08:00 (see buildScheduleModel). */
@@ -339,7 +354,9 @@ function buildScheduleModel(viewMode, anchorDate, offsets = { prev: 0, next: 0 }
   } else {
     for (let o = -offsets.prev; o <= offsets.next; o++) {
       const targetMonth = new Date(y, mo + o, 1);
-      dates.push(...weekdaysInMonth(targetMonth.getFullYear(), targetMonth.getMonth()));
+      dates.push(
+        ...weekdaysInMonth(targetMonth.getFullYear(), targetMonth.getMonth() + 1)
+      );
       if (o === 0) {
         bandTitle = targetMonth.toLocaleDateString("en-AU", { month: "long", year: "numeric" });
       }
@@ -403,12 +420,103 @@ function buildScheduleModel(viewMode, anchorDate, offsets = { prev: 0, next: 0 }
   };
 }
 
+function dateFromKey(key) {
+  const parts = String(key).split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return new Date();
+  return new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0, 0);
+}
+
+/** Weekday columns between two ISO date keys (inclusive). */
+function buildScheduleModelCustomRange(startKey, endKey) {
+  const dates = [];
+  const x = dateFromKey(startKey);
+  const end = dateFromKey(endKey);
+  if (x > end) return buildScheduleModelCustomRange(endKey, startKey);
+  const cur = new Date(x);
+  while (cur <= end) {
+    if (!isWeekendDate(cur)) dates.push(new Date(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  if (dates.length === 0) {
+    const dk = dateKeyLocal(new Date());
+    return {
+      columnCount: 1,
+      bandTitle: "—",
+      bandSpans: [{ span: 1, label: "—", weekParity: 0 }],
+      slots: [
+        {
+          main: "—",
+          sub: "",
+          weekParity: 0,
+          weekBlockStart: true,
+          weekBlockEnd: true,
+          dateKey: dk,
+        },
+      ],
+      anchorDateKey: dk,
+      aggregateAllSlots: true,
+    };
+  }
+  let weekStripe = -1;
+  let prevMondayKey = null;
+  const slots = dates.map((dt, idx) => {
+    const mk = weekMondayKey(dt);
+    if (mk !== prevMondayKey) {
+      weekStripe++;
+      prevMondayKey = mk;
+    }
+    const prevK = idx > 0 ? weekMondayKey(dates[idx - 1]) : null;
+    const nextK = idx < dates.length - 1 ? weekMondayKey(dates[idx + 1]) : null;
+    return {
+      main: String(dt.getDate()),
+      sub: dt.toLocaleDateString("en-AU", { weekday: "short" }),
+      weekParity: weekStripe % 2,
+      weekBlockStart: mk !== prevK,
+      weekBlockEnd: mk !== nextK,
+      dateKey: dateKeyLocal(dt),
+    };
+  });
+  const bandSpans = [];
+  let i = 0;
+  while (i < dates.length) {
+    const mk0 = weekMondayKey(dates[i]);
+    let j = i + 1;
+    while (j < dates.length && weekMondayKey(dates[j]) === mk0) j++;
+    const span = j - i;
+    bandSpans.push({
+      span,
+      label: `${formatDayMonth(dates[i])} – ${formatDayMonthYear(dates[j - 1])}`,
+      weekParity: slots[i].weekParity,
+    });
+    i = j;
+  }
+  return {
+    columnCount: dates.length,
+    bandTitle: `${formatDayMonth(dates[0])} – ${formatDayMonthYear(dates[dates.length - 1])}`,
+    bandSpans,
+    slots,
+    anchorDateKey: dateKeyLocal(dates[0]),
+    aggregateAllSlots: true,
+  };
+}
+
 function formatHourTotal(n) {
   return `${n.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}h`;
 }
 
-/** Date keys used for hour totals: anchor day only in day view; all visible columns in week/month. */
+/** Date keys used for hour totals: anchor day only in day view; all visible columns in week/month / custom range. */
 function visibleDateKeysForHours(scheduleModel, viewMode, anchorDate) {
+  if (scheduleModel.aggregateAllSlots) {
+    const seen = new Set();
+    const ordered = [];
+    for (const s of scheduleModel.slots) {
+      if (!seen.has(s.dateKey)) {
+        seen.add(s.dateKey);
+        ordered.push(s.dateKey);
+      }
+    }
+    return ordered;
+  }
   if (viewMode === "day") {
     return [dateKeyLocal(anchorDate)];
   }
@@ -468,6 +576,7 @@ function allocationBarHeightPx(alloc) {
 
 const timelineRowEqual = (prev, next) => {
   if (prev.p !== next.p) return false;
+  if (prev.i !== next.i) return false;
   if (prev.viewMode !== next.viewMode) return false;
   if (prev.anchorDate?.getTime?.() !== next.anchorDate?.getTime?.()) return false;
   if (prev.utilizationMode !== next.utilizationMode) return false;
@@ -549,6 +658,7 @@ const TimelineRow = memo(function TimelineRow({
 }) {
   const { theme } = useAppTheme();
   const t = T[theme];
+  const allocViewMode = scheduleModel.aggregateAllSlots ? "week" : viewMode;
   const hours = computePersonHoursInView(p.id, allocations, scheduleModel, viewMode, anchorDate);
   const visibleDays = Math.max(1, visibleDateKeysForHours(scheduleModel, viewMode, anchorDate).length);
   const cap = visibleDays * STANDARD_DAY_HOURS;
@@ -560,7 +670,7 @@ const TimelineRow = memo(function TimelineRow({
   const rowSegments = allocations
     .filter((a) => allocationHasPerson(a, p.id))
     .flatMap((a) =>
-      layoutsForAllocation(a, scheduleModel, viewMode).map((lay) => ({
+      layoutsForAllocation(a, scheduleModel, allocViewMode).map((lay) => ({
         a,
         lay,
         occIdx: lay.occ,
@@ -660,10 +770,10 @@ const TimelineRow = memo(function TimelineRow({
                 key={`lane-${p.id}-${idx}`}
                 className={
                   "lp-week-lane" +
-                  (viewMode !== "day" && slot.weekParity ? " lp-week-lane-b" : "") +
-                  (viewMode !== "day" && !slot.weekParity ? " lp-week-lane-a" : "") +
-                  (viewMode !== "day" && slot.weekBlockStart ? " lp-week-lane-block-start" : "") +
-                  (viewMode !== "day" && slot.weekBlockEnd ? " lp-week-lane-block-end" : "")
+                  (allocViewMode !== "day" && slot.weekParity ? " lp-week-lane-b" : "") +
+                  (allocViewMode !== "day" && !slot.weekParity ? " lp-week-lane-a" : "") +
+                  (allocViewMode !== "day" && slot.weekBlockStart ? " lp-week-lane-block-start" : "") +
+                  (allocViewMode !== "day" && slot.weekBlockEnd ? " lp-week-lane-block-end" : "")
                 }
               />
             ))}
@@ -685,7 +795,7 @@ const TimelineRow = memo(function TimelineRow({
               {leaveSegments.map((seg) => {
                 // Day view: leave covers the entire day, so span all columns
                 // Week/Month view: use the integer column positions from layoutAllocation
-                const isDay = viewMode === "day";
+                const isDay = allocViewMode === "day";
                 const colStart = isDay ? 1 : Math.max(1, Math.round(seg.lay.start) + 1);
                 const colSpan = isDay ? nCols : Math.max(1, Math.round(seg.lay.span));
                 const lbl = seg.a.leaveType ? leaveLabel(seg.a.leaveType) : "Leave";
@@ -817,7 +927,7 @@ const TimelineRow = memo(function TimelineRow({
 }, timelineRowEqual);
 
 export default function LandingPage() {
-  const { theme, toggleTheme } = useAppTheme();
+  const { theme } = useAppTheme();
   const t = T[theme];
 
   const {
@@ -862,15 +972,18 @@ export default function LandingPage() {
   const [utilizationMode, setUtilizationMode] = useState("hours");
 
   const [timelineOffsets, setTimelineOffsets] = useState({ prev: 1, next: 2 });
+  const [timeRangePreset, setTimeRangePreset] = useState(null);
+  const [customRange, setCustomRange] = useState(null);
+  const [customRangeDraft, setCustomRangeDraft] = useState({ start: "", end: "" });
+  const [timeRangeOpen, setTimeRangeOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
+  const [scheduleSort, setScheduleSort] = useState("custom");
+  const timeRangeWrapRef = useRef(null);
+  const sortWrapRef = useRef(null);
   const prevOffsets = useRef(timelineOffsets);
   const prevColCount = useRef(0);
   const scheduleViewportRef = useRef(null);
   const lastAnchorKey = useRef(null);
-
-  // Reset infinite scroll chunks if jumping across large dates/views
-  useEffect(() => {
-    setTimelineOffsets({ prev: 1, next: 2 });
-  }, [anchorDate, viewMode]);
 
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const [densityOpen, setDensityOpen] = useState(false);
@@ -901,15 +1014,19 @@ export default function LandingPage() {
       if (addWrapRef.current && !addWrapRef.current.contains(e.target)) setAddMenuOpen(false);
       if (tagFilterWrapRef.current && !tagFilterWrapRef.current.contains(e.target)) setTagFilterOpen(false);
       if (starredWrapRef.current && !starredWrapRef.current.contains(e.target)) setStarredPopoverOpen(false);
+      if (timeRangeWrapRef.current && !timeRangeWrapRef.current.contains(e.target)) setTimeRangeOpen(false);
+      if (sortWrapRef.current && !sortWrapRef.current.contains(e.target)) setSortOpen(false);
     }
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  const scheduleModel = useMemo(
-    () => buildScheduleModel(viewMode, anchorDate, timelineOffsets),
-    [viewMode, anchorDate, timelineOffsets]
-  );
+  const scheduleModel = useMemo(() => {
+    if (customRange?.start && customRange?.end) {
+      return buildScheduleModelCustomRange(customRange.start, customRange.end);
+    }
+    return buildScheduleModel(viewMode, anchorDate, timelineOffsets);
+  }, [customRange, viewMode, anchorDate, timelineOffsets]);
 
   const todayDateKey = useMemo(() => dateKeyLocal(new Date()), []);
 
@@ -921,14 +1038,41 @@ export default function LandingPage() {
     return Array.from(s).sort((a, b) => a.localeCompare(b));
   }, [people, peopleTagOpts]);
 
+  const peopleOrderMap = useMemo(() => {
+    const m = new Map();
+    let idx = 0;
+    for (const p of people) {
+      if (!p.archived) m.set(p.id, idx++);
+    }
+    return m;
+  }, [people]);
+
   const schedulePeople = useMemo(() => {
     let list = people.filter((p) => !p.archived);
     if (schedulePeopleTagFilter.length > 0) {
       const need = new Set(schedulePeopleTagFilter);
       list = list.filter((p) => (p.tags || []).some((t) => need.has(t)));
     }
-    return list;
-  }, [people, schedulePeopleTagFilter]);
+    const hoursMap = new Map();
+    for (const p of list) {
+      hoursMap.set(
+        p.id,
+        computePersonHoursInView(p.id, allocations, scheduleModel, viewMode, anchorDate)
+      );
+    }
+    return [...list].sort((a, b) =>
+      comparePeopleForScheduleSort(a, b, scheduleSort, peopleOrderMap, hoursMap)
+    );
+  }, [
+    people,
+    schedulePeopleTagFilter,
+    scheduleSort,
+    peopleOrderMap,
+    allocations,
+    scheduleModel,
+    viewMode,
+    anchorDate,
+  ]);
 
   const toggleScheduleFilterTag = useCallback((tag) => {
     setSchedulePeopleTagFilter((prev) =>
@@ -978,10 +1122,13 @@ export default function LandingPage() {
   );
 
   const scheduleMotionKey = useMemo(() => {
-    if (viewMode === "month") return `m-${anchorDate.getFullYear()}-${anchorDate.getMonth()}`;
+    if (customRange?.start && customRange?.end) {
+      return `cr-${customRange.start}-${customRange.end}`;
+    }
+    if (viewMode === "month") return `m-${anchorDate.getFullYear()}-${anchorDate.getMonth() + 1}`;
     if (viewMode === "week") return `w-${weekMondayKey(anchorDate)}`;
     return `d-${dateKeyLocal(anchorDate)}`;
-  }, [viewMode, anchorDate]);
+  }, [viewMode, anchorDate, customRange]);
 
   const prevViewModeRef = useRef(viewMode);
   useEffect(() => {
@@ -999,6 +1146,8 @@ export default function LandingPage() {
   const muted = theme === "dark" ? "#636d84" : "#858da3";
 
   const navigatePrev = useCallback(() => {
+    setCustomRange(null);
+    setTimeRangePreset(null);
     if (viewMode === "day") setAnchorDate((d) => addWeekdays(d, -1));
     else if (viewMode === "week") setAnchorDate((d) => addDays(startOfWeekMonday(d), -7));
     else setAnchorDate((d) => addMonths(d, -1));
@@ -1006,6 +1155,8 @@ export default function LandingPage() {
   }, [viewMode]);
 
   const navigateNext = useCallback(() => {
+    setCustomRange(null);
+    setTimeRangePreset(null);
     if (viewMode === "day") setAnchorDate((d) => addWeekdays(d, 1));
     else if (viewMode === "week") setAnchorDate((d) => addDays(startOfWeekMonday(d), 7));
     else setAnchorDate((d) => addMonths(d, 1));
@@ -1013,10 +1164,81 @@ export default function LandingPage() {
   }, [viewMode]);
 
   const goToday = useCallback(() => {
+    setCustomRange(null);
+    setTimeRangePreset(null);
     setAnchorDate(new Date());
     setTimelineOffsets({ prev: 1, next: 2 });
     lastAnchorKey.current = null;
   }, []);
+
+  const applyTimeRangePreset = useCallback((presetId) => {
+    setTimeRangePreset(presetId);
+    setTimeRangeOpen(false);
+    setTimelineOffsets({ prev: 0, next: 0 });
+    lastAnchorKey.current = null;
+    if (presetId === "custom") return;
+    setCustomRange(null);
+    const now = new Date();
+    if (presetId === "this_week") {
+      setViewMode("week");
+      setAnchorDate(startOfWeekMonday(now));
+      return;
+    }
+    if (presetId === "last_week") {
+      setViewMode("week");
+      setAnchorDate(addDays(startOfWeekMonday(now), -7));
+      return;
+    }
+    if (presetId === "next_week") {
+      setViewMode("week");
+      setAnchorDate(addDays(startOfWeekMonday(now), 7));
+      return;
+    }
+    if (presetId === "this_month") {
+      setViewMode("month");
+      setAnchorDate(new Date(now.getFullYear(), now.getMonth(), 1));
+      return;
+    }
+    if (presetId === "last_month") {
+      setViewMode("month");
+      setAnchorDate(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+      return;
+    }
+    if (presetId === "next_month") {
+      setViewMode("month");
+      setAnchorDate(new Date(now.getFullYear(), now.getMonth() + 1, 1));
+    }
+  }, []);
+
+  const applyCustomRange = useCallback(() => {
+    const s = customRangeDraft.start;
+    const e = customRangeDraft.end;
+    if (!s || !e) return;
+    if (s > e) setCustomRange({ start: e, end: s });
+    else setCustomRange({ start: s, end: e });
+    setTimeRangePreset("custom");
+    setTimeRangeOpen(false);
+    setTimelineOffsets({ prev: 0, next: 0 });
+    lastAnchorKey.current = null;
+  }, [customRangeDraft.start, customRangeDraft.end]);
+
+  const timeRangeLabelText = useMemo(() => {
+    if (timeRangePreset === "custom" && customRange?.start && customRange?.end) {
+      return `${customRange.start} → ${customRange.end}`;
+    }
+    const hit = TIME_RANGE_PRESETS.find((x) => x.id === timeRangePreset);
+    if (hit && hit.id !== "custom") return hit.label;
+    // No preset (e.g. after prev/next): label must match the anchored period, not always "This month".
+    if (viewMode === "month") {
+      return anchorDate.toLocaleDateString("en-AU", { month: "long", year: "numeric" });
+    }
+    if (viewMode === "week") {
+      const mon = startOfWeekMonday(anchorDate);
+      const fri = addDays(mon, 4);
+      return `${formatDayMonth(mon)} – ${formatDayMonthYear(fri)}`;
+    }
+    return anchorDate.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" });
+  }, [timeRangePreset, customRange, viewMode, anchorDate]);
 
   const openAdd = () => {
     setEditingPerson(null);
@@ -1238,7 +1460,14 @@ export default function LandingPage() {
 
   const viewLabel = VIEW_OPTIONS.find((v) => v.id === viewMode)?.label ?? "Months";
 
-  const colMinPx = viewMode === "day" ? 120 : viewMode === "week" ? 150 : 105;
+  const colMinPx =
+    viewMode === "day"
+      ? 120
+      : scheduleModel.columnCount > 28
+        ? 88
+        : viewMode === "week"
+          ? 150
+          : 105;
   const gridTemplate = `repeat(${scheduleModel.columnCount}, minmax(${colMinPx}px, 1fr))`;
   const timelineMinWidthPx = scheduleModel.columnCount * colMinPx;
 
@@ -1289,7 +1518,7 @@ export default function LandingPage() {
       data-density={density}
       data-view={viewMode}
     >
-      <AppSideNav theme={theme} onToggleTheme={toggleTheme} />
+      <AppSideNav />
 
       <div className="lp-main">
         <div className="lp-header-block">
@@ -1501,6 +1730,8 @@ export default function LandingPage() {
                         role="option"
                         className={"lp-popover-item" + (viewMode === opt.id ? " lp-popover-item-active" : "")}
                         onClick={() => {
+                          setCustomRange(null);
+                          setTimeRangePreset(null);
                           setViewMode(opt.id);
                           setViewMenuOpen(false);
                           setTimelineOffsets({ prev: 1, next: 2 });
@@ -1647,16 +1878,182 @@ export default function LandingPage() {
               <button type="button" className="lp-icon-btn" aria-label="Add person" onClick={openAdd}>
                 <UserPlus size={18} />
               </button>
-              <span className="lp-pill lp-pill-muted">
-                {viewMode === "month" && "This month"}
-                {viewMode === "week" && "This week"}
-                {viewMode === "day" && "This day"}
-              </span>
+              <div className="lp-dropdown-wrap" ref={sortWrapRef}>
+                <button
+                  type="button"
+                  className={
+                    "lp-pill lp-pill-btn lp-subbar-dd" +
+                    (scheduleSort !== "custom" ? " lp-subbar-dd-active" : "")
+                  }
+                  aria-expanded={sortOpen}
+                  aria-haspopup="listbox"
+                  aria-label="Sort people"
+                  onClick={() => {
+                    setSortOpen((o) => !o);
+                    setTimeRangeOpen(false);
+                    setTagFilterOpen(false);
+                    setStarredPopoverOpen(false);
+                    setViewMenuOpen(false);
+                    setDensityOpen(false);
+                    setAddMenuOpen(false);
+                  }}
+                >
+                  <ArrowDownUp size={14} strokeWidth={2.25} />
+                  Sort
+                  <ChevronDown size={14} />
+                </button>
+                {sortOpen && (
+                  <div className="lp-popover lp-popover-sort" role="listbox">
+                    {SCHEDULE_SORT_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        role="option"
+                        className={
+                          "lp-popover-item" + (scheduleSort === opt.id ? " lp-popover-item-active" : "")
+                        }
+                        onClick={() => {
+                          setScheduleSort(opt.id);
+                          setSortOpen(false);
+                        }}
+                      >
+                        {opt.label}
+                        {scheduleSort === opt.id && <Check size={16} className="lp-popover-check" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="lp-dropdown-wrap" ref={timeRangeWrapRef}>
+                <button
+                  type="button"
+                  className={
+                    "lp-pill lp-pill-btn lp-subbar-dd" +
+                    (timeRangePreset || customRange ? " lp-subbar-dd-active" : "")
+                  }
+                  aria-expanded={timeRangeOpen}
+                  aria-haspopup="listbox"
+                  aria-label="Time range"
+                  onClick={() => {
+                    const today = dateKeyLocal(new Date());
+                    setCustomRangeDraft({
+                      start: customRange?.start || today,
+                      end: customRange?.end || today,
+                    });
+                    setTimeRangeOpen((o) => !o);
+                    setSortOpen(false);
+                    setTagFilterOpen(false);
+                    setStarredPopoverOpen(false);
+                    setViewMenuOpen(false);
+                    setDensityOpen(false);
+                    setAddMenuOpen(false);
+                  }}
+                >
+                  <Calendar size={14} />
+                  <span className="lp-time-range-label">{timeRangeLabelText}</span>
+                  <ChevronDown size={14} />
+                </button>
+                {timeRangeOpen && (
+                  <div className="lp-popover lp-popover-time-range">
+                    {TIME_RANGE_PRESETS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        className={
+                          "lp-popover-item" +
+                          (opt.id === "custom"
+                            ? timeRangePreset === "custom"
+                              ? " lp-popover-item-active"
+                              : ""
+                            : timeRangePreset === opt.id
+                              ? " lp-popover-item-active"
+                              : "")
+                        }
+                        onClick={() => {
+                          if (opt.id === "custom") {
+                            setTimeRangePreset("custom");
+                            const today = dateKeyLocal(new Date());
+                            setCustomRangeDraft((d) => ({
+                              start: d.start || customRange?.start || today,
+                              end: d.end || customRange?.end || today,
+                            }));
+                            return;
+                          }
+                          applyTimeRangePreset(opt.id);
+                        }}
+                      >
+                        {opt.label}
+                        {opt.id === "custom" ? (
+                          timeRangePreset === "custom" && (
+                            <Check size={16} className="lp-popover-check" />
+                          )
+                        ) : (
+                          timeRangePreset === opt.id && (
+                            <Check size={16} className="lp-popover-check" />
+                          )
+                        )}
+                      </button>
+                    ))}
+                    <div className="lp-popover-divider" />
+                    <div className="lp-custom-range-fields">
+                      <span className="lp-popover-title lp-custom-range-title">Custom range</span>
+                      <div className="lp-custom-range-grid">
+                        <label className="lp-custom-range-lbl">From</label>
+                        <input
+                          type="date"
+                          className="lp-custom-range-input"
+                          value={customRangeDraft.start}
+                          onChange={(e) =>
+                            setCustomRangeDraft((d) => ({ ...d, start: e.target.value }))
+                          }
+                        />
+                        <label className="lp-custom-range-lbl">To</label>
+                        <input
+                          type="date"
+                          className="lp-custom-range-input"
+                          value={customRangeDraft.end}
+                          onChange={(e) =>
+                            setCustomRangeDraft((d) => ({ ...d, end: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <button type="button" className="lp-custom-range-apply" onClick={applyCustomRange}>
+                        Apply custom range
+                      </button>
+                    </div>
+                    <div className="lp-popover-divider" />
+                    <div className="lp-util-row lp-util-row-in-time-dd">
+                      <span className="lp-util-label">Show utilization in</span>
+                      <div className="lp-segment" role="group" aria-label="Utilization unit">
+                        <button
+                          type="button"
+                          className={utilizationMode === "hours" ? "lp-seg-active" : ""}
+                          onClick={() => setUtilizationMode("hours")}
+                          title="Hours"
+                        >
+                          <Clock size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className={utilizationMode === "percent" ? "lp-seg-active" : ""}
+                          onClick={() => setUtilizationMode("percent")}
+                          title="Percent"
+                        >
+                          <Percent size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="lp-subbar-timeline">
-              <span className="lp-hours-total" title={`${visibleCapacityDays} working day(s) in view · ${schedulePeople.length} people`}>
+              <span
+                className="lp-hours-total lp-hours-total-badge"
+                title={`${visibleCapacityDays} working day(s) in view · ${schedulePeople.length} people · ${formatHourTotal(totalHours)} total`}
+              >
                 {utilizationMode === "hours"
-                  ? formatHourTotal(totalHours)
+                  ? `${Math.round(totalHours).toLocaleString("en-AU")}h`
                   : `${teamUtilPercent}%`}
               </span>
             </div>

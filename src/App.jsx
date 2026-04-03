@@ -2,6 +2,8 @@ import { lazy, Suspense, cloneElement } from "react";
 import { BrowserRouter, useLocation, useRoutes, Navigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { ThemeProvider, useAppTheme } from "./context/ThemeContext.jsx";
+import { AppDialogProvider } from "./context/AppDialogContext.jsx";
+import { SlapAnimationProvider } from "./context/SlapAnimationContext.jsx";
 import { AppDataProvider, useAppStore } from "./context/AppDataContext.jsx";
 import AnimatedAppLoader from "./components/ui/AnimatedAppLoader.jsx";
 import PageTransition from "./components/ui/PageTransition.jsx";
@@ -10,6 +12,7 @@ import { Toaster } from "sonner";
 const LandingPage = lazy(() => import("./pages/LandingPage.jsx"));
 const PeoplePage = lazy(() => import("./pages/PeoplePage.jsx"));
 const ProjectsPage = lazy(() => import("./pages/ProjectsPage.jsx"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage.jsx"));
 
 function WorkspaceReady({ children }) {
   const ready = useAppStore((s) => s.workspaceReady);
@@ -44,6 +47,14 @@ function AnimatedRoutes() {
         </PageTransition>
       ),
     },
+    {
+      path: "/settings",
+      element: (
+        <PageTransition>
+          <SettingsPage />
+        </PageTransition>
+      ),
+    },
     { path: "*", element: <Navigate to="/" replace /> },
   ];
   const element = useRoutes(routes, location);
@@ -75,9 +86,10 @@ function ThemedToaster() {
           fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
           backdropFilter: "blur(16px)",
           boxShadow: "0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)",
-          border: theme === "light"
-            ? "1px solid rgba(0,0,0,0.06)"
-            : "1px solid rgba(255,255,255,0.08)",
+          border:
+            theme === "light"
+              ? "1px solid rgba(0,0,0,0.06)"
+              : "1px solid rgba(255,255,255,0.08)",
           padding: "14px 18px",
         },
         className: "float-toast",
@@ -89,16 +101,20 @@ function ThemedToaster() {
 export default function App() {
   return (
     <ThemeProvider>
-      <AppDataProvider>
-        <BrowserRouter>
-          <WorkspaceReady>
-            <div className="app-viewport">
-              <AnimatedRoutes />
-            </div>
-            <ThemedToaster />
-          </WorkspaceReady>
-        </BrowserRouter>
-      </AppDataProvider>
+      <AppDialogProvider>
+        <AppDataProvider>
+          <BrowserRouter>
+            <WorkspaceReady>
+              <SlapAnimationProvider>
+                <div className="app-viewport">
+                  <AnimatedRoutes />
+                </div>
+              </SlapAnimationProvider>
+              <ThemedToaster />
+            </WorkspaceReady>
+          </BrowserRouter>
+        </AppDataProvider>
+      </AppDialogProvider>
     </ThemeProvider>
   );
 }

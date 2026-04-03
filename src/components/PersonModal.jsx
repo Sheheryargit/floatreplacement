@@ -9,19 +9,24 @@ import {
 import { tagChromaProps } from "../utils/tagChroma.js";
 import { projectToAllocationLabel, avatarGradientFromName } from "../utils/projectColors.js";
 import { toast } from "sonner";
+import { SEED_DEPTS } from "../constants/departments.js";
+import { PEOPLE_SEED } from "../data/peopleSeed.js";
+import { DepartmentSelector } from "./DepartmentSelector.jsx";
 
 /* ═══════════════════ DATA ═══════════════════ */
-const SEED_ROLES = ["Graduate","Consultant","Senior Consultant","Manager","Engineer","Senior Specialist Lead","Principal","Director"];
-/** Canonical departments; extras may be added via + or “Create …” in the picker and sync to lookups. */
-const SEED_DEPTS = [
-  "BRI CBO C&E Cloud Transformation",
-  "BRI CBO C&E Integration Engineering",
-  "BRI CBO C&E Quality Engineering",
-  "CAN CBO C&E Quality Engineering",
-  "Deloitte India - Eaas",
-  "Eaas",
-  "Ninjas",
-  "Transition",
+const SEED_ROLES = [
+  "Analyst",
+  "Consultant",
+  "Director",
+  "Engineer",
+  "Graduate",
+  "Manager",
+  "Principal",
+  "Senior Consultant",
+  "Senior Manager",
+  "Senior Specialist Lead",
+  "Specialist Director",
+  "Specialist Lead",
 ];
 const SEED_TAGS = ["Azure",".NET","Cloud Secure","Data&AI","SDM","Firenation","UI and UX Design","service management","AWS Platform","Azkaban","Secure"];
 const TYPES = ["Employee","Contractor","Placeholder"];
@@ -39,20 +44,6 @@ const MODAL_TABS = [
   { key:"projects", label:"Projects", icon:FolderOpen },
 ];
 
-const PEOPLE_SEED = [
-  { id:1,name:"Aditi Bali",role:"—",department:"Fire Nation",access:"—",tags:["Firenation"],type:"Employee",costRate:"0",billRate:"0",startDate:"2026-01-01",endDate:"",workType:"Full-time",notes:"",holidays:"None",email:"aditi.bali@company.com",archived:false },
-  { id:2,name:"Akhil Prasad",role:"Graduate",department:"Eaas",access:"—",tags:["Cloud Secure"],type:"Employee",costRate:"0",billRate:"0",startDate:"2026-01-01",endDate:"",workType:"Full-time",notes:"",holidays:"None",email:"akhil.prasad@company.com",archived:false },
-  { id:3,name:"Ali Raza",role:"Senior Consultant",department:"Sky",access:"Manager",tags:[".NET","Azure"],type:"Employee",costRate:"120",billRate:"180",startDate:"2025-03-15",endDate:"",workType:"Full-time",notes:"",holidays:"Australia — NSW",email:"ali.raza@company.com",archived:false },
-  { id:4,name:"Amisha Punj",role:"Consultant",department:"Transition",access:"—",tags:["UI and UX Design"],type:"Employee",costRate:"85",billRate:"140",startDate:"2025-06-01",endDate:"",workType:"Full-time",notes:"",holidays:"Australia — VIC",email:"amisha.punj@company.com",archived:false },
-  { id:5,name:"Amy Schroter",role:"Senior Consultant",department:"Anger Management",access:"Manager",tags:["service management"],type:"Employee",costRate:"110",billRate:"170",startDate:"2024-11-01",endDate:"",workType:"Full-time",notes:"",holidays:"Australia — VIC",email:"amy.schroter@company.com",archived:false },
-  { id:6,name:"Amy Yienni Liu",role:"Engineer",department:"Azkaban",access:"—",tags:["Azkaban","Secure"],type:"Employee",costRate:"95",billRate:"150",startDate:"2025-01-10",endDate:"",workType:"Full-time",notes:"",holidays:"None",email:"amy.liu@company.com",archived:false },
-  { id:7,name:"Andrew Charles Millard Brown",role:"Manager",department:"Sliced Secure",access:"—",tags:["Azure"],type:"Employee",costRate:"130",billRate:"200",startDate:"2024-08-01",endDate:"",workType:"Full-time",notes:"",holidays:"Australia — NSW",email:"andrew.brown@company.com",archived:false },
-  { id:8,name:"Ankit Patel",role:"Senior Consultant",department:"Sliced Secure",access:"—",tags:["Azure"],type:"Employee",costRate:"105",billRate:"165",startDate:"2025-02-15",endDate:"",workType:"Full-time",notes:"",holidays:"None",email:"ankit.patel@company.com",archived:false },
-  { id:9,name:"Ashish Dubey",role:"Senior Specialist Lead",department:"Hornets",access:"—",tags:["Data&AI"],type:"Employee",costRate:"140",billRate:"210",startDate:"2024-06-01",endDate:"",workType:"Full-time",notes:"",holidays:"Australia — VIC",email:"ashish.dubey@company.com",archived:false },
-  { id:10,name:"Asmita Sayanthan",role:"Graduate",department:"Eaas",access:"—",tags:["Cloud Secure"],type:"Employee",costRate:"0",billRate:"0",startDate:"2026-01-01",endDate:"",workType:"Full-time",notes:"",holidays:"None",email:"asmita.s@company.com",archived:false },
-  { id:11,name:"Belinda Chan",role:"Senior Consultant",department:"Anger Management",access:"Manager",tags:["Cloud Secure"],type:"Employee",costRate:"115",billRate:"175",startDate:"2024-09-15",endDate:"",workType:"Full-time",notes:"",holidays:"Australia — VIC",email:"belinda.chan@company.com",archived:false },
-  { id:12,name:"Belinda Wakefield",role:"Manager",department:"Anger Management",access:"Manager",tags:["SDM"],type:"Employee",costRate:"135",billRate:"205",startDate:"2024-07-01",endDate:"",workType:"Full-time",notes:"",holidays:"Australia — VIC",email:"belinda.w@company.com",archived:false },
-];
 let _nid = 100;
 
 export function nextPersonId() {
@@ -339,27 +330,12 @@ function CTagInput({ tags, setTags, options, t, tagIsDark }) {
 const Lbl = (t) => ({ display:"block",fontSize:11,color:t.textMuted,marginBottom:7,fontWeight:700,textTransform:"uppercase",letterSpacing:0.8 });
 const Inp = (t) => ({ background:t.surfAlt,border:`1.5px solid ${t.borderIn}`,borderRadius:8,padding:"10px 14px",color:t.text,fontSize:14,width:"100%",outline:"none" });
 
-function mergeDepartmentOptions(depts, formDepartment) {
-  const s = new Set(SEED_DEPTS);
-  for (const d of depts) {
-    if (d && String(d).trim()) s.add(String(d).trim());
-  }
-  if (formDepartment && formDepartment !== "No department") s.add(String(formDepartment).trim());
-  const sorted = [...s].sort((a, b) => a.localeCompare(b));
-  return ["No department", ...sorted];
-}
-
 function allocationHasPerson(a, pid) {
   if (Array.isArray(a.personIds) && a.personIds.length > 0) return a.personIds.includes(pid);
   return a.personId === pid;
 }
 
-function InfoTab({ form,setForm,roles,setRoles,depts,setDepts,tagOpts,setTagOpts,t,tagIsDark }) {
-  const [deptMenuKick, setDeptMenuKick] = useState(0);
-  const deptOptions = useMemo(
-    () => mergeDepartmentOptions(depts, form.department),
-    [depts, form.department]
-  );
+function InfoTab({ form,setForm,roles,setRoles,depts,setDepts,tagOpts,setTagOpts,t,tagIsDark,pickerKey }) {
   return (
     <div style={{ display:"flex",flexDirection:"column",gap:22 }}>
       <div style={{ background:t.surfAlt,borderRadius:10,padding:20,display:"flex",flexDirection:"column",gap:18,border:`1px solid ${t.borderSub}` }}>
@@ -376,50 +352,14 @@ function InfoTab({ form,setForm,roles,setRoles,depts,setDepts,tagOpts,setTagOpts
       </div>
       <div>
         <label style={Lbl(t)}>Department</label>
-        <div style={{ display:"flex",gap:8,alignItems:"stretch" }}>
-          <div style={{ flex:1,minWidth:0 }}>
-            <CDropdown
-              t={t}
-              menuOpenKey={deptMenuKick}
-              value={form.department}
-              placeholder="No department"
-              onChange={(v) => {
-                if (v !== "No department" && !depts.includes(v)) setDepts([...depts, v]);
-                setForm({ ...form, department: v });
-              }}
-              options={deptOptions}
-            />
-          </div>
-          <button
-            type="button"
-            aria-label="Add department"
-            title="Add department"
-            onClick={() => setDeptMenuKick((k) => k + 1)}
-            style={{
-              flexShrink:0,
-              width:44,
-              display:"flex",
-              alignItems:"center",
-              justifyContent:"center",
-              background:t.surfAlt,
-              border:`1.5px solid ${t.borderIn}`,
-              borderRadius:8,
-              cursor:"pointer",
-              color:t.accent,
-              transition:"border-color 0.2s, box-shadow 0.2s",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = t.focus;
-              e.currentTarget.style.boxShadow = `0 0 0 3px ${t.accentGlow}`;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = t.borderIn;
-              e.currentTarget.style.boxShadow = "none";
-            }}
-          >
-            <Plus size={18} strokeWidth={2.25} />
-          </button>
-        </div>
+        <DepartmentSelector
+          key={pickerKey}
+          t={t}
+          value={form.department}
+          onChange={(v) => setForm({ ...form, department: v })}
+          depts={depts}
+          setDepts={setDepts}
+        />
       </div>
       <div><label style={Lbl(t)}>Tags</label>
         <CTagInput t={t} tagIsDark={tagIsDark} tags={form.tags} setTags={(nt)=>{ const n=nt.filter((x)=>!tagOpts.includes(x)); if(n.length) setTagOpts([...tagOpts,...n]); setForm({...form,tags:nt}); }} options={tagOpts}/></div>
@@ -741,7 +681,7 @@ export function PersonModal({
 
         {/* Content — scrollable */}
         <div style={{ padding:"22px 32px 10px",overflowY:"auto",flex:1,minHeight:0 }}>
-          {tab===0 && <InfoTab form={form} setForm={setFormWrap} roles={roles} setRoles={setRoles} depts={depts} setDepts={setDepts} tagOpts={tagOpts} setTagOpts={setTagOpts} t={t} tagIsDark={tagIsDark}/>}
+          {tab===0 && <InfoTab form={form} setForm={setFormWrap} roles={roles} setRoles={setRoles} depts={depts} setDepts={setDepts} tagOpts={tagOpts} setTagOpts={setTagOpts} t={t} tagIsDark={tagIsDark} pickerKey={editPerson?.id ?? "new"}/>}
           {tab===1 && <AccessTab form={form} setForm={setFormWrap} t={t}/>}
           {tab===2 && <AvailabilityTab form={form} setForm={setFormWrap} t={t}/>}
           {tab===3 && <TimeOffTab form={form} setForm={setFormWrap} t={t}/>}

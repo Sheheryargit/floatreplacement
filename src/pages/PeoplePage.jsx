@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Users,
   Plus,
@@ -7,6 +7,9 @@ import {
   Search,
   X,
   ChevronRight,
+  ChevronDown,
+  Check,
+  ArrowDownUp,
   UserPlus,
   Shield,
   Archive,
@@ -25,8 +28,14 @@ import PersonModal, {
 } from "../components/PersonModal.jsx";
 import { toast } from "sonner";
 import { tagChromaProps } from "../utils/tagChroma.js";
+import {
+  SCHEDULE_SORT_OPTIONS,
+  comparePeopleForScheduleSort,
+  personApproxTotalAllocatedHours,
+} from "../utils/peopleSort.js";
 import { CreateAllocationModal } from "../components/AllocationModals.jsx";
 import { resolveColorForProjectLabel } from "../utils/projectColors.js";
+import "./PeoplePage.css";
 
 function allocationHasPerson(a, pid) {
   if (Array.isArray(a.personIds) && a.personIds.length > 0) return a.personIds.includes(pid);
@@ -42,7 +51,7 @@ function shortenAllocLabel(s, maxLen) {
    APP
    ═══════════════════════════════════════════════════════════ */
 export default function PeoplePage() {
-  const { theme: mode, toggleTheme } = useAppTheme();
+  const { theme: mode } = useAppTheme();
   const t = T[mode];
 
   const {
@@ -75,6 +84,9 @@ export default function PeoplePage() {
   const [editingPerson,setEditingPerson]=useState(null);
   const [confirmDel,setConfirmDel]=useState(false);
   const [mounted,setMounted]=useState(false);
+  const [peopleSort,setPeopleSort]=useState("custom");
+  const [sortOpen,setSortOpen]=useState(false);
+  const sortWrapRef=useRef(null);
 
   const [allocCreateOpen, setAllocCreateOpen] = useState(false);
   const [allocPreselectPerson, setAllocPreselectPerson] = useState(null);
@@ -154,15 +166,46 @@ export default function PeoplePage() {
       if (p.archived !== isArch) return false;
       if (!search) return true;
       const s=search.toLowerCase();
-      return p.name.toLowerCase().includes(s)||p.role.toLowerCase().includes(s)||p.department.toLowerCase().includes(s)||p.tags.some((tg)=>tg.toLowerCase().includes(s));
+      const role = (p.role || "").toLowerCase();
+      const dept = (p.department || "").toLowerCase();
+      const tags = p.tags || [];
+      return p.name.toLowerCase().includes(s)||role.includes(s)||dept.includes(s)||tags.some((tg)=>String(tg).toLowerCase().includes(s));
     });
   }, [people,search,viewTab]);
+
+  const peopleOrderMap = useMemo(() => {
+    const m = new Map();
+    let i = 0;
+    const isArch = viewTab === "archived";
+    for (const p of people) {
+      if (p.archived === isArch) m.set(p.id, i++);
+    }
+    return m;
+  }, [people, viewTab]);
+
+  const filteredSorted = useMemo(() => {
+    const hoursMap = new Map();
+    for (const p of filtered) {
+      hoursMap.set(p.id, personApproxTotalAllocatedHours(p.id, allocations));
+    }
+    return [...filtered].sort((a, b) =>
+      comparePeopleForScheduleSort(a, b, peopleSort, peopleOrderMap, hoursMap)
+    );
+  }, [filtered, peopleSort, peopleOrderMap, allocations]);
+
+  useEffect(() => {
+    const h = (e) => {
+      if (sortWrapRef.current && !sortWrapRef.current.contains(e.target)) setSortOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
 
   const activeCount = people.filter((p)=>!p.archived).length;
   const archivedCount = people.filter((p)=>p.archived).length;
 
   const toggleSel=(id)=>setSelected((p)=>{ const n=new Set(p); n.has(id)?n.delete(id):n.add(id); return n; });
-  const toggleAll=()=>setSelected(selected.size===filtered.length?new Set():new Set(filtered.map((p)=>p.id)));
+  const toggleAll=()=>setSelected(selected.size===filteredSorted.length?new Set():new Set(filteredSorted.map((p)=>p.id)));
 
   const doDelete=()=>{ const c=selected.size; const ids=[...selected]; setPeople(people.filter((p)=>!selected.has(p.id))); setSelected(new Set()); setConfirmDel(false); syncPeopleDelete(ids); toast.error(`${c} ${c===1?"person":"people"} removed`); };
   const archivePerson=(id)=>{ const p=people.find((x)=>x.id===id); const next={...p,archived:!p.archived}; setPeople(people.map((x)=>x.id===id?next:x)); setSelected(new Set()); toast.warning(`${p.name} ${p.archived?"restored":"archived"}`); syncPersonUpdate(next); };
@@ -190,9 +233,9 @@ export default function PeoplePage() {
 
   return (
     <div
+      className="people-page-root"
+      data-theme={mode === "light" ? "light" : "dark"}
       style={{
-        display: "flex",
-        minHeight: "100vh",
         background: t.bg,
         color: t.text,
         fontFamily: "var(--font-sans, Inter, system-ui, sans-serif)",
@@ -200,11 +243,11 @@ export default function PeoplePage() {
         transition: "background 0.35s ease, color 0.35s ease",
       }}
     >
-      <AppSideNav theme={mode} onToggleTheme={toggleTheme} />
+      <AppSideNav />
 
-      <main style={{ flex: 1, minWidth: 0, padding: "24px 36px" }}>
+      <main className="people-page-main">
         {/* Header */}
-        <header style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8 }}>
+        <header className="people-page-header" style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8 }}>
           <h1 style={{ fontSize:26,fontWeight:700,margin:0,letterSpacing:-0.5 }}>People</h1>
           <div style={{ display:"flex",gap:8,alignItems:"center" }}>
             <div style={{ position:"relative" }}>
@@ -228,7 +271,7 @@ export default function PeoplePage() {
         </header>
 
         {/* Active / Archived Tabs + Bulk Delete */}
-        <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,marginTop:8 }}>
+        <div className="people-page-toolbar" style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,marginTop:8,flexWrap:"wrap",gap:10 }}>
           <div style={{ display:"flex",gap:2,background:t.surfAlt,borderRadius:10,padding:3,border:`1px solid ${t.border}` }}>
             {[
               { key:"active", label:"Active", count:activeCount, icon:Users },
@@ -249,6 +292,42 @@ export default function PeoplePage() {
               </button>);
             })}
           </div>
+          <div style={{ display:"flex",alignItems:"center",gap:10,marginLeft:"auto" }}>
+            <div ref={sortWrapRef} style={{ position:"relative" }}>
+              <button
+                type="button"
+                onClick={()=>setSortOpen((o)=>!o)}
+                style={{
+                  display:"flex",alignItems:"center",gap:8,padding:"8px 14px",borderRadius:8,
+                  background:peopleSort!=="custom"?t.accentGlow:t.btnSec,border:`1px solid ${peopleSort!=="custom"?t.accent+"40":t.border}`,
+                  color:peopleSort!=="custom"?t.accent:t.textSoft,fontSize:13,fontWeight:600,cursor:"pointer",
+                }}
+              >
+                <ArrowDownUp size={14}/> Sort <ChevronDown size={14}/>
+              </button>
+              {sortOpen && (
+                <div style={{
+                  position:"absolute",top:"calc(100% + 6px)",right:0,zIndex:120,minWidth:220,
+                  background:t.surfRaised,border:`1px solid ${t.border}`,borderRadius:10,
+                  boxShadow:"0 12px 40px rgba(0,0,0,0.25)",padding:"6px 0",
+                }}>
+                  {SCHEDULE_SORT_OPTIONS.map((opt)=>(
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={()=>{ setPeopleSort(opt.id); setSortOpen(false); }}
+                      style={{
+                        width:"100%",textAlign:"left",padding:"10px 14px",border:"none",background:peopleSort===opt.id?t.accentGlow:"transparent",
+                        color:t.text,fontSize:13,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",
+                      }}
+                    >
+                      {opt.label}
+                      {peopleSort===opt.id && <Check size={14} style={{ color:t.accent }}/>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           {selected.size>0 && (
             <button onClick={()=>setConfirmDel(true)} style={{
               background:t.dangerSoft,border:`1.5px solid ${t.danger}40`,borderRadius:8,color:t.danger,
@@ -259,21 +338,29 @@ export default function PeoplePage() {
               <Trash2 size={14}/> Delete {selected.size} selected
             </button>
           )}
+          </div>
         </div>
 
-        {/* Table */}
-        <div style={{ background:t.surface,borderRadius:12,border:`1px solid ${t.border}`,overflow:"hidden",transition:"background 0.35s",boxShadow:"0 1px 3px rgba(0,0,0,0.05)" }}>
-          <table style={{ width:"100%",borderCollapse:"collapse" }}>
+        {/* Table — scrolls inside main (matches Schedule / Projects shell) */}
+        <div
+          className="people-page-table-wrap"
+          style={{
+            ["--people-border"]: t.border,
+            ["--people-surface"]: t.surface,
+            transition: "background 0.35s",
+          }}
+        >
+          <table>
             <thead>
               <tr style={{ borderBottom:`2px solid ${t.border}` }}>
-                <th style={{ width:48,padding:"14px 14px" }}><input type="checkbox" checked={selected.size===filtered.length&&filtered.length>0} onChange={toggleAll} style={{ accentColor:t.chk,cursor:"pointer",width:16,height:16 }}/></th>
+                <th style={{ width:48,padding:"14px 14px" }}><input type="checkbox" checked={selected.size===filteredSorted.length&&filteredSorted.length>0} onChange={toggleAll} style={{ accentColor:t.chk,cursor:"pointer",width:16,height:16 }}/></th>
                 {["Name","Role","Department","Access","Tags","Type",""].map((h,i)=>(
                   <th key={i} style={{ textAlign:"left",padding:"14px 16px",fontSize:11,fontWeight:700,color:t.textMuted,textTransform:"uppercase",letterSpacing:0.8,width:i===6?52:undefined }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((p,idx)=>{
+              {filteredSorted.map((p,idx)=>{
                 const sel=selected.has(p.id);
                 return (
                   <tr key={p.id} onClick={()=>openEdit(p)}
@@ -316,7 +403,7 @@ export default function PeoplePage() {
                   </tr>
                 );
               })}
-              {filtered.length===0 && (
+              {filteredSorted.length===0 && (
                 <tr><td colSpan={8} style={{ textAlign:"center",padding:"56px 20px" }}>
                   {viewTab==="archived"
                     ? <><Archive size={32} style={{ color:t.textDim,marginBottom:12 }}/><div style={{ color:t.textMuted,fontSize:15,fontWeight:600 }}>No archived people</div><div style={{ color:t.textDim,fontSize:13,marginTop:4 }}>Archived team members will appear here</div></>

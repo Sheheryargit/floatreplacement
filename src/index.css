@@ -10,6 +10,9 @@
 html {
   height: 100%;
   -webkit-text-size-adjust: 100%;
+  transition:
+    background-color var(--duration-slow, 0.35s) ease,
+    color var(--duration-slow, 0.35s) ease;
 }
 
 body {
@@ -17,6 +20,13 @@ body {
   margin: 0;
   background: #0b0e14;
   font-family: var(--font-sans);
+  transition:
+    background-color var(--duration-slow, 0.35s) ease,
+    color var(--duration-slow, 0.35s) ease;
+}
+
+:root[data-theme="light"] body {
+  background: #f6f7f9;
 }
 
 #root {
@@ -31,6 +41,11 @@ body {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow-x: clip;
+}
+
+.slap-animation-wrapper {
+  overflow-x: clip;
 }
 
 /* Schedule view switch toast — glow + glass */
