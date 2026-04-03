@@ -3,31 +3,31 @@
   flex-direction: column;
   min-height: 100vh;
   width: 100%;
-  background: var(--float-loader-bg, #0b0e14);
+  background: var(--float-loader-bg, #0f1117);
   position: relative;
   overflow: hidden;
 }
 
 :root[data-theme="light"] .float-app-loader {
-  --float-loader-bg: #f5f6f8;
-  --float-loader-rail: rgba(79, 106, 230, 0.12);
+  --float-loader-bg: #f4f6fa;
+  --float-loader-rail: rgba(0, 194, 168, 0.12);
   --float-loader-glow: linear-gradient(
     90deg,
     transparent,
-    rgba(79, 106, 230, 0.55),
-    rgba(167, 139, 250, 0.4),
+    rgba(0, 194, 168, 0.55),
+    rgba(124, 106, 247, 0.28),
     transparent
   );
   --float-loader-caption: #4a5168;
 }
 
 :root[data-theme="dark"] .float-app-loader {
-  --float-loader-rail: rgba(139, 168, 255, 0.1);
+  --float-loader-rail: rgba(0, 229, 200, 0.1);
   --float-loader-glow: linear-gradient(
     90deg,
     transparent,
-    rgba(108, 140, 255, 0.55),
-    rgba(167, 139, 250, 0.35),
+    rgba(0, 229, 200, 0.5),
+    rgba(124, 106, 247, 0.25),
     transparent
   );
   --float-loader-caption: #9ba4b8;
@@ -86,7 +86,7 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--float-loader-caption);
-  font-family: var(--font-sans, system-ui, sans-serif);
+  font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
 }
 
 /* Orbit */

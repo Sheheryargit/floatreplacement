@@ -10,42 +10,42 @@
   --lp-col-min: 36px;
   --lp-timeline-min: 800px;
 
-  --bg: #0b0e14;
-  --surface: #12161f;
-  --surf-alt: #1a2030;
-  --border: #1e2538;
-  --border-sub: #252d3f;
-  --text: #e8ecf4;
+  --bg: #0f1117;
+  --surface: #181c26;
+  --surf-alt: #1e2235;
+  --border: #2a2f45;
+  --border-sub: #323852;
+  --text: #f0f2f8;
   --text-soft: #9ba4b8;
-  --text-muted: #636d84;
-  --text-dim: #3d4660;
-  --sidebar: #090c12;
-  --sidebar-act: #141828;
-  --accent: #6c8cff;
-  --accent-txt: #0b0e14;
-  --accent-glow: rgba(108, 140, 255, 0.12);
-  --tag-bg: #1c2640;
-  --tag-txt: #8aa4ff;
-  --btn-sec: #1e2538;
-  --btn-sec-hov: #252d3f;
-  --grid-bg: #0b0e14;
-  --grid-line: #1e2538;
-  --grid-line-soft: #252d3f;
+  --text-muted: #7b82a0;
+  --text-dim: #4a5168;
+  --sidebar: #0f1117;
+  --sidebar-act: rgba(0, 194, 168, 0.1);
+  --accent: #00c2a8;
+  --accent-txt: #061210;
+  --accent-glow: rgba(0, 194, 168, 0.15);
+  --tag-bg: rgba(124, 106, 247, 0.14);
+  --tag-txt: #b8afff;
+  --btn-sec: #1e2235;
+  --btn-sec-hov: #252a3d;
+  --grid-bg: #0f1117;
+  --grid-line: #2a2f45;
+  --grid-line-soft: #323852;
   --warn: #f59e0b;
   --orange: #e8892c;
   --pink: #e85d9a;
-  --teal: #2bb8a8;
-  --hatch: rgba(255, 255, 255, 0.05);
-  --scroll: #252d3f;
-  /* Mon–Fri week bands (no Sat/Sun columns) */
-  --lp-week-fill-a: rgba(108, 140, 255, 0.09);
-  --lp-week-fill-b: rgba(167, 139, 250, 0.06);
-  --lp-week-frame: rgba(108, 140, 255, 0.45);
-  --lp-week-glow: rgba(108, 140, 255, 0.12);
-  /* “Today” / info highlight — blue–violet, not alarm red */
-  --ui-today: #818cf8;
-  --ui-today-glow: rgba(129, 140, 248, 0.45);
-  --ui-today-soft: rgba(129, 140, 248, 0.22);
+  --teal: #00c2a8;
+  --hatch: rgba(255, 255, 255, 0.04);
+  --scroll: #2a2f45;
+  /* Mon–Fri week bands */
+  --lp-week-fill-a: rgba(0, 194, 168, 0.07);
+  --lp-week-fill-b: rgba(124, 106, 247, 0.06);
+  --lp-week-frame: rgba(0, 194, 168, 0.4);
+  --lp-week-glow: rgba(0, 194, 168, 0.12);
+  /* Today — electric teal */
+  --ui-today: #00e5c8;
+  --ui-today-glow: rgba(0, 229, 200, 0.55);
+  --ui-today-soft: rgba(0, 194, 168, 0.28);
 
   flex: 1 1 auto;
   width: 100%;
@@ -56,7 +56,7 @@
   display: flex;
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font-sans, "Inter", system-ui, sans-serif);
+  font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
   font-size: 14px;
   line-height: 1.5;
   letter-spacing: -0.01em;
@@ -177,36 +177,36 @@
 }
 
 .lp-root[data-theme="light"] {
-  --bg: #f5f6f8;
+  --bg: #f4f6fa;
   --surface: #ffffff;
-  --surf-alt: #f8f9fb;
-  --border: #e4e7ed;
-  --border-sub: #ebedf2;
-  --text: #151922;
+  --surf-alt: #e8ebf4;
+  --border: #e0e4ef;
+  --border-sub: #e4e8f0;
+  --text: #12151f;
   --text-soft: #4a5168;
-  --text-muted: #858da3;
-  --text-dim: #c0c4d0;
+  --text-muted: #5c6478;
+  --text-dim: #9ca3b8;
   --sidebar: #ffffff;
-  --sidebar-act: #f0f1f5;
-  --accent: #4f6ae6;
+  --sidebar-act: rgba(0, 194, 168, 0.08);
+  --accent: #00a896;
   --accent-txt: #ffffff;
-  --accent-glow: rgba(79, 106, 230, 0.08);
-  --tag-bg: #eef1f8;
-  --tag-txt: #4a5da8;
-  --btn-sec: #eef0f4;
-  --btn-sec-hov: #e2e5eb;
-  --grid-bg: #f5f6f8;
-  --grid-line: #e4e7ed;
-  --grid-line-soft: #ebedf2;
-  --hatch: rgba(15, 18, 28, 0.06);
-  --scroll: #d4d8e0;
-  --lp-week-fill-a: rgba(79, 106, 230, 0.08);
-  --lp-week-fill-b: rgba(139, 92, 246, 0.06);
-  --lp-week-frame: rgba(79, 106, 230, 0.4);
-  --lp-week-glow: rgba(79, 106, 230, 0.1);
-  --ui-today: #4f46e5;
-  --ui-today-glow: rgba(79, 70, 229, 0.35);
-  --ui-today-soft: rgba(79, 70, 229, 0.2);
+  --accent-glow: rgba(0, 194, 168, 0.12);
+  --tag-bg: rgba(124, 106, 247, 0.1);
+  --tag-txt: #5b4fcf;
+  --btn-sec: #e8ebf4;
+  --btn-sec-hov: #dde1ec;
+  --grid-bg: #f4f6fa;
+  --grid-line: #e0e4ef;
+  --grid-line-soft: #e4e8f0;
+  --hatch: rgba(15, 18, 28, 0.05);
+  --scroll: #c8cdd8;
+  --lp-week-fill-a: rgba(0, 194, 168, 0.06);
+  --lp-week-fill-b: rgba(124, 106, 247, 0.05);
+  --lp-week-frame: rgba(0, 168, 150, 0.38);
+  --lp-week-glow: rgba(0, 194, 168, 0.1);
+  --ui-today: #00a896;
+  --ui-today-glow: rgba(0, 194, 168, 0.4);
+  --ui-today-soft: rgba(0, 194, 168, 0.18);
 }
 
 .lp-sidenav {

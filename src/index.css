@@ -11,22 +11,22 @@ html {
   height: 100%;
   -webkit-text-size-adjust: 100%;
   transition:
-    background-color var(--duration-slow, 0.35s) ease,
-    color var(--duration-slow, 0.35s) ease;
+    background-color var(--duration-theme, 0.2s) ease,
+    color var(--duration-theme, 0.2s) ease;
 }
 
 body {
   height: 100%;
   margin: 0;
-  background: #0b0e14;
-  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.5;
   transition:
-    background-color var(--duration-slow, 0.35s) ease,
-    color var(--duration-slow, 0.35s) ease;
-}
-
-:root[data-theme="light"] body {
-  background: #f6f7f9;
+    background-color var(--duration-theme, 0.2s) ease,
+    color var(--duration-theme, 0.2s) ease;
 }
 
 #root {
@@ -48,17 +48,76 @@ body {
   overflow-x: clip;
 }
 
-/* Schedule view switch toast — glow + glass */
+/* Scrollbars — thin brand thumb */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-brand) 55%, transparent) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-brand) 65%, transparent);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-brand);
+}
+
+/* Monospace for IDs, dates, utilisation */
+.alloc8-mono {
+  font-family: var(--font-mono);
+  font-size: 0.8125em;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sonner — Alloc8 toast shell */
+.alloc8-toast[data-sonner-toast] {
+  font-family: var(--font-body) !important;
+  font-weight: 500 !important;
+  border-radius: var(--radius-card) !important;
+  padding: 14px 18px !important;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.2),
+    0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+.alloc8-toast[data-sonner-toast][data-type="success"] {
+  border-left: 3px solid var(--color-brand) !important;
+}
+
+.alloc8-toast[data-sonner-toast][data-type="error"] {
+  border-left: 3px solid var(--color-danger) !important;
+}
+
+.alloc8-toast[data-sonner-toast][data-type="warning"] {
+  border-left: 3px solid var(--color-warning) !important;
+}
+
+.alloc8-toast[data-sonner-toast][data-type="info"] {
+  border-left: 3px solid var(--color-info) !important;
+}
+
+/* Schedule view switch toast — teal glass */
 .float-schedule-view-toast {
   background: linear-gradient(
     135deg,
-    rgba(108, 140, 255, 0.18) 0%,
-    rgba(167, 139, 250, 0.1) 50%,
-    rgba(52, 211, 153, 0.08) 100%
+    color-mix(in srgb, var(--color-brand) 18%, transparent) 0%,
+    color-mix(in srgb, var(--color-accent) 10%, transparent) 50%,
+    color-mix(in srgb, var(--color-brand) 8%, transparent) 100%
   ) !important;
-  border: 1px solid rgba(108, 140, 255, 0.35) !important;
+  border: 1px solid color-mix(in srgb, var(--color-brand) 35%, var(--color-border)) !important;
   box-shadow:
-    0 8px 32px rgba(108, 140, 255, 0.2),
-    0 0 0 1px rgba(255, 255, 255, 0.06) inset !important;
+    0 8px 32px color-mix(in srgb, var(--color-brand) 15%, transparent),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset !important;
   backdrop-filter: blur(12px);
 }

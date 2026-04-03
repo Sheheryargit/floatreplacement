@@ -4,6 +4,7 @@ import { HelpCircle, Bell, LogOut, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAppTheme } from "../context/ThemeContext.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 import { useSlapAnimation } from "../context/SlapAnimationContext.jsx";
 import { useAppDialog } from "../context/AppDialogContext.jsx";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
@@ -13,6 +14,7 @@ import "./SettingsPage.css";
 
 export default function SettingsPage() {
   const { theme, themePreference, setThemePreference } = useAppTheme();
+  const { lock } = useAuth();
   const { triggerSlap } = useSlapAnimation();
   const { openDialog } = useAppDialog();
   const navigate = useNavigate();
@@ -51,12 +53,13 @@ export default function SettingsPage() {
   }, [slapThen, openDialog]);
 
   const onLogout = useCallback(() => {
+    lock();
     toast.success("Signed out", {
       description: "See you next time.",
       duration: 2800,
     });
-    navigate("/");
-  }, [navigate]);
+    navigate("/", { replace: true });
+  }, [lock, navigate]);
 
   return (
     <div className="settings-root" data-theme={theme === "light" ? "light" : "dark"}>
@@ -71,10 +74,10 @@ export default function SettingsPage() {
         >
           <div className="settings-hero-badge">
             <Sparkles size={14} strokeWidth={2} aria-hidden />
-            Workspace
+            Alloc8
           </div>
           <h1 className="settings-title">Settings</h1>
-          <p className="settings-lede">Appearance, help, and account.</p>
+          <p className="settings-lede">Appearance, help, and workspace access.</p>
         </motion.header>
 
         <section className="settings-section" aria-labelledby="settings-appearance">

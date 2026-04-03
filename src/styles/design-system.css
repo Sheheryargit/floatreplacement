@@ -1,17 +1,51 @@
 /**
- * Premium SaaS design system — Linear / Vercel inspired
+ * Alloc8 — design tokens (workforce & resource allocation)
+ * Voice: confident, clean — Notion × Linear × Rippling
  */
 
-:root {
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+@import url("https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600&family=JetBrains+Mono:wght@400;500&display=swap");
 
+:root {
+  /* Typography */
+  --font-display: "Syne", system-ui, sans-serif;
+  --font-body: "DM Sans", system-ui, sans-serif;
+  --font-sans: var(--font-body);
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Brand */
+  --color-brand: #00c2a8;
+  --color-brand-light: #00e5c8;
+  --color-brand-dim: #00c2a820;
+
+  /* Neutrals — dark-first */
+  --color-bg: #0f1117;
+  --color-surface: #181c26;
+  --color-surface-2: #1e2235;
+  --color-border: #2a2f45;
+  --color-text: #f0f2f8;
+  --color-muted: #7b82a0;
+
+  /* Semantic */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #38bdf8;
+
+  /* Accent (sparingly) */
+  --color-accent: #7c6af7;
+
+  /* Radii */
+  --radius-input: 8px;
+  --radius-button: 8px;
+  --radius-card: 12px;
+  --radius-modal: 16px;
   --radius-sm: 6px;
   --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 18px;
-  --radius-2xl: 22px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
 
+  /* Spacing (4px base) */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -20,37 +54,84 @@
   --space-6: 24px;
   --space-8: 32px;
   --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
 
-  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-ui: cubic-bezier(0.22, 1, 0.36, 1);
   --duration-fast: 0.15s;
-  --duration-normal: 0.22s;
-  --duration-slow: 0.35s;
+  --duration-normal: 0.2s;
+  --duration-slow: 0.22s;
+  --duration-theme: 0.2s;
+
+  --ds-focus: var(--color-brand);
+
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --color-bg: #f4f6fa;
+  --color-surface: #ffffff;
+  --color-surface-2: #e8ebf4;
+  --color-border: #e0e4ef;
+  --color-text: #12151f;
+  --color-muted: #5c6478;
 
   color-scheme: light;
 }
 
-:root[data-theme="dark"] {
-  color-scheme: dark;
-}
-
 html {
-  font-family: var(--font-sans);
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
 
-:focus-visible {
-  outline: 2px solid var(--ds-focus, #6366f1);
-  outline-offset: 2px;
+/* Page titles: Syne 700 */
+.alloc8-page-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.5rem, 2.5vw, 1.85rem);
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  color: var(--color-text);
 }
 
-/* Default focus when semantic tokens not yet themed */
-:root {
-  --ds-focus: #6366f1;
+/* Section headers */
+.alloc8-section-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.1rem;
+  letter-spacing: -0.02em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ds-focus);
+  outline-offset: 2px;
 }
 
 button:focus:not(:focus-visible),
 a:focus:not(:focus-visible) {
   outline: none;
+}
+
+@keyframes alloc8-fade-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes alloc8-dot-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
 }

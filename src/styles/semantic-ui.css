@@ -23,10 +23,10 @@
   --ds-warn-border: rgba(252, 211, 77, 0.45);
   --ds-warn-glow: 0 4px 20px rgba(251, 191, 36, 0.2);
 
-  --ds-info: #a5b4fc;
-  --ds-info-strong: #818cf8;
-  --ds-info-soft: rgba(165, 180, 252, 0.14);
-  --ds-info-glow: 0 4px 22px rgba(129, 140, 248, 0.22);
+  --ds-info: #38bdf8;
+  --ds-info-strong: #0ea5e9;
+  --ds-info-soft: rgba(56, 189, 248, 0.14);
+  --ds-info-glow: 0 4px 22px rgba(14, 165, 233, 0.22);
 
   --ds-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ds-ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
@@ -54,10 +54,10 @@
   --ds-warn-border: rgba(217, 119, 6, 0.35);
   --ds-warn-glow: 0 4px 16px rgba(217, 119, 6, 0.16);
 
-  --ds-info: #4f46e5;
-  --ds-info-strong: #4338ca;
-  --ds-info-soft: rgba(79, 70, 229, 0.1);
-  --ds-info-glow: 0 4px 18px rgba(79, 70, 229, 0.15);
+  --ds-info: #0284c7;
+  --ds-info-strong: #0369a1;
+  --ds-info-soft: rgba(2, 132, 199, 0.1);
+  --ds-info-glow: 0 4px 18px rgba(2, 132, 199, 0.15);
 
   --ds-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ds-ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
@@ -207,22 +207,22 @@
 
 /* ── Modal shell polish (used with float-premium-modal, overlays) ── */
 .float-modal-overlay-dim {
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .float-modal-panel-enter {
-  animation: floatModalPanelIn 0.28s var(--ds-ease-out) forwards;
+  animation: floatModalPanelIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes floatModalPanelIn {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(0.98);
+    transform: scale(0.96);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: scale(1);
   }
 }
 

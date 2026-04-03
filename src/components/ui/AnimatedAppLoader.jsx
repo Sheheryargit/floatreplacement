@@ -11,8 +11,8 @@ const RIPPLE = 4;
 const MODES = [ORBIT, BARS, BLOOM, MESH, RIPPLE];
 
 function OrbitDots({ light }) {
-  const c = light ? "rgba(79,106,230,0.85)" : "rgba(139,168,255,0.9)";
-  const dim = light ? "rgba(79,106,230,0.2)" : "rgba(139,168,255,0.15)";
+  const c = light ? "rgba(0,168,150,0.9)" : "rgba(0,229,200,0.92)";
+  const dim = light ? "rgba(0,168,150,0.2)" : "rgba(0,229,200,0.14)";
   return (
     <div className="float-loader-orbit" aria-hidden>
       <motion.div
@@ -38,7 +38,7 @@ function OrbitDots({ light }) {
 }
 
 function WaveBars({ light }) {
-  const c = light ? "#4f6ae6" : "#8ba8ff";
+  const c = light ? "#00a896" : "#00e5c8";
   return (
     <div className="float-loader-bars" aria-hidden>
       {[0, 1, 2, 3, 4].map((i) => (
@@ -60,7 +60,7 @@ function WaveBars({ light }) {
 }
 
 function WaveBarsStatic({ light }) {
-  const c = light ? "#4f6ae6" : "#8ba8ff";
+  const c = light ? "#00a896" : "#00e5c8";
   const heights = [0.45, 0.72, 1, 0.68, 0.52];
   return (
     <div className="float-loader-bars" aria-hidden>
@@ -76,7 +76,7 @@ function WaveBarsStatic({ light }) {
 }
 
 function BloomPulse({ light }) {
-  const c = light ? "rgba(79,106,230,0.45)" : "rgba(108,140,255,0.5)";
+  const c = light ? "rgba(0,168,150,0.45)" : "rgba(0,229,200,0.48)";
   return (
     <div className="float-loader-bloom" aria-hidden>
       {[0, 1, 2].map((i) => (
@@ -101,11 +101,11 @@ function BloomPulse({ light }) {
 
 function MeshGlow({ light }) {
   const a = light
-    ? "radial-gradient(circle at 30% 30%, rgba(79,106,230,0.55), transparent 55%)"
-    : "radial-gradient(circle at 30% 30%, rgba(108,140,255,0.5), transparent 55%)";
+    ? "radial-gradient(circle at 30% 30%, rgba(0,194,168,0.5), transparent 55%)"
+    : "radial-gradient(circle at 30% 30%, rgba(0,229,200,0.45), transparent 55%)";
   const b = light
-    ? "radial-gradient(circle at 70% 70%, rgba(167,139,250,0.4), transparent 50%)"
-    : "radial-gradient(circle at 70% 70%, rgba(167,139,250,0.35), transparent 50%)";
+    ? "radial-gradient(circle at 70% 70%, rgba(124,106,247,0.32), transparent 50%)"
+    : "radial-gradient(circle at 70% 70%, rgba(124,106,247,0.28), transparent 50%)";
   return (
     <motion.div
       className="float-loader-mesh"
@@ -121,7 +121,7 @@ function MeshGlow({ light }) {
 }
 
 function RippleGrid({ light }) {
-  const c = light ? "rgba(79,106,230,0.35)" : "rgba(139,168,255,0.3)";
+  const c = light ? "rgba(0,168,150,0.38)" : "rgba(0,229,200,0.28)";
   return (
     <div className="float-loader-ripple-grid" aria-hidden>
       {Array.from({ length: 9 }, (_, i) => i).map((i) => (
@@ -198,7 +198,7 @@ export default function AnimatedAppLoader() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: reduceMotion ? 0 : 0.12, duration: 0.35 }}
         >
-          Loading workspace…
+          Loading Alloc8…
         </motion.p>
       </div>
     </motion.div>

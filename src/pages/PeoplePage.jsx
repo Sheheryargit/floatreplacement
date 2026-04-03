@@ -238,7 +238,7 @@ export default function PeoplePage() {
       style={{
         background: t.bg,
         color: t.text,
-        fontFamily: "var(--font-sans, Inter, system-ui, sans-serif)",
+        fontFamily: "var(--font-body, 'DM Sans', system-ui, sans-serif)",
         fontSize: 14,
         transition: "background 0.35s ease, color 0.35s ease",
       }}

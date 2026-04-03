@@ -36,6 +36,10 @@ function syncThemeDom(resolved) {
   if (typeof document === "undefined") return;
   document.documentElement.dataset.theme = resolved;
   document.documentElement.style.colorScheme = resolved === "dark" ? "dark" : "light";
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) {
+    meta.setAttribute("content", resolved === "dark" ? "#0F1117" : "#F4F6FA");
+  }
 }
 
 export function ThemeProvider({ children }) {

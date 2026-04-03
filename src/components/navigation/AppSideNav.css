@@ -1,83 +1,180 @@
+/* Alloc8 — sidebar 240px expanded, 64px collapsed, teal active rail */
 .app-sidenav {
-  width: 76px;
+  --sidenav-w: 240px;
+  position: relative;
+  width: var(--sidenav-w);
   flex-shrink: 0;
-  background: var(--app-sidebar, #090c12);
-  border-right: 1px solid var(--app-border, #1e2538);
+  min-height: 0;
+  background: var(--app-sidebar, #0f1117);
+  border-right: 1px solid var(--app-border, #2a2f45);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: var(--space-4) 0 var(--space-4);
-  gap: var(--space-1);
+  align-items: stretch;
+  padding: var(--space-4) var(--space-3) var(--space-4);
+  gap: var(--space-2);
   z-index: 50;
-  transition: background var(--duration-slow) ease, border-color var(--duration-slow) ease;
+  transition:
+    width var(--duration-normal) var(--ease-spring),
+    background var(--duration-theme) ease,
+    border-color var(--duration-theme) ease;
+}
+
+.app-sidenav--collapsed {
+  --sidenav-w: 64px;
+  align-items: center;
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
+}
+
+.app-sidenav-noise {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.02;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
 }
 
 :root[data-theme="light"] .app-sidenav {
-  --app-sidebar: #fafafa;
-  --app-border: #e8eaef;
-  --app-sidenav-muted: #6b7280;
-  --app-sidenav-active-bg: #f0f2f6;
-  --app-sidenav-hover: #f4f5f8;
-  --app-accent: #4f46e5;
-  --app-logo-shadow: 0 4px 20px rgba(79, 70, 229, 0.25);
+  --app-sidebar: #f4f6fa;
+  --app-border: #e0e4ef;
+  --app-sidenav-muted: #5c6478;
+  --app-sidenav-active-bg: rgba(0, 194, 168, 0.1);
+  --app-sidenav-hover: rgba(0, 0, 0, 0.04);
+  --app-accent: #00a896;
+  --app-logo-shadow: 0 4px 24px rgba(0, 194, 168, 0.22);
 }
 
 :root[data-theme="dark"] .app-sidenav {
-  --app-sidebar: #090c12;
-  --app-border: #1a1f2e;
-  --app-sidenav-muted: #6b7280;
-  --app-sidenav-active-bg: #141828;
-  --app-sidenav-hover: #12161f;
-  --app-accent: #818cf8;
-  --app-logo-shadow: 0 4px 24px rgba(99, 102, 241, 0.2);
+  --app-sidebar: #0f1117;
+  --app-border: #2a2f45;
+  --app-sidenav-muted: #7b82a0;
+  --app-sidenav-active-bg: rgba(0, 194, 168, 0.1);
+  --app-sidenav-hover: rgba(255, 255, 255, 0.04);
+  --app-accent: #00c2a8;
+  --app-logo-shadow: 0 4px 28px rgba(0, 194, 168, 0.2);
 }
 
-.app-sidenav-brand {
-  margin-bottom: var(--space-3);
+.app-sidenav-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  position: relative;
+  z-index: 1;
 }
 
-.app-sidenav-logo {
-  width: 38px;
-  height: 38px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%);
+.app-sidenav--collapsed .app-sidenav-head {
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.app-sidenav-brand-wrap {
+  min-width: 0;
+  flex: 1;
+}
+
+.app-sidenav--collapsed .app-sidenav-brand-wrap {
+  flex: 0;
+}
+
+.app-sidenav-logo-link {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  font-weight: 800;
-  font-size: 13px;
-  letter-spacing: -0.02em;
+  min-height: 40px;
+  padding: var(--space-2) var(--space-2);
+  border-radius: var(--radius-button);
   text-decoration: none;
-  box-shadow: var(--app-logo-shadow);
-  transition: box-shadow var(--duration-normal) var(--ease-spring);
+  color: var(--color-text, #f0f2f8);
+  transition: background var(--duration-fast) ease;
 }
 
-.app-sidenav-logo:hover {
-  box-shadow: 0 6px 28px rgba(99, 102, 241, 0.35);
+.app-sidenav--expanded .app-sidenav-logo-link {
+  justify-content: flex-start;
+}
+
+.app-sidenav-logo-link:hover {
+  background: var(--app-sidenav-hover);
+}
+
+.alloc8-wordmark-nav {
+  font-family: var(--font-display, "Syne", sans-serif);
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.alloc8-wordmark-nav-eight {
+  color: var(--app-accent);
+}
+
+.app-sidenav-glyph {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display, "Syne", sans-serif);
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--app-accent);
+  background: linear-gradient(145deg, rgba(0, 194, 168, 0.18), rgba(124, 106, 247, 0.1));
+  border: 1px solid color-mix(in srgb, var(--app-accent) 35%, var(--app-border));
+  box-shadow: var(--app-logo-shadow);
+}
+
+.app-sidenav-collapse {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-button);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--app-sidenav-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease;
+}
+
+.app-sidenav-collapse:hover {
+  background: var(--app-sidenav-hover);
+  color: var(--app-accent);
+  border-color: color-mix(in srgb, var(--app-accent) 25%, var(--app-border));
 }
 
 .app-sidenav-links {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 2px;
   width: 100%;
+  position: relative;
+  z-index: 1;
 }
 
 .app-sidenav-item {
   position: relative;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 4px;
-  padding: 10px 6px;
-  border-radius: var(--radius-md);
-  width: 60px;
-  text-align: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-button);
+  width: 100%;
+  text-align: left;
   text-decoration: none;
   color: var(--app-sidenav-muted);
-  font-size: 10px;
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
   font-weight: 500;
   letter-spacing: 0.01em;
   transition:
@@ -85,9 +182,14 @@
     color var(--duration-fast) ease;
 }
 
+.app-sidenav--collapsed .app-sidenav-item {
+  justify-content: center;
+  padding: 10px 8px;
+}
+
 .app-sidenav-item:hover:not(.app-sidenav-item--disabled) {
   background: var(--app-sidenav-hover);
-  color: var(--app-text-soft, #9ca3af);
+  color: var(--app-text-soft, #9ba4b8);
 }
 
 .app-sidenav-item--active {
@@ -105,6 +207,7 @@
   height: 22px;
   border-radius: 0 3px 3px 0;
   background: var(--app-accent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--app-accent) 45%, transparent);
 }
 
 .app-sidenav-item--disabled {
@@ -112,7 +215,6 @@
   cursor: not-allowed;
 }
 
-/* Soon: looks disabled but stays clickable (slap + V2 modal) */
 .app-sidenav-item--soon {
   appearance: none;
   font: inherit;
@@ -124,11 +226,22 @@
 
 .app-sidenav-item--soon:hover {
   opacity: 0.72;
-  color: var(--app-text-soft, #9ca3af);
+  color: var(--app-text-soft, #9ba4b8);
 }
 
 .app-sidenav-label {
-  line-height: 1.15;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-sidenav--collapsed .app-sidenav-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
 }
 
 .app-sidenav-spacer {
@@ -139,24 +252,34 @@
 .app-sidenav-footer {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 6px;
   width: 100%;
   padding-top: var(--space-2);
+  position: relative;
+  z-index: 1;
+}
+
+.app-sidenav--collapsed .app-sidenav-footer {
+  align-items: center;
 }
 
 .app-sidenav-foot-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: var(--radius-button);
   border: 1px solid transparent;
   background: transparent;
   color: var(--app-sidenav-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  gap: 10px;
   text-decoration: none;
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  font-weight: 500;
   transition:
     background var(--duration-fast) ease,
     border-color var(--duration-fast) ease,
@@ -164,11 +287,26 @@
     box-shadow var(--duration-normal) var(--ease-spring);
 }
 
+.app-sidenav--collapsed .app-sidenav-foot-btn {
+  justify-content: center;
+  width: 40px;
+  padding: 0;
+  min-height: 40px;
+}
+
+.app-sidenav-foot-label {
+  white-space: nowrap;
+}
+
+.app-sidenav--collapsed .app-sidenav-foot-label {
+  display: none;
+}
+
 .app-sidenav-foot-btn:hover {
   background: var(--app-sidenav-hover);
   color: var(--app-accent);
   border-color: color-mix(in srgb, var(--app-accent) 28%, var(--app-border));
-  box-shadow: 0 0 16px color-mix(in srgb, var(--app-accent) 18%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--app-accent) 15%, transparent);
 }
 
 .app-sidenav-foot-btn--active {
@@ -186,9 +324,11 @@
 }
 
 .app-sidenav-avatar {
+  position: relative;
   width: 40px;
   height: 40px;
   margin-top: 2px;
+  align-self: flex-start;
   border-radius: 999px;
   border: 1px solid var(--app-border);
   background: linear-gradient(145deg, #334155 0%, #1e293b 100%);
@@ -203,6 +343,10 @@
     transform var(--duration-fast) ease;
 }
 
+.app-sidenav--collapsed .app-sidenav-avatar {
+  align-self: center;
+}
+
 .app-sidenav-avatar:hover {
   border-color: color-mix(in srgb, var(--app-accent) 45%, var(--app-border));
   box-shadow: 0 0 20px color-mix(in srgb, var(--app-accent) 22%, transparent);
@@ -213,6 +357,17 @@
   font-weight: 700;
   color: #f8fafc;
   letter-spacing: -0.02em;
+}
+
+.app-sidenav-avatar-dot {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 2px solid var(--app-sidebar);
 }
 
 .visually-hidden {
@@ -227,19 +382,8 @@
   border: 0;
 }
 
-@media (max-width: 640px) {
-  .app-sidenav {
-    width: 64px;
-    padding-left: 4px;
-    padding-right: 4px;
-  }
-
-  .app-sidenav-item {
-    width: 54px;
-    padding: 8px 4px;
-  }
-
-  .app-sidenav-label {
-    display: none;
+@media (max-width: 900px) {
+  .app-sidenav--expanded {
+    --sidenav-w: 200px;
   }
 }
