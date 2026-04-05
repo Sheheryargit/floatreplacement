@@ -1,4 +1,6 @@
 import { useMemo, useState, useRef, useEffect, useCallback, memo, useLayoutEffect } from "react";
+import { useEnhancedMode } from "../enhanced/useEnhancedMode.js";
+import { useHoverIntent } from "../enhanced/useHoverIntent.js";
 import {
   ChevronDown,
   ChevronLeft,
@@ -33,7 +35,7 @@ import {
   Umbrella,
 } from "lucide-react";
 import { useAppTheme } from "../context/ThemeContext.jsx";
-import { useAppData } from "../context/AppDataContext.jsx";
+import { useSchedulePageData } from "../hooks/useSchedulePageData.js";
 import { ProjectModal } from "./ProjectsPage.jsx";
 import PersonModal, {
   T,
@@ -53,6 +55,7 @@ import AppSideNav from "../components/navigation/AppSideNav.jsx";
 import {
   colorForAllocationBar,
   contrastingTextColor,
+  projectCodeChipStyles,
   resolveColorForProjectLabel,
   projectToAllocationLabel,
 } from "../utils/projectColors.js";
@@ -73,6 +76,11 @@ import {
   buildLeaveHoverTitle,
 } from "../utils/leaveVisuals.js";
 import "./LandingPage.css";
+import "../enhanced/enhancedSchedule.css";
+
+function normProjectLabel(s) {
+  return (s || "").trim().toLowerCase();
+}
 
 const LEAVE_LUCIDE = {
   palmtree: Palmtree,
@@ -623,6 +631,15 @@ const timelineRowEqual = (prev, next) => {
   if (prev.scheduleModel !== next.scheduleModel) return false;
   if (prev.projects !== next.projects) return false;
   if (prev.projectByLabel !== next.projectByLabel) return false;
+  if (prev.enhancedMode !== next.enhancedMode) return false;
+  if (prev.enhancedDimmedRow !== next.enhancedDimmedRow) return false;
+  if (prev.enhancedFocusedRow !== next.enhancedFocusedRow) return false;
+  if (prev.enhancedFocusProjectLabel !== next.enhancedFocusProjectLabel) return false;
+  if (prev.onPersonFocusIntent !== next.onPersonFocusIntent) return false;
+  if (prev.onPersonClearIntent !== next.onPersonClearIntent) return false;
+  if (prev.onProjectFocusIntent !== next.onProjectFocusIntent) return false;
+  if (prev.onProjectClearIntent !== next.onProjectClearIntent) return false;
+  if (prev.onAltLockToggle !== next.onAltLockToggle) return false;
 
   const prevAlloc = prev.allocations.filter((a) => allocationHasPerson(a, prev.p.id));
   const nextAlloc = next.allocations.filter((a) => allocationHasPerson(a, next.p.id));
@@ -735,11 +752,47 @@ const TimelineRow = memo(function TimelineRow({
   handleTimelineClick,
   todayDateKey,
   projectByLabel,
+  enhancedMode,
+  enhancedDimmedRow,
+  enhancedFocusedRow,
+  enhancedFocusProjectLabel,
+  onPersonFocusIntent,
+  onPersonClearIntent,
+  onProjectFocusIntent,
+  onProjectClearIntent,
+  onAltLockToggle,
 }) {
   const { theme } = useAppTheme();
   const t = T[theme];
   const reduceMotion = useReducedMotion();
   const allocViewMode = scheduleModel.aggregateAllSlots ? "week" : viewMode;
+
+  const personHover = useHoverIntent({
+    enabled: enhancedMode,
+    delayMs: 600,
+    onCommit: () => onPersonFocusIntent(p.id),
+    onCancel: onPersonClearIntent,
+  });
+
+  const barTimerRef = useRef(null);
+  useEffect(() => () => clearTimeout(barTimerRef.current), []);
+
+  const handleBarEnter = useCallback(
+    (label) => {
+      if (!enhancedMode) return;
+      clearTimeout(barTimerRef.current);
+      barTimerRef.current = window.setTimeout(() => {
+        onProjectFocusIntent(normProjectLabel(label));
+      }, 550);
+    },
+    [enhancedMode, onProjectFocusIntent]
+  );
+
+  const handleBarLeave = useCallback(() => {
+    clearTimeout(barTimerRef.current);
+    onProjectClearIntent();
+  }, [onProjectClearIntent]);
+
   const hours = computePersonHoursInView(p.id, allocations, scheduleModel, viewMode, anchorDate);
   const visibleDays = Math.max(1, visibleDateKeysForHours(scheduleModel, viewMode, anchorDate).length);
   const cap = visibleDays * STANDARD_DAY_HOURS;
@@ -784,46 +837,84 @@ const TimelineRow = memo(function TimelineRow({
   return (
     <div
       key={p.id}
-      className={"lp-sched-row" + (overloaded ? " lp-sched-row-overloaded" : "")}
+      className={
+        "lp-sched-row" +
+        (overloaded ? " lp-sched-row-overloaded" : "") +
+        (enhancedDimmedRow ? " lp-sched-row--enhanced-dim" : "") +
+        (enhancedFocusedRow ? " lp-sched-row--enhanced-focus" : "")
+      }
       style={{ ["--animation-order"]: i }}
     >
       <div className="lp-sched-person">
-        <div className="lp-person-row-shell">
+        <div
+          className="lp-person-row-shell"
+          onMouseEnter={personHover.onMouseEnter}
+          onMouseLeave={personHover.onMouseLeave}
+          onClick={(e) => {
+            if (enhancedMode && e.altKey) {
+              e.preventDefault();
+              e.stopPropagation();
+              onAltLockToggle?.(p.id);
+            }
+          }}
+        >
           <div className="lp-person-row-cluster">
-            <button type="button" className="lp-person-row lp-person-row-main" onClick={() => openEdit(p)}>
-              <div className="lp-avatar" style={{ background: avGrad(p.name) }}>
-                {ini(p.name)}
-              </div>
-              <div className="lp-person-meta">
-                <div className="lp-person-name">{p.name}</div>
-                <div className="lp-person-sub">
-                  {p.role !== "—" ? `${p.role} · ` : ""}
-                  {p.department || "—"}
-                </div>
-                {p.tags.length > 0 && (
-                  <div className="lp-person-tags">
-                    {p.tags.slice(0, 2).map((tag) => {
-                      const tp = tagChromaProps(tag, theme === "dark", "lp-schedule-tag");
-                      return (
-                        <span key={tag} className={tp.className} style={tp.style}>
-                          {tag}
-                        </span>
-                      );
-                    })}
-                    {p.tags.length > 2 && <span className="lp-tag-more-pill">+{p.tags.length - 2}</span>}
+            <div className="lp-person-row lp-person-row-main">
+              <div
+                className="lp-person-main-col"
+                onClick={(e) => {
+                  if (e.target.closest(".lp-person-add-banner")) return;
+                  openEdit(p);
+                }}
+              >
+                <button
+                  type="button"
+                  className="lp-person-identity-hit"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openEdit(p);
+                  }}
+                >
+                  <div className="lp-avatar" style={{ background: avGrad(p.name) }}>
+                    {ini(p.name)}
                   </div>
-                )}
+                  <div className="lp-person-meta">
+                    <div className="lp-person-name">{p.name}</div>
+                    <div className="lp-person-sub">
+                      {p.role !== "—" ? `${p.role} · ` : ""}
+                      {p.department || "—"}
+                    </div>
+                    {p.tags.length > 0 && (
+                      <div className="lp-person-tags">
+                        {p.tags.slice(0, 2).map((tag) => {
+                          const tp = tagChromaProps(tag, theme === "dark", "lp-schedule-tag");
+                          return (
+                            <span key={tag} className={tp.className} style={tp.style}>
+                              {tag}
+                            </span>
+                          );
+                        })}
+                        {p.tags.length > 2 && <span className="lp-tag-more-pill">+{p.tags.length - 2}</span>}
+                      </div>
+                    )}
+                  </div>
+                </button>
+                <div className="lp-person-add-banner">
+                  <button
+                    type="button"
+                    className="lp-sched-add-btn lp-sched-add-btn--inline"
+                    title="Add allocation"
+                    aria-label={`Add allocation for ${p.name}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openCreateAllocation(p);
+                    }}
+                  >
+                    <Plus size={14} strokeWidth={2.25} />
+                  </button>
+                </div>
               </div>
-            </button>
-            <button
-              type="button"
-              className="lp-person-add-alloc"
-              title="Add allocation"
-              aria-label={`Add allocation for ${p.name}`}
-              onClick={() => openCreateAllocation(p)}
-            >
-              <Plus size={12} strokeWidth={2} />
-            </button>
+            </div>
           </div>
           <button type="button" className="lp-person-row lp-person-hours-hit" onClick={() => openEdit(p)}>
             <span className={"lp-person-hours" + (overloaded ? " lp-person-hours-overloaded" : "")}>
@@ -1011,6 +1102,11 @@ const TimelineRow = memo(function TimelineRow({
                       const hasNotes = Boolean((seg.a.notes || "").trim());
                       const tip = buildWorkAllocationTitle(seg.a, projectName, hoursLabel);
 
+                      const labelNorm = normProjectLabel(seg.a.project);
+                      const projHit =
+                        Boolean(enhancedFocusProjectLabel) && labelNorm === enhancedFocusProjectLabel;
+                      const projMute = Boolean(enhancedFocusProjectLabel) && !projHit;
+
                       const enterDelayMs = reduceMotion ? 0 : Math.min(i, 28) * 22 + stackIdx * 10 + segJ * 38;
 
                       const baseStyle = {
@@ -1042,11 +1138,16 @@ const TimelineRow = memo(function TimelineRow({
                           className={
                             "lp-block lp-block-alloc lp-block-alloc-project lp-alloc-bar" +
                             (micro ? " lp-alloc-bar--micro" : "") +
-                            (allocViewMode === "day" ? " lp-alloc-bar--day" : "")
+                            (allocViewMode === "day" ? " lp-alloc-bar--day" : "") +
+                            (projHit ? " lp-alloc-bar--enhanced-proj-hit" : "") +
+                            (projMute ? " lp-alloc-bar--enhanced-proj-mute" : "") +
+                            (projHit && enhancedFocusProjectLabel ? " lp-alloc-bar--enhanced-pulse" : "")
                           }
                           style={baseStyle}
                           aria-label={allocationAriaLabel(seg.a)}
                           title={tip}
+                          onMouseEnter={() => handleBarEnter(seg.a.project)}
+                          onMouseLeave={handleBarLeave}
                           onClick={(e) => {
                             e.stopPropagation();
                             openAllocationDetail(seg.a);
@@ -1092,7 +1193,12 @@ const TimelineRow = memo(function TimelineRow({
                                 <span className="lp-alloc-top">
                                   <span className="lp-alloc-name">{projectName}</span>
                                   {projectCode ? (
-                                    <span className="lp-alloc-code-chip">{projectCode}</span>
+                                    <span
+                                      className="lp-alloc-code-chip"
+                                      style={projectCodeChipStyles(barColor, theme)}
+                                    >
+                                      {projectCode}
+                                    </span>
                                   ) : null}
                                 </span>
                                 <span className="lp-alloc-bar__row-foot">
@@ -1161,12 +1267,77 @@ export default function LandingPage() {
     syncAllocationCreate,
     syncAllocationUpdate,
     syncAllocationDelete,
-  } = useAppData();
+  } = useSchedulePageData();
 
   const scheduleAllocations = useMemo(
     () => [...allocations, ...publicHolidayAllocations],
     [allocations, publicHolidayAllocations]
   );
+
+  const enhancedMode = useEnhancedMode();
+  const [enhancedFocusPersonId, setEnhancedFocusPersonId] = useState(null);
+  const [enhancedFocusProject, setEnhancedFocusProject] = useState(null);
+  const [enhancedLockedPersonId, setEnhancedLockedPersonId] = useState(null);
+  const lockedRef = useRef(null);
+  useEffect(() => {
+    lockedRef.current = enhancedLockedPersonId;
+  }, [enhancedLockedPersonId]);
+
+  const activePersonFocus = enhancedLockedPersonId ?? enhancedFocusPersonId;
+
+  const enhancedProjectPersonSet = useMemo(() => {
+    if (!enhancedFocusProject) return null;
+    const next = new Set();
+    for (const a of scheduleAllocations) {
+      if (a.isLeave) continue;
+      if (normProjectLabel(a.project) !== enhancedFocusProject) continue;
+      const ids = Array.isArray(a.personIds) && a.personIds.length > 0 ? a.personIds : [a.personId];
+      ids.forEach((id) => next.add(id));
+    }
+    return next;
+  }, [scheduleAllocations, enhancedFocusProject]);
+
+  useEffect(() => {
+    if (!enhancedMode) {
+      setEnhancedFocusPersonId(null);
+      setEnhancedFocusProject(null);
+      setEnhancedLockedPersonId(null);
+    }
+  }, [enhancedMode]);
+
+  useEffect(() => {
+    if (!enhancedMode) return;
+    const fn = (e) => {
+      if (e.key !== "Escape") return;
+      setEnhancedFocusPersonId(null);
+      setEnhancedFocusProject(null);
+      setEnhancedLockedPersonId(null);
+    };
+    window.addEventListener("keydown", fn);
+    return () => window.removeEventListener("keydown", fn);
+  }, [enhancedMode]);
+
+  const onPersonFocusIntent = useCallback((id) => {
+    setEnhancedFocusProject(null);
+    setEnhancedFocusPersonId(id);
+  }, []);
+
+  const onPersonClearIntent = useCallback(() => {
+    setEnhancedFocusPersonId((prev) => (lockedRef.current ? prev : null));
+  }, []);
+
+  const onProjectFocusIntent = useCallback((label) => {
+    setEnhancedFocusPersonId(null);
+    setEnhancedFocusProject(label || null);
+  }, []);
+
+  const onProjectClearIntent = useCallback(() => {
+    setEnhancedFocusProject(null);
+  }, []);
+
+  const onAltLockToggle = useCallback((id) => {
+    setEnhancedLockedPersonId((prev) => (prev === id ? null : id));
+  }, []);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState(null);
@@ -1188,6 +1359,8 @@ export default function LandingPage() {
   const prevOffsets = useRef(timelineOffsets);
   const prevColCount = useRef(0);
   const scheduleViewportRef = useRef(null);
+  /** Coalesces horizontal scroll to one layout read per frame (fewer setState calls while scrolling). */
+  const timelineScrollRafRef = useRef(null);
   const lastAnchorKey = useRef(null);
 
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
@@ -1723,19 +1896,33 @@ export default function LandingPage() {
   }, [scheduleModel, timelineOffsets, colMinPx]);
 
   const handleTimelineScroll = useCallback((e) => {
-    const el = e.target;
-    const thresholdBase = 250;
+    const el = e.currentTarget;
+    if (timelineScrollRafRef.current != null) return;
+    timelineScrollRafRef.current = requestAnimationFrame(() => {
+      timelineScrollRafRef.current = null;
+      const thresholdBase = 250;
 
-    // Left endless load
-    if (el.scrollLeft < thresholdBase) {
-      setTimelineOffsets((o) => (o.prev < 36 ? { ...o, prev: o.prev + 1 } : o));
-    }
+      // Left endless load
+      if (el.scrollLeft < thresholdBase) {
+        setTimelineOffsets((o) => (o.prev < 36 ? { ...o, prev: o.prev + 1 } : o));
+      }
 
-    // Right endless load
-    if (el.scrollLeft + el.clientWidth > el.scrollWidth - thresholdBase) {
-      setTimelineOffsets((o) => (o.next < 36 ? { ...o, next: o.next + 1 } : o));
-    }
+      // Right endless load
+      if (el.scrollLeft + el.clientWidth > el.scrollWidth - thresholdBase) {
+        setTimelineOffsets((o) => (o.next < 36 ? { ...o, next: o.next + 1 } : o));
+      }
+    });
   }, []);
+
+  useEffect(
+    () => () => {
+      if (timelineScrollRafRef.current != null) {
+        cancelAnimationFrame(timelineScrollRafRef.current);
+        timelineScrollRafRef.current = null;
+      }
+    },
+    []
+  );
 
   return (
     <div
@@ -1743,6 +1930,7 @@ export default function LandingPage() {
       data-theme={theme === "light" ? "light" : "dark"}
       data-density={density}
       data-view={viewMode}
+      data-enhanced-mode={enhancedMode ? "1" : "0"}
     >
       <AppSideNav />
 
@@ -2005,7 +2193,7 @@ export default function LandingPage() {
               <div className="lp-dropdown-wrap" ref={addWrapRef}>
                 <button
                   type="button"
-                  className="lp-btn-primary"
+                  className="lp-sched-add-btn"
                   aria-label="Add new"
                   aria-expanded={addMenuOpen}
                   onClick={() => {
@@ -2018,7 +2206,7 @@ export default function LandingPage() {
                     transition: "transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28)",
                   }}
                 >
-                  <Plus size={18} strokeWidth={2.5} />
+                  <Plus size={16} strokeWidth={2.5} />
                 </button>
                 {addMenuOpen && (
                   <div className="lp-popover lp-popover-add" style={{ right: 0, minWidth: "200px", zIndex: 100 }}>
@@ -2332,27 +2520,49 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              {schedulePeople.map((p, i) => (
-                <TimelineRow
-                  key={p.id}
-                  p={p}
-                  i={i}
-                  allocations={scheduleAllocations}
-                  projects={projects}
-                  scheduleModel={scheduleModel}
-                  viewMode={viewMode}
-                  anchorDate={anchorDate}
-                  utilizationMode={utilizationMode}
-                  gridTemplate={gridTemplate}
-                  nCols={scheduleModel.columnCount}
-                  openEdit={openEdit}
-                  openCreateAllocation={openCreateAllocation}
-                  openAllocationDetail={openAllocationDetail}
-                  handleTimelineClick={handleTimelineClick}
-                  todayDateKey={todayDateKey}
-                  projectByLabel={projectByLabel}
-                />
-              ))}
+              {schedulePeople.map((p, i) => {
+                const hasProject =
+                  !enhancedFocusProject || enhancedProjectPersonSet?.has(p.id) === true;
+                const dimRow =
+                  enhancedMode &&
+                  ((Boolean(activePersonFocus) && activePersonFocus !== p.id && !enhancedFocusProject) ||
+                    (Boolean(enhancedFocusProject) && !hasProject));
+                const focusedRow =
+                  enhancedMode &&
+                  !dimRow &&
+                  ((activePersonFocus === p.id && !enhancedFocusProject) ||
+                    (Boolean(enhancedFocusProject) && hasProject));
+                return (
+                  <TimelineRow
+                    key={p.id}
+                    p={p}
+                    i={i}
+                    allocations={scheduleAllocations}
+                    projects={projects}
+                    scheduleModel={scheduleModel}
+                    viewMode={viewMode}
+                    anchorDate={anchorDate}
+                    utilizationMode={utilizationMode}
+                    gridTemplate={gridTemplate}
+                    nCols={scheduleModel.columnCount}
+                    openEdit={openEdit}
+                    openCreateAllocation={openCreateAllocation}
+                    openAllocationDetail={openAllocationDetail}
+                    handleTimelineClick={handleTimelineClick}
+                    todayDateKey={todayDateKey}
+                    projectByLabel={projectByLabel}
+                    enhancedMode={enhancedMode}
+                    enhancedDimmedRow={dimRow}
+                    enhancedFocusedRow={focusedRow}
+                    enhancedFocusProjectLabel={enhancedFocusProject}
+                    onPersonFocusIntent={onPersonFocusIntent}
+                    onPersonClearIntent={onPersonClearIntent}
+                    onProjectFocusIntent={onProjectFocusIntent}
+                    onProjectClearIntent={onProjectClearIntent}
+                    onAltLockToggle={onAltLockToggle}
+                  />
+                );
+              })}
             </motion.div>
           </div>
         </div>

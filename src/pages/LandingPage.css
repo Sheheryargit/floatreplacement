@@ -9,6 +9,7 @@
   --lp-people-w: 280px;
   --lp-col-min: 36px;
   --lp-timeline-min: 800px;
+  --lp-sched-add-btn-size: 32px;
 
   --bg: #0f1117;
   --surface: #181c26;
@@ -795,46 +796,70 @@
   background: var(--accent-glow) !important;
 }
 
-.lp-btn-primary {
+/* Schedule “+” — same control in header and next to each name (high contrast, black on light). */
+.lp-sched-add-btn {
   position: relative;
-  width: 36px;
-  height: 36px;
+  box-sizing: border-box;
+  width: var(--lp-sched-add-btn-size);
+  height: var(--lp-sched-add-btn-size);
+  flex-shrink: 0;
+  padding: 0;
   border-radius: 8px;
-  border: none;
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, var(--accent) 108%, #fff) 0%,
-    var(--accent) 48%,
-    color-mix(in srgb, var(--accent) 88%, #000) 100%
-  );
-  color: var(--accent-txt);
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent) inset,
-    0 2px 12px color-mix(in srgb, var(--accent) 38%, transparent),
-    0 0 24px color-mix(in srgb, var(--accent) 22%, transparent);
   transition:
-    transform 0.22s var(--ease-spring, ease),
-    filter 0.2s ease,
-    box-shadow 0.26s var(--ease-ui-in-out, ease-in-out);
+    transform 0.2s var(--ease-spring, ease),
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.2s ease;
 }
 
-.lp-btn-primary:hover {
-  filter: brightness(1.05);
-  transform: translateY(-1px) scale(1.02);
+.lp-root[data-theme="light"] .lp-sched-add-btn:not(.lp-sched-add-btn--inline) {
+  background: #ffffff;
+  border: 1.5px solid #0f172a;
+  color: #0f172a;
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent) inset,
-    0 6px 22px color-mix(in srgb, var(--accent) 45%, transparent),
-    0 0 36px color-mix(in srgb, var(--accent) 28%, transparent);
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 1px 3px rgba(15, 22, 40, 0.12);
 }
 
-.lp-btn-primary:active {
+.lp-root[data-theme="light"] .lp-sched-add-btn:not(.lp-sched-add-btn--inline):hover {
+  background: #f1f5f9;
+  border-color: #020617;
+  color: #020617;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.95) inset,
+    0 2px 8px rgba(15, 22, 40, 0.15);
+}
+
+.lp-root[data-theme="light"] .lp-sched-add-btn:not(.lp-sched-add-btn--inline):active {
   transform: scale(0.96);
-  filter: brightness(0.98);
+  background: #e2e8f0;
+}
+
+.lp-root[data-theme="dark"] .lp-sched-add-btn:not(.lp-sched-add-btn--inline) {
+  background: color-mix(in srgb, #f8fafc 8%, var(--surface));
+  border: 1.5px solid color-mix(in srgb, #f8fafc 55%, #64748b);
+  color: #f8fafc;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.lp-root[data-theme="dark"] .lp-sched-add-btn:not(.lp-sched-add-btn--inline):hover {
+  background: color-mix(in srgb, #f8fafc 14%, var(--surface));
+  border-color: #f8fafc;
+}
+
+.lp-root[data-theme="dark"] .lp-sched-add-btn:not(.lp-sched-add-btn--inline):active {
+  transform: scale(0.96);
+}
+
+.lp-sched-add-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .lp-subbar {
@@ -1162,17 +1187,131 @@
   flex: 1;
 }
 
-/* Name + meta share one flex grow region; + is a slim sibling (does not sit between meta and hours). */
+/* Name column: identity block + standalone + under meta (hidden until row hover / touch). */
 .lp-person-row-cluster {
   flex: 1;
   min-width: 0;
   display: flex;
+  align-items: stretch;
+}
+
+.lp-person-main-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  padding: var(--lp-person-pad-y) var(--lp-person-pad-x);
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+button.lp-person-identity-hit {
+  display: flex;
+  flex-direction: row;
   align-items: flex-start;
-  gap: 0;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.lp-person-add-banner {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-shrink: 0;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+  border: none;
+  background: none;
+  transition:
+    max-height 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.18s ease,
+    padding 0.18s ease,
+    margin 0.18s ease;
+}
+
+.lp-person-row-shell:hover .lp-person-add-banner,
+.lp-person-row-shell:focus-within .lp-person-add-banner {
+  max-height: 36px;
+  opacity: 1;
+  margin-top: 4px;
+  padding-top: 2px;
+  padding-bottom: 0;
+  pointer-events: auto;
+}
+
+/* Touch / coarse pointers: keep add control discoverable (no full-width bar) */
+@media (hover: none), (pointer: coarse) {
+  .lp-person-add-banner {
+    max-height: 36px;
+    opacity: 1;
+    margin-top: 4px;
+    padding-top: 2px;
+    padding-bottom: 0;
+    pointer-events: auto;
+  }
+}
+
+/* Minimal + under name strip (overrides full .lp-sched-add-btn) */
+.lp-sched-add-btn.lp-sched-add-btn--inline {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.lp-person-row-shell:hover .lp-sched-add-btn--inline,
+.lp-person-row-shell:focus-within .lp-sched-add-btn--inline {
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--accent);
+}
+
+.lp-root[data-theme="light"] .lp-person-row-shell:hover .lp-sched-add-btn--inline,
+.lp-root[data-theme="light"] .lp-person-row-shell:focus-within .lp-sched-add-btn--inline {
+  border-color: rgba(15, 23, 42, 0.14);
+  background: rgba(255, 255, 255, 0.85);
+  color: #0f172a;
+}
+
+.lp-sched-add-btn.lp-sched-add-btn--inline:hover {
+  filter: none;
+  transform: scale(1.05);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .lp-person-add-banner .lp-sched-add-btn--inline {
+    border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+    background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+    color: var(--accent);
+  }
+
+  .lp-root[data-theme="light"] .lp-person-add-banner .lp-sched-add-btn--inline {
+    border-color: rgba(15, 23, 42, 0.14);
+    background: rgba(255, 255, 255, 0.85);
+    color: #0f172a;
+  }
 }
 
 .lp-person-row-main {
-  flex: 1;
   min-width: 0;
   width: auto;
 }
@@ -1208,48 +1347,6 @@
   background: rgba(79, 106, 230, 0.08);
 }
 
-.lp-person-add-alloc {
-  flex-shrink: 0;
-  align-self: flex-start;
-  width: 22px;
-  height: 22px;
-  margin: 3px 0 0 1px;
-  padding: 0;
-  border: none;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0.42;
-  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease, transform 0.15s ease;
-}
-
-.lp-person-row-shell:hover .lp-person-add-alloc {
-  opacity: 0.85;
-}
-
-.lp-person-add-alloc:hover {
-  opacity: 1;
-  color: var(--accent);
-  background: var(--accent-glow);
-}
-
-.lp-person-add-alloc:focus-visible {
-  opacity: 1;
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-/* Touch / coarse pointers: keep control discoverable without hover */
-@media (hover: none) {
-  .lp-person-add-alloc {
-    opacity: 0.72;
-  }
-}
-
 .lp-person-row {
   flex: 1;
   width: 100%;
@@ -1275,13 +1372,15 @@
   flex: 1;
   width: auto;
   min-width: 0;
+  padding: 0;
+  cursor: default;
 }
 
-.lp-person-row:hover {
+.lp-person-row:hover:not(.lp-person-hours-hit) {
   background: linear-gradient(90deg, rgba(108, 140, 255, 0.06) 0%, rgba(108, 140, 255, 0.02) 100%);
 }
 
-.lp-root[data-theme="light"] .lp-person-row:hover {
+.lp-root[data-theme="light"] .lp-person-row:hover:not(.lp-person-hours-hit) {
   background: linear-gradient(90deg, rgba(79, 106, 230, 0.08) 0%, rgba(79, 106, 230, 0.03) 100%);
 }
 
@@ -1303,7 +1402,7 @@
     font-size 0.28s cubic-bezier(0.22, 1, 0.36, 1), transform 0.2s ease;
 }
 
-.lp-person-row:hover .lp-avatar {
+.lp-person-row-shell:hover .lp-avatar {
   transform: scale(1.04);
   box-shadow:
     0 4px 14px rgba(0, 0, 0, 0.25),
@@ -1383,6 +1482,170 @@
   font-weight: 650;
   padding: 4px 9px;
   border-radius: var(--radius-md, 10px);
+  position: relative;
+}
+
+/* ── Person tags: continuous soft glow + slow light sweep (drop-shadow preserves inline chroma shadow) ── */
+.lp-person-tags .float-tag-chroma.lp-schedule-tag {
+  animation: lpTagContinuousGlow 3.8s ease-in-out infinite;
+}
+
+.lp-person-tags .float-tag-chroma.lp-schedule-tag:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.lp-person-tags .float-tag-chroma.lp-schedule-tag:nth-child(2) {
+  animation-delay: 0.6s;
+}
+
+.lp-person-tags .lp-tag-more-pill {
+  animation: lpTagMorePillGlow 3.8s ease-in-out infinite;
+  animation-delay: 0.3s;
+}
+
+.lp-root[data-theme="light"] .lp-person-tags .float-tag-chroma.lp-schedule-tag {
+  animation-name: lpTagContinuousGlowLight;
+}
+
+.lp-root[data-theme="light"] .lp-person-tags .lp-tag-more-pill {
+  animation-name: lpTagMorePillGlowLight;
+}
+
+.lp-person-row-shell:hover .lp-person-tags .float-tag-chroma.lp-schedule-tag,
+.lp-person-row-shell:hover .lp-person-tags .lp-tag-more-pill {
+  animation-duration: 2.6s;
+}
+
+/* Dark: soft white halo that breathes — always on */
+@keyframes lpTagContinuousGlow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.18)) drop-shadow(0 0 10px rgba(255, 255, 255, 0.08))
+      drop-shadow(0 0 20px rgba(255, 255, 255, 0.04));
+  }
+  50% {
+    filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.32)) drop-shadow(0 0 14px rgba(255, 255, 255, 0.14))
+      drop-shadow(0 0 28px rgba(255, 255, 255, 0.08));
+  }
+}
+
+@keyframes lpTagMorePillGlow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 2px color-mix(in srgb, var(--accent) 35%, rgba(255, 255, 255, 0.2)))
+      drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 18%, transparent));
+  }
+  50% {
+    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 50%, rgba(255, 255, 255, 0.35)))
+      drop-shadow(0 0 16px color-mix(in srgb, var(--accent) 28%, transparent));
+  }
+}
+
+/* Light: lift + crisp edge glow so it reads on pale chips */
+@keyframes lpTagContinuousGlowLight {
+  0%,
+  100% {
+    filter: brightness(1) drop-shadow(0 0 3px rgba(255, 255, 255, 0.85)) drop-shadow(0 1px 2px rgba(15, 23, 42, 0.06))
+      drop-shadow(0 0 12px rgba(255, 255, 255, 0.35));
+  }
+  50% {
+    filter: brightness(1.02) drop-shadow(0 0 6px rgba(255, 255, 255, 1)) drop-shadow(0 2px 4px rgba(15, 23, 42, 0.07))
+      drop-shadow(0 0 18px rgba(255, 255, 255, 0.55));
+  }
+}
+
+@keyframes lpTagMorePillGlowLight {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--accent) 25%, rgba(255, 255, 255, 0.6)))
+      drop-shadow(0 0 12px color-mix(in srgb, var(--accent) 15%, transparent));
+  }
+  50% {
+    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 40%, rgba(255, 255, 255, 0.85)))
+      drop-shadow(0 0 18px color-mix(in srgb, var(--accent) 22%, transparent));
+  }
+}
+
+/* Edge-only sheen (keeps label readable; main “light” is filter glow above) */
+.lp-person-tags .float-tag-chroma.lp-schedule-tag::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    rgba(255, 255, 255, 0.07) 0%,
+    transparent 18%,
+    transparent 45%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 55%,
+    transparent 82%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  background-size: 200% 100%;
+  opacity: 0.85;
+  animation: lpTagShimmerSweep 5s ease-in-out infinite;
+  transition: opacity 0.35s ease;
+  mask-image: linear-gradient(to bottom, black 0%, black 22%, transparent 38%, transparent 62%, black 78%, black 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 0%, black 22%, transparent 38%, transparent 62%, black 78%, black 100%);
+}
+
+.lp-root[data-theme="light"] .lp-person-tags .float-tag-chroma.lp-schedule-tag::after {
+  background: linear-gradient(
+    105deg,
+    rgba(255, 255, 255, 0.2) 0%,
+    transparent 18%,
+    transparent 45%,
+    rgba(255, 255, 255, 0.28) 50%,
+    transparent 55%,
+    transparent 82%,
+    rgba(255, 255, 255, 0.12) 100%
+  );
+  background-size: 200% 100%;
+}
+
+.lp-person-row-shell:hover .lp-person-tags .float-tag-chroma.lp-schedule-tag::after {
+  opacity: 1;
+  animation-duration: 3.2s;
+}
+
+@keyframes lpTagShimmerSweep {
+  0% {
+    background-position: 130% 0;
+  }
+  100% {
+    background-position: -30% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-person-tags .float-tag-chroma.lp-schedule-tag,
+  .lp-person-tags .lp-tag-more-pill {
+    animation: none;
+  }
+
+  .lp-root:not([data-theme="light"]) .lp-person-tags .float-tag-chroma.lp-schedule-tag {
+    filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.12));
+  }
+
+  .lp-root[data-theme="light"] .lp-person-tags .float-tag-chroma.lp-schedule-tag {
+    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.5)) drop-shadow(0 1px 2px rgba(15, 23, 42, 0.06));
+  }
+
+  .lp-person-tags .lp-tag-more-pill {
+    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 22%, transparent));
+  }
+
+  .lp-person-tags .float-tag-chroma.lp-schedule-tag::after {
+    animation: none;
+    opacity: 0.18;
+  }
+
+  .lp-person-row-shell:hover .lp-person-tags .float-tag-chroma.lp-schedule-tag,
+  .lp-person-row-shell:hover .lp-person-tags .lp-tag-more-pill {
+    animation: none;
+  }
 }
 
 .lp-tag-more-pill {
@@ -1390,12 +1653,18 @@
   align-items: center;
   padding: 4px 9px;
   border-radius: var(--radius-md, 10px);
-  background: color-mix(in srgb, var(--btn-sec) 88%, var(--text-muted));
+  background: color-mix(in srgb, var(--accent) 12%, var(--btn-sec));
   color: var(--text-soft);
   font-size: 10px;
   font-weight: 650;
   letter-spacing: 0.02em;
-  border: 1px solid var(--border-sub);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border-sub));
+}
+
+.lp-root[data-theme="light"] .lp-tag-more-pill {
+  background: color-mix(in srgb, var(--accent) 8%, #f1f5f9);
+  color: color-mix(in srgb, var(--text-soft) 70%, #0f172a);
+  border-color: color-mix(in srgb, var(--accent) 20%, #cbd5e1);
 }
 
 .lp-person-hours {
@@ -2093,6 +2362,7 @@ button.lp-block.lp-block-alloc.lp-block-alloc-project {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* fill / border come from inline projectCodeChipStyles(barColor, theme) */
   background: rgba(0, 0, 0, 0.22);
   border: 1px solid rgba(255, 255, 255, 0.14);
 }
@@ -2183,28 +2453,52 @@ button.lp-block.lp-block-leave:hover {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--border));
+  color: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 40;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-  transition: color 0.15s, border-color 0.15s;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent),
+    0 8px 24px rgba(0, 0, 0, 0.35),
+    0 2px 10px color-mix(in srgb, var(--accent) 24%, transparent);
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
 }
 
 .lp-root[data-theme="light"] .lp-fab {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  color: color-mix(in srgb, var(--accent) 88%, #0f172a);
+  background: color-mix(in srgb, var(--accent) 10%, #ffffff);
+  border-color: color-mix(in srgb, var(--accent) 32%, #94a3b8);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent),
+    0 8px 28px rgba(15, 22, 40, 0.1),
+    0 2px 12px color-mix(in srgb, var(--accent) 18%, rgba(15, 22, 40, 0.12));
 }
 
 .lp-fab:hover {
   color: var(--accent);
-  border-color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent),
+    0 10px 28px rgba(0, 0, 0, 0.38),
+    0 4px 14px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+.lp-root[data-theme="light"] .lp-fab:hover {
+  background: color-mix(in srgb, var(--accent) 16%, #ffffff);
 }
 
 @media (max-width: 1100px) {

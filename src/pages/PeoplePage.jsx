@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from "react";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Users,
   User,
@@ -42,7 +44,10 @@ import {
 } from "../utils/peopleSort.js";
 import { CreateAllocationModal, leaveLabel } from "../components/AllocationModals.jsx";
 import { resolveColorForProjectLabel } from "../utils/projectColors.js";
+import { useEnhancedMode } from "../enhanced/useEnhancedMode.js";
 import "./PeoplePage.css";
+
+const UserInsightPanel = lazy(() => import("../components/UserInsightPanel.jsx"));
 
 function allocationHasPerson(a, pid) {
   if (Array.isArray(a.personIds) && a.personIds.length > 0) return a.personIds.includes(pid);
@@ -73,6 +78,7 @@ function toggleArr(list, v) {
 export default function PeoplePage() {
   const { theme: mode } = useAppTheme();
   const t = T[mode];
+  const enhancedMode = useEnhancedMode();
 
   const {
     people,
@@ -137,6 +143,10 @@ export default function PeoplePage() {
   const [allocPreselectPerson, setAllocPreselectPerson] = useState(null);
   const [allocPreselectProject, setAllocPreselectProject] = useState(null);
   const [allocDefaultTab, setAllocDefaultTab] = useState("allocation");
+
+  const [personInsight, setPersonInsight] = useState(null);
+  const insightTimerRef = useRef(null);
+  useEffect(() => () => clearTimeout(insightTimerRef.current), []);
 
   const schedulePeople = useMemo(
     () => [...people].filter((p) => !p.archived).sort((a, b) => a.name.localeCompare(b.name)),
@@ -397,6 +407,26 @@ export default function PeoplePage() {
     );
   }, [filtered, peopleSort, peopleOrderMap, allocations]);
 
+  const insightPerson = useMemo(() => {
+    if (!personInsight) return null;
+    return (
+      filteredSorted.find((x) => x.id === personInsight.personId) ||
+      people.find((x) => x.id === personInsight.personId) ||
+      null
+    );
+  }, [personInsight, filteredSorted, people]);
+
+  useEffect(() => {
+    if (!enhancedMode) return;
+    const fn = (e) => {
+      if (e.key !== "Escape") return;
+      clearTimeout(insightTimerRef.current);
+      setPersonInsight(null);
+    };
+    window.addEventListener("keydown", fn);
+    return () => window.removeEventListener("keydown", fn);
+  }, [enhancedMode]);
+
   useEffect(() => {
     const h = (e) => {
       if (sortWrapRef.current && !sortWrapRef.current.contains(e.target)) setSortOpen(false);
@@ -465,6 +495,7 @@ export default function PeoplePage() {
     <div
       className="people-page-root"
       data-theme={mode === "light" ? "light" : "dark"}
+      data-enhanced-mode={enhancedMode ? "1" : "0"}
       style={{
         background: t.bg,
         color: t.text,
@@ -847,14 +878,35 @@ export default function PeoplePage() {
               {filteredSorted.map((p,idx)=>{
                 const sel=selected.has(p.id);
                 return (
-                  <tr key={p.id} onClick={()=>openEdit(p)}
+                  <tr
+                    key={p.id}
+                    data-people-insight-row={p.id}
+                    onClick={()=>openEdit(p)}
                     style={{
                       borderBottom:`1px solid ${t.border}`,background:sel?t.selRow:"transparent",
                       cursor:"pointer",transition:"background 0.12s",
                       animation:mounted?`rowIn 0.35s ease-out ${idx*0.025}s both`:"none",
                     }}
-                    onMouseEnter={(e)=>{ if(!sel) e.currentTarget.style.background=t.rowHov; }}
-                    onMouseLeave={(e)=>{ if(!sel) e.currentTarget.style.background=sel?t.selRow:"transparent"; }}>
+                    onMouseEnter={(e) => {
+                      if (!sel) e.currentTarget.style.background = t.rowHov;
+                      if (!enhancedMode) return;
+                      clearTimeout(insightTimerRef.current);
+                      insightTimerRef.current = window.setTimeout(() => {
+                        const r = e.currentTarget.getBoundingClientRect();
+                        const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
+                        setPersonInsight({
+                          personId: p.id,
+                          top: r.top,
+                          left: Math.min(r.right + 8, vw - 328),
+                        });
+                      }, 620);
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!sel) e.currentTarget.style.background = sel ? t.selRow : "transparent";
+                      clearTimeout(insightTimerRef.current);
+                      setPersonInsight(null);
+                    }}
+                  >
                     <td style={{ padding:"12px 14px" }} onClick={(e)=>e.stopPropagation()}>
                       <input type="checkbox" checked={sel} onChange={()=>toggleSel(p.id)} style={{ accentColor:t.chk,cursor:"pointer",width:16,height:16 }}/>
                     </td>
@@ -899,6 +951,42 @@ export default function PeoplePage() {
           </table>
         </div>
       </main>
+
+      {createPortal(
+        <AnimatePresence>
+          {enhancedMode && personInsight && insightPerson ? (
+            <motion.div
+              key={insightPerson.id}
+              style={{
+                position: "fixed",
+                left: personInsight.left,
+                top: Math.max(8, personInsight.top),
+                zIndex: 4000,
+                pointerEvents: "none",
+                ["--surface"]: t.surface,
+                ["--border"]: t.border,
+                ["--text"]: t.text,
+                ["--text-muted"]: t.textMuted,
+                ["--text-soft"]: t.textSoft,
+                ["--accent"]: t.accent,
+              }}
+              initial={{ opacity: 0, scale: 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <Suspense fallback={null}>
+                <UserInsightPanel
+                  person={insightPerson}
+                  allocations={scheduleAllocations}
+                  theme={mode === "light" ? "light" : "dark"}
+                />
+              </Suspense>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>,
+        document.body
+      )}
 
       <PersonModal
         open={modalOpen} onClose={()=>{ setModalOpen(false); setEditingPerson(null); }}

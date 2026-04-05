@@ -10,9 +10,9 @@ import AnimatedAppLoader from "./components/ui/AnimatedAppLoader.jsx";
 import RouteSkeleton from "./components/ui/RouteSkeleton.jsx";
 import PageTransition from "./components/ui/PageTransition.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
-import CommandPalette from "./components/command/CommandPalette.jsx";
 import { Toaster } from "sonner";
 
+const CommandPalette = lazy(() => import("./components/command/CommandPalette.jsx"));
 const LandingPage = lazy(() => import("./pages/LandingPage.jsx"));
 const PeoplePage = lazy(() => import("./pages/PeoplePage.jsx"));
 const ProjectsPage = lazy(() => import("./pages/ProjectsPage.jsx"));
@@ -86,7 +86,9 @@ function AuthGate() {
     <>
       <WorkspaceReady>
         <SlapAnimationProvider>
-          <CommandPalette />
+          <Suspense fallback={null}>
+            <CommandPalette />
+          </Suspense>
           <div className="app-viewport">
             <AnimatedRoutes />
           </div>

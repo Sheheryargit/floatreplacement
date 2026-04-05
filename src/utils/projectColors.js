@@ -113,6 +113,27 @@ export function contrastingTextColor(hex) {
   return L > 0.62 ? "#151922" : "#fff";
 }
 
+/**
+ * Pill behind project code (ARTC, Internal, …) on schedule bars — tints with project bar color per theme.
+ * @param {string} barHex
+ * @param {"light" | "dark"} theme
+ */
+export function projectCodeChipStyles(barHex, theme) {
+  const hex = (barHex || "#6366f1").trim();
+  const isLight = theme === "light";
+  const fg = contrastingTextColor(hex);
+  return {
+    background: isLight
+      ? `color-mix(in srgb, ${hex} 24%, #ffffff)`
+      : `color-mix(in srgb, ${hex} 44%, rgba(12, 14, 20, 0.94))`,
+    border: `1px solid color-mix(in srgb, ${hex} 62%, ${isLight ? "#0f172a" : "#f8fafc"})`,
+    color: fg,
+    boxShadow: isLight
+      ? "0 1px 0 rgba(255,255,255,0.65) inset, 0 1px 2px rgba(15,22,40,0.08)"
+      : "0 1px 2px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)",
+  };
+}
+
 /** Default color for a new registry project id (stable, not random). */
 export function colorForNewProjectId(projectId) {
   const id = Math.max(1, Number(projectId) || 1);

@@ -23,10 +23,10 @@ export function tagChromaProps(label, isDark, extraClass = "") {
     return {
       className: ["float-tag-chroma", extraClass].filter(Boolean).join(" "),
       style: {
-        background: `rgba(${base},0.18)`,
-        color: `rgb(${Math.min(255, r + 78)},${Math.min(255, g + 78)},${Math.min(255, b + 82)})`,
-        borderColor: `rgba(${base},0.38)`,
-        boxShadow: `0 0 16px rgba(${base},0.12)`,
+        background: `rgba(${base},0.28)`,
+        color: `rgb(${Math.min(255, r + 92)},${Math.min(255, g + 88)},${Math.min(255, b + 94)})`,
+        border: `1px solid rgba(${base},0.52)`,
+        boxShadow: `0 0 20px rgba(${base},0.14), inset 0 1px 0 rgba(255,255,255,0.07)`,
       },
     };
   }
@@ -34,10 +34,10 @@ export function tagChromaProps(label, isDark, extraClass = "") {
   return {
     className: ["float-tag-chroma", extraClass].filter(Boolean).join(" "),
     style: {
-      background: `rgba(${base},0.11)`,
-      color: `rgb(${Math.max(0, r - 52)},${Math.max(0, g - 48)},${Math.max(0, b - 48)})`,
-      borderColor: `rgba(${base},0.24)`,
-      boxShadow: "0 1px 0 rgba(255,255,255,0.6) inset",
+      background: `rgba(${base},0.16)`,
+      color: `rgb(${Math.max(0, r - 38)},${Math.max(0, g - 34)},${Math.max(0, b - 34)})`,
+      border: `1px solid rgba(${base},0.38)`,
+      boxShadow: "0 1px 0 rgba(255,255,255,0.75) inset, 0 1px 2px rgba(15,22,40,0.06)",
     },
   };
 }

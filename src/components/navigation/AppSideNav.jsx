@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, memo } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   CalendarDays,
@@ -34,7 +34,7 @@ const V2_MODAL = {
     "This feature ships in a future release.\nContact Sheher on Slack if needed.",
 };
 
-export default function AppSideNav() {
+function AppSideNav() {
   const navigate = useNavigate();
   const { openDialog } = useAppDialog();
   const { triggerSlap } = useSlapAnimation();
@@ -229,3 +229,5 @@ export default function AppSideNav() {
     </aside>
   );
 }
+
+export default memo(AppSideNav);
