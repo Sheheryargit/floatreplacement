@@ -93,8 +93,11 @@
 }
 
 .settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   border-radius: var(--radius-xl);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .settings-card--glow {

@@ -1,0 +1,100 @@
+.float-palette-seg {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: var(--radius-xl);
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 4px;
+  position: relative;
+}
+
+:root[data-theme="light"] .float-palette-seg {
+  background: rgba(15, 23, 42, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.float-palette-seg-btn {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px 8px 10px;
+  border: none;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: color var(--duration-fast) ease;
+}
+
+.float-palette-seg-btn--active {
+  color: var(--color-text);
+}
+
+.float-palette-seg-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-brand) 35%, transparent) 0%,
+    color-mix(in srgb, var(--color-accent) 22%, transparent) 100%
+  );
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-brand) 25%, transparent) inset,
+    0 4px 20px color-mix(in srgb, var(--color-brand) 18%, transparent);
+  z-index: -1;
+}
+
+.float-palette-swatch {
+  position: relative;
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12) inset;
+}
+
+.float-palette-swatch--alloc8 {
+  background: linear-gradient(145deg, #00e5c8, #00a896 55%, #0d9488);
+}
+
+.float-palette-swatch--stellar {
+  background: linear-gradient(145deg, #2997ff 0%, #0c0c0e 42%, #e82127 100%);
+}
+
+.float-palette-seg-copy {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  line-height: 1.15;
+}
+
+.float-palette-seg-lbl {
+  font-weight: 650;
+}
+
+.float-palette-seg-sub {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.75;
+}
+
+@media (max-width: 520px) {
+  .float-palette-seg-sub {
+    display: none;
+  }
+  .float-palette-seg-btn {
+    padding: 8px 12px;
+  }
+}

@@ -2191,7 +2191,7 @@ button.lp-block.lp-block-alloc.lp-block-alloc-project {
   outline-offset: 2px;
 }
 
-/* ── Work allocation bar — layered rail, load fill, stage/billable, detail highlight ── */
+/* ── Work allocation bar — thick project-color border, inner wash + load fill ── */
 .lp-alloc-lane--stripe {
   border-radius: 9px;
   background: rgba(124, 106, 247, 0.05);
@@ -2203,48 +2203,6 @@ button.lp-block.lp-block-alloc.lp-block-alloc-project {
 
 .lp-alloc-bar.lp-block-alloc-project {
   transform-origin: center center;
-}
-
-.lp-alloc-bar__stage-top {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  z-index: 6;
-  pointer-events: none;
-  border-radius: inherit;
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.lp-alloc-bar__rail {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 5px;
-  z-index: 1;
-  pointer-events: none;
-  border-radius: 3px 0 0 3px;
-  box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.14);
-}
-
-.lp-alloc-bar--day .lp-alloc-bar__rail::after {
-  content: "";
-  position: absolute;
-  left: 1px;
-  top: 0;
-  width: 2px;
-  height: 8px;
-  border-radius: 1px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.35);
-}
-
-.lp-root[data-theme="light"] .lp-alloc-bar--day .lp-alloc-bar__rail::after {
-  background: rgba(18, 24, 38, 0.88);
-  box-shadow: none;
 }
 
 .lp-alloc-bar__underlay {
@@ -2291,13 +2249,13 @@ button.lp-block.lp-block-alloc.lp-block-alloc-project {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 7px 10px 7px 13px;
+  padding: 7px 10px;
   gap: 5px;
   box-sizing: border-box;
 }
 
 .lp-alloc-bar--micro .lp-alloc-bar__body {
-  padding: 5px 8px 5px 11px;
+  padding: 5px 8px;
   gap: 3px;
   justify-content: center;
 }

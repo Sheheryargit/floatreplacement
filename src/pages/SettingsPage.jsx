@@ -10,12 +10,13 @@ import { useAppDialog } from "../context/AppDialogContext.jsx";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
 import { SettingsItem } from "../components/ui/SettingsItem.jsx";
 import { ThemePreferenceControl } from "../components/ui/ThemePreferenceControl.jsx";
+import { PalettePreferenceControl } from "../components/ui/PalettePreferenceControl.jsx";
 import { ToggleSwitch } from "../components/ui/ToggleSwitch.jsx";
 import { useEnhancedMode, useSetEnhancedMode } from "../enhanced/useEnhancedMode.js";
 import "./SettingsPage.css";
 
 export default function SettingsPage() {
-  const { theme, themePreference, setThemePreference } = useAppTheme();
+  const { theme, themePreference, setThemePreference, palette, setPalette } = useAppTheme();
   const enhancedMode = useEnhancedMode();
   const setEnhancedMode = useSetEnhancedMode();
   const { lock } = useAuth();
@@ -94,6 +95,13 @@ export default function SettingsPage() {
           <div className="settings-card settings-card--glow">
             <SettingsItem label="Theme" subtext="Dark, light, or match system" showChevron={false}>
               <ThemePreferenceControl value={themePreference} onChange={setThemePreference} />
+            </SettingsItem>
+            <SettingsItem
+              label="Palette"
+              subtext="Alloc8 teal or Stellar (graphite, Tesla red · Apple blue)"
+              showChevron={false}
+            >
+              <PalettePreferenceControl value={palette} onChange={setPalette} />
             </SettingsItem>
           </div>
         </section>

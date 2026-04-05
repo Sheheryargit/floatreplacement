@@ -124,9 +124,9 @@ export function projectCodeChipStyles(barHex, theme) {
   const fg = contrastingTextColor(hex);
   return {
     background: isLight
-      ? `color-mix(in srgb, ${hex} 24%, #ffffff)`
-      : `color-mix(in srgb, ${hex} 44%, rgba(12, 14, 20, 0.94))`,
-    border: `1px solid color-mix(in srgb, ${hex} 62%, ${isLight ? "#0f172a" : "#f8fafc"})`,
+      ? `color-mix(in srgb, ${hex} 20%, #ffffff)`
+      : `color-mix(in srgb, ${hex} 38%, rgba(12, 14, 20, 0.94))`,
+    border: `1px solid color-mix(in srgb, ${hex} 58%, ${isLight ? "#0f172a" : "#f8fafc"})`,
     color: fg,
     boxShadow: isLight
       ? "0 1px 0 rgba(255,255,255,0.65) inset, 0 1px 2px rgba(15,22,40,0.08)"

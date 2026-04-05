@@ -258,6 +258,35 @@ function layoutAllocation(alloc, scheduleModel, viewMode) {
   return { start: i0, span };
 }
 
+/**
+ * Split a week/month layout that spans multiple ISO weeks into one segment per week.
+ * Each segment shows the same allocation (project, hours, etc.) — e.g. Wed–Fri then Mon–Fri
+ * appear as two bars instead of one continuous bar across the Fri↔Mon week boundary.
+ */
+function splitLayoutByWorkWeek(lay, scheduleModel) {
+  const keys = scheduleModel.slots.map((s) => s.dateKey);
+  const i0 = lay.start;
+  const i1 = lay.start + lay.span - 1;
+  if (i0 < 0 || i1 >= keys.length || i1 < i0) return [lay];
+  const segments = [];
+  let segStart = i0;
+  let curMonday = weekMondayKey(dateFromKey(keys[i0]));
+  for (let idx = i0 + 1; idx <= i1; idx++) {
+    const km = weekMondayKey(dateFromKey(keys[idx]));
+    if (km !== curMonday) {
+      const segSpan = Math.max(MIN_WEEK_MONTH_SPAN_COLS, idx - segStart);
+      segments.push({ start: segStart, span: segSpan });
+      segStart = idx;
+      curMonday = km;
+    }
+  }
+  segments.push({
+    start: segStart,
+    span: Math.max(MIN_WEEK_MONTH_SPAN_COLS, i1 - segStart + 1),
+  });
+  return segments.length > 0 ? segments : [lay];
+}
+
 /** Greedy lane assignment for overlapping [start, start+span) intervals. Mutates segments with .stack. */
 function assignAllocationStackLevels(segments) {
   const sorted = [...segments].sort((a, b) => {
@@ -300,7 +329,17 @@ function layoutsForAllocation(alloc, scheduleModel, viewMode) {
 
   for (let i = 0; i < 80; i++) {
     const lay = layoutAllocation({ ...alloc, startDate: start, endDate: end }, scheduleModel, viewMode);
-    if (lay) out.push({ ...lay, occ: i });
+    if (lay) {
+      if (viewMode === "day") {
+        out.push({ ...lay, occ: i, weekPart: 0 });
+      } else {
+        const splits = splitLayoutByWorkWeek(lay, scheduleModel);
+        const weekSplitCount = splits.length;
+        splits.forEach((sli, partIdx) => {
+          out.push({ ...sli, occ: i, weekPart: partIdx, weekSplitCount });
+        });
+      }
+    }
     if (repeatId === "none") break;
     const next = advanceRepeatWindow(start, end, repeatId);
     if (!next) break;
@@ -630,7 +669,6 @@ const timelineRowEqual = (prev, next) => {
   if (prev.gridTemplate !== next.gridTemplate) return false;
   if (prev.scheduleModel !== next.scheduleModel) return false;
   if (prev.projects !== next.projects) return false;
-  if (prev.projectByLabel !== next.projectByLabel) return false;
   if (prev.enhancedMode !== next.enhancedMode) return false;
   if (prev.enhancedDimmedRow !== next.enhancedDimmedRow) return false;
   if (prev.enhancedFocusedRow !== next.enhancedFocusedRow) return false;
@@ -677,36 +715,27 @@ function mixRgbHex(hex, target, amount) {
   return `#${clampByte(R).toString(16).padStart(2, "0")}${clampByte(G).toString(16).padStart(2, "0")}${clampByte(B).toString(16).padStart(2, "0")}`;
 }
 
-/** Matches `STAGES` in ProjectsPage (visual accent only). */
-const PROJECT_STAGE_TOP = {
-  draft: "#636d84",
-  tentative: "#f59e0b",
-  confirmed: "#34d399",
-  completed: "#4fc3f7",
-  cancelled: "#ff4d6a",
-};
-
 function allocationBarChromeStyles(barColor, hours, theme) {
   const light = theme === "light";
-  const rim = mixRgbHex(barColor, 255, light ? 0.55 : 0.22);
   const hnorm = Math.min(1, Math.max(0, hours) / BAR_H_NORM);
   const sheen = light
-    ? "inset 0 1px 0 rgba(255,255,255,0.55), inset 0 -1px 0 rgba(0,0,0,0.06)"
-    : "inset 0 1px 0 rgba(255,255,255,0.24), inset 0 -1px 0 rgba(0,0,0,0.38)";
-  const edge = light ? "rgba(15,22,40,0.1)" : "rgba(0,0,0,0.42)";
-  const glow = `0 0 0 1px ${edge}, 0 4px ${14 + hnorm * 16}px ${hexToRgba(barColor, light ? 0.2 + hnorm * 0.12 : 0.32 + hnorm * 0.12)}, 0 ${18 + hnorm * 14}px ${40 + hnorm * 28}px ${hexToRgba(barColor, light ? 0.09 + hnorm * 0.07 : 0.16)}`;
+    ? "inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -1px 0 rgba(0,0,0,0.05)"
+    : "inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.35)";
+  const drop = light
+    ? `0 2px 10px ${hexToRgba(barColor, 0.2 + hnorm * 0.08)}`
+    : `0 2px 12px rgba(0,0,0,0.42)`;
   return {
-    boxShadow: `${sheen}, ${glow}`,
-    border: `1px solid ${hexToRgba(rim, light ? 0.45 : 0.38)}`,
+    boxShadow: `${sheen}, ${drop}`,
+    border: `3px solid ${barColor}`,
   };
 }
 
-/** Softer interior wash behind text (rail carries saturated accent). */
+/** Softer interior wash behind text — slightly lifted toward white / mid-tones for calmer UI. */
 function allocationBarInnerWash(barColor, theme) {
   const light = theme === "light";
-  const hi = mixRgbHex(barColor, 255, light ? 0.62 : 0.38);
-  const mid = mixRgbHex(barColor, light ? 255 : 0, light ? 0.28 : 0.22);
-  const lo = mixRgbHex(barColor, 0, light ? 0.14 : 0.4);
+  const hi = mixRgbHex(barColor, 255, light ? 0.72 : 0.46);
+  const mid = mixRgbHex(barColor, light ? 255 : 0, light ? 0.36 : 0.28);
+  const lo = mixRgbHex(barColor, 0, light ? 0.1 : 0.34);
   return `linear-gradient(168deg, ${hi} 0%, ${mid} 42%, ${lo} 100%)`;
 }
 
@@ -751,7 +780,6 @@ const TimelineRow = memo(function TimelineRow({
   openAllocationDetail,
   handleTimelineClick,
   todayDateKey,
-  projectByLabel,
   enhancedMode,
   enhancedDimmedRow,
   enhancedFocusedRow,
@@ -808,7 +836,7 @@ const TimelineRow = memo(function TimelineRow({
         a,
         lay,
         occIdx: lay.occ,
-        segKey: `${a.id}-o${lay.occ}-s${lay.start}-sp${lay.span}`,
+        segKey: `${a.id}-o${lay.occ}-wk${lay.weekPart ?? 0}-s${lay.start}-sp${lay.span}`,
         start: lay.start,
         span: lay.span,
       }))
@@ -1081,19 +1109,16 @@ const TimelineRow = memo(function TimelineRow({
                       const fg = contrastingTextColor(barColor);
                       const chrome = allocationBarChromeStyles(barColor, h, theme);
                       const innerWash = allocationBarInnerWash(barColor, theme);
-                      const reg = projectByLabel.get((seg.a.project || "").trim()) ?? null;
-                      const stageKey = reg?.stage && PROJECT_STAGE_TOP[reg.stage] ? reg.stage : null;
-                      const stageTop = stageKey ? PROJECT_STAGE_TOP[stageKey] : null;
-                      const billTint =
-                        reg && typeof reg.billable === "boolean"
-                          ? reg.billable
-                            ? "var(--lp-alloc-bill-yes, #22c55e)"
-                            : "var(--lp-alloc-bill-no, #f59e0b)"
-                          : null;
-                      const topAccent = stageTop || billTint;
 
                       const brPx = allocationBarBorderRadiusPx(widthPct);
-                      const micro = widthPct < 5.5;
+                      // Narrow bars switch to initials ("micro"). Week view: ~5 weekday columns (~20%/day) so
+                      // micro is rare. Month view: ~20+ columns (~4–5%/day) so almost every day is "narrow" and
+                      // would show code initials (e.g. "AM") instead of the full name — disable micro in month.
+                      // Week-split segments also keep full label so each segment matches the widest one.
+                      const micro =
+                        viewMode !== "month" &&
+                        widthPct < 5.5 &&
+                        (seg.lay.weekSplitCount ?? 1) <= 1;
                       const compactInitials = allocationCompactInitials(projectName, projectCode);
                       const hoursFontW = 600 + Math.round(hnorm * 220);
                       const clampedHw = Math.min(820, Math.max(600, hoursFontW));
@@ -1153,19 +1178,11 @@ const TimelineRow = memo(function TimelineRow({
                             openAllocationDetail(seg.a);
                           }}
                         >
-                          {topAccent ? (
-                            <span
-                              className="lp-alloc-bar__stage-top"
-                              style={{ background: topAccent }}
-                              aria-hidden
-                            />
-                          ) : null}
-                          <span className="lp-alloc-bar__rail" style={{ backgroundColor: barColor }} aria-hidden />
                           <span className="lp-alloc-bar__underlay" style={{ background: innerWash }} aria-hidden />
                           <span
                             className="lp-alloc-bar__load"
                             style={{
-                              background: `linear-gradient(to top, ${hexToRgba(barColor, theme === "light" ? 0.42 : 0.5)}, ${hexToRgba(barColor, 0)})`,
+                              background: `linear-gradient(to top, ${hexToRgba(barColor, theme === "light" ? 0.34 : 0.42)}, ${hexToRgba(barColor, 0)})`,
                               height: `${hnorm * 100}%`,
                             }}
                             aria-hidden
@@ -2550,7 +2567,6 @@ export default function LandingPage() {
                     openAllocationDetail={openAllocationDetail}
                     handleTimelineClick={handleTimelineClick}
                     todayDateKey={todayDateKey}
-                    projectByLabel={projectByLabel}
                     enhancedMode={enhancedMode}
                     enhancedDimmedRow={dimRow}
                     enhancedFocusedRow={focusedRow}
