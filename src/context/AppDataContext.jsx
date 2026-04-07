@@ -26,7 +26,7 @@ import * as peopleApi from "../lib/api/people.js";
 import * as projectsApi from "../lib/api/projects.js";
 import * as allocationsApi from "../lib/api/allocations.js";
 import * as lookupsApi from "../lib/api/lookups.js";
-import { isSupabaseConfigured } from "../lib/supabase.js";
+import { isSupabaseConfigured, supabase } from "../lib/supabase.js";
 import * as workspaceSettingsApi from "../lib/api/workspaceSettings.js";
 import {
   migrateFilterRulesFromLegacyTags,
@@ -283,40 +283,52 @@ export const useAppStore = create((set, get) => ({
 }));
 
 export function syncPersonCreate(person) {
-  dbSync(async () => {
-    await peopleApi.createPerson(person);
-    await refreshPublicHolidayAllocationsInStore();
-  });
+  if (!isSupabaseConfigured) return Promise.resolve(person);
+  return Promise.resolve()
+    .then(() => peopleApi.createPerson(person))
+    .then(async (created) => {
+      await refreshPublicHolidayAllocationsInStore();
+      return created;
+    });
 }
 export function syncPersonUpdate(person) {
-  dbSync(async () => {
-    await peopleApi.updatePerson(person);
-    await refreshPublicHolidayAllocationsInStore();
-  });
+  if (!isSupabaseConfigured) return Promise.resolve(person);
+  return Promise.resolve()
+    .then(() => peopleApi.updatePerson(person))
+    .then(async (updated) => {
+      await refreshPublicHolidayAllocationsInStore();
+      return updated;
+    });
 }
 export function syncPeopleDelete(ids) {
-  dbSync(async () => {
-    await peopleApi.deletePeople(ids);
-    await refreshPublicHolidayAllocationsInStore();
-  });
+  if (!isSupabaseConfigured) return Promise.resolve();
+  return Promise.resolve()
+    .then(() => peopleApi.deletePeople(ids))
+    .then(() => refreshPublicHolidayAllocationsInStore());
 }
 export function syncProjectCreate(project) {
-  dbSync(() => projectsApi.createProject(project));
+  if (!isSupabaseConfigured) return Promise.resolve(project);
+  return projectsApi.createProject(project);
 }
 export function syncProjectUpdate(project) {
-  dbSync(() => projectsApi.updateProject(project));
+  if (!isSupabaseConfigured) return Promise.resolve(project);
+  return projectsApi.updateProject(project);
 }
 export function syncProjectsDelete(ids) {
-  dbSync(() => projectsApi.deleteProjects(ids));
+  if (!isSupabaseConfigured) return Promise.resolve();
+  return projectsApi.deleteProjects(ids);
 }
 export function syncAllocationCreate(allocation) {
-  dbSync(() => allocationsApi.createAllocation(allocation));
+  if (!isSupabaseConfigured) return Promise.resolve(allocation);
+  return allocationsApi.createAllocation(allocation);
 }
 export function syncAllocationUpdate(allocation) {
-  dbSync(() => allocationsApi.updateAllocation(allocation));
+  if (!isSupabaseConfigured) return Promise.resolve(allocation);
+  return allocationsApi.updateAllocation(allocation);
 }
 export function syncAllocationDelete(id) {
-  dbSync(() => allocationsApi.deleteAllocation(id));
+  if (!isSupabaseConfigured) return Promise.resolve();
+  return allocationsApi.deleteAllocation(id);
 }
 
 /**
@@ -396,6 +408,33 @@ export function AppDataProvider({ children }) {
     if (!isSupabaseConfigured) return undefined;
 
     let cancelled = false;
+    let timer = null;
+
+    const scheduleReload = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (cancelled) return;
+        loadWorkspaceFromSupabase()
+          .then((data) => {
+            if (cancelled || !data) return;
+            mergeRemoteWorkspace(data);
+          })
+          .catch((e) => console.warn("[float] Supabase reload:", e?.message || e));
+      }, 500);
+    };
+
+    // Realtime: keep multiple users in sync (best-effort).
+    const ch = supabase
+      ?.channel("float-workspace-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "allocations" },
+        () => scheduleReload()
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "people" }, () => scheduleReload())
+      .on("postgres_changes", { event: "*", schema: "public", table: "projects" }, () => scheduleReload())
+      .subscribe();
+
     loadWorkspaceFromSupabase()
       .then((data) => {
         if (cancelled || !data) return;
@@ -408,6 +447,8 @@ export function AppDataProvider({ children }) {
 
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
+      if (ch) supabase.removeChannel(ch);
     };
   }, []);
 

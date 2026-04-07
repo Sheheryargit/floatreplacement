@@ -547,7 +547,7 @@ function ProjectsTab({
     typeof syncAllocationDelete === "function" &&
     typeof syncAllocationUpdate === "function";
 
-  const removePersonFromProjectLabel = (projectLabel) => {
+  const removePersonFromProjectLabel = async (projectLabel) => {
     if (!canRemove || personId == null) return;
     const pl = (projectLabel || "").trim();
     const affected = allocations.filter(
@@ -563,8 +563,15 @@ function ProjectsTab({
             : [];
       const nextIds = ids.filter((id) => id !== personId);
       if (nextIds.length === 0) {
-        setAllocations((prev) => prev.filter((x) => x.id !== a.id));
-        queueMicrotask(() => syncAllocationDelete(a.id));
+        const prev = a;
+        setAllocations((prevList) => prevList.filter((x) => x.id !== a.id));
+        try {
+          await syncAllocationDelete(a.id);
+        } catch (e) {
+          setAllocations((prevList) => [...prevList, prev]);
+          toast.error("Update failed", { description: e?.message || String(e) });
+          return;
+        }
       } else {
         const merged = {
           ...a,
@@ -572,9 +579,20 @@ function ProjectsTab({
           personId: nextIds[0],
           updatedBy: "You",
           updatedAt: new Date().toISOString(),
+          version: Number(a.version) || 1,
         };
-        setAllocations((prev) => prev.map((x) => (x.id === a.id ? merged : x)));
-        queueMicrotask(() => syncAllocationUpdate(merged));
+        setAllocations((prevList) => prevList.map((x) => (x.id === a.id ? merged : x)));
+        try {
+          const saved = await syncAllocationUpdate(merged);
+          setAllocations((prevList) => prevList.map((x) => (x.id === a.id ? saved : x)));
+        } catch (e) {
+          const msg =
+            e?.name === "OptimisticLockError"
+              ? "Someone else edited this allocation. Refresh and retry."
+              : e?.message || String(e);
+          toast.error("Update failed", { description: msg });
+          return;
+        }
       }
     }
     toast.success("Schedule updated", { description: `Removed from ${pl}` });

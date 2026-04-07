@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useAppData } from "../context/AppDataContext.jsx";
+import { isSupabaseConfigured } from "../lib/supabase.js";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
 import { Button } from "../components/ui/Button.jsx";
 import { FloatSelect, FloatPersonPicker } from "../components/ui/FloatSelect.jsx";
-import { PROJECT_COLOR_PALETTE, colorForNewProjectId, avatarGradientFromName } from "../utils/projectColors.js";
+import { PROJECT_COLOR_PALETTE, avatarGradientFromName } from "../utils/projectColors.js";
 import { tagChromaProps } from "../utils/tagChroma.js";
 import { toast } from "sonner";
 import {
@@ -151,9 +152,9 @@ const Lbl=t=>({fontSize:13,color:t.textMuted,fontWeight:600,whiteSpace:"nowrap"}
 
 const defProject={name:"",code:"",owner:"sy",stage:"draft",billable:true,client:"",tags:[],startDate:"",endDate:"",notes:"",teamIds:[],managerEdit:false,color:"#6c8cff"};
 
-export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,clients,setClients,tagOpts,setTagOpts,getNextProjectId,t,tagIsDark=true}){
+export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,clients,setClients,tagOpts,setTagOpts,t,tagIsDark=true}){
   const[form,setForm]=useState(null);const ref=useRef(null);const isEdit=!!editProject;
-  useEffect(()=>{if(!open)return;if(editProject)setForm({...editProject,teamIds:[...(editProject.teamIds||[])]});else setForm({...defProject,color:colorForNewProjectId(getNextProjectId())});},[open,editProject?.id,getNextProjectId]);
+  useEffect(()=>{if(!open)return;if(editProject)setForm({...editProject,teamIds:[...(editProject.teamIds||[])]});else setForm({...defProject,color:PROJECT_COLORS[Math.floor(Math.random()*PROJECT_COLORS.length)]});},[open,editProject?.id]);
   if(!open||!form)return null;
   const upd=p=>setForm({...form,...p});
   const save=()=>{if(!form.name.trim())return;onSave(form);};
@@ -309,7 +310,6 @@ export default function ProjectsPage(){
     setClients,
     projectTagOpts,
     setProjectTagOpts,
-    getNextProjectId,
     syncProjectCreate,
     syncProjectUpdate,
     syncProjectsDelete,
@@ -329,11 +329,30 @@ export default function ProjectsPage(){
   const archivedCount=projects.filter(p=>p.archived).length;
   const toggleSel=id=>setSelected(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
   const toggleAll=()=>setSelected(selected.size===filtered.length?new Set():new Set(filtered.map(p=>p.id)));
-  const doDelete=()=>{const c=selected.size;const ids=[...selected];setProjects(projects.filter(p=>!selected.has(p.id)));setSelected(new Set());setConfirmDel(false);syncProjectsDelete(ids);toast.error(`${c} project${c===1?"":"s"} removed`);};
-  const archiveProject=id=>{const p=projects.find(x=>x.id===id);const next={...p,archived:!p.archived};setProjects(projects.map(x=>x.id===id?next:x));setSelected(new Set());toast.warning(`${p.name} ${p.archived?"restored":"archived"}`);syncProjectUpdate(next);};
+  const doDelete=async()=>{const c=selected.size;const ids=[...selected];const prev=projects;setProjects(projects.filter(p=>!selected.has(p.id)));setSelected(new Set());setConfirmDel(false);try{if(isSupabaseConfigured) await syncProjectsDelete(ids);toast.error(`${c} project${c===1?"":"s"} removed`);}catch(e){setProjects(prev);toast.error("Delete failed",{description:e?.message||String(e)});} };
+  const archiveProject=async(id)=>{const p=projects.find(x=>x.id===id);const next={...p,archived:!p.archived};const prev=projects;setProjects(projects.map(x=>x.id===id?next:x));setSelected(new Set());try{if(isSupabaseConfigured) await syncProjectUpdate(next);toast.warning(`${p.name} ${p.archived?"restored":"archived"}`);}catch(e){setProjects(prev);toast.error("Update failed",{description:e?.message||String(e)});} };
   const openAdd=()=>{setEditingProject(null);setModalOpen(true);};
   const openEdit=p=>{setEditingProject(p);setModalOpen(true);};
-  const handleSave=form=>{const clean={...form};delete clean._colorOpen;if(editingProject){const updated={...clean,id:editingProject.id,archived:editingProject.archived};setProjects(projects.map(p=>p.id===editingProject.id?updated:p).sort((a,b)=>a.name.localeCompare(b.name)));syncProjectUpdate(updated);toast.success(`${form.name} updated`);}else{const id=getNextProjectId();const created={...clean,id,archived:false};setProjects([...projects,created].sort((a,b)=>a.name.localeCompare(b.name)));syncProjectCreate(created);toast.success(`${form.name} created`);}setModalOpen(false);setEditingProject(null);};
+  const handleSave=async(form)=>{const clean={...form};delete clean._colorOpen;
+    if(editingProject){
+      const draft={...clean,id:editingProject.id,archived:editingProject.archived};
+      try{
+        const saved=isSupabaseConfigured? await syncProjectUpdate(draft):draft;
+        setProjects(projects.map(p=>p.id===editingProject.id?saved:p).sort((a,b)=>a.name.localeCompare(b.name)));
+        toast.success(`${form.name} updated`);
+        setModalOpen(false);setEditingProject(null);
+      }catch(e){toast.error("Update failed",{description:e?.message||String(e)});}
+    } else {
+      const tempId=typeof crypto!=="undefined"&&typeof crypto.randomUUID==="function"?crypto.randomUUID():`tmp_${Date.now()}`;
+      const draft={...clean,id:tempId,archived:false};
+      try{
+        const saved=isSupabaseConfigured? await syncProjectCreate(draft):draft;
+        setProjects([...projects,saved].sort((a,b)=>a.name.localeCompare(b.name)));
+        toast.success(`${form.name} created`);
+        setModalOpen(false);setEditingProject(null);
+      }catch(e){toast.error("Save failed",{description:e?.message||String(e)});}
+    }
+  };
   const handleModalArchive=()=>{if(editingProject){archiveProject(editingProject.id);setModalOpen(false);setEditingProject(null);}};
 
   return(
@@ -392,7 +411,7 @@ export default function ProjectsPage(){
         </div>
       </main>
 
-      <ProjectModal open={modalOpen} onClose={()=>{setModalOpen(false);setEditingProject(null);}} onSave={handleSave} onArchive={handleModalArchive} editProject={editingProject} people={people} clients={clients} setClients={setClients} tagOpts={projectTagOpts} setTagOpts={setProjectTagOpts} getNextProjectId={getNextProjectId} t={t} tagIsDark={mode==="dark"}/>
+      <ProjectModal open={modalOpen} onClose={()=>{setModalOpen(false);setEditingProject(null);}} onSave={handleSave} onArchive={handleModalArchive} editProject={editingProject} people={people} clients={clients} setClients={setClients} tagOpts={projectTagOpts} setTagOpts={setProjectTagOpts} t={t} tagIsDark={mode==="dark"}/>
       <Confirm open={confirmDel} t={t} onYes={doDelete} onNo={()=>{setConfirmDel(false);setSelected(new Set());}} title="Confirm deletion" desc={<>You are about to permanently remove <strong style={{color:t.text}}>{selected.size} project{selected.size===1?"":"s"}</strong>.</>} yesLabel="Delete" yesIcon={Trash2} yesDanger/>
 
 

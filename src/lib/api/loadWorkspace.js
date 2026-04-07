@@ -21,6 +21,13 @@ import { fetchPersonPublicHolidaysSafe, resolvePublicHolidayAllocations } from "
 export async function loadWorkspaceFromSupabase() {
   if (!isSupabaseConfigured) return null;
 
+  // Default allocation window: 90 days back, 365 days forward.
+  const now = new Date();
+  const start = new Date(now);
+  start.setDate(start.getDate() - 90);
+  const end = new Date(now);
+  end.setDate(end.getDate() + 365);
+
   const [
     people,
     projectsRaw,
@@ -36,7 +43,7 @@ export async function loadWorkspaceFromSupabase() {
   ] = await Promise.all([
     fetchPeople(),
     fetchProjects(),
-    fetchAllocations(),
+    fetchAllocations({ startDate: start, endDate: end }),
     fetchPersonPublicHolidaysSafe(),
     fetchRoles(),
     fetchDepts(),

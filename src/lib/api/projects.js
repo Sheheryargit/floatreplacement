@@ -1,9 +1,8 @@
 import { supabase, isSupabaseConfigured } from "../supabase.js";
 
 function projectToRow(p) {
-  const teamIds = Array.isArray(p.teamIds) ? p.teamIds.map(Number) : [];
+  const teamIds = Array.isArray(p.teamIds) ? p.teamIds.map(String) : [];
   return {
-    id: Number(p.id),
     name: p.name,
     code: p.code ?? "",
     client: p.client ?? "",
@@ -24,9 +23,9 @@ function projectToRow(p) {
 
 export function rowToProject(row) {
   if (!row) return null;
-  const teamIds = Array.isArray(row.team_ids) ? row.team_ids.map(Number) : [];
+  const teamIds = Array.isArray(row.team_ids) ? row.team_ids.map(String) : [];
   return {
-    id: Number(row.id),
+    id: row.id,
     name: row.name,
     code: row.code ?? "",
     client: row.client ?? "",
@@ -53,18 +52,25 @@ export async function fetchProjects() {
 
 export async function createProject(project) {
   if (!isSupabaseConfigured) return;
-  const { error } = await supabase.from("projects").insert(projectToRow(project));
+  const { data, error } = await supabase.from("projects").insert(projectToRow(project)).select("*").single();
   if (error) throw error;
+  return rowToProject(data);
 }
 
 export async function updateProject(project) {
   if (!isSupabaseConfigured) return;
-  const { error } = await supabase.from("projects").update(projectToRow(project)).eq("id", Number(project.id));
+  const { data, error } = await supabase
+    .from("projects")
+    .update(projectToRow(project))
+    .eq("id", String(project.id))
+    .select("*")
+    .single();
   if (error) throw error;
+  return rowToProject(data);
 }
 
 export async function deleteProjects(ids) {
   if (!isSupabaseConfigured || !ids.length) return;
-  const { error } = await supabase.from("projects").delete().in("id", ids.map(Number));
+  const { error } = await supabase.from("projects").delete().in("id", ids.map(String));
   if (error) throw error;
 }

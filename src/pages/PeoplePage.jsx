@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useAppData } from "../context/AppDataContext.jsx";
+import { isSupabaseConfigured } from "../lib/supabase.js";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
 import { Button } from "../components/ui/Button.jsx";
 import PersonModal, {
@@ -176,7 +177,7 @@ export default function PeoplePage() {
   }, []);
 
   const handleCreateAllocation = useCallback(
-    (payload) => {
+    async (payload) => {
       if (!payload.isLeave) {
         const pStart = payload.startDate;
         const pEnd = payload.endDate;
@@ -202,24 +203,29 @@ export default function PeoplePage() {
       }
 
       const projectColor = resolveColorForProjectLabel(payload.project, projects);
-      setAllocations((prev) => {
-        const nextId = prev.reduce((m, a) => Math.max(m, Number(a.id) || 0), 0) + 1;
-        const created = {
-          id: nextId,
-          ...payload,
-          updatedBy: "You",
-          updatedAt: new Date().toISOString(),
-          projectColor,
-        };
-        queueMicrotask(() => syncAllocationCreate(created));
-        return [...prev, created];
-      });
-      toast.success(payload.isLeave ? "Leave saved" : "Allocation saved", {
-        description: payload.isLeave
-          ? `${payload.startDate} → ${payload.endDate}`
-          : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
-        duration: 2800,
-      });
+      const createdDraft = {
+        id:
+          typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+            ? crypto.randomUUID()
+            : `tmp_${Date.now()}`,
+        ...payload,
+        updatedBy: "You",
+        updatedAt: new Date().toISOString(),
+        projectColor,
+        version: 1,
+      };
+      try {
+        const saved = isSupabaseConfigured ? await syncAllocationCreate(createdDraft) : createdDraft;
+        setAllocations((prev) => [...prev, saved]);
+        toast.success(payload.isLeave ? "Leave saved" : "Allocation saved", {
+          description: payload.isLeave
+            ? `${payload.startDate} → ${payload.endDate}`
+            : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
+          duration: 2800,
+        });
+      } catch (e) {
+        toast.error("Save failed", { description: e?.message || String(e) });
+      }
     },
     [setAllocations, projects, scheduleAllocations, people, syncAllocationCreate]
   );
@@ -468,25 +474,35 @@ export default function PeoplePage() {
   const toggleSel=(id)=>setSelected((p)=>{ const n=new Set(p); n.has(id)?n.delete(id):n.add(id); return n; });
   const toggleAll=()=>setSelected(selected.size===filteredSorted.length?new Set():new Set(filteredSorted.map((p)=>p.id)));
 
-  const doDelete=()=>{ const c=selected.size; const ids=[...selected]; setPeople(people.filter((p)=>!selected.has(p.id))); setSelected(new Set()); setConfirmDel(false); syncPeopleDelete(ids); toast.error(`${c} ${c===1?"person":"people"} removed`); };
-  const archivePerson=(id)=>{ const p=people.find((x)=>x.id===id); const next={...p,archived:!p.archived}; setPeople(people.map((x)=>x.id===id?next:x)); setSelected(new Set()); toast.warning(`${p.name} ${p.archived?"restored":"archived"}`); syncPersonUpdate(next); };
+  const doDelete=async()=>{ const c=selected.size; const ids=[...selected]; const prev=people; setPeople(people.filter((p)=>!selected.has(p.id))); setSelected(new Set()); setConfirmDel(false); try{ if(isSupabaseConfigured) await syncPeopleDelete(ids); toast.error(`${c} ${c===1?"person":"people"} removed`);} catch(e){ setPeople(prev); toast.error("Delete failed",{description:e?.message||String(e)});} };
+  const archivePerson=async(id)=>{ const p=people.find((x)=>x.id===id); const next={...p,archived:!p.archived}; const prev=people; setPeople(people.map((x)=>x.id===id?next:x)); setSelected(new Set()); try{ if(isSupabaseConfigured) await syncPersonUpdate(next); toast.warning(`${p.name} ${p.archived?"restored":"archived"}`);} catch(e){ setPeople(prev); toast.error("Update failed",{description:e?.message||String(e)});} };
 
   const openAdd=()=>{ setEditingPerson(null); setModalOpen(true); };
   const openEdit=(person)=>{ setEditingPerson(person); setModalOpen(true); };
 
-  const handleModalSave=(form)=>{
+  const handleModalSave=async(form)=>{
     if(editingPerson) {
-      const updated = formToPerson(form, editingPerson.id, editingPerson.archived);
-      setPeople(people.map((p)=>p.id===editingPerson.id?updated:p).sort((a,b)=>a.name.localeCompare(b.name)));
-      syncPersonUpdate(updated);
-      toast.success(`${form.name} updated`);
+      const draft = formToPerson(form, editingPerson.id, editingPerson.archived);
+      try{
+        const saved = isSupabaseConfigured ? await syncPersonUpdate(draft) : draft;
+        setPeople(people.map((p)=>p.id===editingPerson.id?saved:p).sort((a,b)=>a.name.localeCompare(b.name)));
+        toast.success(`${form.name} updated`);
+        setModalOpen(false); setEditingPerson(null);
+      } catch(e){
+        toast.error("Update failed",{description:e?.message||String(e)});
+      }
     } else {
-      const newP = formToPerson(form, getNextPersonId(), false);
-      setPeople([...people,newP].sort((a,b)=>a.name.localeCompare(b.name)));
-      syncPersonCreate(newP);
-      toast.success(`${form.name} added to directory`);
+      const tempId = typeof crypto!=="undefined"&&typeof crypto.randomUUID==="function" ? crypto.randomUUID() : `tmp_${Date.now()}`;
+      const draft = formToPerson(form, tempId, false);
+      try{
+        const saved = isSupabaseConfigured ? await syncPersonCreate(draft) : draft;
+        setPeople([...people,saved].sort((a,b)=>a.name.localeCompare(b.name)));
+        toast.success(`${form.name} added to directory`);
+        setModalOpen(false); setEditingPerson(null);
+      } catch(e){
+        toast.error("Save failed",{description:e?.message||String(e)});
+      }
     }
-    setModalOpen(false); setEditingPerson(null);
   };
   const handleModalArchive=()=>{
     if(editingPerson) { archivePerson(editingPerson.id); setModalOpen(false); setEditingPerson(null); }

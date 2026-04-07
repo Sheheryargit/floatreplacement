@@ -4,7 +4,6 @@ import { legacyHolidaysToRegion, regionToLegacyHolidays } from "../../constants/
 function personToRow(p) {
   const region = p.publicHolidayRegion ?? legacyHolidaysToRegion(p.holidays);
   return {
-    id: Number(p.id),
     name: p.name,
     email: p.email ?? "",
     role: p.role ?? "—",
@@ -32,7 +31,7 @@ export function rowToPerson(row) {
       ? String(row.public_holiday_region).trim()
       : legacyHolidaysToRegion(row.holidays);
   return {
-    id: Number(row.id),
+    id: row.id,
     name: row.name,
     email: row.email ?? "",
     role: row.role ?? "—",
@@ -61,18 +60,25 @@ export async function fetchPeople() {
 
 export async function createPerson(person) {
   if (!isSupabaseConfigured) return;
-  const { error } = await supabase.from("people").insert(personToRow(person));
+  const { data, error } = await supabase.from("people").insert(personToRow(person)).select("*").single();
   if (error) throw error;
+  return rowToPerson(data);
 }
 
 export async function updatePerson(person) {
   if (!isSupabaseConfigured) return;
-  const { error } = await supabase.from("people").update(personToRow(person)).eq("id", Number(person.id));
+  const { data, error } = await supabase
+    .from("people")
+    .update(personToRow(person))
+    .eq("id", String(person.id))
+    .select("*")
+    .single();
   if (error) throw error;
+  return rowToPerson(data);
 }
 
 export async function deletePeople(ids) {
   if (!isSupabaseConfigured || !ids.length) return;
-  const { error } = await supabase.from("people").delete().in("id", ids.map(Number));
+  const { error } = await supabase.from("people").delete().in("id", ids.map(String));
   if (error) throw error;
 }

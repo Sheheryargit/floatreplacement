@@ -69,6 +69,7 @@ import {
   countActiveFilterRules,
 } from "../utils/scheduleAllocationFilter.js";
 import { leaveBlocksWorkAllocation } from "../utils/allocationLeaveConflict.js";
+import { isSupabaseConfigured } from "../lib/supabase.js";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   normalizeLeaveTypeId,
@@ -1728,7 +1729,7 @@ export default function LandingPage() {
   );
 
   const handleCreateAllocation = useCallback(
-    (payload) => {
+    async (payload) => {
       // ── Block allocation if any assigned person is on leave during these dates ──
       if (!payload.isLeave) {
         const pStart = payload.startDate;
@@ -1755,31 +1756,37 @@ export default function LandingPage() {
       }
 
       const projectColor = resolveColorForProjectLabel(payload.project, projects);
-      setAllocations((prev) => {
-        const nextId = prev.reduce((m, a) => Math.max(m, Number(a.id) || 0), 0) + 1;
-        const created = {
-          id: nextId,
-          ...payload,
-          updatedBy: "You",
-          updatedAt: new Date().toISOString(),
-          projectColor,
-        };
-        queueMicrotask(() => syncAllocationCreate(created));
-        return [...prev, created];
-      });
-      toast.success(payload.isLeave ? "Leave saved" : "Allocation saved", {
-        description: payload.isLeave
-          ? `${payload.startDate} → ${payload.endDate}`
-          : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
-        duration: 2800,
-        className: "float-schedule-view-toast",
-      });
+      const createdDraft = {
+        id:
+          typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+            ? crypto.randomUUID()
+            : `tmp_${Date.now()}`,
+        ...payload,
+        updatedBy: "You",
+        updatedAt: new Date().toISOString(),
+        projectColor,
+        version: 1,
+      };
+
+      try {
+        const saved = isSupabaseConfigured ? await syncAllocationCreate(createdDraft) : createdDraft;
+        setAllocations((prev) => [...prev, saved]);
+        toast.success(payload.isLeave ? "Leave saved" : "Allocation saved", {
+          description: payload.isLeave
+            ? `${payload.startDate} → ${payload.endDate}`
+            : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
+          duration: 2800,
+          className: "float-schedule-view-toast",
+        });
+      } catch (e) {
+        toast.error("Save failed", { description: e?.message || String(e) });
+      }
     },
     [setAllocations, projects, scheduleAllocations, people, syncAllocationCreate]
   );
 
   const handleEditAllocation = useCallback(
-    (payload, id) => {
+    async (payload, id) => {
       // ── Block allocation if any assigned person is on leave during these dates ──
       if (!payload.isLeave) {
         const pStart = payload.startDate;
@@ -1807,42 +1814,52 @@ export default function LandingPage() {
       }
 
       const projectColor = payload.isLeave ? undefined : resolveColorForProjectLabel(payload.project, projects);
-      setAllocations((prev) =>
-        prev.map((a) => {
-          if (a.id !== id) return a;
-          const merged = {
-            ...a,
-            ...payload,
-            updatedBy: "You",
-            updatedAt: new Date().toISOString(),
-            projectColor,
-          };
-          queueMicrotask(() => syncAllocationUpdate(merged));
-          return merged;
-        })
-      );
-      toast.success(payload.isLeave ? "Leave updated" : "Allocation updated", {
-        description: payload.isLeave
-          ? `${payload.startDate} → ${payload.endDate}`
-          : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
-        duration: 2600,
-        className: "float-schedule-view-toast",
-      });
+      const prevAlloc = scheduleAllocations.find((a) => a.id === id) || null;
+      const merged = {
+        ...(prevAlloc || {}),
+        id,
+        ...payload,
+        updatedBy: "You",
+        updatedAt: new Date().toISOString(),
+        projectColor,
+        version: Number(prevAlloc?.version) || 1,
+      };
+
+      try {
+        const saved = isSupabaseConfigured ? await syncAllocationUpdate(merged) : merged;
+        setAllocations((prev) => prev.map((a) => (a.id === id ? saved : a)));
+        toast.success(payload.isLeave ? "Leave updated" : "Allocation updated", {
+          description: payload.isLeave
+            ? `${payload.startDate} → ${payload.endDate}`
+            : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
+          duration: 2600,
+          className: "float-schedule-view-toast",
+        });
+      } catch (e) {
+        const msg = e?.name === "OptimisticLockError" ? "Someone else edited this allocation. Refresh and retry." : e?.message || String(e);
+        toast.error("Update failed", { description: msg });
+      }
     },
     [setAllocations, projects, scheduleAllocations, people, syncAllocationUpdate]
   );
 
   const handleDeleteAllocation = useCallback(
-    (alloc) => {
+    async (alloc) => {
       if (alloc?.syntheticPublicHoliday) {
         toast.message("Public holidays follow the person’s region", {
           description: "Change their region under Time off in the profile, or edit availability dates.",
         });
         return;
       }
-      setAllocations((prev) => prev.filter((a) => a.id !== alloc.id));
-      syncAllocationDelete(alloc.id);
-      toast.success("Allocation deleted");
+      const prev = alloc;
+      setAllocations((cur) => cur.filter((a) => a.id !== alloc.id));
+      try {
+        if (isSupabaseConfigured) await syncAllocationDelete(alloc.id);
+        toast.success("Allocation deleted");
+      } catch (e) {
+        setAllocations((cur) => [...cur, prev]);
+        toast.error("Delete failed", { description: e?.message || String(e) });
+      }
     },
     [setAllocations, syncAllocationDelete]
   );
@@ -1876,32 +1893,48 @@ export default function LandingPage() {
     setModalOpen(true);
   }, []);
 
-  const handleModalSave = (form) => {
+  const handleModalSave = async (form) => {
     if (editingPerson) {
-      const updated = formToPerson(form, editingPerson.id, editingPerson.archived);
-      setPeople(
-        people.map((p) => (p.id === editingPerson.id ? updated : p)).sort((a, b) => a.name.localeCompare(b.name))
-      );
-      syncPersonUpdate(updated);
-      toast.success(`${form.name} updated`);
+      const draft = formToPerson(form, editingPerson.id, editingPerson.archived);
+      try {
+        const saved = isSupabaseConfigured ? await syncPersonUpdate(draft) : draft;
+        setPeople(people.map((p) => (p.id === editingPerson.id ? saved : p)).sort((a, b) => a.name.localeCompare(b.name)));
+        toast.success(`${form.name} updated`);
+        setModalOpen(false);
+        setEditingPerson(null);
+      } catch (e) {
+        toast.error("Update failed", { description: e?.message || String(e) });
+      }
     } else {
-      const newP = formToPerson(form, getNextPersonId(), false);
-      setPeople([...people, newP].sort((a, b) => a.name.localeCompare(b.name)));
-      syncPersonCreate(newP);
-      toast.success(`${form.name} added to directory`);
+      const tempId =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `tmp_${Date.now()}`;
+      const draft = formToPerson(form, tempId, false);
+      try {
+        const saved = isSupabaseConfigured ? await syncPersonCreate(draft) : draft;
+        setPeople([...people, saved].sort((a, b) => a.name.localeCompare(b.name)));
+        toast.success(`${form.name} added to directory`);
+        setModalOpen(false);
+        setEditingPerson(null);
+      } catch (e) {
+        toast.error("Save failed", { description: e?.message || String(e) });
+      }
     }
-    setModalOpen(false);
-    setEditingPerson(null);
   };
 
-  const handleModalArchive = () => {
-    if (editingPerson) {
-      const next = { ...editingPerson, archived: !editingPerson.archived };
-      setPeople(people.map((p) => (p.id === editingPerson.id ? next : p)));
-      syncPersonUpdate(next);
+  const handleModalArchive = async () => {
+    if (!editingPerson) return;
+    const next = { ...editingPerson, archived: !editingPerson.archived };
+    setPeople(people.map((p) => (p.id === editingPerson.id ? next : p)));
+    try {
+      if (isSupabaseConfigured) await syncPersonUpdate(next);
       toast.warning(`${editingPerson.name} ${editingPerson.archived ? "restored" : "archived"}`);
       setModalOpen(false);
       setEditingPerson(null);
+    } catch (e) {
+      setPeople(people.map((p) => (p.id === editingPerson.id ? editingPerson : p)));
+      toast.error("Update failed", { description: e?.message || String(e) });
     }
   };
 
@@ -2686,15 +2719,22 @@ export default function LandingPage() {
       <ProjectModal
         open={projectCreateOpen}
         onClose={() => setProjectCreateOpen(false)}
-        onSave={(form) => {
+        onSave={async (form) => {
           const clean = { ...form };
           delete clean._colorOpen;
-          const id = getNextProjectId();
-          const created = { ...clean, id, archived: false };
-          setProjects([...projects, created].sort((a, b) => a.name.localeCompare(b.name)));
-          syncProjectCreate(created);
-          toast.success(`Project "${form.name}" created!`);
-          setProjectCreateOpen(false);
+          const tempId =
+            typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+              ? crypto.randomUUID()
+              : `tmp_${Date.now()}`;
+          const draft = { ...clean, id: tempId, archived: false };
+          try {
+            const saved = isSupabaseConfigured ? await syncProjectCreate(draft) : draft;
+            setProjects([...projects, saved].sort((a, b) => a.name.localeCompare(b.name)));
+            toast.success(`Project "${form.name}" created!`);
+            setProjectCreateOpen(false);
+          } catch (e) {
+            toast.error("Save failed", { description: e?.message || String(e) });
+          }
         }}
         people={people}
         clients={clients}

@@ -19,13 +19,13 @@ function syntheticPublicHolidayId(personId, holidayDateIso, name) {
 }
 
 /**
- * @param {Array<{ person_id: number, holiday_date: string, name: string, holiday_type?: string }>} rows
+ * @param {Array<{ person_id: string, holiday_date: string, name: string, holiday_type?: string }>} rows
  */
 export function rowsToSyntheticPublicHolidayAllocations(rows) {
   const list = [];
   for (const row of rows || []) {
-    const pid = Number(row.person_id);
-    if (!Number.isFinite(pid)) continue;
+    const pid = row.person_id != null ? String(row.person_id) : "";
+    if (!pid) continue;
     const dk = isoFromHolidayDate(row.holiday_date);
     if (!dk) continue;
     const name = (row.name || "Public holiday").trim() || "Public holiday";
