@@ -44,6 +44,7 @@ import {
 } from "../utils/peopleSort.js";
 import { CreateAllocationModal, leaveLabel } from "../components/AllocationModals.jsx";
 import { resolveColorForProjectLabel } from "../utils/projectColors.js";
+import { leaveBlocksWorkAllocation } from "../utils/allocationLeaveConflict.js";
 import { useEnhancedMode } from "../enhanced/useEnhancedMode.js";
 import "./PeoplePage.css";
 
@@ -182,7 +183,7 @@ export default function PeoplePage() {
         for (const pid of payload.personIds) {
           const leaveConflict = scheduleAllocations.find(
             (a) =>
-              a.isLeave &&
+              leaveBlocksWorkAllocation(a) &&
               allocationHasPerson(a, pid) &&
               a.startDate <= pEnd &&
               a.endDate >= pStart

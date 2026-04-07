@@ -68,6 +68,7 @@ import {
   personMatchesScheduleFilter,
   countActiveFilterRules,
 } from "../utils/scheduleAllocationFilter.js";
+import { leaveBlocksWorkAllocation } from "../utils/allocationLeaveConflict.js";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   normalizeLeaveTypeId,
@@ -355,8 +356,12 @@ function shortenAllocLabel(s, maxLen) {
 }
 
 function allocationDisplay(alloc) {
-  const parts = alloc.project.split("/").map((x) => x.trim());
-  const name = parts.length > 1 ? parts.slice(1).join(" / ") : parts[0] || alloc.project;
+  const raw = (alloc.project || "").trim();
+  if (!raw) {
+    return { projectName: "", projectCode: "", hoursLabel: `${Number(alloc.hoursPerDay) || 0}h` };
+  }
+  const parts = raw.split("/").map((x) => x.trim()).filter(Boolean);
+  const name = parts.length > 1 ? parts.slice(1).join(" / ") : parts[0] || raw;
   const code = parts.length > 1 ? parts[0] : "";
   const h = alloc.hoursPerDay;
   const hStr = Number.isInteger(h) ? String(h) : String(h);
@@ -650,14 +655,26 @@ function personHasOverloadInView(personId, allocations, scheduleModel, viewMode,
 const BAR_H_MIN = 26;
 const BAR_H_MAX = 136;
 const BAR_H_NORM = 7.5;
+/**
+ * Week/month bars show full project name (multi-line clamp), code chip, hours row, 3px border.
+ * Lane height is budgeted from this value; if too small, absolute-positioned bars overflow the row.
+ */
+const MIN_TIMELINE_BAR_CONTENT_PX = 104;
 
-function allocationBarHeightPx(alloc) {
+function allocationBarHeightPx(alloc, allocViewMode) {
   if (alloc?.isLeave) return 54;
   const h = Math.max(0, parseFloat(alloc.hoursPerDay) || 0);
-  if (h <= 0) return BAR_H_MIN + 6;
+  if (h <= 0) {
+    const base = BAR_H_MIN + 6;
+    return allocViewMode && allocViewMode !== "day" ? Math.max(base, MIN_TIMELINE_BAR_CONTENT_PX) : base;
+  }
   const t = Math.min(h, 12) / BAR_H_NORM;
   const curved = Math.pow(Math.min(t, 1.45), 0.52);
-  return Math.round(BAR_H_MIN + curved * (BAR_H_MAX - BAR_H_MIN));
+  let px = Math.round(BAR_H_MIN + curved * (BAR_H_MAX - BAR_H_MIN));
+  if (allocViewMode && allocViewMode !== "day") {
+    px = Math.max(px, MIN_TIMELINE_BAR_CONTENT_PX);
+  }
+  return px;
 }
 
 const timelineRowEqual = (prev, next) => {
@@ -748,8 +765,14 @@ function allocationBarBorderRadiusPx(widthPct) {
 
 function allocationCompactInitials(projectName, projectCode) {
   const code = (projectCode || "").trim();
-  if (code.length >= 2) return code.slice(0, 2).toUpperCase();
-  const parts = (projectName || "").trim().split(/\s+/).filter(Boolean);
+  const name = (projectName || "").trim();
+  const parts = name.split(/\s+/).filter(Boolean);
+  // Numeric-only codes (e.g. "12") read wrong as micro label; prefer letters from the project name.
+  if (code.length >= 2 && !/^\d+$/.test(code)) return code.slice(0, 2).toUpperCase();
+  if (code.length >= 2 && /^\d+$/.test(code)) {
+    if (parts.length >= 2) return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
+    if (name.length >= 2) return name.slice(0, 2).toUpperCase();
+  }
   if (parts.length >= 2) return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
   if (parts.length === 1 && parts[0].length >= 2) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0]?.[0] || "?").toUpperCase();
@@ -855,7 +878,7 @@ const TimelineRow = memo(function TimelineRow({
   for (let k = 0; k < allocLaneCount; k++) {
     const segs = workSegments.filter((s) => s.stack === k);
     if (segs.length === 0) continue;
-    const mh = Math.max(...segs.map((s) => allocationBarHeightPx(s.a))) + BAR_VPAD;
+    const mh = Math.max(...segs.map((s) => allocationBarHeightPx(s.a, allocViewMode))) + BAR_VPAD;
     stackHeightsSum += mh;
     if (k < allocLaneCount - 1) stackHeightsSum += LANE_STACK_GAP;
   }
@@ -1072,7 +1095,10 @@ const TimelineRow = memo(function TimelineRow({
               pointerEvents: "none" 
             }}
           >
-            <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "10px", width: "100%", position: "relative" }}>
+            <div
+              className="lp-alloc-lanes-root"
+              style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "10px", width: "100%", position: "relative" }}
+            >
               {Array.from({ length: allocLaneCount }).map((_, stackIdx) => {
                 const laneSegs = workSegments
                   .filter((s) => s.stack === stackIdx)
@@ -1081,7 +1107,7 @@ const TimelineRow = memo(function TimelineRow({
                 if (laneSegs.length === 0) return null;
 
                 const laneMinH =
-                  Math.max(...laneSegs.map((s) => allocationBarHeightPx(s.a))) + BAR_VPAD;
+                  Math.max(...laneSegs.map((s) => allocationBarHeightPx(s.a, allocViewMode))) + BAR_VPAD;
 
                 return (
                   <div
@@ -1094,15 +1120,20 @@ const TimelineRow = memo(function TimelineRow({
                     }}
                   >
                     {laneSegs.map((seg, segJ) => {
-                      const colStartFrac = seg.lay.start / nCols;
-                      const colWidthFrac = seg.lay.span / nCols;
+                      const startCol = Math.max(0, Math.min(seg.lay.start, Math.max(0, nCols - 1)));
+                      const spanClamped = Math.max(
+                        0,
+                        Math.min(seg.lay.span, nCols - startCol)
+                      );
+                      const colStartFrac = nCols > 0 ? startCol / nCols : 0;
+                      const colWidthFrac = nCols > 0 ? spanClamped / nCols : 0;
                       const leftPct = colStartFrac * 100;
                       const widthPct = colWidthFrac * 100;
                       const z = 20 + seg.stack * 20 + seg.occIdx + Math.floor(seg.lay.start);
 
                       const h = Math.max(0, parseFloat(seg.a.hoursPerDay) || 0);
                       const hnorm = Math.min(1, Math.max(0, h) / BAR_H_NORM);
-                      const calculatedHeight = allocationBarHeightPx(seg.a);
+                      const calculatedHeight = allocationBarHeightPx(seg.a, allocViewMode);
 
                       const { projectName, projectCode, hoursLabel } = allocationDisplay(seg.a);
                       const barColor = colorForAllocationBar(seg.a, projects);
@@ -1111,12 +1142,12 @@ const TimelineRow = memo(function TimelineRow({
                       const innerWash = allocationBarInnerWash(barColor, theme);
 
                       const brPx = allocationBarBorderRadiusPx(widthPct);
-                      // Narrow bars switch to initials ("micro"). Week view: ~5 weekday columns (~20%/day) so
-                      // micro is rare. Month view: ~20+ columns (~4–5%/day) so almost every day is "narrow" and
-                      // would show code initials (e.g. "AM") instead of the full name — disable micro in month.
-                      // Week-split segments also keep full label so each segment matches the widest one.
+                      // Micro layout (code initials): only on **day** (hourly) grid where columns are time slots.
+                      // Week/month/custom range use many date columns → narrow width% → never use micro or we show
+                      // project codes (e.g. "12") instead of names when endless-scroll adds many weeks.
+                      // Week-split segments keep full label per segment via weekSplitCount when micro applies.
                       const micro =
-                        viewMode !== "month" &&
+                        allocViewMode === "day" &&
                         widthPct < 5.5 &&
                         (seg.lay.weekSplitCount ?? 1) <= 1;
                       const compactInitials = allocationCompactInitials(projectName, projectCode);
@@ -1705,7 +1736,7 @@ export default function LandingPage() {
         for (const pid of payload.personIds) {
           const leaveConflict = scheduleAllocations.find(
             (a) =>
-              a.isLeave &&
+              leaveBlocksWorkAllocation(a) &&
               allocationHasPerson(a, pid) &&
               a.startDate <= pEnd &&
               a.endDate >= pStart
@@ -1757,7 +1788,7 @@ export default function LandingPage() {
           const leaveConflict = scheduleAllocations.find(
             (a) =>
               a.id !== id &&
-              a.isLeave &&
+              leaveBlocksWorkAllocation(a) &&
               allocationHasPerson(a, pid) &&
               a.startDate <= pEnd &&
               a.endDate >= pStart
