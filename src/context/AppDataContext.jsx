@@ -36,6 +36,9 @@ import {
 
 const LEGACY_STORAGE_KEY = "float-workspace-v1";
 
+/** Debounce window for postgres_changes → full reload (coalesces bursts from many editors). */
+const WORKSPACE_REALTIME_DEBOUNCE_MS = 900;
+
 export function dbSync(fn) {
   if (!isSupabaseConfigured) return;
   Promise.resolve()
@@ -143,6 +146,14 @@ function mergeRemoteWorkspace(remote) {
     schedulePeopleTagFilter,
     scheduleFilterRules,
   });
+}
+
+/** Reload workspace from Supabase and merge into store (e.g. after availability updates allocations). */
+export async function refreshWorkspaceFromSupabase() {
+  if (!isSupabaseConfigured) return null;
+  const data = await loadWorkspaceFromSupabase();
+  if (data) mergeRemoteWorkspace(data);
+  return data;
 }
 
 async function refreshPublicHolidayAllocationsInStore() {
@@ -394,6 +405,7 @@ export function useAppData() {
     syncAllocationCreate,
     syncAllocationUpdate,
     syncAllocationDelete,
+    refreshWorkspaceFromSupabase,
   };
 }
 
@@ -410,22 +422,35 @@ export function AppDataProvider({ children }) {
     let cancelled = false;
     let timer = null;
 
+    const runReload = () => {
+      if (cancelled) return;
+      loadWorkspaceFromSupabase()
+        .then((data) => {
+          if (cancelled || !data) return;
+          mergeRemoteWorkspace(data);
+        })
+        .catch((e) => console.warn("[float] Supabase reload:", e?.message || e));
+    };
+
     const scheduleReload = () => {
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        if (cancelled) return;
-        loadWorkspaceFromSupabase()
-          .then((data) => {
-            if (cancelled || !data) return;
-            mergeRemoteWorkspace(data);
-          })
-          .catch((e) => console.warn("[float] Supabase reload:", e?.message || e));
-      }, 500);
+      timer = setTimeout(runReload, WORKSPACE_REALTIME_DEBOUNCE_MS);
     };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") scheduleReload();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    // Unique channel per tab avoids cross-tab subscription quirks; postgres_changes still stream per client.
+    const channelName =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? `float-ws-${crypto.randomUUID()}`
+        : `float-ws-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
     // Realtime: keep multiple users in sync (best-effort).
     const ch = supabase
-      ?.channel("float-workspace-realtime")
+      ?.channel(channelName)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "allocations" },
@@ -447,6 +472,7 @@ export function AppDataProvider({ children }) {
 
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       if (timer) clearTimeout(timer);
       if (ch) supabase.removeChannel(ch);
     };

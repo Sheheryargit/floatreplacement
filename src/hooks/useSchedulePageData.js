@@ -7,6 +7,7 @@ import {
   syncAllocationCreate,
   syncAllocationUpdate,
   syncAllocationDelete,
+  refreshWorkspaceFromSupabase,
 } from "../context/AppDataContext.jsx";
 import { projectToAllocationLabel } from "../utils/projectColors.js";
 
@@ -84,5 +85,6 @@ export function useSchedulePageData() {
     syncAllocationCreate,
     syncAllocationUpdate,
     syncAllocationDelete,
+    refreshWorkspaceFromSupabase,
   };
 }

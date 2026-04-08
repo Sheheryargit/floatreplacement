@@ -26,6 +26,8 @@ import {
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useAppData } from "../context/AppDataContext.jsx";
 import { isSupabaseConfigured } from "../lib/supabase.js";
+import { syncPersonAvailabilityFromForm } from "../lib/api/personAvailability.js";
+import { previewAvailabilityHours } from "../utils/availabilityPreview.js";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
 import { Button } from "../components/ui/Button.jsx";
 import PersonModal, {
@@ -45,7 +47,7 @@ import {
 } from "../utils/peopleSort.js";
 import { CreateAllocationModal, leaveLabel } from "../components/AllocationModals.jsx";
 import { resolveColorForProjectLabel } from "../utils/projectColors.js";
-import { leaveBlocksWorkAllocation } from "../utils/allocationLeaveConflict.js";
+import { findLeaveOverlapWithWorkRange } from "../utils/allocationLeaveConflict.js";
 import { useEnhancedMode } from "../enhanced/useEnhancedMode.js";
 import "./PeoplePage.css";
 
@@ -104,6 +106,7 @@ export default function PeoplePage() {
     syncAllocationCreate,
     syncAllocationUpdate,
     syncAllocationDelete,
+    refreshWorkspaceFromSupabase,
   } = useAppData();
 
   const scheduleAllocations = useMemo(
@@ -182,20 +185,28 @@ export default function PeoplePage() {
         const pStart = payload.startDate;
         const pEnd = payload.endDate;
         for (const pid of payload.personIds) {
-          const leaveConflict = scheduleAllocations.find(
-            (a) =>
-              leaveBlocksWorkAllocation(a) &&
-              allocationHasPerson(a, pid) &&
-              a.startDate <= pEnd &&
-              a.endDate >= pStart
-          );
-          if (leaveConflict) {
+          let leaveConflict = null;
+          let overlap = null;
+          for (const a of scheduleAllocations) {
+            if (!allocationHasPerson(a, pid)) continue;
+            const o = findLeaveOverlapWithWorkRange(a, pStart, pEnd);
+            if (o) {
+              leaveConflict = a;
+              overlap = o;
+              break;
+            }
+          }
+          if (leaveConflict && overlap) {
             const personName = people.find((p) => p.id === pid)?.name || "This person";
             const leaveTypeName = leaveConflict.leaveType
               ? leaveLabel(leaveConflict.leaveType)
               : "Leave";
+            const rangeLabel =
+              overlap.start === overlap.end
+                ? overlap.start
+                : `${overlap.start} → ${overlap.end}`;
             toast.error(
-              `Cannot allocate ${personName} — they are on ${leaveTypeName} (${leaveConflict.startDate} to ${leaveConflict.endDate})`
+              `Cannot allocate ${personName} — they are on ${leaveTypeName} (${rangeLabel})`
             );
             return;
           }
@@ -481,12 +492,34 @@ export default function PeoplePage() {
   const openEdit=(person)=>{ setEditingPerson(person); setModalOpen(true); };
 
   const handleModalSave=async(form)=>{
+    const syncAvailAfterSave = async (saved) => {
+      if (!isSupabaseConfigured || !saved?.id) return;
+      const wh = parseFloat(String(form.weeklyHours ?? "37.5")) || 0;
+      const prev = previewAvailabilityHours({
+        mon: !!form.availMon,
+        tue: !!form.availTue,
+        wed: !!form.availWed,
+        thu: !!form.availThu,
+        fri: !!form.availFri,
+        weeklyHours: wh,
+      });
+      if (!prev.valid) return;
+      try {
+        await syncPersonAvailabilityFromForm(saved.id, form);
+        await refreshWorkspaceFromSupabase();
+      } catch (availErr) {
+        toast.warning("Profile saved; availability did not sync", {
+          description: availErr?.message || String(availErr),
+        });
+      }
+    };
     if(editingPerson) {
       const draft = formToPerson(form, editingPerson.id, editingPerson.archived);
       try{
         const saved = isSupabaseConfigured ? await syncPersonUpdate(draft) : draft;
         setPeople(people.map((p)=>p.id===editingPerson.id?saved:p).sort((a,b)=>a.name.localeCompare(b.name)));
         toast.success(`${form.name} updated`);
+        await syncAvailAfterSave(saved);
         setModalOpen(false); setEditingPerson(null);
       } catch(e){
         toast.error("Update failed",{description:e?.message||String(e)});
@@ -498,6 +531,7 @@ export default function PeoplePage() {
         const saved = isSupabaseConfigured ? await syncPersonCreate(draft) : draft;
         setPeople([...people,saved].sort((a,b)=>a.name.localeCompare(b.name)));
         toast.success(`${form.name} added to directory`);
+        await syncAvailAfterSave(saved);
         setModalOpen(false); setEditingPerson(null);
       } catch(e){
         toast.error("Save failed",{description:e?.message||String(e)});
@@ -1019,6 +1053,7 @@ export default function PeoplePage() {
           openCreateAllocationForPersonProject(person, projectLabel)
         }
         onOpenCreateLeave={(person) => openCreateLeaveForPerson(person)}
+        onRefreshWorkspace={refreshWorkspaceFromSupabase}
         tagTheme={mode}
       />
 

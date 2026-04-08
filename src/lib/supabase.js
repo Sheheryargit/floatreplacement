@@ -22,4 +22,17 @@ assertProductionSupabaseUrl(url);
 
 export const isSupabaseConfigured = Boolean(url && key);
 
-export const supabase = isSupabaseConfigured ? createClient(url, key) : null;
+/**
+ * Realtime + defaults tuned for many concurrent browser tabs (e.g. 20–30 planners).
+ * eventsPerSecond avoids flooding the client if the DB emits bursts of postgres_changes.
+ */
+export const supabase = isSupabaseConfigured
+  ? createClient(url, key, {
+      realtime: {
+        params: { eventsPerSecond: 12 },
+      },
+      global: {
+        headers: { "x-client-info": "float-schedule-web" },
+      },
+    })
+  : null;

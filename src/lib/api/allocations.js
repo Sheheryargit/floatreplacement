@@ -20,6 +20,7 @@ function allocationToRow(a) {
     leave_type: a.leaveType ?? null,
     updated_by: a.updatedBy ?? null,
     project_color: a.projectColor ?? null,
+    availability_slot_key: a.availabilitySlotKey ?? null,
   };
 }
 
@@ -47,6 +48,7 @@ export function rowToAllocation(row) {
     updatedAt: row.updated_at ?? "",
     projectColor: row.project_color ?? undefined,
     version: Number(row.version) || 1,
+    availabilitySlotKey: row.availability_slot_key ?? undefined,
   };
 }
 
@@ -65,12 +67,42 @@ export async function fetchAllocations({ startDate, endDate } = {}) {
   const s = isoDateKey(startDate);
   const e = isoDateKey(endDate);
 
-  let q = supabase.from("allocations").select("*, allocation_people(person_id)");
+  const select = "*, allocation_people(person_id)";
+
   if (s && e) {
-    // overlap: start_date <= e AND end_date >= s
-    q = q.lte("start_date", e).gte("end_date", s);
+    // Plain overlap: allocation interval intersects [s, e].
+    const [overlapRes, repeatingRes] = await Promise.all([
+      supabase
+        .from("allocations")
+        .select(select)
+        .lte("start_date", e)
+        .gte("end_date", s),
+      supabase
+        .from("allocations")
+        .select(select)
+        .not("repeat_id", "eq", "none")
+        .not("repeat_id", "is", null)
+        .lte("start_date", e),
+    ]);
+    if (overlapRes.error) throw overlapRes.error;
+    if (repeatingRes.error) throw repeatingRes.error;
+
+    // Recurring rows (e.g. availability "Other / Leave" with anchor dates in the past)
+    // may have end_date before `s` but still produce occurrences inside the window via
+    // advanceRepeatWindow — they must be loaded.
+    const byId = new Map();
+    for (const row of overlapRes.data || []) byId.set(row.id, row);
+    for (const row of repeatingRes.data || []) byId.set(row.id, row);
+    const merged = [...byId.values()].sort((a, b) =>
+      String(a.start_date).localeCompare(String(b.start_date))
+    );
+    return merged.map(rowToAllocation);
   }
-  const { data, error } = await q.order("start_date");
+
+  const { data, error } = await supabase
+    .from("allocations")
+    .select(select)
+    .order("start_date");
   if (error) throw error;
   return (data || []).map(rowToAllocation);
 }

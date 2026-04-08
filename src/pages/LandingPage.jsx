@@ -44,12 +44,14 @@ import PersonModal, {
   avGrad,
 } from "../components/PersonModal.jsx";
 import { toast } from "sonner";
+import { syncPersonAvailabilityFromForm } from "../lib/api/personAvailability.js";
+import { previewAvailabilityHours } from "../utils/availabilityPreview.js";
 import {
   CreateAllocationModal,
   AllocationDetailModal,
-  advanceRepeatWindow,
   leaveLabel,
 } from "../components/AllocationModals.jsx";
+import { advanceRepeatWindow } from "../utils/allocationRepeatWindow.js";
 import { ScheduleAllocationFilterMenu } from "../components/ScheduleAllocationFilterMenu.jsx";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
 import {
@@ -68,7 +70,11 @@ import {
   personMatchesScheduleFilter,
   countActiveFilterRules,
 } from "../utils/scheduleAllocationFilter.js";
-import { leaveBlocksWorkAllocation } from "../utils/allocationLeaveConflict.js";
+import {
+  findLeaveOverlapWithWorkRange,
+  maxWorkHoursOnDayAfterLeave,
+} from "../utils/allocationLeaveConflict.js";
+import { workAllocationCoversDateKey } from "../utils/allocationOccurrence.js";
 import { isSupabaseConfigured } from "../lib/supabase.js";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
@@ -628,7 +634,7 @@ function sumWorkHoursPersonOnDay(personId, allocations, dateKey) {
   for (const a of allocations) {
     if (a.isLeave) continue;
     if (!allocationHasPerson(a, personId)) continue;
-    if (dateKey >= a.startDate && dateKey <= a.endDate) {
+    if (workAllocationCoversDateKey(a, dateKey)) {
       sum += parseFloat(a.hoursPerDay) || 0;
     }
   }
@@ -647,7 +653,8 @@ function computePersonHoursInView(personId, allocations, scheduleModel, viewMode
 function personHasOverloadInView(personId, allocations, scheduleModel, viewMode, anchorDate) {
   const keys = visibleDateKeysForHours(scheduleModel, viewMode, anchorDate);
   for (const dk of keys) {
-    if (sumWorkHoursPersonOnDay(personId, allocations, dk) > STANDARD_DAY_HOURS + 1e-6) return true;
+    const maxH = maxWorkHoursOnDayAfterLeave(personId, allocations, dk, STANDARD_DAY_HOURS);
+    if (sumWorkHoursPersonOnDay(personId, allocations, dk) > maxH + 1e-6) return true;
   }
   return false;
 }
@@ -845,13 +852,22 @@ const TimelineRow = memo(function TimelineRow({
     onProjectClearIntent();
   }, [onProjectClearIntent]);
 
+  const hoursKeys = visibleDateKeysForHours(scheduleModel, viewMode, anchorDate);
   const hours = computePersonHoursInView(p.id, allocations, scheduleModel, viewMode, anchorDate);
-  const visibleDays = Math.max(1, visibleDateKeysForHours(scheduleModel, viewMode, anchorDate).length);
-  const cap = visibleDays * STANDARD_DAY_HOURS;
-  const pct = Math.min(100, Math.round((hours / cap) * 100));
+  const rawCap = hoursKeys.reduce(
+    (s, dk) => s + maxWorkHoursOnDayAfterLeave(p.id, allocations, dk, STANDARD_DAY_HOURS),
+    0
+  );
+  const pct =
+    rawCap > 0
+      ? Math.min(100, Math.round((hours / rawCap) * 100))
+      : hours > 1e-6
+        ? 100
+        : 0;
   const right =
     utilizationMode === "hours" ? `${hours.toFixed(hours % 1 ? 1 : 0)}h` : `${pct}%`;
   const overloaded = personHasOverloadInView(p.id, allocations, scheduleModel, viewMode, anchorDate);
+  const noWorkingDaysInView = hoursKeys.length > 0 && rawCap < 1e-6;
 
   const rowSegments = allocations
     .filter((a) => allocationHasPerson(a, p.id))
@@ -955,10 +971,16 @@ const TimelineRow = memo(function TimelineRow({
                   <button
                     type="button"
                     className="lp-sched-add-btn lp-sched-add-btn--inline"
-                    title="Add allocation"
+                    disabled={noWorkingDaysInView}
+                    title={
+                      noWorkingDaysInView
+                        ? "No working days in this view (all days have leave or are unavailable)"
+                        : "Add allocation (blocked on leave days when you save)"
+                    }
                     aria-label={`Add allocation for ${p.name}`}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (noWorkingDaysInView) return;
                       openCreateAllocation(p);
                     }}
                   >
@@ -1316,6 +1338,7 @@ export default function LandingPage() {
     syncAllocationCreate,
     syncAllocationUpdate,
     syncAllocationDelete,
+    refreshWorkspaceFromSupabase,
   } = useSchedulePageData();
 
   const scheduleAllocations = useMemo(
@@ -1537,10 +1560,16 @@ export default function LandingPage() {
     return s;
   }, [schedulePeople, scheduleAllocations, scheduleModel, viewMode, anchorDate]);
 
-  const teamCapacityHours = useMemo(
-    () => Math.max(STANDARD_DAY_HOURS, schedulePeople.length * visibleCapacityDays * STANDARD_DAY_HOURS),
-    [schedulePeople.length, visibleCapacityDays]
-  );
+  const teamCapacityHours = useMemo(() => {
+    const keys = visibleDateKeysForHours(scheduleModel, viewMode, anchorDate);
+    let cap = 0;
+    for (const p of schedulePeople) {
+      for (const dk of keys) {
+        cap += maxWorkHoursOnDayAfterLeave(p.id, scheduleAllocations, dk, STANDARD_DAY_HOURS);
+      }
+    }
+    return Math.max(STANDARD_DAY_HOURS, cap);
+  }, [schedulePeople, scheduleAllocations, scheduleModel, viewMode, anchorDate]);
 
   const teamUtilPercent = useMemo(
     () => (teamCapacityHours > 0 ? Math.min(100, Math.round((totalHours / teamCapacityHours) * 100)) : 0),
@@ -1723,9 +1752,23 @@ export default function LandingPage() {
       const colIndex = Math.min(Math.max(0, Math.floor(x / colWidth)), nCols - 1);
       const slot = scheduleModel.slots[colIndex];
       const clickedDate = slot?.dateKey ?? null;
+      if (person && clickedDate) {
+        const maxH = maxWorkHoursOnDayAfterLeave(
+          person.id,
+          scheduleAllocations,
+          clickedDate,
+          STANDARD_DAY_HOURS
+        );
+        if (maxH < 1e-6) {
+          toast.error(`${person.name} is not available that day`, {
+            description: "That date is covered by leave or recurring unavailability.",
+          });
+          return;
+        }
+      }
       openCreateAllocation(person, clickedDate);
     },
-    [scheduleModel, openCreateAllocation]
+    [scheduleModel, openCreateAllocation, scheduleAllocations]
   );
 
   const handleCreateAllocation = useCallback(
@@ -1735,20 +1778,28 @@ export default function LandingPage() {
         const pStart = payload.startDate;
         const pEnd = payload.endDate;
         for (const pid of payload.personIds) {
-          const leaveConflict = scheduleAllocations.find(
-            (a) =>
-              leaveBlocksWorkAllocation(a) &&
-              allocationHasPerson(a, pid) &&
-              a.startDate <= pEnd &&
-              a.endDate >= pStart
-          );
-          if (leaveConflict) {
+          let leaveConflict = null;
+          let overlap = null;
+          for (const a of scheduleAllocations) {
+            if (!allocationHasPerson(a, pid)) continue;
+            const o = findLeaveOverlapWithWorkRange(a, pStart, pEnd);
+            if (o) {
+              leaveConflict = a;
+              overlap = o;
+              break;
+            }
+          }
+          if (leaveConflict && overlap) {
             const personName = people.find((p) => p.id === pid)?.name || "This person";
             const leaveTypeName = leaveConflict.leaveType
               ? leaveLabel(leaveConflict.leaveType)
               : "Leave";
+            const rangeLabel =
+              overlap.start === overlap.end
+                ? overlap.start
+                : `${overlap.start} → ${overlap.end}`;
             toast.error(
-              `Cannot allocate ${personName} — they are on ${leaveTypeName} (${leaveConflict.startDate} to ${leaveConflict.endDate})`
+              `Cannot allocate ${personName} — they are on ${leaveTypeName} (${rangeLabel})`
             );
             return;
           }
@@ -1792,21 +1843,29 @@ export default function LandingPage() {
         const pStart = payload.startDate;
         const pEnd = payload.endDate;
         for (const pid of payload.personIds) {
-          const leaveConflict = scheduleAllocations.find(
-            (a) =>
-              a.id !== id &&
-              leaveBlocksWorkAllocation(a) &&
-              allocationHasPerson(a, pid) &&
-              a.startDate <= pEnd &&
-              a.endDate >= pStart
-          );
-          if (leaveConflict) {
+          let leaveConflict = null;
+          let overlap = null;
+          for (const a of scheduleAllocations) {
+            if (a.id === id) continue;
+            if (!allocationHasPerson(a, pid)) continue;
+            const o = findLeaveOverlapWithWorkRange(a, pStart, pEnd);
+            if (o) {
+              leaveConflict = a;
+              overlap = o;
+              break;
+            }
+          }
+          if (leaveConflict && overlap) {
             const personName = people.find((p) => p.id === pid)?.name || "This person";
             const leaveTypeName = leaveConflict.leaveType
               ? leaveLabel(leaveConflict.leaveType)
               : "Leave";
+            const rangeLabel =
+              overlap.start === overlap.end
+                ? overlap.start
+                : `${overlap.start} → ${overlap.end}`;
             toast.error(
-              `Cannot allocate ${personName} — they are on ${leaveTypeName} (${leaveConflict.startDate} to ${leaveConflict.endDate})`
+              `Cannot allocate ${personName} — they are on ${leaveTypeName} (${rangeLabel})`
             );
             return;
           }
@@ -1836,11 +1895,17 @@ export default function LandingPage() {
           className: "float-schedule-view-toast",
         });
       } catch (e) {
-        const msg = e?.name === "OptimisticLockError" ? "Someone else edited this allocation. Refresh and retry." : e?.message || String(e);
-        toast.error("Update failed", { description: msg });
+        if (e?.name === "OptimisticLockError") {
+          toast.error("Someone else edited this allocation", {
+            description: "Refreshing the schedule from the server.",
+          });
+          refreshWorkspaceFromSupabase().catch(() => {});
+        } else {
+          toast.error("Update failed", { description: e?.message || String(e) });
+        }
       }
     },
-    [setAllocations, projects, scheduleAllocations, people, syncAllocationUpdate]
+    [setAllocations, projects, scheduleAllocations, people, syncAllocationUpdate, refreshWorkspaceFromSupabase]
   );
 
   const handleDeleteAllocation = useCallback(
@@ -1894,12 +1959,34 @@ export default function LandingPage() {
   }, []);
 
   const handleModalSave = async (form) => {
+    const syncAvailAfterSave = async (saved) => {
+      if (!isSupabaseConfigured || !saved?.id) return;
+      const wh = parseFloat(String(form.weeklyHours ?? "37.5")) || 0;
+      const prev = previewAvailabilityHours({
+        mon: !!form.availMon,
+        tue: !!form.availTue,
+        wed: !!form.availWed,
+        thu: !!form.availThu,
+        fri: !!form.availFri,
+        weeklyHours: wh,
+      });
+      if (!prev.valid) return;
+      try {
+        await syncPersonAvailabilityFromForm(saved.id, form);
+        await refreshWorkspaceFromSupabase();
+      } catch (availErr) {
+        toast.warning("Profile saved; availability did not sync", {
+          description: availErr?.message || String(availErr),
+        });
+      }
+    };
     if (editingPerson) {
       const draft = formToPerson(form, editingPerson.id, editingPerson.archived);
       try {
         const saved = isSupabaseConfigured ? await syncPersonUpdate(draft) : draft;
         setPeople(people.map((p) => (p.id === editingPerson.id ? saved : p)).sort((a, b) => a.name.localeCompare(b.name)));
         toast.success(`${form.name} updated`);
+        await syncAvailAfterSave(saved);
         setModalOpen(false);
         setEditingPerson(null);
       } catch (e) {
@@ -1915,6 +2002,7 @@ export default function LandingPage() {
         const saved = isSupabaseConfigured ? await syncPersonCreate(draft) : draft;
         setPeople([...people, saved].sort((a, b) => a.name.localeCompare(b.name)));
         toast.success(`${form.name} added to directory`);
+        await syncAvailAfterSave(saved);
         setModalOpen(false);
         setEditingPerson(null);
       } catch (e) {
@@ -2677,6 +2765,7 @@ export default function LandingPage() {
           openCreateAllocationForPersonProject(person, projectLabel)
         }
         onOpenCreateLeave={(person) => openCreateLeaveForPerson(person)}
+        onRefreshWorkspace={refreshWorkspaceFromSupabase}
         tagTheme={theme}
       />
 

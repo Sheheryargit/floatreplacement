@@ -22,6 +22,16 @@ import {
 } from "../constants/auHolidayRegions.js";
 import { leaveLabel } from "./AllocationModals.jsx";
 import { leaveAccentTheme, isoDateLocal } from "../utils/leaveVisuals.js";
+import { isSupabaseConfigured } from "../lib/supabase.js";
+import {
+  getPersonAvailability,
+  putPersonAvailability,
+} from "../lib/api/personAvailability.js";
+import {
+  previewAvailabilityHours,
+  employmentToWorkType,
+  workTypeToEmployment,
+} from "../utils/availabilityPreview.js";
 
 /* ═══════════════════ DATA ═══════════════════ */
 const SEED_ROLES = [
@@ -62,6 +72,23 @@ export function nextPersonId() {
 /* ═══════════════════ HELPERS ═══════════════════ */
 const ini = (n) => { if(!n) return ""; const p=n.trim().split(/\s+/); return p.length===1?(p[0][0]||"").toUpperCase():(p[0][0]+p[p.length-1][0]).toUpperCase(); };
 const avGrad = avatarGradientFromName;
+const AVAIL_DEFAULTS = {
+  availMon: true,
+  availTue: true,
+  availWed: true,
+  availThu: true,
+  availFri: true,
+  weeklyHours: "37.5",
+};
+
+const DAY_FIELDS = [
+  { key: "availMon", short: "Mon" },
+  { key: "availTue", short: "Tue" },
+  { key: "availWed", short: "Wed" },
+  { key: "availThu", short: "Thu" },
+  { key: "availFri", short: "Fri" },
+];
+
 const personToForm = (p) => ({
   name:p.name, email:p.email||"", role:p.role==="—"?"No role":p.role,
   costRate:p.costRate||"0", billRate:p.billRate||"0",
@@ -70,6 +97,7 @@ const personToForm = (p) => ({
   startDate:p.startDate||"2026-01-01", endDate:p.endDate||"", workType:p.workType||"Full-time",
   notes:p.notes||"",
   publicHolidayRegion: p.publicHolidayRegion ?? legacyHolidaysToRegion(p.holidays),
+  ...AVAIL_DEFAULTS,
 });
 const formToPerson = (form, id, archived) => {
   const al = ACCESS_OPTS.find((a)=>a.value===form.access)?.label||"—";
@@ -350,21 +378,174 @@ function AccessTab({ form,setForm,t }) {
   </div>);
 }
 
-function AvailabilityTab({ form,setForm,t }) {
+function AvailabilityTab({ form, setForm, t, editPerson, onRefreshWorkspace, tagTheme }) {
+  const [applying, setApplying] = useState(false);
+  const weeklyNum = parseFloat(String(form.weeklyHours ?? "37.5")) || 0;
+  const preview = previewAvailabilityHours({
+    mon: !!form.availMon,
+    tue: !!form.availTue,
+    wed: !!form.availWed,
+    thu: !!form.availThu,
+    fri: !!form.availFri,
+    weeklyHours: weeklyNum,
+  });
+
+  const toggleDay = (fieldKey) => {
+    const nextVal = !form[fieldKey];
+    const n = DAY_FIELDS.reduce(
+      (acc, { key }) => acc + (key === fieldKey ? (nextVal ? 1 : 0) : (form[key] ? 1 : 0)),
+      0
+    );
+    if (n <= 0) {
+      toast.error("Select at least one weekday", {
+        description: "The schedule needs at least one working day.",
+      });
+      return;
+    }
+    setForm({ ...form, [fieldKey]: nextVal });
+  };
+
+  const applyToSchedule = async () => {
+    if (!editPerson?.id || !isSupabaseConfigured) {
+      toast.error("Save this person first to sync availability to the schedule.");
+      return;
+    }
+    if (!preview.valid) return;
+    setApplying(true);
+    try {
+      await putPersonAvailability({
+        personId: editPerson.id,
+        employmentType: workTypeToEmployment(form.workType),
+        weeklyHours: weeklyNum,
+        mon: !!form.availMon,
+        tue: !!form.availTue,
+        wed: !!form.availWed,
+        thu: !!form.availThu,
+        fri: !!form.availFri,
+      });
+      if (onRefreshWorkspace) await onRefreshWorkspace();
+      toast.success("Availability applied to schedule", {
+        description: "Weekly hours and leave blocks were updated on the server.",
+      });
+    } catch (e) {
+      toast.error("Could not apply availability", {
+        description: e?.message || String(e),
+      });
+    } finally {
+      setApplying(false);
+    }
+  };
+
   return (
     <div style={{ background:t.surfAlt,borderRadius:10,padding:20,border:`1px solid ${t.borderSub}`,display:"flex",flexDirection:"column",gap:18 }}>
       <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
         {[["Start date","startDate"],["End date","endDate"]].map(([lbl,key])=>(
-          <div key={key}><label style={Lbl(t)}>{lbl}</label><input type="date" value={form[key]} onChange={(e)=>setForm({...form,[key]:e.target.value})} style={{ ...Inp(t),colorScheme:t===T.dark?"dark":"light" }}/></div>
+          <div key={key}><label style={Lbl(t)}>{lbl}</label><input type="date" value={form[key]} onChange={(e)=>setForm({...form,[key]:e.target.value})} style={{ ...Inp(t),colorScheme:tagTheme==="dark"?"dark":"light" }}/></div>
         ))}
       </div>
       <div style={{ display:"flex",gap:0 }}>
-        {["Full-time","Part-time"].map((opt,i)=>(<button key={opt} onClick={()=>setForm({...form,workType:opt})} style={{
+        {["Full-time","Part-time"].map((opt,i)=>(<button key={opt} type="button" onClick={()=>{
+          if (opt === "Full-time") {
+            setForm({
+              ...form,
+              workType: opt,
+              ...AVAIL_DEFAULTS,
+            });
+          } else {
+            setForm({ ...form, workType: opt });
+          }
+        }} style={{
           padding:"9px 24px",fontSize:13,cursor:"pointer",fontWeight:600,border:`1.5px solid ${form.workType===opt?t.accent:t.borderIn}`,
           borderRadius:i===0?"8px 0 0 8px":"0 8px 8px 0",background:form.workType===opt?t.accentGlow:t.surfAlt,
           color:form.workType===opt?t.accent:t.textSoft,transition:"all 0.15s",marginLeft:i===1?-1.5:0,
         }}>{opt}</button>))}
       </div>
+
+      <div>
+        <label style={Lbl(t)}>Working days (Mon–Fri)</label>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+          {DAY_FIELDS.map(({ key, short }) => (
+            <label
+              key={key}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: `1.5px solid ${form[key] ? t.accent : t.borderIn}`,
+                background: form[key] ? t.accentGlow : t.surface,
+                cursor: "pointer",
+                userSelect: "none",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={!!form[key]}
+                onChange={() => toggleDay(key)}
+                style={{ accentColor: t.accent, width: 16, height: 16, cursor: "pointer" }}
+              />
+              <span style={{ fontSize: 13, fontWeight: 600, color: form[key] ? t.accent : t.textSoft }}>{short}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div>
+          <label style={Lbl(t)}>Total weekly hours</label>
+          <input
+            type="number"
+            min={0}
+            step={0.25}
+            value={form.weeklyHours}
+            onChange={(e) => setForm({ ...form, weeklyHours: e.target.value })}
+            style={{ ...Inp(t) }}
+          />
+        </div>
+        <div>
+          <label style={Lbl(t)}>Hours per working day (preview)</label>
+          <div
+            style={{
+              ...Inp(t),
+              display: "flex",
+              alignItems: "center",
+              color: preview.valid ? t.text : t.warn,
+              fontWeight: 600,
+            }}
+          >
+            {preview.valid ? preview.hoursPerDay : "—"}
+            {preview.valid ? (
+              <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 500, color: t.textMuted }}>
+                ({preview.workingDays} day{preview.workingDays === 1 ? "" : "s"})
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      <p style={{ margin: 0, fontSize: 12, color: t.textMuted, lineHeight: 1.5 }}>
+        Unchecked weekdays become weekly <strong style={{ color: t.textSoft }}>Other / Leave</strong> blocks on the schedule.
+        The server recalculates hours and replaces those rows when you apply or save.
+      </p>
+
+      {isSupabaseConfigured && editPerson?.id ? (
+        <Button
+          type="button"
+          variant="secondary"
+          size="md"
+          disabled={!preview.valid || applying}
+          onClick={applyToSchedule}
+          style={{ alignSelf: "flex-start" }}
+        >
+          {applying ? "Applying…" : "Apply to schedule"}
+        </Button>
+      ) : (
+        <p style={{ margin: 0, fontSize: 12, color: t.textDim }}>
+          Save the person first, then use Apply to schedule to push this pattern to the server.
+        </p>
+      )}
+
       <div><label style={Lbl(t)}>Notes</label><textarea value={form.notes} onChange={(e)=>setForm({...form,notes:e.target.value})} rows={4} style={{ ...Inp(t),resize:"vertical",minHeight:80,fontFamily:"inherit" }}/></div>
     </div>
   );
@@ -516,6 +697,7 @@ function ProjectsTab({
   syncAllocationDelete,
   syncAllocationUpdate,
   onOpenCreateAllocation,
+  onRefreshWorkspace,
 }) {
   const [pickKey, setPickKey] = useState(0);
   const personId = editPerson?.id;
@@ -586,11 +768,16 @@ function ProjectsTab({
           const saved = await syncAllocationUpdate(merged);
           setAllocations((prevList) => prevList.map((x) => (x.id === a.id ? saved : x)));
         } catch (e) {
-          const msg =
-            e?.name === "OptimisticLockError"
-              ? "Someone else edited this allocation. Refresh and retry."
-              : e?.message || String(e);
-          toast.error("Update failed", { description: msg });
+          if (e?.name === "OptimisticLockError") {
+            toast.error("Someone else edited this allocation", {
+              description: "Refreshing from the server.",
+            });
+            if (typeof onRefreshWorkspace === "function") {
+              onRefreshWorkspace().catch(() => {});
+            }
+          } else {
+            toast.error("Update failed", { description: e?.message || String(e) });
+          }
           return;
         }
       }
@@ -727,6 +914,7 @@ export function PersonModal({
   syncAllocationUpdate,
   onOpenCreateAllocation,
   onOpenCreateLeave,
+  onRefreshWorkspace,
   tagTheme = "dark",
 }) {
   const tagIsDark = tagTheme === "dark";
@@ -743,10 +931,34 @@ export function PersonModal({
         name:"",email:"",role:"No role",costRate:"0",billRate:"0",
         department:"No department",tags:[],type:"Employee",access:"none",
         startDate:"2026-01-01",endDate:"",workType:"Full-time",notes:"",publicHolidayRegion:"None",
+        ...AVAIL_DEFAULTS,
       });
       setDirty(false);
     }
   }, [open, editPerson]);
+
+  useEffect(() => {
+    if (!open || !editPerson?.id || !isSupabaseConfigured) return undefined;
+    let cancelled = false;
+    getPersonAvailability(editPerson.id)
+      .then((row) => {
+        if (cancelled || row == null || typeof row !== "object") return;
+        setForm((f) => ({
+          ...f,
+          workType: employmentToWorkType(row.employment_type),
+          weeklyHours: String(row.weekly_hours ?? "37.5"),
+          availMon: !!row.mon,
+          availTue: !!row.tue,
+          availWed: !!row.wed,
+          availThu: !!row.thu,
+          availFri: !!row.fri,
+        }));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [open, editPerson?.id]);
 
   if (!open || !form) return null;
 
@@ -838,7 +1050,16 @@ export function PersonModal({
         <div style={{ padding:"22px 32px 10px",overflowY:"auto",flex:1,minHeight:0 }}>
           {tab===0 && <InfoTab form={form} setForm={setFormWrap} roles={roles} setRoles={setRoles} depts={depts} setDepts={setDepts} tagOpts={tagOpts} setTagOpts={setTagOpts} t={t} tagIsDark={tagIsDark} pickerKey={editPerson?.id ?? "new"}/>}
           {tab===1 && <AccessTab form={form} setForm={setFormWrap} t={t}/>}
-          {tab===2 && <AvailabilityTab form={form} setForm={setFormWrap} t={t}/>}
+          {tab===2 && (
+            <AvailabilityTab
+              form={form}
+              setForm={setFormWrap}
+              t={t}
+              editPerson={editPerson}
+              onRefreshWorkspace={onRefreshWorkspace}
+              tagTheme={tagTheme}
+            />
+          )}
           {tab===3 && (
             <TimeOffTab
               form={form}
@@ -859,6 +1080,7 @@ export function PersonModal({
               syncAllocationDelete={syncAllocationDelete}
               syncAllocationUpdate={syncAllocationUpdate}
               onOpenCreateAllocation={onOpenCreateAllocation}
+              onRefreshWorkspace={onRefreshWorkspace}
             />
           )}
         </div>

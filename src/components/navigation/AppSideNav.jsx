@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, memo } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   CalendarDays,
-  ClipboardList,
   Users,
   FolderOpen,
   BarChart3,
@@ -22,7 +21,6 @@ const COLLAPSE_KEY = "alloc8-sidenav-collapsed";
 
 const NAV = [
   { to: "/", end: true, icon: CalendarDays, label: "Schedule" },
-  { to: null, icon: ClipboardList, label: "Project plan", soon: true },
   { to: "/people", icon: Users, label: "People" },
   { to: "/projects", icon: FolderOpen, label: "Projects" },
   { to: null, icon: BarChart3, label: "Report", soon: true },

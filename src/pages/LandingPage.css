@@ -1297,6 +1297,21 @@ button.lp-person-identity-hit {
   transform: scale(1.05);
 }
 
+.lp-sched-add-btn.lp-sched-add-btn--inline:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+  pointer-events: none;
+}
+
+.lp-person-row-shell:hover .lp-sched-add-btn--inline:disabled,
+.lp-person-row-shell:focus-within .lp-sched-add-btn--inline:disabled {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+}
+
 @media (hover: none), (pointer: coarse) {
   .lp-person-add-banner .lp-sched-add-btn--inline {
     border-color: color-mix(in srgb, var(--accent) 35%, transparent);
