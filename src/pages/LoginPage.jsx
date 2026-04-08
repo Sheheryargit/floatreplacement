@@ -12,6 +12,15 @@ import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import "./LoginPage.css";
 
+function HudTicker() {
+  const [hudTick, setHudTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setHudTick((t) => (t + 1) % 1000), 1200);
+    return () => window.clearInterval(id);
+  }, []);
+  return <span className="login-page-hud-seg">SIG {String(hudTick).padStart(3, "0")}</span>;
+}
+
 const ACCESS_PASSWORD =
   String(import.meta.env.VITE_APP_ACCESS_PASSWORD ?? "").trim() ||
   "Engineering";
@@ -117,7 +126,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [shake, setShake] = useState(false);
-  const [hudTick, setHudTick] = useState(0);
+  const [emptyPulse, setEmptyPulse] = useState(false);
   const [creditHot, setCreditHot] = useState(false);
 
   const creditZoneVariants = useMemo(() => {
@@ -214,11 +223,6 @@ export default function LoginPage() {
     }
   }, []);
 
-  useEffect(() => {
-    const id = window.setInterval(() => setHudTick((t) => (t + 1) % 1000), 1200);
-    return () => window.clearInterval(id);
-  }, []);
-
   const onPointerMove = useCallback((e) => {
     const el = rootRef.current;
     if (!el) return;
@@ -258,9 +262,9 @@ export default function LoginPage() {
   const submit = useCallback(() => {
     const p = password.trim();
     if (!p) {
-      setError("Enter your workspace password.");
-      setShake(false);
-      requestAnimationFrame(() => setShake(true));
+      setError("Authorization required.");
+      setEmptyPulse(false);
+      requestAnimationFrame(() => setEmptyPulse(true));
       return;
     }
     if (p !== ACCESS_PASSWORD) {
@@ -271,9 +275,10 @@ export default function LoginPage() {
     }
     setError("");
     setBusy(true);
+    setEmptyPulse(false);
     window.setTimeout(() => {
       unlock();
-    }, 420);
+    }, 1800);
   }, [password, unlock]);
 
   const cardSpring = reduceMotion
@@ -288,62 +293,7 @@ export default function LoginPage() {
       onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}
     >
-      <div className="login-page-bg" aria-hidden />
-      <div className="login-page-aurora" aria-hidden />
-      <div className="login-page-spotlight" aria-hidden />
-      <div className="login-page-vignette" aria-hidden />
-      <div className="login-page-grid" aria-hidden />
-      <div className="login-page-noise" aria-hidden />
-      {!reduceMotion ? (
-        <>
-          <div className="login-page-scanline" aria-hidden />
-          <div className="login-page-particles" aria-hidden>
-            {particles.map((p) => (
-              <motion.span
-                key={p.id}
-                className="login-page-particle"
-                style={{
-                  left: p.left,
-                  top: p.top,
-                  width: p.size,
-                  height: p.size,
-                }}
-                animate={{
-                  opacity: [0.08, 0.45, 0.1],
-                  y: [0, -18, 0],
-                  scale: [1, 1.4, 1],
-                }}
-                transition={{
-                  duration: p.duration,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  delay: p.delay,
-                }}
-              />
-            ))}
-          </div>
-        </>
-      ) : null}
-      <motion.div
-        className="login-page-orb login-page-orb--a"
-        aria-hidden
-        animate={
-          reduceMotion
-            ? { opacity: 0.4 }
-            : { opacity: [0.32, 0.48, 0.32], scale: [1, 1.06, 1] }
-        }
-        transition={
-          reduceMotion ? { duration: 0 } : { duration: 10, repeat: Infinity, ease: "easeInOut" }
-        }
-      />
-      <motion.div
-        className="login-page-orb login-page-orb--b"
-        aria-hidden
-        animate={reduceMotion ? { opacity: 0.18 } : { opacity: [0.16, 0.32, 0.16] }}
-        transition={
-          reduceMotion ? { duration: 0 } : { duration: 12, repeat: Infinity, ease: "easeInOut" }
-        }
-      />
+
 
       <div className="login-page-shell">
         <section className="login-page-hero" aria-label="Alloc8 overview">
@@ -423,6 +373,8 @@ export default function LoginPage() {
                   rotateY,
                   transformPerspective: 1400,
                   transformStyle: "preserve-3d",
+                  WebkitTransformStyle: "preserve-3d",
+                  willChange: "transform",
                 }
           }
           onPointerMove={onCardPointerMove}
@@ -473,25 +425,37 @@ export default function LoginPage() {
                   <label className="login-page-pwd-label" htmlFor="login-workspace-password">
                     Workspace password
                   </label>
-                  <div className="login-page-field">
-                    <Lock size={18} strokeWidth={2} aria-hidden />
-                    <input
-                      id="login-workspace-password"
-                      type="password"
-                      className={`login-page-input${shake && error ? " login-page-input--error" : ""}`}
-                      placeholder="Enter password"
-                      value={password}
-                      onChange={(e) => {
-                        setPassword(e.target.value);
-                        setError("");
-                        setShake(false);
-                      }}
-                      onAnimationEnd={() => setShake(false)}
-                      autoComplete="current-password"
-                      autoFocus
-                      disabled={busy}
-                    />
-                  </div>
+                  <motion.div 
+                    className={`login-page-field-wrapper ${emptyPulse ? "is-empty-lock" : ""}`}
+                    animate={emptyPulse ? { width: 50, x: "calc(50% - 25px)", background: "rgba(255, 60, 60, 0.15)", borderColor: "rgba(255, 60, 60, 0.6)" } : { width: "100%", x: 0, background: "rgba(0, 0, 0, 0)", borderColor: "rgba(255, 255, 255, 0.08)" }}
+                    transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 20 }}
+                    onAnimationComplete={() => {
+                        if (emptyPulse) {
+                          setTimeout(() => setEmptyPulse(false), 900);
+                        }
+                    }}
+                  >
+                    <div className="login-page-field">
+                      <Lock className="login-page-field-icon" size={18} strokeWidth={2} aria-hidden />
+                      <input
+                        id="login-workspace-password"
+                        type="password"
+                        className={`login-page-input${shake && error && !emptyPulse ? " login-page-input--error" : ""}`}
+                        placeholder={emptyPulse ? "" : "Enter password"}
+                        value={password}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          setError("");
+                          setShake(false);
+                          setEmptyPulse(false);
+                        }}
+                        onAnimationEnd={() => setShake(false)}
+                        autoComplete="current-password"
+                        autoFocus
+                        disabled={busy || emptyPulse}
+                      />
+                    </div>
+                  </motion.div>
 
                   <AnimatePresence mode="wait">
                     {error ? (
@@ -511,19 +475,19 @@ export default function LoginPage() {
 
                   <motion.button
                     type="submit"
-                    className="login-page-submit"
-                    disabled={busy}
-                    whileHover={reduceMotion || busy ? {} : { scale: 1.02 }}
-                    whileTap={reduceMotion || busy ? {} : { scale: 0.98 }}
+                    className={`login-page-submit ${busy ? "login-page-submit--busy" : ""}`}
+                    disabled={busy || emptyPulse}
+                    whileHover={reduceMotion || busy || emptyPulse ? {} : { scale: 1.02 }}
+                    whileTap={reduceMotion || busy || emptyPulse ? {} : { scale: 0.98 }}
                   >
-                    {busy ? (
-                      <span className="login-page-submit-busy">
-                        <span className="login-page-submit-dots" aria-hidden />
-                        Opening…
-                      </span>
-                    ) : (
-                      <span className="login-page-submit-inner">
-                        Continue <ArrowRight size={18} strokeWidth={2.25} aria-hidden />
+                    <span className={`login-page-submit-inner ${busy ? "is-exiting" : ""}`}>
+                      <span className="login-page-button-text">Login</span> 
+                      <ArrowRight className="login-page-arrow" size={18} strokeWidth={2.25} aria-hidden />
+                    </span>
+                    {busy && (
+                      <span className="login-page-submit-busy-scan">
+                        AUTHENTICATING
+                        <span className="login-page-scanner-line" />
                       </span>
                     )}
                   </motion.button>
@@ -589,7 +553,7 @@ export default function LoginPage() {
         <span className="login-page-hud-sep">·</span>
         <span className="login-page-hud-seg login-page-hud-seg--ok">ENV READY</span>
         <span className="login-page-hud-sep">·</span>
-        <span className="login-page-hud-seg">SIG {String(hudTick).padStart(3, "0")}</span>
+        <HudTicker />
         <span className="login-page-hud-sep">·</span>
         <span className="login-page-hud-seg login-page-hud-blink">LIVE</span>
       </footer>

@@ -13,17 +13,17 @@
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
   /* Brand */
-  --color-brand: #00c2a8;
-  --color-brand-light: #00e5c8;
-  --color-brand-dim: #00c2a820;
+  --color-brand: #0088ff;
+  --color-brand-light: #00e5ff;
+  --color-brand-dim: #0088ff20;
 
   /* Neutrals — dark-first */
-  --color-bg: #0f1117;
-  --color-surface: #181c26;
-  --color-surface-2: #1e2235;
-  --color-border: #2a2f45;
+  --color-bg: #040814;
+  --color-surface: #0a1122;
+  --color-surface-2: #101830;
+  --color-border: #1e2846;
   --color-text: #f0f2f8;
-  --color-muted: #7b82a0;
+  --color-muted: #8a9cd0;
 
   /* Semantic */
   --color-success: #22c55e;

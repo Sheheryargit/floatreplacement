@@ -10,6 +10,7 @@ import AnimatedAppLoader from "./components/ui/AnimatedAppLoader.jsx";
 import RouteSkeleton from "./components/ui/RouteSkeleton.jsx";
 import PageTransition from "./components/ui/PageTransition.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
+import GlobalBackground from "./components/ui/GlobalBackground.jsx";
 import { Toaster } from "sonner";
 
 const CommandPalette = lazy(() => import("./components/command/CommandPalette.jsx"));
@@ -143,6 +144,7 @@ export default function App() {
       <AuthProvider>
         <AppDialogProvider>
           <AppDataProvider>
+            <GlobalBackground />
             <BrowserRouter>
               <AuthGate />
             </BrowserRouter>
