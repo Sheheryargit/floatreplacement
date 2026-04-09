@@ -1,6 +1,6 @@
-import { lazy, Suspense, cloneElement } from "react";
+import { lazy, Suspense } from "react";
 import { BrowserRouter, useLocation, useRoutes, Navigate } from "react-router-dom";
-import { AnimatePresence } from "framer-motion";
+import { MotionConfig } from "framer-motion";
 import { ThemeProvider, useAppTheme } from "./context/ThemeContext.jsx";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { AppDialogProvider } from "./context/AppDialogContext.jsx";
@@ -8,16 +8,24 @@ import { SlapAnimationProvider } from "./context/SlapAnimationContext.jsx";
 import { AppDataProvider, useAppStore } from "./context/AppDataContext.jsx";
 import AnimatedAppLoader from "./components/ui/AnimatedAppLoader.jsx";
 import RouteSkeleton from "./components/ui/RouteSkeleton.jsx";
-import PageTransition from "./components/ui/PageTransition.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import GlobalBackground from "./components/ui/GlobalBackground.jsx";
 import { Toaster } from "sonner";
+import { isStaticUi } from "./config/uiMode.js";
 
 const CommandPalette = lazy(() => import("./components/command/CommandPalette.jsx"));
 const LandingPage = lazy(() => import("./pages/LandingPage.jsx"));
 const PeoplePage = lazy(() => import("./pages/PeoplePage.jsx"));
 const ProjectsPage = lazy(() => import("./pages/ProjectsPage.jsx"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage.jsx"));
+
+const workspaceRoutes = [
+  { path: "/", element: <LandingPage /> },
+  { path: "/people", element: <PeoplePage /> },
+  { path: "/projects", element: <ProjectsPage /> },
+  { path: "/settings", element: <SettingsPage /> },
+  { path: "*", element: <Navigate to="/" replace /> },
+];
 
 function WorkspaceReady({ children }) {
   const ready = useAppStore((s) => s.workspaceReady);
@@ -27,48 +35,22 @@ function WorkspaceReady({ children }) {
 
 function AnimatedRoutes() {
   const location = useLocation();
-  const routes = [
-    {
-      path: "/",
-      element: (
-        <PageTransition>
-          <LandingPage />
-        </PageTransition>
-      ),
-    },
-    {
-      path: "/people",
-      element: (
-        <PageTransition>
-          <PeoplePage />
-        </PageTransition>
-      ),
-    },
-    {
-      path: "/projects",
-      element: (
-        <PageTransition>
-          <ProjectsPage />
-        </PageTransition>
-      ),
-    },
-    {
-      path: "/settings",
-      element: (
-        <PageTransition>
-          <SettingsPage />
-        </PageTransition>
-      ),
-    },
-    { path: "*", element: <Navigate to="/" replace /> },
-  ];
-  const element = useRoutes(routes, location);
-
+  const element = useRoutes(workspaceRoutes, location);
   return (
     <Suspense fallback={<RouteSkeleton />}>
-      <AnimatePresence mode="wait">
-        {element && cloneElement(element, { key: location.pathname })}
-      </AnimatePresence>
+      <div
+        key={location.pathname}
+        className="app-route-shell"
+        style={{
+          flex: 1,
+          minHeight: 0,
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {element}
+      </div>
     </Suspense>
   );
 }
@@ -102,6 +84,7 @@ function AuthGate() {
 
 function ThemedToaster() {
   const { theme } = useAppTheme();
+  const staticUi = isStaticUi();
   return (
     <Toaster
       theme={theme}
@@ -121,8 +104,12 @@ function ThemedToaster() {
           fontSize: "13.5px",
           fontWeight: 600,
           fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif",
-          backdropFilter: "blur(20px) saturate(1.2)",
-          WebkitBackdropFilter: "blur(20px) saturate(1.2)",
+          ...(staticUi
+            ? {}
+            : {
+                backdropFilter: "blur(20px) saturate(1.2)",
+                WebkitBackdropFilter: "blur(20px) saturate(1.2)",
+              }),
           boxShadow:
             theme === "light"
               ? "0 12px 40px rgba(15,23,42,0.12), 0 0 0 1px rgba(0,0,0,0.04), 0 4px 16px rgba(0,194,168,0.06)"
@@ -140,17 +127,19 @@ function ThemedToaster() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <AppDialogProvider>
-          <AppDataProvider>
-            <GlobalBackground />
-            <BrowserRouter>
-              <AuthGate />
-            </BrowserRouter>
-          </AppDataProvider>
-        </AppDialogProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <MotionConfig reducedMotion={isStaticUi() ? "always" : "user"}>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppDialogProvider>
+            <AppDataProvider>
+              <GlobalBackground />
+              <BrowserRouter>
+                <AuthGate />
+              </BrowserRouter>
+            </AppDataProvider>
+          </AppDialogProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </MotionConfig>
   );
 }

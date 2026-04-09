@@ -252,7 +252,7 @@ export function personMatchesScheduleFilter(person, rules, ctx) {
   const norm = normalizeFilterRules(rules);
   if (norm.length === 0) return true;
 
-  const { allocations, projects, visibleKeys } = ctx;
+  const { allocations, projects, visibleKeys, personAllocations: paOpt } = ctx;
   const pid = person.id;
 
   const personRules = norm.filter((r) => PERSON_FIELDS.has(r.field));
@@ -264,10 +264,12 @@ export function personMatchesScheduleFilter(person, rules, ctx) {
 
   if (allocRules.length === 0) return true;
 
-  const allocs = allocations.filter(
-    (a) =>
-      allocationHasPerson(a, pid) && allocationIntersectsVisible(a, visibleKeys)
-  );
+  const allocs = paOpt
+    ? paOpt.filter((a) => allocationIntersectsVisible(a, visibleKeys))
+    : allocations.filter(
+        (a) =>
+          allocationHasPerson(a, pid) && allocationIntersectsVisible(a, visibleKeys)
+      );
 
   for (const a of allocs) {
     if (allocRules.every((rule) => allocationMatchesRule(a, rule, projects))) {

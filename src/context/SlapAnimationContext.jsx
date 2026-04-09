@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import { motion } from "framer-motion";
+import { isStaticUi } from "../config/uiMode.js";
 
 const SlapContext = createContext(null);
 
@@ -15,21 +16,26 @@ const SCALE = [1, 0.98, 1];
 const DURATION = 0.42;
 const EASE = [0.22, 1, 0.36, 1];
 
+const shellStyle = { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" };
+
 /**
  * Shakes the wrapped subtree; flash overlay is a fixed sibling (not affected by transform).
+ * In static UI mode, resolves immediately with no motion.
  */
 export function SlapAnimationProvider({ children }) {
+  const staticUi = isStaticUi();
   const [slapOn, setSlapOn] = useState(false);
   const [flashOn, setFlashOn] = useState(false);
   const doneRef = useRef(null);
 
   const triggerSlap = useCallback(() => {
+    if (staticUi) return Promise.resolve();
     return new Promise((resolve) => {
       doneRef.current = resolve;
       setFlashOn(true);
       setSlapOn(true);
     });
-  }, []);
+  }, [staticUi]);
 
   const onShakeComplete = useCallback(() => {
     setSlapOn(false);
@@ -44,19 +50,25 @@ export function SlapAnimationProvider({ children }) {
 
   const value = useMemo(() => ({ triggerSlap }), [triggerSlap]);
 
+  if (staticUi) {
+    return (
+      <SlapContext.Provider value={value}>
+        <div className="slap-animation-wrapper" style={shellStyle}>
+          {children}
+        </div>
+      </SlapContext.Provider>
+    );
+  }
+
   return (
     <SlapContext.Provider value={value}>
       <motion.div
         className="slap-animation-wrapper"
         initial={false}
-        animate={
-          slapOn
-            ? { x: SHAKE, scale: SCALE }
-            : { x: 0, scale: 1 }
-        }
+        animate={slapOn ? { x: SHAKE, scale: SCALE } : { x: 0, scale: 1 }}
         transition={{ duration: DURATION, ease: EASE }}
         onAnimationComplete={slapOn ? onShakeComplete : undefined}
-        style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
+        style={shellStyle}
       >
         {children}
       </motion.div>
@@ -64,11 +76,7 @@ export function SlapAnimationProvider({ children }) {
         className="slap-flash-overlay"
         aria-hidden
         initial={false}
-        animate={
-          flashOn
-            ? { opacity: [0, 0.16, 0] }
-            : { opacity: 0 }
-        }
+        animate={flashOn ? { opacity: [0, 0.16, 0] } : { opacity: 0 }}
         transition={{ duration: DURATION, ease: EASE }}
         onAnimationComplete={flashOn ? onFlashComplete : undefined}
         style={{

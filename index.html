@@ -9,6 +9,23 @@
       } catch (e) {
         document.documentElement.dataset.palette = "alloc8";
       }
+      try {
+        if (localStorage.getItem("alloc8-low-gpu") === "1") {
+          document.documentElement.setAttribute("data-low-gpu", "1");
+        }
+      } catch (e) {
+        /* ignore */
+      }
+      /* Default: static lightweight UI. Re-enable motion: localStorage.setItem('alloc8-static-ui','0'); location.reload() */
+      try {
+        if (localStorage.getItem("alloc8-static-ui") === "0") {
+          document.documentElement.removeAttribute("data-static-ui");
+        } else {
+          document.documentElement.setAttribute("data-static-ui", "1");
+        }
+      } catch (e) {
+        document.documentElement.setAttribute("data-static-ui", "1");
+      }
     </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

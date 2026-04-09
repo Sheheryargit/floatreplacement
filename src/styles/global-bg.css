@@ -37,7 +37,7 @@
     rgba(124, 106, 247, 0.03) 35%,
     transparent 62%
   );
-  filter: blur(44px);
+  filter: blur(32px);
 }
 
 .global-spotlight {
@@ -126,7 +126,7 @@
 .global-orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(100px);
+  filter: blur(64px);
   pointer-events: none;
 }
 
@@ -156,4 +156,18 @@
 @keyframes particleFloat {
   0%, 100% { opacity: 0.08; transform: translateY(0) scale(1); }
   50% { opacity: 0.45; transform: translateY(-18px) scale(1.4); }
+}
+
+/* Optional: run once in console: localStorage.setItem('alloc8-low-gpu','1') then reload */
+:root[data-low-gpu="1"] .global-particles,
+:root[data-low-gpu="1"] .global-scanline {
+  display: none !important;
+}
+
+:root[data-low-gpu="1"] .global-aurora {
+  filter: blur(20px);
+}
+
+:root[data-low-gpu="1"] .global-orb {
+  filter: blur(40px);
 }

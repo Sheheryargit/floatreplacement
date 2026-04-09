@@ -1,6 +1,7 @@
 @import "./styles/design-system.css";
 @import "./styles/semantic-ui.css";
 @import "./styles/global-bg.css";
+@import "./styles/static-ui.css";
 
 *,
 *::before,

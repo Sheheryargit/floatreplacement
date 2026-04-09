@@ -1,0 +1,57 @@
+/**
+ * Global lightweight UI: kill motion, backdrop blurs, and heavy compositing.
+ * Active when `<html data-static-ui="1">`.
+ */
+
+.global-bg-container--static {
+  position: fixed;
+  inset: 0;
+  z-index: -100;
+  pointer-events: none;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+:root[data-static-ui="1"] {
+  scroll-behavior: auto;
+}
+
+:root[data-static-ui="1"] html {
+  scroll-behavior: auto;
+}
+
+/* Near-instant transitions/animations (keeps specificity over longhand rules) */
+:root[data-static-ui="1"] *,
+:root[data-static-ui="1"] *::before,
+:root[data-static-ui="1"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  animation-delay: 0s !important;
+  transition-duration: 0.001ms !important;
+  transition-delay: 0s !important;
+}
+
+:root[data-static-ui="1"] * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  will-change: auto !important;
+}
+
+/* Decorative GPU filters (keep text sharp) */
+:root[data-static-ui="1"] .login-page,
+:root[data-static-ui="1"] .login-page * {
+  filter: none !important;
+  mix-blend-mode: normal !important;
+}
+
+:root[data-static-ui="1"] .lp-root .lp-schedule,
+:root[data-static-ui="1"] .lp-root .lp-header-block {
+  filter: none !important;
+}
+
+/* Sonner toasts — solid surfaces, no glass */
+:root[data-static-ui="1"] [data-sonner-toast],
+:root[data-static-ui="1"] [data-sonner-toaster] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}

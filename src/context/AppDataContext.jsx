@@ -19,6 +19,10 @@ import {
 } from "../utils/projectColors.js";
 import { loadWorkspaceFromSupabase } from "../lib/api/loadWorkspace.js";
 import {
+  defaultWorkspaceAllocationWindow,
+  mapProjectsWithResolvedColors,
+} from "../lib/api/loadWorkspaceCore.js";
+import {
   fetchPersonPublicHolidaysSafe,
   resolvePublicHolidayAllocations,
 } from "../lib/api/publicHolidaySchedule.js";
@@ -421,8 +425,10 @@ export function AppDataProvider({ children }) {
 
     let cancelled = false;
     let timer = null;
+    /** Tables touched since last flush; coalesced into one debounced partial refresh. */
+    const dirtyRealtime = new Set();
 
-    const runReload = () => {
+    const runFullReload = () => {
       if (cancelled) return;
       loadWorkspaceFromSupabase()
         .then((data) => {
@@ -432,13 +438,56 @@ export function AppDataProvider({ children }) {
         .catch((e) => console.warn("[float] Supabase reload:", e?.message || e));
     };
 
-    const scheduleReload = () => {
+    const scheduleFullReload = () => {
       if (timer) clearTimeout(timer);
-      timer = setTimeout(runReload, WORKSPACE_REALTIME_DEBOUNCE_MS);
+      dirtyRealtime.clear();
+      timer = setTimeout(runFullReload, WORKSPACE_REALTIME_DEBOUNCE_MS);
+    };
+
+    const runPartialRealtimeRefresh = async (tables) => {
+      if (cancelled || tables.size === 0) return;
+      try {
+        if (tables.has("people")) {
+          const people = await peopleApi.fetchPeople();
+          if (cancelled) return;
+          useAppStore.setState({ people });
+          await refreshPublicHolidayAllocationsInStore();
+        }
+        if (cancelled) return;
+        if (tables.has("projects")) {
+          const raw = await projectsApi.fetchProjects();
+          if (cancelled) return;
+          useAppStore.setState({ projects: mapProjectsWithResolvedColors(raw) });
+        }
+        if (cancelled) return;
+        if (tables.has("allocations")) {
+          const { start, end } = defaultWorkspaceAllocationWindow();
+          const allocations = await allocationsApi.fetchAllocations({ startDate: start, endDate: end });
+          if (cancelled) return;
+          useAppStore.setState({ allocations });
+        }
+      } catch (e) {
+        console.warn("[float] Supabase partial reload:", e?.message || e);
+        if (!cancelled) runFullReload();
+      }
+    };
+
+    const flushRealtimeDirty = () => {
+      timer = null;
+      if (cancelled || dirtyRealtime.size === 0) return;
+      const tables = new Set(dirtyRealtime);
+      dirtyRealtime.clear();
+      void runPartialRealtimeRefresh(tables);
+    };
+
+    const markRealtimeDirty = (table) => {
+      dirtyRealtime.add(table);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(flushRealtimeDirty, WORKSPACE_REALTIME_DEBOUNCE_MS);
     };
 
     const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") scheduleReload();
+      if (document.visibilityState === "visible") scheduleFullReload();
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
 
@@ -448,16 +497,21 @@ export function AppDataProvider({ children }) {
         ? `float-ws-${crypto.randomUUID()}`
         : `float-ws-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
-    // Realtime: keep multiple users in sync (best-effort).
+    // Realtime: partial refresh per table (avoids refetching lookups, settings, and duplicate holiday work on every edit).
     const ch = supabase
       ?.channel(channelName)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "allocations" },
-        () => scheduleReload()
+        () => markRealtimeDirty("allocations")
       )
-      .on("postgres_changes", { event: "*", schema: "public", table: "people" }, () => scheduleReload())
-      .on("postgres_changes", { event: "*", schema: "public", table: "projects" }, () => scheduleReload())
+      .on("postgres_changes", { event: "*", schema: "public", table: "people" }, () => {
+        markRealtimeDirty("people");
+        markRealtimeDirty("allocations");
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "projects" }, () =>
+        markRealtimeDirty("projects")
+      )
       .subscribe();
 
     loadWorkspaceFromSupabase()
@@ -474,6 +528,7 @@ export function AppDataProvider({ children }) {
       cancelled = true;
       document.removeEventListener("visibilitychange", onVisibilityChange);
       if (timer) clearTimeout(timer);
+      dirtyRealtime.clear();
       if (ch) supabase.removeChannel(ch);
     };
   }, []);

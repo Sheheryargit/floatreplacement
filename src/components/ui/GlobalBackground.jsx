@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useReducedMotion } from "framer-motion";
 import { motion } from "framer-motion";
+import { isStaticUi } from "../../config/uiMode.js";
 import "../../styles/global-bg.css";
 
 function createParticles(count) {
@@ -19,22 +20,48 @@ function createParticles(count) {
 
 export default function GlobalBackground() {
   const reduceMotion = useReducedMotion();
-  const particles = useMemo(() => createParticles(reduceMotion ? 0 : 28), [reduceMotion]);
+  const staticUi = isStaticUi();
+  const lowGpu =
+    typeof document !== "undefined" && document.documentElement.dataset.lowGpu === "1";
+  const particles = useMemo(
+    () => createParticles(reduceMotion || lowGpu || staticUi ? 0 : 12),
+    [reduceMotion, lowGpu, staticUi]
+  );
+  const rafRef = useRef(0);
+  const pendingRef = useRef(null);
 
   useEffect(() => {
-    const handlePointerMove = (e) => {
+    if (staticUi) return undefined;
+    const applyPointer = () => {
+      rafRef.current = 0;
+      const e = pendingRef.current;
+      if (!e) return;
+      pendingRef.current = null;
       const x = (e.clientX / window.innerWidth) * 100;
       const y = (e.clientY / window.innerHeight) * 100;
       document.documentElement.style.setProperty("--mx", `${x}%`);
       document.documentElement.style.setProperty("--my", `${y}%`);
     };
-    
+
+    const handlePointerMove = (e) => {
+      pendingRef.current = e;
+      if (rafRef.current) return;
+      rafRef.current = requestAnimationFrame(applyPointer);
+    };
+
     document.documentElement.style.setProperty("--mx", "50%");
     document.documentElement.style.setProperty("--my", "50%");
-    
-    window.addEventListener("pointermove", handlePointerMove);
-    return () => window.removeEventListener("pointermove", handlePointerMove);
-  }, []);
+
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [staticUi]);
+
+  if (staticUi) {
+    return <div className="global-bg-container global-bg-container--static" aria-hidden />;
+  }
 
   return (
     <div className="global-bg-container" aria-hidden="true">
@@ -67,19 +94,19 @@ export default function GlobalBackground() {
       <motion.div
         className="global-orb global-orb--a"
         animate={
-          reduceMotion
+          reduceMotion || lowGpu
             ? { opacity: 0.4 }
             : { opacity: [0.32, 0.48, 0.32], scale: [1, 1.06, 1] }
         }
         transition={
-          reduceMotion ? { duration: 0 } : { duration: 10, repeat: Infinity, ease: "easeInOut" }
+          reduceMotion || lowGpu ? { duration: 0 } : { duration: 10, repeat: Infinity, ease: "easeInOut" }
         }
       />
       <motion.div
         className="global-orb global-orb--b"
-        animate={reduceMotion ? { opacity: 0.18 } : { opacity: [0.16, 0.32, 0.16] }}
+        animate={reduceMotion || lowGpu ? { opacity: 0.18 } : { opacity: [0.16, 0.32, 0.16] }}
         transition={
-          reduceMotion ? { duration: 0 } : { duration: 12, repeat: Infinity, ease: "easeInOut" }
+          reduceMotion || lowGpu ? { duration: 0 } : { duration: 12, repeat: Infinity, ease: "easeInOut" }
         }
       />
     </div>

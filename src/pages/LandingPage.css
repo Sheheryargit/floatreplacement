@@ -1073,6 +1073,11 @@
   min-width: max(100%, calc(var(--lp-people-w) + var(--lp-timeline-min)));
 }
 
+.lp-sched-virtual-rows,
+.lp-sched-virtual-anchor {
+  box-sizing: border-box;
+}
+
 .lp-sched-row {
   display: flex;
   flex-direction: row;

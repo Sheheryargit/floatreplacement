@@ -81,3 +81,19 @@ export function maxWorkHoursOnDayAfterLeave(
   }
   return standardDayHours;
 }
+
+/**
+ * Like `maxWorkHoursOnDayAfterLeave` but only scans rows already scoped to that person
+ * (e.g. from `buildAllocationsByPerson`). Uses the same leave overlap rules as the full scan.
+ */
+export function maxWorkHoursOnDayForPersonList(
+  personAllocations,
+  dateKey,
+  standardDayHours = 7.5
+) {
+  const dk = String(dateKey).slice(0, 10);
+  for (const a of personAllocations) {
+    if (findLeaveOverlapWithWorkRange(a, dk, dk)) return 0;
+  }
+  return standardDayHours;
+}

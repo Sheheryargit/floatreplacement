@@ -18,14 +18,32 @@ import { projectToAllocationLabel, resolveColorForProjectLabel } from "../../uti
 import { fetchWorkspaceSettings } from "./workspaceSettings.js";
 import { fetchPersonPublicHolidaysSafe, resolvePublicHolidayAllocations } from "./publicHolidaySchedule.js";
 
-export async function loadWorkspaceFromSupabaseOnce() {
-  if (!isSupabaseConfigured) return null;
-
+/** Same window as the schedule workspace (keep in sync with partial realtime refreshes). */
+export function defaultWorkspaceAllocationWindow() {
   const now = new Date();
   const start = new Date(now);
   start.setDate(start.getDate() - 90);
   const end = new Date(now);
   end.setDate(end.getDate() + 365);
+  return { start, end };
+}
+
+export function mapProjectsWithResolvedColors(projectsRaw) {
+  return projectsRaw.map((p) => {
+    const label = projectToAllocationLabel({ ...p, id: p.id });
+    const hasHex =
+      p.color && typeof p.color === "string" && /^#([0-9A-Fa-f]{6})$/.test(p.color.trim());
+    return {
+      ...p,
+      color: hasHex ? p.color.trim() : resolveColorForProjectLabel(label, []),
+    };
+  });
+}
+
+export async function loadWorkspaceFromSupabaseOnce() {
+  if (!isSupabaseConfigured) return null;
+
+  const { start, end } = defaultWorkspaceAllocationWindow();
 
   const [
     people,
@@ -55,15 +73,7 @@ export async function loadWorkspaceFromSupabaseOnce() {
 
   const publicHolidayAllocations = await resolvePublicHolidayAllocations(people, phResult);
 
-  const projects = projectsRaw.map((p) => {
-    const label = projectToAllocationLabel({ ...p, id: p.id });
-    const hasHex =
-      p.color && typeof p.color === "string" && /^#([0-9A-Fa-f]{6})$/.test(p.color.trim());
-    return {
-      ...p,
-      color: hasHex ? p.color.trim() : resolveColorForProjectLabel(label, []),
-    };
-  });
+  const projects = mapProjectsWithResolvedColors(projectsRaw);
 
   return {
     people,

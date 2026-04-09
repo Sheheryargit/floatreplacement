@@ -1,12 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import {
-  motion,
-  AnimatePresence,
-  useReducedMotion,
-  useMotionValue,
-  useSpring,
-  useTransform,
-} from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { LayoutGrid, Users, ShieldCheck, Lock, ArrowRight } from "lucide-react";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -91,37 +84,11 @@ const listStagger = {
   },
 };
 
-function createParticles(count) {
-  return Array.from({ length: count }, (_, i) => {
-    const s = Math.sin(i * 12.9898 + i * i * 0.01) * 43758.5453;
-    const t = s - Math.floor(s);
-    const u = Math.cos(i * 78.233 + 2.1) * 12345.6789;
-    const v = u - Math.floor(u);
-    return {
-      id: i,
-      left: `${8 + t * 84}%`,
-      top: `${6 + v * 88}%`,
-      delay: i * 0.12,
-      size: 1.5 + (i % 4) * 0.85,
-      duration: 5.5 + (i % 5) * 1.2,
-    };
-  });
-}
-
 export default function LoginPage() {
   const { theme } = useAppTheme();
   const { unlock } = useAuth();
   const reduceMotion = useReducedMotion();
   const rootRef = useRef(null);
-  const cardRef = useRef(null);
-  const tiltMx = useMotionValue(0);
-  const tiltMy = useMotionValue(0);
-  const springTiltX = useSpring(tiltMx, { stiffness: 260, damping: 32, mass: 0.4 });
-  const springTiltY = useSpring(tiltMy, { stiffness: 260, damping: 32, mass: 0.4 });
-  const rotateY = useTransform(springTiltX, [-0.5, 0.5], [13, -13]);
-  const rotateX = useTransform(springTiltY, [-0.5, 0.5], [-9, 9]);
-
-  const particles = useMemo(() => createParticles(28), []);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -240,25 +207,6 @@ export default function LoginPage() {
     el.style.setProperty("--my", "42%");
   }, []);
 
-  const onCardPointerMove = useCallback(
-    (e) => {
-      if (reduceMotion) return;
-      const el = cardRef.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      const px = (e.clientX - r.left) / r.width - 0.5;
-      const py = (e.clientY - r.top) / r.height - 0.5;
-      tiltMx.set(Math.max(-0.5, Math.min(0.5, px)));
-      tiltMy.set(Math.max(-0.5, Math.min(0.5, py)));
-    },
-    [reduceMotion, tiltMx, tiltMy]
-  );
-
-  const onCardPointerLeave = useCallback(() => {
-    tiltMx.set(0);
-    tiltMy.set(0);
-  }, [tiltMx, tiltMy]);
-
   const submit = useCallback(() => {
     const p = password.trim();
     if (!p) {
@@ -360,25 +308,10 @@ export default function LoginPage() {
         </section>
 
         <motion.div
-          ref={cardRef}
           className="login-page-card-tilt"
           initial={{ opacity: 0, y: 36 }}
           animate={{ opacity: 1, y: 0, scale: busy ? 0.988 : 1 }}
           transition={cardSpring}
-          style={
-            reduceMotion
-              ? undefined
-              : {
-                  rotateX,
-                  rotateY,
-                  transformPerspective: 1400,
-                  transformStyle: "preserve-3d",
-                  WebkitTransformStyle: "preserve-3d",
-                  willChange: "transform",
-                }
-          }
-          onPointerMove={onCardPointerMove}
-          onPointerLeave={onCardPointerLeave}
         >
           <div className="login-page-card-wrap">
             <div className="login-page-card-ring" aria-hidden />

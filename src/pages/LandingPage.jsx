@@ -1,4 +1,13 @@
-import { useMemo, useState, useRef, useEffect, useCallback, memo, useLayoutEffect } from "react";
+import {
+  useMemo,
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  memo,
+  useLayoutEffect,
+} from "react";
+import { useVirtualizer, measureElement as virtualMeasureElement } from "@tanstack/react-virtual";
 import { useEnhancedMode } from "../enhanced/useEnhancedMode.js";
 import { useHoverIntent } from "../enhanced/useHoverIntent.js";
 import {
@@ -72,9 +81,10 @@ import {
 } from "../utils/scheduleAllocationFilter.js";
 import {
   findLeaveOverlapWithWorkRange,
-  maxWorkHoursOnDayAfterLeave,
+  maxWorkHoursOnDayForPersonList,
 } from "../utils/allocationLeaveConflict.js";
 import { workAllocationCoversDateKey } from "../utils/allocationOccurrence.js";
+import { buildAllocationsByPerson, getPersonAllocations } from "../utils/allocationsByPerson.js";
 import { isSupabaseConfigured } from "../lib/supabase.js";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
@@ -319,11 +329,6 @@ function assignAllocationStackLevels(segments) {
       laneEnds.push(e);
     }
   }
-}
-
-function allocationHasPerson(a, pid) {
-  if (Array.isArray(a.personIds) && a.personIds.length > 0) return a.personIds.includes(pid);
-  return a.personId === pid;
 }
 
 /** Visible timeline segments for an allocation (includes recurring occurrences). */
@@ -629,11 +634,10 @@ function visibleDateKeysForHours(scheduleModel, viewMode, anchorDate) {
   return ordered;
 }
 
-function sumWorkHoursPersonOnDay(personId, allocations, dateKey) {
+function sumWorkHoursOnDayForPersonList(personAllocations, dateKey) {
   let sum = 0;
-  for (const a of allocations) {
+  for (const a of personAllocations) {
     if (a.isLeave) continue;
-    if (!allocationHasPerson(a, personId)) continue;
     if (workAllocationCoversDateKey(a, dateKey)) {
       sum += parseFloat(a.hoursPerDay) || 0;
     }
@@ -641,20 +645,20 @@ function sumWorkHoursPersonOnDay(personId, allocations, dateKey) {
   return sum;
 }
 
-function computePersonHoursInView(personId, allocations, scheduleModel, viewMode, anchorDate) {
+function computePersonHoursInViewFromList(personAllocations, scheduleModel, viewMode, anchorDate) {
   const keys = visibleDateKeysForHours(scheduleModel, viewMode, anchorDate);
   let t = 0;
   for (const dk of keys) {
-    t += sumWorkHoursPersonOnDay(personId, allocations, dk);
+    t += sumWorkHoursOnDayForPersonList(personAllocations, dk);
   }
   return t;
 }
 
-function personHasOverloadInView(personId, allocations, scheduleModel, viewMode, anchorDate) {
+function personHasOverloadInViewFromList(personAllocations, scheduleModel, viewMode, anchorDate) {
   const keys = visibleDateKeysForHours(scheduleModel, viewMode, anchorDate);
   for (const dk of keys) {
-    const maxH = maxWorkHoursOnDayAfterLeave(personId, allocations, dk, STANDARD_DAY_HOURS);
-    if (sumWorkHoursPersonOnDay(personId, allocations, dk) > maxH + 1e-6) return true;
+    const maxH = maxWorkHoursOnDayForPersonList(personAllocations, dk, STANDARD_DAY_HOURS);
+    if (sumWorkHoursOnDayForPersonList(personAllocations, dk) > maxH + 1e-6) return true;
   }
   return false;
 }
@@ -694,6 +698,7 @@ const timelineRowEqual = (prev, next) => {
   if (prev.gridTemplate !== next.gridTemplate) return false;
   if (prev.scheduleModel !== next.scheduleModel) return false;
   if (prev.projects !== next.projects) return false;
+  if (prev.personAllocations !== next.personAllocations) return false;
   if (prev.enhancedMode !== next.enhancedMode) return false;
   if (prev.enhancedDimmedRow !== next.enhancedDimmedRow) return false;
   if (prev.enhancedFocusedRow !== next.enhancedFocusedRow) return false;
@@ -704,13 +709,6 @@ const timelineRowEqual = (prev, next) => {
   if (prev.onProjectClearIntent !== next.onProjectClearIntent) return false;
   if (prev.onAltLockToggle !== next.onAltLockToggle) return false;
 
-  const prevAlloc = prev.allocations.filter((a) => allocationHasPerson(a, prev.p.id));
-  const nextAlloc = next.allocations.filter((a) => allocationHasPerson(a, next.p.id));
-
-  if (prevAlloc.length !== nextAlloc.length) return false;
-  for (let idx = 0; idx < prevAlloc.length; idx++) {
-    if (prevAlloc[idx] !== nextAlloc[idx]) return false;
-  }
   return true;
 };
 
@@ -798,7 +796,7 @@ function buildWorkAllocationTitle(alloc, projectName, hoursLabel) {
 const TimelineRow = memo(function TimelineRow({
   p,
   i,
-  allocations,
+  personAllocations,
   projects,
   scheduleModel,
   viewMode,
@@ -853,9 +851,9 @@ const TimelineRow = memo(function TimelineRow({
   }, [onProjectClearIntent]);
 
   const hoursKeys = visibleDateKeysForHours(scheduleModel, viewMode, anchorDate);
-  const hours = computePersonHoursInView(p.id, allocations, scheduleModel, viewMode, anchorDate);
+  const hours = computePersonHoursInViewFromList(personAllocations, scheduleModel, viewMode, anchorDate);
   const rawCap = hoursKeys.reduce(
-    (s, dk) => s + maxWorkHoursOnDayAfterLeave(p.id, allocations, dk, STANDARD_DAY_HOURS),
+    (s, dk) => s + maxWorkHoursOnDayForPersonList(personAllocations, dk, STANDARD_DAY_HOURS),
     0
   );
   const pct =
@@ -866,12 +864,15 @@ const TimelineRow = memo(function TimelineRow({
         : 0;
   const right =
     utilizationMode === "hours" ? `${hours.toFixed(hours % 1 ? 1 : 0)}h` : `${pct}%`;
-  const overloaded = personHasOverloadInView(p.id, allocations, scheduleModel, viewMode, anchorDate);
+  const overloaded = personHasOverloadInViewFromList(
+    personAllocations,
+    scheduleModel,
+    viewMode,
+    anchorDate
+  );
   const noWorkingDaysInView = hoursKeys.length > 0 && rawCap < 1e-6;
 
-  const rowSegments = allocations
-    .filter((a) => allocationHasPerson(a, p.id))
-    .flatMap((a) =>
+  const rowSegments = personAllocations.flatMap((a) =>
       layoutsForAllocation(a, scheduleModel, allocViewMode).map((lay) => ({
         a,
         lay,
@@ -1346,6 +1347,11 @@ export default function LandingPage() {
     [allocations, publicHolidayAllocations]
   );
 
+  const allocationsByPerson = useMemo(
+    () => buildAllocationsByPerson(scheduleAllocations),
+    [scheduleAllocations]
+  );
+
   const enhancedMode = useEnhancedMode();
   const [enhancedFocusPersonId, setEnhancedFocusPersonId] = useState(null);
   const [enhancedFocusProject, setEnhancedFocusProject] = useState(null);
@@ -1431,6 +1437,8 @@ export default function LandingPage() {
   const prevOffsets = useRef(timelineOffsets);
   const prevColCount = useRef(0);
   const scheduleViewportRef = useRef(null);
+  const scheduleHeadRef = useRef(null);
+  const [scheduleHeadHeight, setScheduleHeadHeight] = useState(0);
   /** Coalesces horizontal scroll to one layout read per frame (fewer setState calls while scrolling). */
   const timelineScrollRafRef = useRef(null);
   const lastAnchorKey = useRef(null);
@@ -1496,25 +1504,28 @@ export default function LandingPage() {
     [scheduleModel, viewMode, anchorDate]
   );
 
-  const schedulePeople = useMemo(() => {
+  const { schedulePeople, schedulePeopleHoursInView } = useMemo(() => {
     let list = people.filter((p) => !p.archived);
     list = list.filter((p) =>
       personMatchesScheduleFilter(p, scheduleFilterRules, {
         allocations: scheduleAllocations,
+        personAllocations: getPersonAllocations(allocationsByPerson, p.id),
         projects,
         visibleKeys: scheduleVisibleKeys,
       })
     );
     const hoursMap = new Map();
     for (const p of list) {
+      const pa = getPersonAllocations(allocationsByPerson, p.id);
       hoursMap.set(
         p.id,
-        computePersonHoursInView(p.id, scheduleAllocations, scheduleModel, viewMode, anchorDate)
+        computePersonHoursInViewFromList(pa, scheduleModel, viewMode, anchorDate)
       );
     }
-    return [...list].sort((a, b) =>
+    const sorted = [...list].sort((a, b) =>
       comparePeopleForScheduleSort(a, b, scheduleSort, peopleOrderMap, hoursMap)
     );
+    return { schedulePeople: sorted, schedulePeopleHoursInView: hoursMap };
   }, [
     people,
     scheduleFilterRules,
@@ -1522,6 +1533,7 @@ export default function LandingPage() {
     scheduleSort,
     peopleOrderMap,
     scheduleAllocations,
+    allocationsByPerson,
     projects,
     scheduleModel,
     viewMode,
@@ -1555,26 +1567,38 @@ export default function LandingPage() {
   const totalHours = useMemo(() => {
     let s = 0;
     for (const p of schedulePeople) {
-      s += computePersonHoursInView(p.id, scheduleAllocations, scheduleModel, viewMode, anchorDate);
+      s += schedulePeopleHoursInView.get(p.id) ?? 0;
     }
     return s;
-  }, [schedulePeople, scheduleAllocations, scheduleModel, viewMode, anchorDate]);
+  }, [schedulePeople, schedulePeopleHoursInView]);
 
   const teamCapacityHours = useMemo(() => {
     const keys = visibleDateKeysForHours(scheduleModel, viewMode, anchorDate);
     let cap = 0;
     for (const p of schedulePeople) {
+      const pa = getPersonAllocations(allocationsByPerson, p.id);
       for (const dk of keys) {
-        cap += maxWorkHoursOnDayAfterLeave(p.id, scheduleAllocations, dk, STANDARD_DAY_HOURS);
+        cap += maxWorkHoursOnDayForPersonList(pa, dk, STANDARD_DAY_HOURS);
       }
     }
     return Math.max(STANDARD_DAY_HOURS, cap);
-  }, [schedulePeople, scheduleAllocations, scheduleModel, viewMode, anchorDate]);
+  }, [schedulePeople, allocationsByPerson, scheduleModel, viewMode, anchorDate]);
 
   const teamUtilPercent = useMemo(
     () => (teamCapacityHours > 0 ? Math.min(100, Math.round((totalHours / teamCapacityHours) * 100)) : 0),
     [totalHours, teamCapacityHours]
   );
+
+  useLayoutEffect(() => {
+    const el = scheduleHeadRef.current;
+    if (!el) return;
+    const measure = () => setScheduleHeadHeight(Math.round(el.getBoundingClientRect().height));
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [scheduleModel, viewMode, customRange, timelineOffsets]);
 
   const scheduleMotionKey = useMemo(() => {
     if (customRange?.start && customRange?.end) {
@@ -1753,12 +1777,8 @@ export default function LandingPage() {
       const slot = scheduleModel.slots[colIndex];
       const clickedDate = slot?.dateKey ?? null;
       if (person && clickedDate) {
-        const maxH = maxWorkHoursOnDayAfterLeave(
-          person.id,
-          scheduleAllocations,
-          clickedDate,
-          STANDARD_DAY_HOURS
-        );
+        const pa = getPersonAllocations(allocationsByPerson, person.id);
+        const maxH = maxWorkHoursOnDayForPersonList(pa, clickedDate, STANDARD_DAY_HOURS);
         if (maxH < 1e-6) {
           toast.error(`${person.name} is not available that day`, {
             description: "That date is covered by leave or recurring unavailability.",
@@ -1768,7 +1788,7 @@ export default function LandingPage() {
       }
       openCreateAllocation(person, clickedDate);
     },
-    [scheduleModel, openCreateAllocation, scheduleAllocations]
+    [scheduleModel, openCreateAllocation, allocationsByPerson]
   );
 
   const handleCreateAllocation = useCallback(
@@ -1780,8 +1800,7 @@ export default function LandingPage() {
         for (const pid of payload.personIds) {
           let leaveConflict = null;
           let overlap = null;
-          for (const a of scheduleAllocations) {
-            if (!allocationHasPerson(a, pid)) continue;
+          for (const a of getPersonAllocations(allocationsByPerson, pid)) {
             const o = findLeaveOverlapWithWorkRange(a, pStart, pEnd);
             if (o) {
               leaveConflict = a;
@@ -1833,7 +1852,7 @@ export default function LandingPage() {
         toast.error("Save failed", { description: e?.message || String(e) });
       }
     },
-    [setAllocations, projects, scheduleAllocations, people, syncAllocationCreate]
+    [setAllocations, projects, allocationsByPerson, people, syncAllocationCreate]
   );
 
   const handleEditAllocation = useCallback(
@@ -1845,9 +1864,8 @@ export default function LandingPage() {
         for (const pid of payload.personIds) {
           let leaveConflict = null;
           let overlap = null;
-          for (const a of scheduleAllocations) {
+          for (const a of getPersonAllocations(allocationsByPerson, pid)) {
             if (a.id === id) continue;
-            if (!allocationHasPerson(a, pid)) continue;
             const o = findLeaveOverlapWithWorkRange(a, pStart, pEnd);
             if (o) {
               leaveConflict = a;
@@ -1905,7 +1923,7 @@ export default function LandingPage() {
         }
       }
     },
-    [setAllocations, projects, scheduleAllocations, people, syncAllocationUpdate, refreshWorkspaceFromSupabase]
+    [setAllocations, projects, allocationsByPerson, people, syncAllocationUpdate, refreshWorkspaceFromSupabase]
   );
 
   const handleDeleteAllocation = useCallback(
@@ -2092,6 +2110,24 @@ export default function LandingPage() {
     },
     []
   );
+
+  const scheduleFirefox =
+    typeof navigator !== "undefined" && /firefox/i.test(navigator.userAgent || "");
+
+  const scheduleRowVirtualizer = useVirtualizer({
+    count: schedulePeople.length,
+    getScrollElement: () => scheduleViewportRef.current,
+    estimateSize: () => 148,
+    overscan: 4,
+    scrollMargin: scheduleHeadHeight,
+    measureElement: scheduleFirefox ? undefined : virtualMeasureElement,
+  });
+
+  const scheduleRowVirtualizerRef = useRef(scheduleRowVirtualizer);
+  scheduleRowVirtualizerRef.current = scheduleRowVirtualizer;
+  useLayoutEffect(() => {
+    scheduleRowVirtualizerRef.current.measure();
+  }, [scheduleModel, viewMode, customRange, colMinPx, schedulePeople.length]);
 
   return (
     <div
@@ -2625,7 +2661,7 @@ export default function LandingPage() {
               animate={{ opacity: 1, scale: 1, filter: "brightness(1)" }}
               transition={{ type: "spring", stiffness: 420, damping: 32, mass: 0.88 }}
             >
-              <div className="lp-sched-row lp-sched-row-head">
+              <div className="lp-sched-row lp-sched-row-head" ref={scheduleHeadRef}>
                 <div className="lp-sched-corner" aria-hidden />
                 <div className="lp-sched-timeline lp-sched-sticky-top">
                   <div className="lp-cal-head">
@@ -2689,48 +2725,74 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              {schedulePeople.map((p, i) => {
-                const hasProject =
-                  !enhancedFocusProject || enhancedProjectPersonSet?.has(p.id) === true;
-                const dimRow =
-                  enhancedMode &&
-                  ((Boolean(activePersonFocus) && activePersonFocus !== p.id && !enhancedFocusProject) ||
-                    (Boolean(enhancedFocusProject) && !hasProject));
-                const focusedRow =
-                  enhancedMode &&
-                  !dimRow &&
-                  ((activePersonFocus === p.id && !enhancedFocusProject) ||
-                    (Boolean(enhancedFocusProject) && hasProject));
-                return (
-                  <TimelineRow
-                    key={p.id}
-                    p={p}
-                    i={i}
-                    allocations={scheduleAllocations}
-                    projects={projects}
-                    scheduleModel={scheduleModel}
-                    viewMode={viewMode}
-                    anchorDate={anchorDate}
-                    utilizationMode={utilizationMode}
-                    gridTemplate={gridTemplate}
-                    nCols={scheduleModel.columnCount}
-                    openEdit={openEdit}
-                    openCreateAllocation={openCreateAllocation}
-                    openAllocationDetail={openAllocationDetail}
-                    handleTimelineClick={handleTimelineClick}
-                    todayDateKey={todayDateKey}
-                    enhancedMode={enhancedMode}
-                    enhancedDimmedRow={dimRow}
-                    enhancedFocusedRow={focusedRow}
-                    enhancedFocusProjectLabel={enhancedFocusProject}
-                    onPersonFocusIntent={onPersonFocusIntent}
-                    onPersonClearIntent={onPersonClearIntent}
-                    onProjectFocusIntent={onProjectFocusIntent}
-                    onProjectClearIntent={onProjectClearIntent}
-                    onAltLockToggle={onAltLockToggle}
-                  />
-                );
-              })}
+              <div
+                className="lp-sched-virtual-rows"
+                style={{
+                  height: scheduleRowVirtualizer.getTotalSize(),
+                  width: "100%",
+                  minWidth: "max(100%, calc(var(--lp-people-w) + var(--lp-timeline-min)))",
+                  position: "relative",
+                }}
+              >
+                {scheduleRowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const p = schedulePeople[virtualRow.index];
+                  const i = virtualRow.index;
+                  const hasProject =
+                    !enhancedFocusProject || enhancedProjectPersonSet?.has(p.id) === true;
+                  const dimRow =
+                    enhancedMode &&
+                    ((Boolean(activePersonFocus) && activePersonFocus !== p.id && !enhancedFocusProject) ||
+                      (Boolean(enhancedFocusProject) && !hasProject));
+                  const focusedRow =
+                    enhancedMode &&
+                    !dimRow &&
+                    ((activePersonFocus === p.id && !enhancedFocusProject) ||
+                      (Boolean(enhancedFocusProject) && hasProject));
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      data-index={virtualRow.index}
+                      ref={scheduleRowVirtualizer.measureElement}
+                      className="lp-sched-virtual-anchor"
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        minWidth: "max(100%, calc(var(--lp-people-w) + var(--lp-timeline-min)))",
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                    >
+                      <TimelineRow
+                        p={p}
+                        i={i}
+                        personAllocations={getPersonAllocations(allocationsByPerson, p.id)}
+                        projects={projects}
+                        scheduleModel={scheduleModel}
+                        viewMode={viewMode}
+                        anchorDate={anchorDate}
+                        utilizationMode={utilizationMode}
+                        gridTemplate={gridTemplate}
+                        nCols={scheduleModel.columnCount}
+                        openEdit={openEdit}
+                        openCreateAllocation={openCreateAllocation}
+                        openAllocationDetail={openAllocationDetail}
+                        handleTimelineClick={handleTimelineClick}
+                        todayDateKey={todayDateKey}
+                        enhancedMode={enhancedMode}
+                        enhancedDimmedRow={dimRow}
+                        enhancedFocusedRow={focusedRow}
+                        enhancedFocusProjectLabel={enhancedFocusProject}
+                        onPersonFocusIntent={onPersonFocusIntent}
+                        onPersonClearIntent={onPersonClearIntent}
+                        onProjectFocusIntent={onProjectFocusIntent}
+                        onProjectClearIntent={onProjectClearIntent}
+                        onAltLockToggle={onAltLockToggle}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             </motion.div>
           </div>
         </div>

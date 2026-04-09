@@ -1,4 +1,4 @@
-oksy/* Alloc8 — mission-grade sign-in: precision UI, interactive depth, reduced-motion safe */
+/* Alloc8 — mission-grade sign-in: precision UI, interactive depth, reduced-motion safe */
 
 .login-page {
   --mx: 50%;
@@ -525,19 +525,14 @@ oksy/* Alloc8 — mission-grade sign-in: precision UI, interactive depth, reduce
   box-shadow: 0 0 12px color-mix(in srgb, var(--color-success) 60%, transparent);
 }
 
-/* Card stack — 3D tilt driven by Framer on .login-page-card-tilt */
+/* Card stack (2D only — 3D tilt removed to avoid GPU compositor crashes in Brave/Chromium). */
 .login-page-card-tilt {
   position: relative;
   z-index: 2;
-  transform-style: preserve-3d;
-  will-change: transform;
 }
 
 .login-page-card-wrap {
   position: relative;
-  transform-style: preserve-3d;
-  -webkit-transform-style: preserve-3d;
-  will-change: transform;
 }
 
 .login-page-card-sheen {
@@ -586,9 +581,14 @@ oksy/* Alloc8 — mission-grade sign-in: precision UI, interactive depth, reduce
     transparent 280deg,
     transparent 360deg
   );
-  animation: loginRingSpin 14s linear infinite;
   opacity: 0.55;
   filter: blur(0.5px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .login-page-card-ring {
+    animation: loginRingSpin 14s linear infinite;
+  }
 }
 
 @keyframes loginRingSpin {
@@ -616,43 +616,20 @@ oksy/* Alloc8 — mission-grade sign-in: precision UI, interactive depth, reduce
   position: relative;
   width: 100%;
   border-radius: 16px;
-  background: color-mix(in srgb, #12151f 88%, transparent);
+  /* Solid panel avoids backdrop-filter + preserve-3d compositing (GPU crashes in some Chromium/Brave builds). */
+  background: rgba(18, 21, 31, 0.94);
   border: 1px solid color-mix(in srgb, var(--color-border) 70%, rgba(255, 255, 255, 0.06));
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.05) inset,
     0 48px 120px rgba(0, 0, 0, 0.55),
     0 0 100px color-mix(in srgb, var(--color-brand) 6%, transparent);
-  backdrop-filter: blur(28px) saturate(1.25);
-  -webkit-backdrop-filter: blur(28px) saturate(1.25);
-  transform-style: preserve-3d;
-  -webkit-transform-style: preserve-3d;
   overflow: hidden;
-  animation: cardBreathe 4s ease-in-out infinite alternate;
-}
-
-@keyframes cardBreathe {
-  from {
-    box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.05) inset,
-      0 48px 120px rgba(0, 0, 0, 0.55),
-      0 0 80px rgba(0, 136, 255, 0.05);
-  }
-  to {
-    box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.09) inset,
-      0 48px 120px rgba(0, 0, 0, 0.65),
-      0 0 120px rgba(0, 136, 255, 0.25);
-    border-color: rgba(0, 136, 255, 0.25);
-  }
 }
 
 .login-page-card-inner {
   position: relative;
   z-index: 3;
   padding: 42px 38px 34px;
-  transform: translateZ(10px);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
   pointer-events: auto !important;
 }
 
