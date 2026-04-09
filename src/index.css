@@ -88,34 +88,41 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Sonner — Alloc8 toast shell */
+/* Sonner — Alloc8 toast shell (opaque; richColors defaults are translucent) */
 .alloc8-toast[data-sonner-toast] {
   font-family: var(--font-body) !important;
   font-weight: 500 !important;
   border-radius: var(--radius-card) !important;
   padding: 14px 18px !important;
+  background: var(--color-surface) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.2),
     0 2px 8px rgba(0, 0, 0, 0.08) !important;
 }
 
 .alloc8-toast[data-sonner-toast][data-type="success"] {
+  background: color-mix(in srgb, var(--color-success) 11%, var(--color-surface)) !important;
   border-left: 3px solid var(--color-brand) !important;
 }
 
 .alloc8-toast[data-sonner-toast][data-type="error"] {
+  background: color-mix(in srgb, var(--color-danger) 12%, var(--color-surface)) !important;
   border-left: 3px solid var(--color-danger) !important;
 }
 
 .alloc8-toast[data-sonner-toast][data-type="warning"] {
+  background: color-mix(in srgb, var(--color-warning) 12%, var(--color-surface)) !important;
   border-left: 3px solid var(--color-warning) !important;
 }
 
 .alloc8-toast[data-sonner-toast][data-type="info"] {
+  background: color-mix(in srgb, var(--color-info) 12%, var(--color-surface)) !important;
   border-left: 3px solid var(--color-info) !important;
 }
 
-/* Schedule view switch toast — teal glass */
+/* Schedule view switch toast — brand-tinted panel */
 @keyframes alloc8-enter-up {
   from {
     opacity: 0;
@@ -131,16 +138,20 @@ body {
   animation: alloc8-enter-up 0.26s var(--ease-ui-in-out, ease-in-out) both;
 }
 
-.float-schedule-view-toast {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--color-brand) 18%, transparent) 0%,
-    color-mix(in srgb, var(--color-accent) 10%, transparent) 50%,
-    color-mix(in srgb, var(--color-brand) 8%, transparent) 100%
-  ) !important;
-  border: 1px solid color-mix(in srgb, var(--color-brand) 35%, var(--color-border)) !important;
+/* Schedule / allocation confirmations — solid panel, same tokens as the rest of the app */
+.alloc8-toast.float-schedule-view-toast[data-sonner-toast] {
+  background: color-mix(in srgb, var(--color-brand) 14%, var(--color-surface)) !important;
+  border: 1px solid color-mix(in srgb, var(--color-brand) 32%, var(--color-border)) !important;
+  border-left: 3px solid var(--color-brand) !important;
   box-shadow:
-    0 8px 32px color-mix(in srgb, var(--color-brand) 15%, transparent),
-    0 0 0 1px rgba(255, 255, 255, 0.05) inset !important;
-  backdrop-filter: blur(12px);
+    0 12px 36px rgba(0, 0, 0, 0.32),
+    0 2px 8px rgba(0, 0, 0, 0.18) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+:root[data-theme="light"] .alloc8-toast.float-schedule-view-toast[data-sonner-toast] {
+  box-shadow:
+    0 12px 32px rgba(15, 23, 42, 0.12),
+    0 2px 8px rgba(15, 23, 42, 0.06) !important;
 }

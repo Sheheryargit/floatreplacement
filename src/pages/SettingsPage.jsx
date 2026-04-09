@@ -10,15 +10,10 @@ import { useAppDialog } from "../context/AppDialogContext.jsx";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
 import { SettingsItem } from "../components/ui/SettingsItem.jsx";
 import { ThemePreferenceControl } from "../components/ui/ThemePreferenceControl.jsx";
-import { PalettePreferenceControl } from "../components/ui/PalettePreferenceControl.jsx";
-import { ToggleSwitch } from "../components/ui/ToggleSwitch.jsx";
-import { useEnhancedMode, useSetEnhancedMode } from "../enhanced/useEnhancedMode.js";
 import "./SettingsPage.css";
 
 export default function SettingsPage() {
-  const { theme, themePreference, setThemePreference, palette, setPalette } = useAppTheme();
-  const enhancedMode = useEnhancedMode();
-  const setEnhancedMode = useSetEnhancedMode();
+  const { theme, themePreference, setThemePreference } = useAppTheme();
   const { lock } = useAuth();
   const { triggerSlap } = useSlapAnimation();
   const { openDialog } = useAppDialog();
@@ -95,36 +90,6 @@ export default function SettingsPage() {
           <div className="settings-card settings-card--glow">
             <SettingsItem label="Theme" subtext="Dark, light, or match system" showChevron={false}>
               <ThemePreferenceControl value={themePreference} onChange={setThemePreference} />
-            </SettingsItem>
-            <SettingsItem
-              label="Palette"
-              subtext="Alloc8 teal or Stellar (graphite, Tesla red · Apple blue)"
-              showChevron={false}
-            >
-              <PalettePreferenceControl value={palette} onChange={setPalette} />
-            </SettingsItem>
-          </div>
-        </section>
-
-        <section className="settings-section" aria-labelledby="settings-ui-preferences">
-          <h2 id="settings-ui-preferences" className="settings-h2">
-            UI preferences
-          </h2>
-          <p className="settings-section-desc">
-            Optional interaction modes. Toggles are stored only in this browser.
-          </p>
-          <div className="settings-card settings-card--glow">
-            <SettingsItem
-              label="Enhanced Mode (Experimental)"
-              subtext="Enables advanced interactions, focus effects, and dynamic UI behavior."
-              showChevron={false}
-            >
-              <ToggleSwitch
-                id="settings-enhanced-mode"
-                checked={enhancedMode}
-                onChange={setEnhancedMode}
-                aria-label="Enhanced Mode (Experimental)"
-              />
             </SettingsItem>
           </div>
         </section>

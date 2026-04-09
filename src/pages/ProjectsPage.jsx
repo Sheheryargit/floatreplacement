@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useAppData } from "../context/AppDataContext.jsx";
 import { isSupabaseConfigured } from "../lib/supabase.js";
@@ -8,6 +9,7 @@ import { FloatSelect, FloatPersonPicker } from "../components/ui/FloatSelect.jsx
 import { PROJECT_COLOR_PALETTE, avatarGradientFromName } from "../utils/projectColors.js";
 import { tagChromaProps } from "../utils/tagChroma.js";
 import { toast } from "sonner";
+import { useFixedAnchorDropdown } from "../hooks/useFixedAnchorDropdown.js";
 import {
   Users,
   FolderOpen,
@@ -64,9 +66,12 @@ const avGrad = avatarGradientFromName;
 const fmtDate = (d) => { if(!d)return"—"; const dt=new Date(d); return dt.toLocaleDateString("en-AU",{day:"2-digit",month:"short",year:"numeric"}); };
 
 /* ═══════════════════ THEMES ═══════════════════ */
+/** Cap staggered row enter animations — large tables stay responsive */
+const TABLE_ROW_ENTER_ANIM_MAX = 32;
+
 const T = {
-  dark: { bg:"#0f1117",surface:"#181c26",surfRaised:"#1e2235",surfAlt:"#1a1e2e",border:"#2a2f45",borderSub:"#323852",borderIn:"#3a4060",text:"#f0f2f8",textSoft:"#9ba4b8",textMuted:"#7b82a0",textDim:"#4a5168",accent:"#00c2a8",accentHov:"#00e5c8",accentTxt:"#061210",accentGlow:"rgba(0,194,168,0.15)",sidebar:"#0f1117",sidebarAct:"rgba(0,194,168,0.08)",rowHov:"#151a24",tagBg:"rgba(124,106,247,0.12)",tagTxt:"#a599fc",btnSec:"#1e2235",btnSecHov:"#252a3d",btnSecTxt:"#c4c9d8",danger:"#ef4444",dangerHov:"#dc2626",dangerSoft:"rgba(239,68,68,0.16)",dangerTxt:"#fff",dangerGlow:"0 4px 24px rgba(239,68,68,0.25)",success:"#22c55e",successHov:"#16a34a",successSoft:"rgba(34,197,94,0.14)",successGlow:"0 4px 20px rgba(34,197,94,0.22)",warn:"#f59e0b",warnHov:"#d97706",warnTxt:"#0f172a",warnSoft:"rgba(245,158,11,0.16)",warnGlow:"0 4px 20px rgba(245,158,11,0.2)",info:"#38bdf8",infoSoft:"rgba(56,189,248,0.14)",overlay:"rgba(0,0,0,0.6)",shadow:"0 32px 100px rgba(0,0,0,0.55)",chk:"#00c2a8",scroll:"#2a2f45",selRow:"rgba(0,194,168,0.06)",focus:"#00c2a8",toastBg:"#181c26",toastBdr:"#2a2f45",tabActiveBg:"rgba(0,194,168,0.12)",tabHovBg:"rgba(0,194,168,0.06)" },
-  light: { bg:"#f4f6fa",surface:"#ffffff",surfRaised:"#ffffff",surfAlt:"#e8ebf4",border:"#e0e4ef",borderSub:"#e4e8f0",borderIn:"#d4d8e4",text:"#12151f",textSoft:"#4a5168",textMuted:"#5c6478",textDim:"#9ca3b8",accent:"#00a896",accentHov:"#00c2a8",accentTxt:"#ffffff",accentGlow:"rgba(0,194,168,0.12)",sidebar:"#ffffff",sidebarAct:"rgba(0,194,168,0.08)",rowHov:"#f4f6fa",tagBg:"rgba(124,106,247,0.1)",tagTxt:"#5b4fcf",btnSec:"#e8ebf4",btnSecHov:"#dde1ec",btnSecTxt:"#3e4560",danger:"#ef4444",dangerHov:"#dc2626",dangerSoft:"rgba(239,68,68,0.1)",dangerTxt:"#fff",dangerGlow:"0 4px 18px rgba(239,68,68,0.2)",success:"#16a34a",successHov:"#15803d",successSoft:"rgba(22,163,74,0.1)",successGlow:"0 4px 16px rgba(22,163,74,0.18)",warn:"#d97706",warnHov:"#b45309",warnTxt:"#fff",warnSoft:"rgba(217,119,6,0.1)",warnGlow:"0 4px 16px rgba(217,119,6,0.16)",info:"#0284c7",infoSoft:"rgba(2,132,199,0.1)",overlay:"rgba(15,18,28,0.35)",shadow:"0 32px 100px rgba(0,0,0,0.12)",chk:"#00a896",scroll:"#d4d8e0",selRow:"rgba(0,194,168,0.08)",focus:"#00c2a8",toastBg:"#ffffff",toastBdr:"#e0e4ef",tabActiveBg:"rgba(0,194,168,0.1)",tabHovBg:"rgba(0,194,168,0.05)" },
+  dark: { bg:"#0f1117",surface:"#181c26",surfRaised:"#1e2235",surfAlt:"#1a1e2e",border:"#2a2f45",borderSub:"#323852",borderIn:"#3a4060",text:"#f0f2f8",textSoft:"#9ba4b8",textMuted:"#7b82a0",textDim:"#4a5168",accent:"#0088ff",accentHov:"#1a9bff",accentTxt:"#ffffff",accentGlow:"rgba(0,136,255,0.15)",sidebar:"#0f1117",sidebarAct:"rgba(0,136,255,0.08)",rowHov:"#151a24",tagBg:"rgba(124,106,247,0.12)",tagTxt:"#a599fc",btnSec:"#1e2235",btnSecHov:"#252a3d",btnSecTxt:"#c4c9d8",danger:"#ef4444",dangerHov:"#dc2626",dangerSoft:"rgba(239,68,68,0.16)",dangerTxt:"#fff",dangerGlow:"0 4px 24px rgba(239,68,68,0.25)",success:"#22c55e",successHov:"#16a34a",successSoft:"rgba(34,197,94,0.14)",successGlow:"0 4px 20px rgba(34,197,94,0.22)",warn:"#f59e0b",warnHov:"#d97706",warnTxt:"#0f172a",warnSoft:"rgba(245,158,11,0.16)",warnGlow:"0 4px 20px rgba(245,158,11,0.2)",info:"#38bdf8",infoSoft:"rgba(56,189,248,0.14)",overlay:"rgba(0,0,0,0.6)",shadow:"0 32px 100px rgba(0,0,0,0.55)",chk:"#0088ff",scroll:"#2a2f45",selRow:"rgba(0,136,255,0.06)",focus:"#0088ff",toastBg:"#181c26",toastBdr:"#2a2f45",tabActiveBg:"rgba(0,136,255,0.12)",tabHovBg:"rgba(0,136,255,0.06)" },
+  light: { bg:"#f4f6fa",surface:"#ffffff",surfRaised:"#ffffff",surfAlt:"#e8ebf4",border:"#e0e4ef",borderSub:"#e4e8f0",borderIn:"#d4d8e4",text:"#12151f",textSoft:"#4a5168",textMuted:"#5c6478",textDim:"#9ca3b8",accent:"#0077e6",accentHov:"#0088ff",accentTxt:"#ffffff",accentGlow:"rgba(0,136,255,0.12)",sidebar:"#ffffff",sidebarAct:"rgba(0,136,255,0.08)",rowHov:"#f4f6fa",tagBg:"rgba(124,106,247,0.1)",tagTxt:"#5b4fcf",btnSec:"#e8ebf4",btnSecHov:"#dde1ec",btnSecTxt:"#3e4560",danger:"#ef4444",dangerHov:"#dc2626",dangerSoft:"rgba(239,68,68,0.1)",dangerTxt:"#fff",dangerGlow:"0 4px 18px rgba(239,68,68,0.2)",success:"#16a34a",successHov:"#15803d",successSoft:"rgba(22,163,74,0.1)",successGlow:"0 4px 16px rgba(22,163,74,0.18)",warn:"#d97706",warnHov:"#b45309",warnTxt:"#fff",warnSoft:"rgba(217,119,6,0.1)",warnGlow:"0 4px 16px rgba(217,119,6,0.16)",info:"#0284c7",infoSoft:"rgba(2,132,199,0.1)",overlay:"rgba(15,18,28,0.35)",shadow:"0 32px 100px rgba(0,0,0,0.12)",chk:"#0077e6",scroll:"#d4d8e0",selRow:"rgba(0,136,255,0.08)",focus:"#0088ff",toastBg:"#ffffff",toastBdr:"#e0e4ef",tabActiveBg:"rgba(0,136,255,0.1)",tabHovBg:"rgba(0,136,255,0.05)" },
 };
 
 
@@ -128,23 +133,124 @@ function Section({title,icon:Icon,count,defaultOpen,children,t}){
   </div>);
 }
 
-/* ═══════════════════ ROW ACTIONS ═══════════════════ */
-function RowActions({project,onEdit,onArchive,onDelete,t}){
-  const[open,setOpen]=useState(false);const ref=useRef(null);
-  useEffect(()=>{const h=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);};document.addEventListener("mousedown",h);return()=>document.removeEventListener("mousedown",h);},[]);
-  return(<div ref={ref} style={{position:"relative",zIndex:open?50:1}}>
-    <button onClick={e=>{e.stopPropagation();setOpen(!open);}} style={{background:"transparent",border:"none",cursor:"pointer",color:t.textMuted,padding:6,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.background=t.accentGlow;e.currentTarget.style.color=t.accent;}} onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=t.textMuted;}}><MoreHorizontal size={16}/></button>
-    {open&&(<>
-      <div onClick={e=>{e.stopPropagation();setOpen(false);}} style={{position:"fixed",inset:0,zIndex:99}}/>
-      <div style={{position:"absolute",right:0,top:"100%",marginTop:4,zIndex:100,background:t.bg==="#0f1117"||t.bg==="#0b0e14"?"#111627":"#ffffff",border:`1.5px solid ${t.accent}30`,borderRadius:10,boxShadow:`0 12px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.3)`,minWidth:190,overflow:"hidden",animation:"dropIn 0.15s ease-out"}}>
-      {[
-        {icon:Pencil,label:"Edit project",action:()=>{onEdit();setOpen(false);},color:t.text},
-        {icon:project.archived?ArchiveRestore:Archive,label:project.archived?"Restore":"Archive",action:()=>{onArchive();setOpen(false);},color:t.warn},
-        {icon:Trash2,label:"Delete",action:()=>{onDelete();setOpen(false);},color:t.danger},
-      ].map((item,i)=>(<div key={i} onClick={e=>{e.stopPropagation();item.action();}} style={{padding:"11px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontSize:13,fontWeight:500,color:item.color,transition:"background 0.12s",borderBottom:i<2?`1px solid ${t.bg==="#0f1117"||t.bg==="#0b0e14"?"#1a2030":"#e4e7ed"}`:"none"}} onMouseEnter={e=>e.currentTarget.style.background=t.bg==="#0f1117"||t.bg==="#0b0e14"?"#1a2236":"#f0f2f5"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}><item.icon size={15}/> {item.label}</div>))}
-      </div>
-    </>)}
-  </div>);
+const PROJ_ROW_MENU_Z_BACK = 10040;
+const PROJ_ROW_MENU_Z_PANEL = 10041;
+
+/* ═══════════════════ ROW ACTIONS (portaled — escapes table overflow/stacking) ═══════════════════ */
+function RowActions({ project, onEdit, onArchive, onDelete, t }) {
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
+  const { triggerRef, menuRef, pos } = useFixedAnchorDropdown(open, close);
+  const panelBg = t.bg === "#0f1117" || t.bg === "#0b0e14" ? "#111627" : "#ffffff";
+  const sep = t.bg === "#0f1117" || t.bg === "#0b0e14" ? "#1a2030" : "#e4e7ed";
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="Row actions"
+        style={{
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          color: t.textMuted,
+          padding: 6,
+          borderRadius: 8,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "all 0.15s",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = t.accentGlow;
+          e.currentTarget.style.color = t.accent;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "transparent";
+          e.currentTarget.style.color = t.textMuted;
+        }}
+      >
+        <MoreHorizontal size={16} />
+      </button>
+      {open &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <>
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(false);
+              }}
+              style={{ position: "fixed", inset: 0, zIndex: PROJ_ROW_MENU_Z_BACK }}
+              aria-hidden
+            />
+            <div
+              ref={menuRef}
+              role="menu"
+              style={{
+                position: "fixed",
+                top: pos.top,
+                right: pos.right,
+                zIndex: PROJ_ROW_MENU_Z_PANEL,
+                background: panelBg,
+                border: `1.5px solid ${t.accent}30`,
+                borderRadius: 10,
+                boxShadow: "0 12px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.3)",
+                minWidth: 190,
+                overflow: "hidden",
+                animation: "dropIn 0.15s ease-out",
+              }}
+            >
+              {[
+                { icon: Pencil, label: "Edit project", action: () => { onEdit(); setOpen(false); }, color: t.text },
+                {
+                  icon: project.archived ? ArchiveRestore : Archive,
+                  label: project.archived ? "Restore" : "Archive",
+                  action: () => { onArchive(); setOpen(false); },
+                  color: t.warn,
+                },
+                { icon: Trash2, label: "Delete", action: () => { onDelete(); setOpen(false); }, color: t.danger },
+              ].map((item, i) => (
+                <div
+                  key={i}
+                  role="menuitem"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    item.action();
+                  }}
+                  style={{
+                    padding: "11px 16px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: item.color,
+                    transition: "background 0.12s",
+                    borderBottom: i < 2 ? `1px solid ${sep}` : "none",
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.background = t.bg === "#0f1117" || t.bg === "#0b0e14" ? "#1a2236" : "#f0f2f5")
+                  }
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  <item.icon size={15} /> {item.label}
+                </div>
+              ))}
+            </div>
+          </>,
+          document.body
+        )}
+    </div>
+  );
 }
 
 /* ═══════════════════ PROJECT MODAL ═══════════════════ */
@@ -391,7 +497,7 @@ export default function ProjectsPage(){
             </tr></thead>
             <tbody>
               {filtered.map((p,idx)=>{const sel=selected.has(p.id);const stg=STAGES.find(s=>s.value===p.stage)||STAGES[0];const owner=SEED_OWNERS.find(o=>o.id===p.owner);const teamPeople=p.teamIds.map(id=>people.find(x=>x.id===id)).filter(Boolean);return(
-                <tr key={p.id} onClick={()=>openEdit(p)} style={{borderBottom:`1px solid ${t.border}`,background:sel?t.selRow:"transparent",cursor:"pointer",transition:"background 0.12s",animation:mounted?`rowIn 0.35s ease-out ${idx*0.025}s both`:"none"}} onMouseEnter={e=>{if(!sel)e.currentTarget.style.background=t.rowHov;}} onMouseLeave={e=>{if(!sel)e.currentTarget.style.background=sel?t.selRow:"transparent";}}>
+                <tr key={p.id} onClick={()=>openEdit(p)} style={{borderBottom:`1px solid ${t.border}`,background:sel?t.selRow:"transparent",cursor:"pointer",transition:"background 0.12s",animation:mounted&&idx<TABLE_ROW_ENTER_ANIM_MAX?`rowIn 0.35s ease-out ${idx*0.025}s both`:"none"}} onMouseEnter={e=>{if(!sel)e.currentTarget.style.background=t.rowHov;}} onMouseLeave={e=>{if(!sel)e.currentTarget.style.background=sel?t.selRow:"transparent";}}>
                   <td style={{padding:"12px 14px"}} onClick={e=>e.stopPropagation()}><input type="checkbox" checked={sel} onChange={()=>toggleSel(p.id)} style={{accentColor:t.chk,cursor:"pointer",width:16,height:16}}/></td>
                   <td style={{padding:"12px 12px"}}><div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:4,height:28,borderRadius:2,background:p.color,flexShrink:0}}/><span style={{fontWeight:600,color:p.archived?t.textMuted:t.text,fontSize:14}}>{p.name}</span></div></td>
                   <td style={{padding:"12px 12px",color:p.code?t.textSoft:t.textDim,fontFamily:"'DM Mono', monospace",fontSize:12}}>{p.code||"—"}</td>

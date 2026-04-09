@@ -21,10 +21,10 @@
   --text-muted: #7b82a0;
   --text-dim: #4a5168;
   --sidebar: #0f1117;
-  --sidebar-act: rgba(0, 194, 168, 0.1);
-  --accent: #00c2a8;
-  --accent-txt: #061210;
-  --accent-glow: rgba(0, 194, 168, 0.15);
+  --sidebar-act: rgba(0, 136, 255, 0.1);
+  --accent: #0088ff;
+  --accent-txt: #ffffff;
+  --accent-glow: rgba(0, 136, 255, 0.15);
   --tag-bg: rgba(124, 106, 247, 0.14);
   --tag-txt: #b8afff;
   --btn-sec: #1e2235;
@@ -35,18 +35,18 @@
   --warn: #f59e0b;
   --orange: #e8892c;
   --pink: #e85d9a;
-  --teal: #00c2a8;
+  --teal: #0088ff; /* legacy name — schedule “brand” blocks; now matches blue accent */
   --hatch: rgba(255, 255, 255, 0.04);
   --scroll: #2a2f45;
   /* Mon–Fri week bands */
-  --lp-week-fill-a: rgba(0, 194, 168, 0.07);
+  --lp-week-fill-a: rgba(0, 136, 255, 0.07);
   --lp-week-fill-b: rgba(124, 106, 247, 0.06);
-  --lp-week-frame: rgba(0, 194, 168, 0.4);
-  --lp-week-glow: rgba(0, 194, 168, 0.12);
-  /* Today — electric teal */
-  --ui-today: #00e5c8;
-  --ui-today-glow: rgba(0, 229, 200, 0.55);
-  --ui-today-soft: rgba(0, 194, 168, 0.28);
+  --lp-week-frame: rgba(0, 136, 255, 0.4);
+  --lp-week-glow: rgba(0, 136, 255, 0.12);
+  /* Today — bright brand blue */
+  --ui-today: #4dadff;
+  --ui-today-glow: rgba(77, 173, 255, 0.55);
+  --ui-today-soft: rgba(0, 136, 255, 0.28);
 
   flex: 1 1 auto;
   width: 100%;
@@ -188,10 +188,10 @@
   --text-muted: #5c6478;
   --text-dim: #9ca3b8;
   --sidebar: #ffffff;
-  --sidebar-act: rgba(0, 194, 168, 0.08);
-  --accent: #00a896;
+  --sidebar-act: rgba(0, 136, 255, 0.08);
+  --accent: #0077e6;
   --accent-txt: #ffffff;
-  --accent-glow: rgba(0, 194, 168, 0.12);
+  --accent-glow: rgba(0, 136, 255, 0.12);
   --tag-bg: rgba(124, 106, 247, 0.1);
   --tag-txt: #5b4fcf;
   --btn-sec: #e8ebf4;
@@ -201,13 +201,13 @@
   --grid-line-soft: #e4e8f0;
   --hatch: rgba(15, 18, 28, 0.05);
   --scroll: #c8cdd8;
-  --lp-week-fill-a: rgba(0, 194, 168, 0.06);
+  --lp-week-fill-a: rgba(0, 136, 255, 0.06);
   --lp-week-fill-b: rgba(124, 106, 247, 0.05);
-  --lp-week-frame: rgba(0, 168, 150, 0.38);
-  --lp-week-glow: rgba(0, 194, 168, 0.1);
-  --ui-today: #00a896;
-  --ui-today-glow: rgba(0, 194, 168, 0.4);
-  --ui-today-soft: rgba(0, 194, 168, 0.18);
+  --lp-week-frame: rgba(0, 119, 230, 0.38);
+  --lp-week-glow: rgba(0, 136, 255, 0.1);
+  --ui-today: #0077e6;
+  --ui-today-glow: rgba(0, 136, 255, 0.4);
+  --ui-today-soft: rgba(0, 136, 255, 0.18);
 }
 
 .lp-sidenav {
@@ -1076,6 +1076,16 @@
 .lp-sched-virtual-rows,
 .lp-sched-virtual-anchor {
   box-sizing: border-box;
+}
+
+/* One continuous line between people (virtual rows); avoids split borders on sticky panel vs timeline */
+.lp-sched-virtual-rows .lp-sched-virtual-anchor {
+  border-bottom: 1px solid var(--border);
+}
+
+.lp-sched-virtual-rows .lp-sched-virtual-anchor .lp-sched-person,
+.lp-sched-virtual-rows .lp-sched-virtual-anchor .lp-sched-timeline {
+  border-bottom: none;
 }
 
 .lp-sched-row {
@@ -2873,7 +2883,7 @@ button.lp-block.lp-block-leave:hover {
   letter-spacing: 0.02em;
 }
 
-/* Annual — soft teal stripes + gradient */
+/* Annual — soft brand stripes + gradient */
 .lp-leave-block--annual {
   background:
     repeating-linear-gradient(

@@ -119,8 +119,8 @@
 
 /* Primary */
 .alloc8-btn--primary {
-  color: #061210;
-  background: linear-gradient(135deg, var(--color-brand-light, #00e5c8) 0%, var(--color-brand, #00c2a8) 52%, color-mix(in srgb, var(--color-brand) 88%, #0a1620) 100%);
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--color-brand-light, #4dadff) 0%, var(--color-brand, #0088ff) 52%, color-mix(in srgb, var(--color-brand) 88%, #0a1620) 100%);
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--color-brand-light) 35%, transparent) inset,
     0 2px 8px rgba(0, 0, 0, 0.18),

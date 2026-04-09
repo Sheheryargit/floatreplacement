@@ -8,8 +8,6 @@ import {
   useLayoutEffect,
 } from "react";
 import { useVirtualizer, measureElement as virtualMeasureElement } from "@tanstack/react-virtual";
-import { useEnhancedMode } from "../enhanced/useEnhancedMode.js";
-import { useHoverIntent } from "../enhanced/useHoverIntent.js";
 import {
   ChevronDown,
   ChevronLeft,
@@ -94,11 +92,6 @@ import {
   buildLeaveHoverTitle,
 } from "../utils/leaveVisuals.js";
 import "./LandingPage.css";
-import "../enhanced/enhancedSchedule.css";
-
-function normProjectLabel(s) {
-  return (s || "").trim().toLowerCase();
-}
 
 const LEAVE_LUCIDE = {
   palmtree: Palmtree,
@@ -699,15 +692,6 @@ const timelineRowEqual = (prev, next) => {
   if (prev.scheduleModel !== next.scheduleModel) return false;
   if (prev.projects !== next.projects) return false;
   if (prev.personAllocations !== next.personAllocations) return false;
-  if (prev.enhancedMode !== next.enhancedMode) return false;
-  if (prev.enhancedDimmedRow !== next.enhancedDimmedRow) return false;
-  if (prev.enhancedFocusedRow !== next.enhancedFocusedRow) return false;
-  if (prev.enhancedFocusProjectLabel !== next.enhancedFocusProjectLabel) return false;
-  if (prev.onPersonFocusIntent !== next.onPersonFocusIntent) return false;
-  if (prev.onPersonClearIntent !== next.onPersonClearIntent) return false;
-  if (prev.onProjectFocusIntent !== next.onProjectFocusIntent) return false;
-  if (prev.onProjectClearIntent !== next.onProjectClearIntent) return false;
-  if (prev.onAltLockToggle !== next.onAltLockToggle) return false;
 
   return true;
 };
@@ -809,46 +793,11 @@ const TimelineRow = memo(function TimelineRow({
   openAllocationDetail,
   handleTimelineClick,
   todayDateKey,
-  enhancedMode,
-  enhancedDimmedRow,
-  enhancedFocusedRow,
-  enhancedFocusProjectLabel,
-  onPersonFocusIntent,
-  onPersonClearIntent,
-  onProjectFocusIntent,
-  onProjectClearIntent,
-  onAltLockToggle,
 }) {
   const { theme } = useAppTheme();
   const t = T[theme];
   const reduceMotion = useReducedMotion();
   const allocViewMode = scheduleModel.aggregateAllSlots ? "week" : viewMode;
-
-  const personHover = useHoverIntent({
-    enabled: enhancedMode,
-    delayMs: 600,
-    onCommit: () => onPersonFocusIntent(p.id),
-    onCancel: onPersonClearIntent,
-  });
-
-  const barTimerRef = useRef(null);
-  useEffect(() => () => clearTimeout(barTimerRef.current), []);
-
-  const handleBarEnter = useCallback(
-    (label) => {
-      if (!enhancedMode) return;
-      clearTimeout(barTimerRef.current);
-      barTimerRef.current = window.setTimeout(() => {
-        onProjectFocusIntent(normProjectLabel(label));
-      }, 550);
-    },
-    [enhancedMode, onProjectFocusIntent]
-  );
-
-  const handleBarLeave = useCallback(() => {
-    clearTimeout(barTimerRef.current);
-    onProjectClearIntent();
-  }, [onProjectClearIntent]);
 
   const hoursKeys = visibleDateKeysForHours(scheduleModel, viewMode, anchorDate);
   const hours = computePersonHoursInViewFromList(personAllocations, scheduleModel, viewMode, anchorDate);
@@ -907,26 +856,12 @@ const TimelineRow = memo(function TimelineRow({
     <div
       key={p.id}
       className={
-        "lp-sched-row" +
-        (overloaded ? " lp-sched-row-overloaded" : "") +
-        (enhancedDimmedRow ? " lp-sched-row--enhanced-dim" : "") +
-        (enhancedFocusedRow ? " lp-sched-row--enhanced-focus" : "")
+        "lp-sched-row" + (overloaded ? " lp-sched-row-overloaded" : "")
       }
       style={{ ["--animation-order"]: i }}
     >
       <div className="lp-sched-person">
-        <div
-          className="lp-person-row-shell"
-          onMouseEnter={personHover.onMouseEnter}
-          onMouseLeave={personHover.onMouseLeave}
-          onClick={(e) => {
-            if (enhancedMode && e.altKey) {
-              e.preventDefault();
-              e.stopPropagation();
-              onAltLockToggle?.(p.id);
-            }
-          }}
-        >
+        <div className="lp-person-row-shell">
           <div className="lp-person-row-cluster">
             <div className="lp-person-row lp-person-row-main">
               <div
@@ -1182,11 +1117,6 @@ const TimelineRow = memo(function TimelineRow({
                       const hasNotes = Boolean((seg.a.notes || "").trim());
                       const tip = buildWorkAllocationTitle(seg.a, projectName, hoursLabel);
 
-                      const labelNorm = normProjectLabel(seg.a.project);
-                      const projHit =
-                        Boolean(enhancedFocusProjectLabel) && labelNorm === enhancedFocusProjectLabel;
-                      const projMute = Boolean(enhancedFocusProjectLabel) && !projHit;
-
                       const enterDelayMs = reduceMotion ? 0 : Math.min(i, 28) * 22 + stackIdx * 10 + segJ * 38;
 
                       const baseStyle = {
@@ -1218,16 +1148,11 @@ const TimelineRow = memo(function TimelineRow({
                           className={
                             "lp-block lp-block-alloc lp-block-alloc-project lp-alloc-bar" +
                             (micro ? " lp-alloc-bar--micro" : "") +
-                            (allocViewMode === "day" ? " lp-alloc-bar--day" : "") +
-                            (projHit ? " lp-alloc-bar--enhanced-proj-hit" : "") +
-                            (projMute ? " lp-alloc-bar--enhanced-proj-mute" : "") +
-                            (projHit && enhancedFocusProjectLabel ? " lp-alloc-bar--enhanced-pulse" : "")
+                            (allocViewMode === "day" ? " lp-alloc-bar--day" : "")
                           }
                           style={baseStyle}
                           aria-label={allocationAriaLabel(seg.a)}
                           title={tip}
-                          onMouseEnter={() => handleBarEnter(seg.a.project)}
-                          onMouseLeave={handleBarLeave}
                           onClick={(e) => {
                             e.stopPropagation();
                             openAllocationDetail(seg.a);
@@ -1352,71 +1277,6 @@ export default function LandingPage() {
     [scheduleAllocations]
   );
 
-  const enhancedMode = useEnhancedMode();
-  const [enhancedFocusPersonId, setEnhancedFocusPersonId] = useState(null);
-  const [enhancedFocusProject, setEnhancedFocusProject] = useState(null);
-  const [enhancedLockedPersonId, setEnhancedLockedPersonId] = useState(null);
-  const lockedRef = useRef(null);
-  useEffect(() => {
-    lockedRef.current = enhancedLockedPersonId;
-  }, [enhancedLockedPersonId]);
-
-  const activePersonFocus = enhancedLockedPersonId ?? enhancedFocusPersonId;
-
-  const enhancedProjectPersonSet = useMemo(() => {
-    if (!enhancedFocusProject) return null;
-    const next = new Set();
-    for (const a of scheduleAllocations) {
-      if (a.isLeave) continue;
-      if (normProjectLabel(a.project) !== enhancedFocusProject) continue;
-      const ids = Array.isArray(a.personIds) && a.personIds.length > 0 ? a.personIds : [a.personId];
-      ids.forEach((id) => next.add(id));
-    }
-    return next;
-  }, [scheduleAllocations, enhancedFocusProject]);
-
-  useEffect(() => {
-    if (!enhancedMode) {
-      setEnhancedFocusPersonId(null);
-      setEnhancedFocusProject(null);
-      setEnhancedLockedPersonId(null);
-    }
-  }, [enhancedMode]);
-
-  useEffect(() => {
-    if (!enhancedMode) return;
-    const fn = (e) => {
-      if (e.key !== "Escape") return;
-      setEnhancedFocusPersonId(null);
-      setEnhancedFocusProject(null);
-      setEnhancedLockedPersonId(null);
-    };
-    window.addEventListener("keydown", fn);
-    return () => window.removeEventListener("keydown", fn);
-  }, [enhancedMode]);
-
-  const onPersonFocusIntent = useCallback((id) => {
-    setEnhancedFocusProject(null);
-    setEnhancedFocusPersonId(id);
-  }, []);
-
-  const onPersonClearIntent = useCallback(() => {
-    setEnhancedFocusPersonId((prev) => (lockedRef.current ? prev : null));
-  }, []);
-
-  const onProjectFocusIntent = useCallback((label) => {
-    setEnhancedFocusPersonId(null);
-    setEnhancedFocusProject(label || null);
-  }, []);
-
-  const onProjectClearIntent = useCallback(() => {
-    setEnhancedFocusProject(null);
-  }, []);
-
-  const onAltLockToggle = useCallback((id) => {
-    setEnhancedLockedPersonId((prev) => (prev === id ? null : id));
-  }, []);
-
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState(null);
 
@@ -1437,8 +1297,6 @@ export default function LandingPage() {
   const prevOffsets = useRef(timelineOffsets);
   const prevColCount = useRef(0);
   const scheduleViewportRef = useRef(null);
-  const scheduleHeadRef = useRef(null);
-  const [scheduleHeadHeight, setScheduleHeadHeight] = useState(0);
   /** Coalesces horizontal scroll to one layout read per frame (fewer setState calls while scrolling). */
   const timelineScrollRafRef = useRef(null);
   const lastAnchorKey = useRef(null);
@@ -1588,17 +1446,6 @@ export default function LandingPage() {
     () => (teamCapacityHours > 0 ? Math.min(100, Math.round((totalHours / teamCapacityHours) * 100)) : 0),
     [totalHours, teamCapacityHours]
   );
-
-  useLayoutEffect(() => {
-    const el = scheduleHeadRef.current;
-    if (!el) return;
-    const measure = () => setScheduleHeadHeight(Math.round(el.getBoundingClientRect().height));
-    measure();
-    if (typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => measure());
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [scheduleModel, viewMode, customRange, timelineOffsets]);
 
   const scheduleMotionKey = useMemo(() => {
     if (customRange?.start && customRange?.end) {
@@ -2114,12 +1961,13 @@ export default function LandingPage() {
   const scheduleFirefox =
     typeof navigator !== "undefined" && /firefox/i.test(navigator.userAgent || "");
 
+  // scrollMargin must stay 0: the calendar header is a sibling above .lp-sched-virtual-rows in the
+  // scroll flow. Non-zero scrollMargin would add the same offset again as empty space above row 0.
   const scheduleRowVirtualizer = useVirtualizer({
     count: schedulePeople.length,
     getScrollElement: () => scheduleViewportRef.current,
     estimateSize: () => 148,
     overscan: 4,
-    scrollMargin: scheduleHeadHeight,
     measureElement: scheduleFirefox ? undefined : virtualMeasureElement,
   });
 
@@ -2135,7 +1983,6 @@ export default function LandingPage() {
       data-theme={theme === "light" ? "light" : "dark"}
       data-density={density}
       data-view={viewMode}
-      data-enhanced-mode={enhancedMode ? "1" : "0"}
     >
       <AppSideNav />
 
@@ -2661,7 +2508,7 @@ export default function LandingPage() {
               animate={{ opacity: 1, scale: 1, filter: "brightness(1)" }}
               transition={{ type: "spring", stiffness: 420, damping: 32, mass: 0.88 }}
             >
-              <div className="lp-sched-row lp-sched-row-head" ref={scheduleHeadRef}>
+              <div className="lp-sched-row lp-sched-row-head">
                 <div className="lp-sched-corner" aria-hidden />
                 <div className="lp-sched-timeline lp-sched-sticky-top">
                   <div className="lp-cal-head">
@@ -2737,17 +2584,6 @@ export default function LandingPage() {
                 {scheduleRowVirtualizer.getVirtualItems().map((virtualRow) => {
                   const p = schedulePeople[virtualRow.index];
                   const i = virtualRow.index;
-                  const hasProject =
-                    !enhancedFocusProject || enhancedProjectPersonSet?.has(p.id) === true;
-                  const dimRow =
-                    enhancedMode &&
-                    ((Boolean(activePersonFocus) && activePersonFocus !== p.id && !enhancedFocusProject) ||
-                      (Boolean(enhancedFocusProject) && !hasProject));
-                  const focusedRow =
-                    enhancedMode &&
-                    !dimRow &&
-                    ((activePersonFocus === p.id && !enhancedFocusProject) ||
-                      (Boolean(enhancedFocusProject) && hasProject));
                   return (
                     <div
                       key={virtualRow.key}
@@ -2779,15 +2615,6 @@ export default function LandingPage() {
                         openAllocationDetail={openAllocationDetail}
                         handleTimelineClick={handleTimelineClick}
                         todayDateKey={todayDateKey}
-                        enhancedMode={enhancedMode}
-                        enhancedDimmedRow={dimRow}
-                        enhancedFocusedRow={focusedRow}
-                        enhancedFocusProjectLabel={enhancedFocusProject}
-                        onPersonFocusIntent={onPersonFocusIntent}
-                        onPersonClearIntent={onPersonClearIntent}
-                        onProjectFocusIntent={onProjectFocusIntent}
-                        onProjectClearIntent={onProjectClearIntent}
-                        onAltLockToggle={onAltLockToggle}
                       />
                     </div>
                   );

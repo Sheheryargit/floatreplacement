@@ -10,11 +10,11 @@
 
 :root[data-theme="light"] .float-app-loader {
   --float-loader-bg: #f4f6fa;
-  --float-loader-rail: rgba(0, 194, 168, 0.12);
+  --float-loader-rail: rgba(0, 136, 255, 0.12);
   --float-loader-glow: linear-gradient(
     90deg,
     transparent,
-    rgba(0, 194, 168, 0.55),
+    rgba(0, 136, 255, 0.55),
     rgba(124, 106, 247, 0.28),
     transparent
   );

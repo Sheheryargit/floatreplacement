@@ -1,13 +1,13 @@
 import { create } from "zustand";
 import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { PEOPLE_SEED } from "../data/peopleSeed.js";
 import {
-  PEOPLE_SEED,
   SEED_ROLES,
-  SEED_DEPTS,
   SEED_TAGS,
-} from "../components/PersonModal.jsx";
-import { ALLOCATION_PROJECT_SEED } from "../components/AllocationModals.jsx";
+  ALLOCATION_PROJECT_SEED,
+} from "../data/workspaceSeedConstants.js";
+import { SEED_DEPTS } from "../constants/departments.js";
 import {
   PROJECTS_SEED,
   SEED_CLIENTS,
@@ -43,7 +43,7 @@ const LEGACY_STORAGE_KEY = "float-workspace-v1";
 /** Debounce window for postgres_changes → full reload (coalesces bursts from many editors). */
 const WORKSPACE_REALTIME_DEBOUNCE_MS = 900;
 
-export function dbSync(fn) {
+function dbSync(fn) {
   if (!isSupabaseConfigured) return;
   Promise.resolve()
     .then(fn)

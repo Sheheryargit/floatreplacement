@@ -170,7 +170,7 @@
   height: min(560px, 65vw);
   top: -22%;
   left: -12%;
-  background: linear-gradient(148deg, #0050ff, #00e5ff 45%, #4a9eff);
+  background: linear-gradient(148deg, #0050ff, #4dadff 45%, #4a9eff);
   opacity: 0.38;
 }
 
@@ -375,7 +375,7 @@
   letter-spacing: 0.18em;
   font-size: 13px;
   font-weight: 800;
-  color: #00e5ff;
+  color: #4dadff;
   text-shadow: 0 0 12px rgba(0, 229, 255, 0.8);
   display: flex;
   align-items: center;
@@ -398,7 +398,7 @@
   width: 100%;
   height: 2px;
   background: #ffffff;
-  box-shadow: 0 0 12px 3px #00e5ff;
+  box-shadow: 0 0 12px 3px #4dadff;
   animation: laserScan 1.6s ease-in-out infinite;
   z-index: 10;
 }
@@ -451,8 +451,8 @@
 
 @keyframes flyArrow {
   0% { transform: translateX(6px); opacity: 1; color: #fff; filter: drop-shadow(0 0 0 transparent); }
-  80% { transform: translateX(200px); opacity: 1; color: #00e5ff; filter: drop-shadow(0 0 12px #00e5ff); }
-  100% { transform: translateX(300px); opacity: 0; color: #00e5ff; filter: drop-shadow(0 0 20px #00e5ff); }
+  80% { transform: translateX(200px); opacity: 1; color: #4dadff; filter: drop-shadow(0 0 12px #4dadff); }
+  100% { transform: translateX(300px); opacity: 0; color: #4dadff; filter: drop-shadow(0 0 20px #4dadff); }
 }
 
 .login-page-hero-item-icon {

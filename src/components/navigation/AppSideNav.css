@@ -1,4 +1,4 @@
-/* Alloc8 — sidebar 240px expanded, 64px collapsed, teal active rail */
+/* Alloc8 — sidebar 240px expanded, 64px collapsed, brand blue active rail */
 .app-sidenav {
   --sidenav-w: 240px;
   position: relative;
@@ -39,20 +39,20 @@
   --app-sidebar: #f4f6fa;
   --app-border: #e0e4ef;
   --app-sidenav-muted: #5c6478;
-  --app-sidenav-active-bg: rgba(0, 194, 168, 0.1);
+  --app-sidenav-active-bg: rgba(0, 136, 255, 0.1);
   --app-sidenav-hover: rgba(0, 0, 0, 0.04);
-  --app-accent: #00a896;
-  --app-logo-shadow: 0 4px 24px rgba(0, 194, 168, 0.22);
+  --app-accent: #0077e6;
+  --app-logo-shadow: 0 4px 24px rgba(0, 136, 255, 0.22);
 }
 
 :root[data-theme="dark"] .app-sidenav {
   --app-sidebar: #0f1117;
   --app-border: #2a2f45;
   --app-sidenav-muted: #7b82a0;
-  --app-sidenav-active-bg: rgba(0, 194, 168, 0.1);
+  --app-sidenav-active-bg: rgba(0, 136, 255, 0.1);
   --app-sidenav-hover: rgba(255, 255, 255, 0.04);
-  --app-accent: #00c2a8;
-  --app-logo-shadow: 0 4px 28px rgba(0, 194, 168, 0.2);
+  --app-accent: #0088ff;
+  --app-logo-shadow: 0 4px 28px rgba(0, 136, 255, 0.2);
 }
 
 .app-sidenav-head {
@@ -122,7 +122,7 @@
   font-weight: 800;
   font-size: 1.1rem;
   color: var(--app-accent);
-  background: linear-gradient(145deg, rgba(0, 194, 168, 0.18), rgba(124, 106, 247, 0.1));
+  background: linear-gradient(145deg, rgba(0, 136, 255, 0.18), rgba(124, 106, 247, 0.1));
   border: 1px solid color-mix(in srgb, var(--app-accent) 35%, var(--app-border));
   box-shadow: var(--app-logo-shadow);
 }

@@ -53,7 +53,7 @@
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.05) inset,
     0 20px 56px rgba(0, 0, 0, 0.42),
-    0 0 40px color-mix(in srgb, var(--color-brand, #00c2a8) 6%, transparent);
+    0 0 40px color-mix(in srgb, var(--color-brand, #0088ff) 6%, transparent);
   overflow: hidden;
 }
 

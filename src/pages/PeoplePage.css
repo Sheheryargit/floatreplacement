@@ -117,7 +117,7 @@
 }
 
 .people-filter-people-scroll label:hover {
-  background: var(--people-filter-row-hov, rgba(0, 194, 168, 0.06));
+  background: var(--people-filter-row-hov, rgba(0, 136, 255, 0.06));
 }
 
 .people-page-root[data-theme="light"] .people-filter-people-scroll {

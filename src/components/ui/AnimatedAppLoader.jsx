@@ -38,7 +38,7 @@ function OrbitDots({ light }) {
 }
 
 function WaveBars({ light }) {
-  const c = light ? "#00a896" : "#00e5c8";
+  const c = light ? "#0077e6" : "#4dadff";
   return (
     <div className="float-loader-bars" aria-hidden>
       {[0, 1, 2, 3, 4].map((i) => (
@@ -60,7 +60,7 @@ function WaveBars({ light }) {
 }
 
 function WaveBarsStatic({ light }) {
-  const c = light ? "#00a896" : "#00e5c8";
+  const c = light ? "#0077e6" : "#4dadff";
   const heights = [0.45, 0.72, 1, 0.68, 0.52];
   return (
     <div className="float-loader-bars" aria-hidden>

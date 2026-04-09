@@ -13,6 +13,17 @@ import GlobalBackground from "./components/ui/GlobalBackground.jsx";
 import { Toaster } from "sonner";
 import { isStaticUi } from "./config/uiMode.js";
 
+/** Opaque toast shell — detailed fills live in index.css (.alloc8-toast). */
+const toastShellStyle = {
+  borderRadius: "14px",
+  fontSize: "13.5px",
+  fontWeight: 600,
+  fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif",
+  border: "1px solid var(--color-border)",
+  padding: "14px 18px",
+  boxShadow: "0 12px 40px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.2)",
+};
+
 const CommandPalette = lazy(() => import("./components/command/CommandPalette.jsx"));
 const LandingPage = lazy(() => import("./pages/LandingPage.jsx"));
 const PeoplePage = lazy(() => import("./pages/PeoplePage.jsx"));
@@ -84,7 +95,6 @@ function AuthGate() {
 
 function ThemedToaster() {
   const { theme } = useAppTheme();
-  const staticUi = isStaticUi();
   return (
     <Toaster
       theme={theme}
@@ -100,25 +110,11 @@ function ThemedToaster() {
           toast: "alloc8-toast",
         },
         style: {
-          borderRadius: "14px",
-          fontSize: "13.5px",
-          fontWeight: 600,
-          fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif",
-          ...(staticUi
-            ? {}
-            : {
-                backdropFilter: "blur(20px) saturate(1.2)",
-                WebkitBackdropFilter: "blur(20px) saturate(1.2)",
-              }),
+          ...toastShellStyle,
           boxShadow:
             theme === "light"
-              ? "0 12px 40px rgba(15,23,42,0.12), 0 0 0 1px rgba(0,0,0,0.04), 0 4px 16px rgba(0,194,168,0.06)"
-              : "0 16px 48px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06), 0 0 40px rgba(0,194,168,0.08)",
-          border:
-            theme === "light"
-              ? "1px solid rgba(0,0,0,0.06)"
-              : "1px solid rgba(255,255,255,0.1)",
-          padding: "14px 18px",
+              ? "0 12px 36px rgba(15, 23, 42, 0.14), 0 2px 8px rgba(15, 23, 42, 0.06)"
+              : toastShellStyle.boxShadow,
         },
       }}
     />

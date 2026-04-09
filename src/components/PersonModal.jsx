@@ -1,17 +1,19 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Users, FolderOpen, BarChart3, CalendarDays, ClipboardList,
-  Plus, Download, Trash2, X, ChevronRight,
-  Sun, Moon, Check, AlertTriangle, UserPlus, Shield, Clock,
-  Palmtree, Briefcase, Tag, Building2, DollarSign, Mail, Info, Calendar,
-  Archive, ArchiveRestore, Save, MoreHorizontal, Pencil, CircleAlert,
+  Users, FolderOpen,
+  Plus, Trash2, X, ChevronRight,
+  AlertTriangle, UserPlus, Shield, Clock,
+  Palmtree, Briefcase, Tag, DollarSign, Mail, Info, Calendar,
+  Archive, ArchiveRestore, Save, MoreHorizontal, Pencil,
 } from "lucide-react";
 import { Button } from "./ui/Button.jsx";
 import { tagChromaProps } from "../utils/tagChroma.js";
 import { projectToAllocationLabel, avatarGradientFromName } from "../utils/projectColors.js";
 import { toast } from "sonner";
 import { SEED_DEPTS } from "../constants/departments.js";
+import { SEED_ROLES, SEED_TAGS } from "../data/workspaceSeedConstants.js";
 import { PEOPLE_SEED } from "../data/peopleSeed.js";
 import { DepartmentSelector } from "./DepartmentSelector.jsx";
 import { FloatSelect } from "./ui/FloatSelect.jsx";
@@ -23,6 +25,7 @@ import {
 import { leaveLabel } from "./AllocationModals.jsx";
 import { leaveAccentTheme, isoDateLocal } from "../utils/leaveVisuals.js";
 import { isSupabaseConfigured } from "../lib/supabase.js";
+import { useFixedAnchorDropdown } from "../hooks/useFixedAnchorDropdown.js";
 import {
   getPersonAvailability,
   putPersonAvailability,
@@ -34,21 +37,6 @@ import {
 } from "../utils/availabilityPreview.js";
 
 /* ═══════════════════ DATA ═══════════════════ */
-const SEED_ROLES = [
-  "Analyst",
-  "Consultant",
-  "Director",
-  "Engineer",
-  "Graduate",
-  "Manager",
-  "Principal",
-  "Senior Consultant",
-  "Senior Manager",
-  "Senior Specialist Lead",
-  "Specialist Director",
-  "Specialist Lead",
-];
-const SEED_TAGS = ["Azure",".NET","Cloud Secure","Data&AI","SDM","Firenation","UI and UX Design","service management","AWS Platform","Azkaban","Secure"];
 const TYPES = ["Employee","Contractor","Placeholder"];
 const ACCESS_OPTS = [
   { value:"none", label:"No access rights", desc:"", icon:Shield },
@@ -62,12 +50,6 @@ const MODAL_TABS = [
   { key:"timeoff", label:"Time Off", icon:Palmtree },
   { key:"projects", label:"Projects", icon:FolderOpen },
 ];
-
-let _nid = 100;
-
-export function nextPersonId() {
-  return _nid++;
-}
 
 /* ═══════════════════ HELPERS ═══════════════════ */
 const ini = (n) => { if(!n) return ""; const p=n.trim().split(/\s+/); return p.length===1?(p[0][0]||"").toUpperCase():(p[0][0]+p[p.length-1][0]).toUpperCase(); };
@@ -120,8 +102,8 @@ const T = {
     bg:"#0f1117",surface:"#181c26",surfRaised:"#1e2235",surfAlt:"#1a1e2e",
     border:"#2a2f45",borderSub:"#323852",borderIn:"#3a4060",
     text:"#f0f2f8",textSoft:"#9ba4b8",textMuted:"#7b82a0",textDim:"#4a5168",
-    accent:"#00c2a8",accentSoft:"#009e8a",accentHov:"#00e5c8",accentTxt:"#061210",accentGlow:"rgba(0,194,168,0.15)",
-    sidebar:"#0f1117",sidebarAct:"rgba(0,194,168,0.08)",rowHov:"#151a24",
+    accent:"#0088ff",accentSoft:"#006edc",accentHov:"#1a9bff",accentTxt:"#ffffff",accentGlow:"rgba(0,136,255,0.15)",
+    sidebar:"#0f1117",sidebarAct:"rgba(0,136,255,0.08)",rowHov:"#151a24",
     tagBg:"rgba(124,106,247,0.12)",tagTxt:"#a599fc",
     btnSec:"#1e2235",btnSecHov:"#252a3d",btnSecTxt:"#c4c9d8",
     danger:"#ef4444",dangerHov:"#dc2626",dangerSoft:"rgba(239,68,68,0.16)",dangerTxt:"#fff",
@@ -130,16 +112,15 @@ const T = {
     warn:"#f59e0b",warnHov:"#d97706",warnTxt:"#0f172a",warnSoft:"rgba(245,158,11,0.16)",warnGlow:"0 4px 20px rgba(245,158,11,0.2)",
     info:"#38bdf8",infoSoft:"rgba(56,189,248,0.14)",infoGlow:"0 4px 22px rgba(56,189,248,0.22)",
     overlay:"rgba(0,0,0,0.6)",shadow:"0 32px 100px rgba(0,0,0,0.55)",
-    chk:"#00c2a8",scroll:"#2a2f45",selRow:"rgba(0,194,168,0.06)",focus:"#00c2a8",
-    toastBg:"#181c26",toastBdr:"#2a2f45",
-    tabActiveBg:"rgba(0,194,168,0.12)",tabHovBg:"rgba(0,194,168,0.06)",
+    chk:"#0088ff",scroll:"#2a2f45",selRow:"rgba(0,136,255,0.06)",focus:"#0088ff",
+    tabActiveBg:"rgba(0,136,255,0.12)",tabHovBg:"rgba(0,136,255,0.06)",
   },
   light: {
     bg:"#f4f6fa",surface:"#ffffff",surfRaised:"#ffffff",surfAlt:"#e8ebf4",
     border:"#e0e4ef",borderSub:"#e4e8f0",borderIn:"#d4d8e4",
     text:"#12151f",textSoft:"#4a5168",textMuted:"#5c6478",textDim:"#9ca3b8",
-    accent:"#00a896",accentSoft:"#008f7d",accentHov:"#00c2a8",accentTxt:"#ffffff",accentGlow:"rgba(0,194,168,0.12)",
-    sidebar:"#ffffff",sidebarAct:"rgba(0,194,168,0.08)",rowHov:"#f4f6fa",
+    accent:"#0077e6",accentSoft:"#0066cc",accentHov:"#0088ff",accentTxt:"#ffffff",accentGlow:"rgba(0,136,255,0.12)",
+    sidebar:"#ffffff",sidebarAct:"rgba(0,136,255,0.08)",rowHov:"#f4f6fa",
     tagBg:"rgba(124,106,247,0.1)",tagTxt:"#5b4fcf",
     btnSec:"#e8ebf4",btnSecHov:"#dde1ec",btnSecTxt:"#3e4560",
     danger:"#ef4444",dangerHov:"#dc2626",dangerSoft:"rgba(239,68,68,0.1)",dangerTxt:"#fff",
@@ -148,44 +129,10 @@ const T = {
     warn:"#d97706",warnHov:"#b45309",warnTxt:"#fff",warnSoft:"rgba(217,119,6,0.1)",warnGlow:"0 4px 16px rgba(217,119,6,0.16)",
     info:"#0284c7",infoSoft:"rgba(2,132,199,0.1)",infoGlow:"0 4px 18px rgba(2,132,199,0.15)",
     overlay:"rgba(15,18,28,0.35)",shadow:"0 32px 100px rgba(0,0,0,0.12)",
-    chk:"#00a896",scroll:"#d4d8e0",selRow:"rgba(0,194,168,0.08)",focus:"#00c2a8",
-    toastBg:"#ffffff",toastBdr:"#e0e4ef",
-    tabActiveBg:"rgba(0,194,168,0.1)",tabHovBg:"rgba(0,194,168,0.05)",
+    chk:"#0077e6",scroll:"#d4d8e0",selRow:"rgba(0,136,255,0.08)",focus:"#0088ff",
+    tabActiveBg:"rgba(0,136,255,0.1)",tabHovBg:"rgba(0,136,255,0.05)",
   },
 };
-
-/* ═══════════════════ TOASTS ═══════════════════ */
-let _tid = 0;
-function useToasts() {
-  const [ts, setTs] = useState([]);
-  const add = useCallback((msg, type="info") => {
-    const id=++_tid;
-    setTs((p) => [...p, { id, msg, type, out:false }]);
-    setTimeout(() => setTs((p) => p.map((x) => x.id===id?{...x,out:true}:x)), 2600);
-    setTimeout(() => setTs((p) => p.filter((x) => x.id!==id)), 3000);
-  }, []);
-  return { ts, add };
-}
-function Toasts({ ts, t }) {
-  const icons = { success:Check, danger:CircleAlert, info:Info, warn:Archive };
-  const colors = { success:t.success, danger:t.danger, info:t.info ?? t.accent, warn:t.warn };
-  return (
-    <div style={{ position:"fixed",bottom:24,right:24,zIndex:999,display:"flex",flexDirection:"column-reverse",gap:8 }}>
-      {ts.map((x) => { const I=icons[x.type]||Info; const glow=x.type==="success"?t.successGlow:x.type==="danger"?t.dangerGlow:x.type==="warn"?t.warnGlow:t.infoGlow; return (
-        <div key={x.id} style={{
-          background:t.toastBg, border:`1px solid ${t.toastBdr}`, borderRadius:12,
-          padding:"12px 18px", display:"flex",alignItems:"center",gap:10,
-          boxShadow:`0 8px 30px rgba(0,0,0,0.14), ${glow||"none"}`, minWidth:280, maxWidth:400,
-          animation:x.out?"toastOut 0.35s ease-in forwards":"toastIn 0.35s ease-out",
-          borderLeft:`3px solid ${colors[x.type]}`,
-        }}>
-          <I size={16} style={{ color:colors[x.type], flexShrink:0 }} />
-          <span style={{ color:t.text,fontSize:13,fontWeight:500 }}>{x.msg}</span>
-        </div>
-      ); })}
-    </div>
-  );
-}
 
 /* ═══════════════════ CONFIRM DIALOG ═══════════════════ */
 function Confirm({ open, onYes, onNo, title, desc, yesLabel, yesIcon:YI, yesDanger, t }) {
@@ -222,44 +169,101 @@ function Confirm({ open, onYes, onNo, title, desc, yesLabel, yesIcon:YI, yesDang
   );
 }
 
-/* ═══════════════════ ROW ACTIONS MENU ═══════════════════ */
+const ROW_MENU_Z_BACK = 10040;
+const ROW_MENU_Z_PANEL = 10041;
+
+/* ═══════════════════ ROW ACTIONS MENU (portaled — escapes table overflow/stacking) ═══════════════════ */
 function RowActions({ person, onEdit, onArchive, onDelete, t }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  useEffect(() => { const h=(e)=>{ if(ref.current&&!ref.current.contains(e.target)) setOpen(false); }; document.addEventListener("mousedown",h); return ()=>document.removeEventListener("mousedown",h); },[]);
+  const close = useCallback(() => setOpen(false), []);
+  const { triggerRef, menuRef, pos } = useFixedAnchorDropdown(open, close);
+  const panelBg = t.bg === "#0f1117" || t.bg === "#0b0e14" ? "#111627" : "#ffffff";
+  const sep = t.bg === "#0f1117" || t.bg === "#0b0e14" ? "#1a2030" : "#e4e7ed";
+
   return (
-    <div ref={ref} style={{ position:"relative", zIndex: open ? 50 : 1 }}>
+    <div style={{ position: "relative" }}>
       <button
+        ref={triggerRef}
         type="button"
         className="alloc8-icon-btn"
-        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label="Row actions"
       >
         <MoreHorizontal size={16} />
       </button>
-      {open && (<>
-        <div onClick={(e)=>{ e.stopPropagation(); setOpen(false); }} style={{ position:"fixed",inset:0,zIndex:99 }}/>
-        <div style={{
-          position:"absolute",right:0,top:"100%",marginTop:4,zIndex:100,
-          background:t.bg==="#0f1117"||t.bg==="#0b0e14"?"#111627":"#ffffff",border:`1.5px solid ${t.accent}30`,borderRadius:10,
-          boxShadow:`0 12px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.3)`,minWidth:190,overflow:"hidden",animation:"dropIn 0.15s ease-out",
-        }}>
-          {[
-            { icon:Pencil, label:"Edit profile", action:()=>{ onEdit(); setOpen(false); }, color:t.text },
-            { icon:person.archived?ArchiveRestore:Archive, label:person.archived?"Restore":"Archive", action:()=>{ onArchive(); setOpen(false); }, color:t.warn },
-            { icon:Trash2, label:"Delete", action:()=>{ onDelete(); setOpen(false); }, color:t.danger },
-          ].map((item,i) => (
-            <div key={i} onClick={(e)=>{ e.stopPropagation(); item.action(); }}
-              style={{ padding:"11px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontSize:13,fontWeight:500,color:item.color,transition:"background 0.12s",borderBottom:i<2?`1px solid ${t.bg==="#0f1117"||t.bg==="#0b0e14"?"#1a2030":"#e4e7ed"}`:"none" }}
-              onMouseEnter={(e)=>e.currentTarget.style.background=t.bg==="#0f1117"||t.bg==="#0b0e14"?"#1a2236":"#f0f2f5"}
-              onMouseLeave={(e)=>e.currentTarget.style.background="transparent"}>
-              <item.icon size={14}/> {item.label}
+      {open &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <>
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(false);
+              }}
+              style={{ position: "fixed", inset: 0, zIndex: ROW_MENU_Z_BACK }}
+              aria-hidden
+            />
+            <div
+              ref={menuRef}
+              role="menu"
+              style={{
+                position: "fixed",
+                top: pos.top,
+                right: pos.right,
+                zIndex: ROW_MENU_Z_PANEL,
+                background: panelBg,
+                border: `1.5px solid ${t.accent}30`,
+                borderRadius: 10,
+                boxShadow: "0 12px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.3)",
+                minWidth: 190,
+                overflow: "hidden",
+                animation: "dropIn 0.15s ease-out",
+              }}
+            >
+              {[
+                { icon: Pencil, label: "Edit profile", action: () => { onEdit(); setOpen(false); }, color: t.text },
+                {
+                  icon: person.archived ? ArchiveRestore : Archive,
+                  label: person.archived ? "Restore" : "Archive",
+                  action: () => { onArchive(); setOpen(false); },
+                  color: t.warn,
+                },
+                { icon: Trash2, label: "Delete", action: () => { onDelete(); setOpen(false); }, color: t.danger },
+              ].map((item, i) => (
+                <div
+                  key={i}
+                  role="menuitem"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    item.action();
+                  }}
+                  style={{
+                    padding: "11px 16px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: item.color,
+                    transition: "background 0.12s",
+                    borderBottom: i < 2 ? `1px solid ${sep}` : "none",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = t.bg === "#0f1117" || t.bg === "#0b0e14" ? "#1a2236" : "#f0f2f5")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  <item.icon size={14} /> {item.label}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </>)}
+          </>,
+          document.body
+        )}
     </div>
   );
 }
@@ -1120,8 +1124,6 @@ export function PersonModal({
 export default PersonModal;
 export {
   T,
-  useToasts,
-  Toasts,
   Confirm,
   RowActions,
   PEOPLE_SEED,

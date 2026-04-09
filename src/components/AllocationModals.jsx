@@ -5,12 +5,9 @@ import { X, ChevronDown, ArrowLeftRight, Zap, Trash2, Palmtree } from "lucide-re
 import { resolveColorForProjectLabel } from "../utils/projectColors.js";
 import { normalizeLeaveTypeId, leaveAccentTheme, leavePanelStyleVars } from "../utils/leaveVisuals.js";
 import "./AllocationModals.css";
+import { ALLOCATION_PROJECT_SEED } from "../data/workspaceSeedConstants.js";
 
-export const ALLOCATION_PROJECT_SEED = [
-  "ASF / ASF Managed Services",
-  "ARTC / Cloud Managed Services",
-  "Internal / Admin & Ops",
-];
+export { ALLOCATION_PROJECT_SEED };
 
 export const REPEAT_OPTIONS = [
   { id: "none", label: "Doesn't repeat" },
@@ -628,7 +625,7 @@ export function CreateAllocationModal({
               </div>
               {leaveType === "annual" ? (
                 <p className="lpam-leave-hint" style={{ color: t.textMuted }}>
-                  Paid time off — appears on the schedule with a teal pattern so it stays distinct from other leave types.
+                  Paid time off — appears on the schedule with a distinct fill pattern so it stays separate from other leave types.
                 </p>
               ) : null}
               <div className="lpam-field">
@@ -1023,5 +1020,3 @@ export function AllocationDetailModal({ open, allocation, assigneeNames, onClose
   );
 }
 
-export { countWorkingDaysBetween };
-export { advanceRepeatWindow } from "../utils/allocationRepeatWindow.js";

@@ -49,9 +49,9 @@
   filter: none !important;
 }
 
-/* Sonner toasts — solid surfaces, no glass */
-:root[data-static-ui="1"] [data-sonner-toast],
-:root[data-static-ui="1"] [data-sonner-toaster] {
+/* Sonner toasts — ensure no glass (base styles are opaque in index.css) */
+[data-sonner-toast],
+[data-sonner-toaster] {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }

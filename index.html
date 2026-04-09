@@ -3,13 +3,6 @@
   <head>
     <script>
       try {
-        var pal = localStorage.getItem("float-replacement-palette");
-        document.documentElement.dataset.palette =
-          pal === "stellar" || pal === "alloc8" ? pal : "alloc8";
-      } catch (e) {
-        document.documentElement.dataset.palette = "alloc8";
-      }
-      try {
         if (localStorage.getItem("alloc8-low-gpu") === "1") {
           document.documentElement.setAttribute("data-low-gpu", "1");
         }
