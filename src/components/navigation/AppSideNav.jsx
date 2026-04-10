@@ -23,7 +23,7 @@ const NAV = [
   { to: "/", end: true, icon: CalendarDays, label: "Schedule" },
   { to: "/people", icon: Users, label: "People" },
   { to: "/projects", icon: FolderOpen, label: "Projects" },
-  { to: null, icon: BarChart3, label: "Report", soon: true },
+  { to: "/report", icon: BarChart3, label: "Report" },
 ];
 
 const V2_MODAL = {

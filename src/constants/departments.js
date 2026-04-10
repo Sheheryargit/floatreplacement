@@ -13,7 +13,7 @@ export const DEFAULT_DEPARTMENTS = [
   "Platmechs",
   "Fire Nation",
   "CPS",
-  "Sky",
+  "Earth Sky",
   "Sliced Secure",
   "Anger Management",
   "Hornets",

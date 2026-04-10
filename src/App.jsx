@@ -29,11 +29,13 @@ const LandingPage = lazy(() => import("./pages/LandingPage.jsx"));
 const PeoplePage = lazy(() => import("./pages/PeoplePage.jsx"));
 const ProjectsPage = lazy(() => import("./pages/ProjectsPage.jsx"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage.jsx"));
+const ReportingPage = lazy(() => import("./pages/ReportingPage.jsx"));
 
 const workspaceRoutes = [
   { path: "/", element: <LandingPage /> },
   { path: "/people", element: <PeoplePage /> },
   { path: "/projects", element: <ProjectsPage /> },
+  { path: "/report", element: <ReportingPage /> },
   { path: "/settings", element: <SettingsPage /> },
   { path: "*", element: <Navigate to="/" replace /> },
 ];
