@@ -17,8 +17,16 @@ export function normalizeLeaveTypeId(id) {
   return id && ALLOWED.has(id) ? id : "other";
 }
 
+/** Weekly day-off blocks generated from availability (Mon–Fri unchecked). */
+export function isAvailabilityDayOffAlloc(alloc) {
+  if (!alloc?.isLeave) return false;
+  const k = alloc.availabilitySlotKey;
+  return typeof k === "string" && k.startsWith("avail_off:");
+}
+
 /** Icon key for Lucide mapping in consumers */
 export function leaveTimelineIconKey(id) {
+  if (id === "day_off") return "calendaroff";
   const t = normalizeLeaveTypeId(id);
   const map = {
     annual: "palmtree",
@@ -73,6 +81,13 @@ export function leaveSpansToday(alloc, todayIso = isoDateLocal()) {
 }
 
 export function buildLeaveHoverTitle(alloc, leaveLabelFn) {
+  if (isAvailabilityDayOffAlloc(alloc)) {
+    const range =
+      alloc.startDate === alloc.endDate
+        ? alloc.startDate
+        : `${alloc.startDate} → ${alloc.endDate}`;
+    return `Day Off · ${range}. Click for details.`;
+  }
   const lbl = alloc.leaveType ? leaveLabelFn(alloc.leaveType) : "Leave";
   const range =
     alloc.startDate === alloc.endDate

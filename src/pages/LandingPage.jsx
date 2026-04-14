@@ -40,6 +40,7 @@ import {
   Wallet,
   Landmark,
   Umbrella,
+  CalendarOff,
 } from "lucide-react";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useSchedulePageData } from "../hooks/useSchedulePageData.js";
@@ -83,13 +84,16 @@ import {
 } from "../utils/allocationLeaveConflict.js";
 import { workAllocationCoversDateKey } from "../utils/allocationOccurrence.js";
 import { buildAllocationsByPerson, getPersonAllocations } from "../utils/allocationsByPerson.js";
+import { mergeScheduleAllocations } from "../utils/scheduleAllocationsMerge.js";
 import { isSupabaseConfigured } from "../lib/supabase.js";
+import { dismissPublicHolidayForPerson } from "../lib/api/personPublicHolidays.js";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   normalizeLeaveTypeId,
   leaveTimelineIconKey,
   leaveSpansToday,
   buildLeaveHoverTitle,
+  isAvailabilityDayOffAlloc,
 } from "../utils/leaveVisuals.js";
 import "./LandingPage.css";
 
@@ -102,6 +106,7 @@ const LEAVE_LUCIDE = {
   wallet: Wallet,
   landmark: Landmark,
   umbrella: Umbrella,
+  calendaroff: CalendarOff,
 };
 
 function LeaveTimelineGlyph({ leaveTypeId, className }) {
@@ -979,8 +984,9 @@ const TimelineRow = memo(function TimelineRow({
                   const isDay = allocViewMode === "day";
                   const colStart = isDay ? 1 : Math.max(1, Math.round(seg.lay.start) + 1);
                   const colSpan = isDay ? nCols : Math.max(1, Math.round(seg.lay.span));
-                  const lbl = seg.a.leaveType ? leaveLabel(seg.a.leaveType) : "Leave";
-                  const typeId = normalizeLeaveTypeId(seg.a.leaveType);
+                  const isDayOff = isAvailabilityDayOffAlloc(seg.a);
+                  const lbl = isDayOff ? "Day Off" : seg.a.leaveType ? leaveLabel(seg.a.leaveType) : "Leave";
+                  const typeId = isDayOff ? "day_off" : normalizeLeaveTypeId(seg.a.leaveType);
                   const onToday = leaveSpansToday(seg.a, todayDateKey);
                   const dateLine =
                     seg.a.startDate === seg.a.endDate
@@ -1032,7 +1038,7 @@ const TimelineRow = memo(function TimelineRow({
                         openAllocationDetail(seg.a);
                       }}
                     >
-                      <LeaveTimelineGlyph leaveTypeId={seg.a.leaveType} className="lp-leave-block__icon" />
+                      <LeaveTimelineGlyph leaveTypeId={isDayOff ? "day_off" : seg.a.leaveType} className="lp-leave-block__icon" />
                       <span className="lp-leave-block__label">
                         <span>{lbl}</span>
                         <span className="lp-leave-block__dates">{dateLine}</span>
@@ -1265,10 +1271,11 @@ export default function LandingPage() {
     syncAllocationUpdate,
     syncAllocationDelete,
     refreshWorkspaceFromSupabase,
+    setPublicHolidayAllocations,
   } = useSchedulePageData();
 
   const scheduleAllocations = useMemo(
-    () => [...allocations, ...publicHolidayAllocations],
+    () => mergeScheduleAllocations(allocations, publicHolidayAllocations),
     [allocations, publicHolidayAllocations]
   );
 
@@ -1770,15 +1777,30 @@ export default function LandingPage() {
         }
       }
     },
-    [setAllocations, projects, allocationsByPerson, people, syncAllocationUpdate, refreshWorkspaceFromSupabase]
+    [setAllocations, projects, allocationsByPerson, people, syncAllocationUpdate, refreshWorkspaceFromSupabase, scheduleAllocations]
   );
 
   const handleDeleteAllocation = useCallback(
     async (alloc) => {
       if (alloc?.syntheticPublicHoliday) {
-        toast.message("Public holidays follow the person’s region", {
-          description: "Change their region under Time off in the profile, or edit availability dates.",
-        });
+        const pid = alloc.personIds?.[0];
+        if (!pid) return;
+        if (!isSupabaseConfigured) {
+          setPublicHolidayAllocations((cur) => cur.filter((a) => a.id !== alloc.id));
+          toast.success("Public holiday removed from schedule");
+          return;
+        }
+        try {
+          await dismissPublicHolidayForPerson({
+            personId: pid,
+            holidayDate: alloc.startDate,
+            name: alloc.notes,
+          });
+          await refreshWorkspaceFromSupabase();
+          toast.success("Public holiday removed from schedule");
+        } catch (e) {
+          toast.error("Delete failed", { description: e?.message || String(e) });
+        }
         return;
       }
       const prev = alloc;
@@ -1791,7 +1813,7 @@ export default function LandingPage() {
         toast.error("Delete failed", { description: e?.message || String(e) });
       }
     },
-    [setAllocations, syncAllocationDelete]
+    [setAllocations, setPublicHolidayAllocations, syncAllocationDelete, refreshWorkspaceFromSupabase]
   );
 
   const openAllocationDetail = useCallback((alloc) => {
@@ -2681,9 +2703,9 @@ export default function LandingPage() {
         allocation={selectedAllocation}
         assigneeNames={selectedAssigneeNames}
         onClose={closeAllocationDetail}
-        onDelete={selectedAllocation?.syntheticPublicHoliday ? undefined : handleDeleteAllocation}
+        onDelete={handleDeleteAllocation}
         onEditClick={
-          selectedAllocation && !selectedAllocation.syntheticPublicHoliday
+          selectedAllocation
             ? () => {
                 setAllocEditing(selectedAllocation);
                 setAllocDetailOpen(false);

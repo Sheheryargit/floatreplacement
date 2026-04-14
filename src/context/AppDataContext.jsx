@@ -26,12 +26,14 @@ import {
   fetchPersonPublicHolidaysSafe,
   resolvePublicHolidayAllocations,
 } from "../lib/api/publicHolidaySchedule.js";
+import { fetchPersonPublicHolidayDismissalsSafe } from "../lib/api/personPublicHolidays.js";
 import * as peopleApi from "../lib/api/people.js";
 import * as projectsApi from "../lib/api/projects.js";
 import * as allocationsApi from "../lib/api/allocations.js";
 import * as lookupsApi from "../lib/api/lookups.js";
 import { isSupabaseConfigured, supabase } from "../lib/supabase.js";
 import * as workspaceSettingsApi from "../lib/api/workspaceSettings.js";
+import { recalculatePersonAvailability } from "../lib/api/personAvailability.js";
 import {
   migrateFilterRulesFromLegacyTags,
   normalizeFilterRules,
@@ -163,8 +165,11 @@ export async function refreshWorkspaceFromSupabase() {
 async function refreshPublicHolidayAllocationsInStore() {
   if (!isSupabaseConfigured) return;
   const { people } = useAppStore.getState();
-  const phResult = await fetchPersonPublicHolidaysSafe();
-  const publicHolidayAllocations = await resolvePublicHolidayAllocations(people, phResult);
+  const [phResult, dismissResult] = await Promise.all([
+    fetchPersonPublicHolidaysSafe(),
+    fetchPersonPublicHolidayDismissalsSafe(),
+  ]);
+  const publicHolidayAllocations = await resolvePublicHolidayAllocations(people, phResult, dismissResult.rows);
   useAppStore.setState({ publicHolidayAllocations });
 }
 
@@ -303,6 +308,13 @@ export function syncPersonCreate(person) {
     .then(() => peopleApi.createPerson(person))
     .then(async (created) => {
       await refreshPublicHolidayAllocationsInStore();
+      if (created?.id) {
+        try {
+          await recalculatePersonAvailability(created.id);
+        } catch (e) {
+          console.warn("[float] recalculate_person_availability after create failed:", e?.message || e);
+        }
+      }
       return created;
     });
 }

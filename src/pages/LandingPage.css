@@ -3044,6 +3044,27 @@ button.lp-block.lp-block-leave:hover {
   background: linear-gradient(125deg, rgba(254, 249, 195, 0.95), rgba(253, 230, 138, 0.55));
 }
 
+/* Non-working weekday (availability) — solid grey */
+.lp-leave-block--day_off {
+  background: #64748b;
+  color: #cbd5e1;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.2), 0 2px 12px rgba(15, 23, 42, 0.12);
+}
+
+.lp-root[data-theme="light"] .lp-leave-block--day_off {
+  background: #94a3b8;
+  color: #f1f5f9;
+  box-shadow: inset 0 0 0 1px rgba(51, 65, 85, 0.25), 0 2px 12px rgba(51, 65, 85, 0.12);
+}
+
+.lp-leave-block--day_off .lp-leave-block__dates {
+  color: rgba(241, 245, 249, 0.82);
+}
+
+.lp-root[data-theme="light"] .lp-leave-block--day_off .lp-leave-block__dates {
+  color: rgba(241, 245, 249, 0.88);
+}
+
 /* Other — neutral hatch */
 .lp-leave-block--other {
   background:

@@ -4,6 +4,22 @@ import {
 } from "./personPublicHolidays.js";
 import { buildPublicHolidayRowsFromStaticJson } from "../../utils/publicHolidaysStatic.js";
 
+function phRowKey(personId, holidayDate, name) {
+  const dk = typeof holidayDate === "string" ? holidayDate.slice(0, 10) : String(holidayDate || "").slice(0, 10);
+  return `${String(personId)}|${dk}|${String(name || "").trim()}`;
+}
+
+/**
+ * Remove rows that the user dismissed from the schedule (see `person_public_holiday_dismissals`).
+ * @param {Array} rows person_public_holidays-shaped rows
+ * @param {Array<{ person_id: string, holiday_date: string, name: string }>} dismissals
+ */
+export function filterPublicHolidayRowsByDismissals(rows, dismissals) {
+  if (!dismissals?.length) return rows || [];
+  const hidden = new Set(dismissals.map((d) => phRowKey(d.person_id, d.holiday_date, d.name)));
+  return (rows || []).filter((r) => !hidden.has(phRowKey(r.person_id, r.holiday_date, r.name)));
+}
+
 function dedupePhRows(rows) {
   const seen = new Set();
   const out = [];
@@ -24,8 +40,9 @@ function dedupePhRows(rows) {
  *
  * @param {Array} people
  * @param {{ rows: Array, error: Error | null }} phResult
+ * @param {Array<{ person_id: string, holiday_date: string, name: string }>} [dismissals]
  */
-export async function resolvePublicHolidayAllocations(people, phResult) {
+export async function resolvePublicHolidayAllocations(people, phResult, dismissals = []) {
   let rows = [...(phResult?.rows ?? [])];
   const err = phResult?.error ?? null;
 
@@ -35,15 +52,16 @@ export async function resolvePublicHolidayAllocations(people, phResult) {
   } else {
     const countByPerson = new Map();
     for (const r of rows) {
-      const pid = Number(r.person_id);
-      if (!Number.isFinite(pid)) continue;
-      countByPerson.set(pid, (countByPerson.get(pid) ?? 0) + 1);
+      const pid = r.person_id;
+      const key = pid != null ? String(pid) : "";
+      if (!key) continue;
+      countByPerson.set(key, (countByPerson.get(key) ?? 0) + 1);
     }
     const missing = (people || []).filter((p) => {
       const reg = p.publicHolidayRegion != null ? String(p.publicHolidayRegion).trim() : "";
       if (reg === "" || reg.toLowerCase() === "none") return false;
-      const pid = Number(p.id);
-      return Number.isFinite(pid) && (countByPerson.get(pid) ?? 0) === 0;
+      const pid = p.id != null ? String(p.id) : "";
+      return pid !== "" && (countByPerson.get(pid) ?? 0) === 0;
     });
     if (missing.length) {
       const fb = await buildPublicHolidayRowsFromStaticJson(missing);
@@ -51,6 +69,7 @@ export async function resolvePublicHolidayAllocations(people, phResult) {
     }
   }
 
+  rows = filterPublicHolidayRowsByDismissals(rows, dismissals);
   return rowsToSyntheticPublicHolidayAllocations(dedupePhRows(rows));
 }
 

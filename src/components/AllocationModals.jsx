@@ -223,6 +223,8 @@ export function CreateAllocationModal({
 
   if (!open) return null;
 
+  const isSyntheticPhEdit = editAllocation?.syntheticPublicHoliday === true;
+
   const handleSave = () => {
     if (activeTab === "allocation") {
       if (assignedIds.length === 0 || !startDate || !endDate || !project) return;
@@ -257,7 +259,7 @@ export function CreateAllocationModal({
         isLeave: true,
         leaveType,
       };
-      if (editAllocation && onEditAllocation) {
+      if (editAllocation && onEditAllocation && !isSyntheticPhEdit) {
         onEditAllocation(payload, editAllocation.id);
       } else {
         onCreateLeave(payload);
@@ -286,7 +288,9 @@ export function CreateAllocationModal({
           </Dialog.Description>
         <div className="lpam-head">
           <Dialog.Title asChild>
-            <h2 className="lpam-title">{editAllocation ? "Edit" : (activeTab === "leave" ? "Leave" : "Allocation")}</h2>
+            <h2 className="lpam-title">
+              {editAllocation && !isSyntheticPhEdit ? "Edit" : activeTab === "leave" ? "Leave" : "Allocation"}
+            </h2>
           </Dialog.Title>
           <Dialog.Close asChild>
             <button type="button" className="lpam-icon-close" aria-label="Close">
@@ -806,7 +810,11 @@ export function CreateAllocationModal({
               }}
               whileTap={reduceMotion || workingDays <= 0 ? undefined : { scale: 0.98 }}
             >
-              {editAllocation ? "Save changes" : (activeTab === "leave" ? "Create leave" : "Create allocation")}
+              {editAllocation && !isSyntheticPhEdit
+                ? "Save changes"
+                : activeTab === "leave"
+                  ? "Create leave"
+                  : "Create allocation"}
             </motion.button>
             <Dialog.Close asChild>
               <button
@@ -835,7 +843,12 @@ export function AllocationDetailModal({ open, allocation, assigneeNames, onClose
 
   const handleDelete = () => {
     if (!onDelete) return;
-    const msg = isLeave ? "Delete this leave entry? This cannot be undone." : "Delete this allocation? This cannot be undone.";
+    let msg;
+    if (allocation.syntheticPublicHoliday) {
+      msg = "Remove this public holiday from the schedule for this person?";
+    } else {
+      msg = isLeave ? "Delete this leave entry? This cannot be undone." : "Delete this allocation? This cannot be undone.";
+    }
     if (typeof window !== "undefined" && !window.confirm(msg)) return;
     onDelete(allocation);
     onClose();
@@ -964,7 +977,9 @@ export function AllocationDetailModal({ open, allocation, assigneeNames, onClose
           <div className="lpam-meta" style={{ color: t.textMuted }}>
             <Zap size={14} />
             <span>
-              Updated by {allocation.updatedBy} · {formatAllocDate(allocation.updatedAt)}
+              {allocation.syntheticPublicHoliday
+                ? "Regional calendar — Edit to record custom leave, Delete to hide this day on the schedule."
+                : `Updated by ${allocation.updatedBy || "—"} · ${formatAllocDate(allocation.updatedAt)}`}
             </span>
           </div>
           <div className="lpam-detail-actions" style={{ display: "flex", gap: "10px" }}>

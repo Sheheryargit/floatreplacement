@@ -16,7 +16,11 @@ import {
 } from "./lookups.js";
 import { projectToAllocationLabel, resolveColorForProjectLabel } from "../../utils/projectColors.js";
 import { fetchWorkspaceSettings } from "./workspaceSettings.js";
-import { fetchPersonPublicHolidaysSafe, resolvePublicHolidayAllocations } from "./publicHolidaySchedule.js";
+import {
+  fetchPersonPublicHolidaysSafe,
+  resolvePublicHolidayAllocations,
+} from "./publicHolidaySchedule.js";
+import { fetchPersonPublicHolidayDismissalsSafe } from "./personPublicHolidays.js";
 
 /** Same window as the schedule workspace (keep in sync with partial realtime refreshes). */
 export function defaultWorkspaceAllocationWindow() {
@@ -50,6 +54,7 @@ export async function loadWorkspaceFromSupabaseOnce() {
     projectsRaw,
     allocations,
     phResult,
+    dismissResult,
     roles,
     depts,
     clients,
@@ -62,6 +67,7 @@ export async function loadWorkspaceFromSupabaseOnce() {
     fetchProjects(),
     fetchAllocations({ startDate: start, endDate: end }),
     fetchPersonPublicHolidaysSafe(),
+    fetchPersonPublicHolidayDismissalsSafe(),
     fetchRoles(),
     fetchDepts(),
     fetchClients(),
@@ -71,7 +77,11 @@ export async function loadWorkspaceFromSupabaseOnce() {
     fetchWorkspaceSettings(),
   ]);
 
-  const publicHolidayAllocations = await resolvePublicHolidayAllocations(people, phResult);
+  const publicHolidayAllocations = await resolvePublicHolidayAllocations(
+    people,
+    phResult,
+    dismissResult.rows
+  );
 
   const projects = mapProjectsWithResolvedColors(projectsRaw);
 

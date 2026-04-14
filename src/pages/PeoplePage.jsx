@@ -46,6 +46,7 @@ import {
 import { CreateAllocationModal, leaveLabel } from "../components/AllocationModals.jsx";
 import { resolveColorForProjectLabel } from "../utils/projectColors.js";
 import { findLeaveOverlapWithWorkRange } from "../utils/allocationLeaveConflict.js";
+import { mergeScheduleAllocations } from "../utils/scheduleAllocationsMerge.js";
 import "./PeoplePage.css";
 
 /** Cap staggered row enter animations — large tables stay responsive */
@@ -107,7 +108,7 @@ export default function PeoplePage() {
   } = useAppData();
 
   const scheduleAllocations = useMemo(
-    () => [...allocations, ...publicHolidayAllocations],
+    () => mergeScheduleAllocations(allocations, publicHolidayAllocations),
     [allocations, publicHolidayAllocations]
   );
 

@@ -27,6 +27,7 @@ export function useSchedulePageData() {
   const allocations = useAppStore((s) => s.allocations);
   const setAllocations = useAppStore((s) => s.setAllocations);
   const publicHolidayAllocations = useAppStore((s) => s.publicHolidayAllocations);
+  const setPublicHolidayAllocations = useAppStore((s) => s.setPublicHolidayAllocations);
   const projects = useAppStore((s) => s.projects);
   const setProjects = useAppStore((s) => s.setProjects);
   const clients = useAppStore((s) => s.clients);
@@ -65,6 +66,7 @@ export function useSchedulePageData() {
     allocations,
     setAllocations,
     publicHolidayAllocations,
+    setPublicHolidayAllocations,
     projects,
     setProjects,
     clients,

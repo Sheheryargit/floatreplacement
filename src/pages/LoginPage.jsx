@@ -3,6 +3,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { LayoutGrid, Users, ShieldCheck, Lock, ArrowRight } from "lucide-react";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useAppDialog } from "../context/AppDialogContext.jsx";
 import "./LoginPage.css";
 
 function HudTicker() {
@@ -16,7 +17,7 @@ function HudTicker() {
 
 const ACCESS_PASSWORD =
   String(import.meta.env.VITE_APP_ACCESS_PASSWORD ?? "").trim() ||
-  "Engineering";
+  "Engineering1";
 
 function GoogleMark() {
   return (
@@ -87,12 +88,14 @@ const listStagger = {
 export default function LoginPage() {
   const { theme } = useAppTheme();
   const { unlock } = useAuth();
+  const { openDialog } = useAppDialog();
   const reduceMotion = useReducedMotion();
   const rootRef = useRef(null);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [shake, setShake] = useState(false);
+  const [pwdRejected, setPwdRejected] = useState(false);
   const [emptyPulse, setEmptyPulse] = useState(false);
   const [creditHot, setCreditHot] = useState(false);
 
@@ -210,24 +213,32 @@ export default function LoginPage() {
   const submit = useCallback(() => {
     const p = password.trim();
     if (!p) {
+      setPwdRejected(false);
       setError("Authorization required.");
       setEmptyPulse(false);
       requestAnimationFrame(() => setEmptyPulse(true));
       return;
     }
     if (p !== ACCESS_PASSWORD) {
-      setError("That password doesn’t match. Try again.");
+      setError("");
+      setPwdRejected(true);
       setShake(false);
       requestAnimationFrame(() => setShake(true));
+      openDialog({
+        title: "Incorrect password",
+        message:
+          "Please contact Sheher. Changes are being done in production.",
+      });
       return;
     }
     setError("");
+    setPwdRejected(false);
     setBusy(true);
     setEmptyPulse(false);
     window.setTimeout(() => {
       unlock();
     }, 1800);
-  }, [password, unlock]);
+  }, [password, unlock, openDialog]);
 
   const cardSpring = reduceMotion
     ? {}
@@ -373,12 +384,13 @@ export default function LoginPage() {
                       <input
                         id="login-workspace-password"
                         type="password"
-                        className={`login-page-input${shake && error && !emptyPulse ? " login-page-input--error" : ""}`}
+                        className={`login-page-input${shake && (error || pwdRejected) && !emptyPulse ? " login-page-input--error" : ""}`}
                         placeholder={emptyPulse ? "" : "Enter password"}
                         value={password}
                         onChange={(e) => {
                           setPassword(e.target.value);
                           setError("");
+                          setPwdRejected(false);
                           setShake(false);
                           setEmptyPulse(false);
                         }}
