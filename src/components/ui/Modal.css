@@ -1,7 +1,8 @@
+/* Above .login-page (z-index 300) and command palette (400) so app dialogs always stack on top. */
 .float-modal-root {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 500;
   pointer-events: auto;
 }
 
