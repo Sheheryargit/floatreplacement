@@ -303,9 +303,17 @@ function splitLayoutByWorkWeek(lay, scheduleModel) {
   return segments.length > 0 ? segments : [lay];
 }
 
-/** Greedy lane assignment for overlapping [start, start+span) intervals. Mutates segments with .stack. */
+/** Greedy lane assignment for overlapping [start, start+span) intervals. Mutates segments with .stack.
+ *  Primary sort is by hours ascending so that — when stacked in the same cell — the
+ *  smallest allocation sits at the top and the largest at the bottom, giving the
+ *  visual "fill gauge" a clean pyramid shape. Falls back to start/span to keep
+ *  the greedy packer deterministic for non-overlapping intervals. */
 function assignAllocationStackLevels(segments) {
+  const hoursOf = (seg) => Math.max(0, parseFloat(seg?.a?.hoursPerDay) || 0);
   const sorted = [...segments].sort((a, b) => {
+    const ha = hoursOf(a);
+    const hb = hoursOf(b);
+    if (ha !== hb) return ha - hb;
     if (a.start !== b.start) return a.start - b.start;
     return b.span - a.span;
   });
@@ -661,30 +669,31 @@ function personHasOverloadInViewFromList(personAllocations, scheduleModel, viewM
   return false;
 }
 
-/** Bar thickness: strong contrast between light (e.g. 1h) and heavy (7.5h+) bookings. */
-const BAR_H_MIN = 26;
-const BAR_H_MAX = 136;
-const BAR_H_NORM = 7.5;
 /**
- * Week/month bars show full project name (multi-line clamp), code chip, hours row, 3px border.
- * Lane height is budgeted from this value; if too small, absolute-positioned bars overflow the row.
+ * Bar thickness scales linearly with hours: `height = BASE + hours * STEP`.
+ * - BASE gives every bar (even 0.5h) enough room for the two-line compact layout.
+ * - STEP makes each 0.5h step a clearly distinct jump in height, so the stacked
+ *   column still reads as a proportional fill gauge.
+ * A full 7.5h working day lands near `BASE + 7.5 * STEP` px; overloaded days
+ * overflow visibly as the stack exceeds one cell's worth of height.
  */
-const MIN_TIMELINE_BAR_CONTENT_PX = 104;
+const BAR_H_NORM = 7.5;
+const BAR_H_STEP = 0.5;
+const BAR_H_BASE_PX = 22;          // readable floor for 0.5h bars
+const PX_PER_HOUR = 22;            // slope: each extra hour adds 22px → 0.5h step = 11px
+const BAR_H_MIN_VISIBLE_PX = BAR_H_BASE_PX;
+const WEEK_CELL_FULL_DAY_PX = BAR_H_BASE_PX + BAR_H_NORM * PX_PER_HOUR; // 187px for a full day
 
-function allocationBarHeightPx(alloc, allocViewMode) {
+function allocationBarHeightPx(alloc) {
   if (alloc?.isLeave) return 54;
-  const h = Math.max(0, parseFloat(alloc.hoursPerDay) || 0);
-  if (h <= 0) {
-    const base = BAR_H_MIN + 6;
-    return allocViewMode && allocViewMode !== "day" ? Math.max(base, MIN_TIMELINE_BAR_CONTENT_PX) : base;
-  }
-  const t = Math.min(h, 12) / BAR_H_NORM;
-  const curved = Math.pow(Math.min(t, 1.45), 0.52);
-  let px = Math.round(BAR_H_MIN + curved * (BAR_H_MAX - BAR_H_MIN));
-  if (allocViewMode && allocViewMode !== "day") {
-    px = Math.max(px, MIN_TIMELINE_BAR_CONTENT_PX);
-  }
-  return px;
+  const raw = Math.max(0, parseFloat(alloc.hoursPerDay) || 0);
+  if (raw <= 0) return BAR_H_MIN_VISIBLE_PX;
+  // Snap to 0.5h so equal allocations always render identically; tiny sub-0.5h
+  // values (e.g. 0.08) still lift to the minimum visible bar without distorting
+  // the rest of the scale.
+  const snapped = Math.round(raw / BAR_H_STEP) * BAR_H_STEP;
+  const effective = snapped < BAR_H_STEP ? BAR_H_STEP : snapped;
+  return Math.round(BAR_H_BASE_PX + effective * PX_PER_HOUR);
 }
 
 const timelineRowEqual = (prev, next) => {
@@ -727,7 +736,7 @@ function mixRgbHex(hex, target, amount) {
   return `#${clampByte(R).toString(16).padStart(2, "0")}${clampByte(G).toString(16).padStart(2, "0")}${clampByte(B).toString(16).padStart(2, "0")}`;
 }
 
-function allocationBarChromeStyles(barColor, hours, theme) {
+function allocationBarChromeStyles(barColor, hours, theme, { thin = false } = {}) {
   const light = theme === "light";
   const hnorm = Math.min(1, Math.max(0, hours) / BAR_H_NORM);
   const sheen = light
@@ -736,9 +745,12 @@ function allocationBarChromeStyles(barColor, hours, theme) {
   const drop = light
     ? `0 2px 10px ${hexToRgba(barColor, 0.2 + hnorm * 0.08)}`
     : `0 2px 12px rgba(0,0,0,0.42)`;
+  // Thin bars can be as short as ~14px; a 3px border would swallow most of the fill,
+  // so scale the border down to keep the hours label legible.
+  const borderPx = thin ? 1 : 3;
   return {
     boxShadow: `${sheen}, ${drop}`,
-    border: `3px solid ${barColor}`,
+    border: `${borderPx}px solid ${barColor}`,
   };
 }
 
@@ -843,14 +855,16 @@ const TimelineRow = memo(function TimelineRow({
   assignAllocationStackLevels(workSegments);
   const allocLaneCount = workSegments.length ? Math.max(...workSegments.map((s) => s.stack)) + 1 : 1;
 
-  const LANE_STACK_GAP = 10;
-  const BAR_VPAD = 10;
+  // Bars stack flush — no per-bar vertical padding and no gap between lanes — so
+  // the stacked height of a person×day cell is literally the sum of their hours.
+  const LANE_STACK_GAP = 2;
+  const BAR_VPAD = 0;
   const ROW_ALLOC_PAD = 24;
   let stackHeightsSum = 0;
   for (let k = 0; k < allocLaneCount; k++) {
     const segs = workSegments.filter((s) => s.stack === k);
     if (segs.length === 0) continue;
-    const mh = Math.max(...segs.map((s) => allocationBarHeightPx(s.a, allocViewMode))) + BAR_VPAD;
+    const mh = Math.max(...segs.map((s) => allocationBarHeightPx(s.a))) + BAR_VPAD;
     stackHeightsSum += mh;
     if (k < allocLaneCount - 1) stackHeightsSum += LANE_STACK_GAP;
   }
@@ -1062,7 +1076,7 @@ const TimelineRow = memo(function TimelineRow({
           >
             <div
               className="lp-alloc-lanes-root"
-              style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "10px", width: "100%", position: "relative" }}
+              style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: `${LANE_STACK_GAP}px`, width: "100%", position: "relative" }}
             >
               {Array.from({ length: allocLaneCount }).map((_, stackIdx) => {
                 const laneSegs = workSegments
@@ -1071,8 +1085,7 @@ const TimelineRow = memo(function TimelineRow({
 
                 if (laneSegs.length === 0) return null;
 
-                const laneMinH =
-                  Math.max(...laneSegs.map((s) => allocationBarHeightPx(s.a, allocViewMode))) + BAR_VPAD;
+                const laneMinH = Math.max(...laneSegs.map((s) => allocationBarHeightPx(s.a))) + BAR_VPAD;
 
                 return (
                   <div
@@ -1098,12 +1111,11 @@ const TimelineRow = memo(function TimelineRow({
 
                       const h = Math.max(0, parseFloat(seg.a.hoursPerDay) || 0);
                       const hnorm = Math.min(1, Math.max(0, h) / BAR_H_NORM);
-                      const calculatedHeight = allocationBarHeightPx(seg.a, allocViewMode);
+                      const calculatedHeight = allocationBarHeightPx(seg.a);
 
                       const { projectName, projectCode, hoursLabel } = allocationDisplay(seg.a);
                       const barColor = colorForAllocationBar(seg.a, projects);
                       const fg = contrastingTextColor(barColor);
-                      const chrome = allocationBarChromeStyles(barColor, h, theme);
                       const innerWash = allocationBarInnerWash(barColor, theme);
 
                       const brPx = allocationBarBorderRadiusPx(widthPct);
@@ -1115,6 +1127,11 @@ const TimelineRow = memo(function TimelineRow({
                         allocViewMode === "day" &&
                         widthPct < 5.5 &&
                         (seg.lay.weekSplitCount ?? 1) <= 1;
+                      // Every non-micro bar uses the same compact two-line layout with
+                      // a consistent text style — short bars clip via overflow: hidden.
+                      // The thin border still helps the smallest bars stay legible.
+                      const compactBorder = !micro && calculatedHeight < 40;
+                      const chrome = allocationBarChromeStyles(barColor, h, theme, { thin: compactBorder });
                       const compactInitials = allocationCompactInitials(projectName, projectCode);
                       const hoursFontW = 600 + Math.round(hnorm * 220);
                       const clampedHw = Math.min(820, Math.max(600, hoursFontW));
@@ -1131,7 +1148,14 @@ const TimelineRow = memo(function TimelineRow({
                         width: `${widthPct}%`,
                         top: 0,
                         zIndex: z,
+                        // Pin a hard height so a 1h / 2h / 3h bar cannot grow to fit content —
+                        // proportional scaling only reads clearly when the box is actually sized
+                        // to the hour value and content clips via overflow: hidden. The CSS var
+                        // pairs with an !important rule below to beat the .lp-block-alloc default.
+                        "--alloc-bar-h": `${calculatedHeight}px`,
+                        height: `${calculatedHeight}px`,
                         minHeight: `${calculatedHeight}px`,
+                        maxHeight: `${calculatedHeight}px`,
                         padding: 0,
                         display: "flex",
                         flexDirection: "column",
@@ -1143,7 +1167,7 @@ const TimelineRow = memo(function TimelineRow({
                         ...chrome,
                         color: fg,
                         transition:
-                          "min-height 0.35s cubic-bezier(0.22, 1, 0.36, 1), left 0.35s cubic-bezier(0.22, 1, 0.36, 1), width 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease, transform 0.2s ease, filter 0.2s ease",
+                          "height 0.35s cubic-bezier(0.22, 1, 0.36, 1), left 0.35s cubic-bezier(0.22, 1, 0.36, 1), width 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease, transform 0.2s ease, filter 0.2s ease",
                         animationDelay: enterDelayMs ? `${enterDelayMs}ms` : undefined,
                       };
 
@@ -1154,8 +1178,11 @@ const TimelineRow = memo(function TimelineRow({
                           className={
                             "lp-block lp-block-alloc lp-block-alloc-project lp-alloc-bar" +
                             (micro ? " lp-alloc-bar--micro" : "") +
+                            (compactBorder ? " lp-alloc-bar--compact" : "") +
                             (allocViewMode === "day" ? " lp-alloc-bar--day" : "")
                           }
+                          data-hours={h}
+                          data-bar-h={calculatedHeight}
                           style={baseStyle}
                           aria-label={allocationAriaLabel(seg.a)}
                           title={tip}
@@ -1187,14 +1214,18 @@ const TimelineRow = memo(function TimelineRow({
                                     ) : null}
                                   </span>
                                 </span>
-                                <span className="lp-alloc-hours" style={{ fontWeight: clampedHw }}>
-                                  {hoursLabel}
-                                </span>
+                                <span className="lp-alloc-hours">{hoursLabel}</span>
                               </>
                             ) : (
+                              /* One consistent compact layout for EVERY bar, regardless of hours.
+                                 Line 1: project name (truncated). Line 2: code chip + hours + icons.
+                                 Short bars (e.g. 0.5h = 12px) clip via overflow: hidden; tall bars
+                                 display the full two-line block. Text style/size is the same across all. */
                               <>
-                                <span className="lp-alloc-top">
-                                  <span className="lp-alloc-name">{projectName}</span>
+                                <span className="lp-alloc-bar__line lp-alloc-bar__line--name">
+                                  {projectName || hoursLabel}
+                                </span>
+                                <span className="lp-alloc-bar__line lp-alloc-bar__line--meta">
                                   {projectCode ? (
                                     <span
                                       className="lp-alloc-code-chip"
@@ -1203,19 +1234,17 @@ const TimelineRow = memo(function TimelineRow({
                                       {projectCode}
                                     </span>
                                   ) : null}
-                                </span>
-                                <span className="lp-alloc-bar__row-foot">
-                                  <span className="lp-alloc-hours" style={{ fontWeight: clampedHw }}>
-                                    {hoursLabel}
-                                  </span>
-                                  <span className="lp-alloc-bar__icons">
-                                    {repeatOn ? (
-                                      <Repeat2 size={12} strokeWidth={2.25} className="lp-alloc-bar__ic" aria-hidden />
-                                    ) : null}
-                                    {hasNotes ? (
-                                      <StickyNote size={12} strokeWidth={2.25} className="lp-alloc-bar__ic" aria-hidden />
-                                    ) : null}
-                                  </span>
+                                  <span className="lp-alloc-hours">{hoursLabel}</span>
+                                  {(repeatOn || hasNotes) ? (
+                                    <span className="lp-alloc-bar__icons">
+                                      {repeatOn ? (
+                                        <Repeat2 size={10} strokeWidth={2.25} className="lp-alloc-bar__ic" aria-hidden />
+                                      ) : null}
+                                      {hasNotes ? (
+                                        <StickyNote size={10} strokeWidth={2.25} className="lp-alloc-bar__ic" aria-hidden />
+                                      ) : null}
+                                    </span>
+                                  ) : null}
                                 </span>
                               </>
                             )}

@@ -2259,6 +2259,15 @@ button.lp-block.lp-block-alloc.lp-block-alloc-project {
   transform-origin: center center;
 }
 
+/* The allocation bar's height is proportional to its hour value. The CSS custom
+   property `--alloc-bar-h` is set inline per-bar; !important here beats the
+   generic `.lp-block-alloc { min-height: var(--lp-block-max-h); height: auto }` default. */
+button.lp-block.lp-block-alloc.lp-alloc-bar {
+  height: var(--alloc-bar-h, auto) !important;
+  min-height: var(--alloc-bar-h, 0) !important;
+  max-height: var(--alloc-bar-h, none) !important;
+}
+
 .lp-alloc-bar__underlay {
   position: absolute;
   inset: 0;
@@ -2302,16 +2311,73 @@ button.lp-block.lp-block-alloc.lp-block-alloc-project {
   width: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  padding: 7px 10px;
-  gap: 5px;
+  justify-content: flex-start;
+  align-items: stretch;
+  padding: 3px 8px;
+  gap: 2px;
   box-sizing: border-box;
+  font-size: 11px;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
 }
 
 .lp-alloc-bar--micro .lp-alloc-bar__body {
   padding: 5px 8px;
   gap: 3px;
   justify-content: center;
+}
+
+/* Shorter bars use tighter padding so the compact text still fits. */
+.lp-alloc-bar--compact .lp-alloc-bar__body {
+  padding: 1px 6px;
+  gap: 0;
+}
+
+/* Single consistent compact layout used for every bar (name line + meta line).
+   Short bars clip via overflow: hidden; tall bars show both lines cleanly. */
+.lp-alloc-bar__line {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.lp-alloc-bar__line--name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.lp-alloc-bar__line--meta {
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.lp-alloc-bar__line--meta .lp-alloc-code-chip {
+  margin-top: 0;
+  padding: 1px 5px;
+  font-size: 10px;
+  line-height: 1.15;
+  border-radius: 4px;
+}
+
+.lp-alloc-bar__line--meta .lp-alloc-hours {
+  margin-top: 0;
+  margin-left: auto;
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  align-self: center;
+}
+
+.lp-alloc-bar__line--meta .lp-alloc-bar__icons {
+  gap: 3px;
+  opacity: 0.85;
+  flex-shrink: 0;
 }
 
 .lp-alloc-bar__micro-row {
