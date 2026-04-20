@@ -86,7 +86,7 @@ export function buildLeaveHoverTitle(alloc, leaveLabelFn) {
       alloc.startDate === alloc.endDate
         ? alloc.startDate
         : `${alloc.startDate} → ${alloc.endDate}`;
-    return `Day Off · ${range}. Click for details.`;
+    return `Off · ${range}. Click for details.`;
   }
   const lbl = alloc.leaveType ? leaveLabelFn(alloc.leaveType) : "Leave";
   const range =

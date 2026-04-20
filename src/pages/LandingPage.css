@@ -3055,25 +3055,70 @@ button.lp-block.lp-block-leave:hover {
   background: linear-gradient(125deg, rgba(254, 249, 195, 0.95), rgba(253, 230, 138, 0.55));
 }
 
-/* Non-working weekday (availability) — solid grey */
+/* Non-working weekday (part-time availability) — minimal, quiet "off" block */
 .lp-leave-block--day_off {
-  background: #64748b;
-  color: #cbd5e1;
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.2), 0 2px 12px rgba(15, 23, 42, 0.12);
+  background-color: transparent;
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(148, 163, 184, 0.14) 0,
+    rgba(148, 163, 184, 0.14) 6px,
+    rgba(148, 163, 184, 0.04) 6px,
+    rgba(148, 163, 184, 0.04) 12px
+  );
+  color: rgba(226, 232, 240, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
+  opacity: 1;
+  cursor: default;
+}
+
+.lp-leave-block--day_off:hover {
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(148, 163, 184, 0.2) 0,
+    rgba(148, 163, 184, 0.2) 6px,
+    rgba(148, 163, 184, 0.06) 6px,
+    rgba(148, 163, 184, 0.06) 12px
+  );
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.28);
+}
+
+.lp-leave-block--day_off .lp-leave-block__label {
+  justify-content: center;
+  align-items: center;
+  gap: 0;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+  font-size: 10px;
+  color: rgba(203, 213, 225, 0.78);
 }
 
 .lp-root[data-theme="light"] .lp-leave-block--day_off {
-  background: #94a3b8;
-  color: #f1f5f9;
-  box-shadow: inset 0 0 0 1px rgba(51, 65, 85, 0.25), 0 2px 12px rgba(51, 65, 85, 0.12);
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(100, 116, 139, 0.12) 0,
+    rgba(100, 116, 139, 0.12) 6px,
+    rgba(100, 116, 139, 0.03) 6px,
+    rgba(100, 116, 139, 0.03) 12px
+  );
+  color: rgba(71, 85, 105, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.2);
 }
 
-.lp-leave-block--day_off .lp-leave-block__dates {
-  color: rgba(241, 245, 249, 0.82);
+.lp-root[data-theme="light"] .lp-leave-block--day_off:hover {
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(100, 116, 139, 0.18) 0,
+    rgba(100, 116, 139, 0.18) 6px,
+    rgba(100, 116, 139, 0.05) 6px,
+    rgba(100, 116, 139, 0.05) 12px
+  );
+  box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.3);
 }
 
-.lp-root[data-theme="light"] .lp-leave-block--day_off .lp-leave-block__dates {
-  color: rgba(241, 245, 249, 0.88);
+.lp-root[data-theme="light"] .lp-leave-block--day_off .lp-leave-block__label {
+  color: rgba(71, 85, 105, 0.72);
 }
 
 /* Other — neutral hatch */

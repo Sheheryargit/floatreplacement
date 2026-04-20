@@ -313,8 +313,24 @@ function layoutsForAllocation(alloc, scheduleModel) {
   let start = alloc.startDate;
   let end = alloc.endDate;
   const repeatId = alloc.repeatId ?? "none";
-  const originMs = new Date(`${alloc.startDate}T12:00:00`).getTime();
+
+  // Fast-forward a recurring series whose anchor is far before the visible window
+  // (e.g. availability `avail_off:` rows anchored at 2024-01-02) straight into range,
+  // so we don't burn iteration budget walking the gap.
+  if (repeatId !== "none" && scheduleModel?.slots?.length) {
+    const firstKey = scheduleModel.slots[0].dateKey;
+    let guard = 0;
+    while (end < firstKey && guard++ < 2600) {
+      const next = advanceRepeatWindow(start, end, repeatId);
+      if (!next) break;
+      start = next.start;
+      end = next.end;
+    }
+  }
+
+  const originMs = new Date(`${start}T12:00:00`).getTime();
   const maxMs = originMs + 800 * 864e5;
+  let occ = 0;
 
   for (let i = 0; i < 80; i++) {
     const lay = layoutAllocation({ ...alloc, startDate: start, endDate: end }, scheduleModel);
@@ -322,9 +338,10 @@ function layoutsForAllocation(alloc, scheduleModel) {
       const splits = splitLayoutByWorkWeek(lay, scheduleModel);
       const weekSplitCount = splits.length;
       splits.forEach((sli, partIdx) => {
-        out.push({ ...sli, occ: i, weekPart: partIdx, weekSplitCount });
+        out.push({ ...sli, occ, weekPart: partIdx, weekSplitCount });
       });
     }
+    occ += 1;
     if (repeatId === "none") break;
     const next = advanceRepeatWindow(start, end, repeatId);
     if (!next) break;
@@ -893,7 +910,7 @@ const TimelineRow = memo(function TimelineRow({
                   const colStart = Math.max(1, Math.round(seg.lay.start) + 1);
                   const colSpan = Math.max(1, Math.round(seg.lay.span));
                   const isDayOff = isAvailabilityDayOffAlloc(seg.a);
-                  const lbl = isDayOff ? "Day Off" : seg.a.leaveType ? leaveLabel(seg.a.leaveType) : "Leave";
+                  const lbl = isDayOff ? "Off" : seg.a.leaveType ? leaveLabel(seg.a.leaveType) : "Leave";
                   const typeId = isDayOff ? "day_off" : normalizeLeaveTypeId(seg.a.leaveType);
                   const onToday = leaveSpansToday(seg.a, todayDateKey);
                   const dateLine =
@@ -946,10 +963,14 @@ const TimelineRow = memo(function TimelineRow({
                         openAllocationDetail(seg.a);
                       }}
                     >
-                      <LeaveTimelineGlyph leaveTypeId={isDayOff ? "day_off" : seg.a.leaveType} className="lp-leave-block__icon" />
+                      {!isDayOff && (
+                        <LeaveTimelineGlyph leaveTypeId={seg.a.leaveType} className="lp-leave-block__icon" />
+                      )}
                       <span className="lp-leave-block__label">
                         <span>{lbl}</span>
-                        <span className="lp-leave-block__dates">{dateLine}</span>
+                        {!isDayOff && (
+                          <span className="lp-leave-block__dates">{dateLine}</span>
+                        )}
                       </span>
                     </motion.button>
                   );
