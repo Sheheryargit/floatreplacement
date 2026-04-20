@@ -1,5 +1,5 @@
 /** Stable empty list — never mutate. */
-export const EMPTY_PERSON_ALLOCATIONS = Object.freeze([]);
+const EMPTY_PERSON_ALLOCATIONS = Object.freeze([]);
 
 /**
  * Map person id (string key) → allocations touching that person (shared array refs per person).

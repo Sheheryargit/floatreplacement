@@ -24,7 +24,7 @@ function norm(s) {
 }
 
 /** Merge default + stored list, unique by case-insensitive name, sorted. */
-export function mergeDepartmentList(depts, ensureName) {
+function mergeDepartmentList(depts, ensureName) {
   const seen = new Set();
   const out = [];
   const add = (name) => {

@@ -24,7 +24,7 @@ function personToRow(p) {
   };
 }
 
-export function rowToPerson(row) {
+function rowToPerson(row) {
   if (!row) return null;
   const region =
     row.public_holiday_region != null && String(row.public_holiday_region).trim() !== ""

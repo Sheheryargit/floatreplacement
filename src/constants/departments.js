@@ -19,5 +19,3 @@ export const DEFAULT_DEPARTMENTS = [
   "Hornets",
 ];
 
-/** @deprecated use DEFAULT_DEPARTMENTS — kept for AppDataContext / PersonModal exports */
-export const SEED_DEPTS = DEFAULT_DEPARTMENTS;

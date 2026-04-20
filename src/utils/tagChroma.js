@@ -43,6 +43,6 @@ export function tagChromaProps(label, isDark, extraClass = "") {
 }
 
 /** @deprecated Prefer tagChromaProps(label, isDark); class-only variant defaults to dark. */
-export function tagChromaClass(label) {
+function tagChromaClass(label) {
   return tagChromaProps(label, true).className;
 }

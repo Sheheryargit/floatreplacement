@@ -6,7 +6,7 @@ import { allocationHasPersonSchedule } from "./peopleSort.js";
  * Regional/calendar public holidays (synthetic rows + leave type `public_holiday`) do not block —
  * teams can still schedule billable work on those days if needed.
  */
-export function leaveBlocksWorkAllocation(a) {
+function leaveBlocksWorkAllocation(a) {
   if (!a?.isLeave) return false;
   if (a.syntheticPublicHoliday === true) return false;
   if (a.leaveType === "public_holiday") return false;
@@ -57,7 +57,7 @@ export function findLeaveOverlapWithWorkRange(leaveAlloc, workStart, workEnd) {
 }
 
 /** True if this leave blocks work on [workStart, workEnd] (includes recurring patterns). */
-export function leaveBlocksWorkOnDateRange(leaveAlloc, workStart, workEnd) {
+function leaveBlocksWorkOnDateRange(leaveAlloc, workStart, workEnd) {
   return findLeaveOverlapWithWorkRange(leaveAlloc, workStart, workEnd) != null;
 }
 
@@ -68,7 +68,7 @@ export function leaveBlocksWorkOnDateRange(leaveAlloc, workStart, workEnd) {
  * @param {string} dateKey ISO date
  * @param {number} [standardDayHours=7.5]
  */
-export function maxWorkHoursOnDayAfterLeave(
+function maxWorkHoursOnDayAfterLeave(
   personId,
   allocations,
   dateKey,

@@ -2,7 +2,7 @@
 const GOLDEN_ANGLE = 137.508;
 const ALLOCATION_PALETTE_SIZE = 200;
 
-export function hashString(s) {
+function hashString(s) {
   let h = 0;
   const str = String(s ?? "");
   for (let i = 0; i < str.length; i++) {
@@ -134,8 +134,3 @@ export function projectCodeChipStyles(barHex, theme) {
   };
 }
 
-/** Default color for a new registry project id (stable, not random). */
-export function colorForNewProjectId(projectId) {
-  const id = Math.max(1, Number(projectId) || 1);
-  return PROJECT_COLOR_PALETTE[(id - 1) % PROJECT_COLOR_PALETTE.length];
-}

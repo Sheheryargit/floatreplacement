@@ -12,7 +12,7 @@ function rangesOverlap(a0, a1, b0, b1) {
  * @param {object[]} allocations
  * @param {object} synthetic
  */
-export function syntheticPublicHolidaySupersededByRealLeave(allocations, synthetic) {
+function syntheticPublicHolidaySupersededByRealLeave(allocations, synthetic) {
   if (!synthetic?.syntheticPublicHoliday) return false;
   const dk = String(synthetic.startDate || "").slice(0, 10);
   const pid = synthetic.personIds?.[0];

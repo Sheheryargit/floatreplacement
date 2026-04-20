@@ -14,7 +14,7 @@ function phRowKey(personId, holidayDate, name) {
  * @param {Array} rows person_public_holidays-shaped rows
  * @param {Array<{ person_id: string, holiday_date: string, name: string }>} dismissals
  */
-export function filterPublicHolidayRowsByDismissals(rows, dismissals) {
+function filterPublicHolidayRowsByDismissals(rows, dismissals) {
   if (!dismissals?.length) return rows || [];
   const hidden = new Set(dismissals.map((d) => phRowKey(d.person_id, d.holiday_date, d.name)));
   return (rows || []).filter((r) => !hidden.has(phRowKey(r.person_id, r.holiday_date, r.name)));

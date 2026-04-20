@@ -414,6 +414,26 @@
   transform: scale(0.97);
 }
 
-.lp-root[data-theme="light"] .lp-schedule-filter-btn.primary {
-  color: #fff;
+.lp-root[data-theme="light"] .lp-schedule-filter-btn.primary,
+[data-theme="light"] .lp-schedule-filter-btn.primary,
+html[data-theme="light"] .lp-schedule-filter-btn.primary {
+  background: #0077e6 !important;
+  color: #ffffff !important;
+  border-color: #0a5fb8 !important;
+  box-shadow:
+    0 0 0 1px rgba(10, 95, 184, 0.45) inset,
+    0 2px 10px rgba(0, 119, 230, 0.35) !important;
+}
+
+.lp-root[data-theme="light"] .lp-schedule-filter-btn.primary:hover,
+.lp-root[data-theme="light"] .lp-schedule-filter-btn.primary:active,
+.lp-root[data-theme="light"] .lp-schedule-filter-btn.primary:focus,
+[data-theme="light"] .lp-schedule-filter-btn.primary:hover,
+[data-theme="light"] .lp-schedule-filter-btn.primary:active,
+[data-theme="light"] .lp-schedule-filter-btn.primary:focus,
+html[data-theme="light"] .lp-schedule-filter-btn.primary:hover,
+html[data-theme="light"] .lp-schedule-filter-btn.primary:active,
+html[data-theme="light"] .lp-schedule-filter-btn.primary:focus {
+  background: #005bbf !important;
+  color: #ffffff !important;
 }

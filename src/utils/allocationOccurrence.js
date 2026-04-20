@@ -7,7 +7,7 @@ function sliceIso(d) {
 /**
  * Whether any occurrence of this allocation (respecting `repeatId`) covers `dateKey` (ISO yyyy-mm-dd).
  */
-export function allocationCoversDateKey(alloc, dateKey) {
+function allocationCoversDateKey(alloc, dateKey) {
   if (!alloc) return false;
   const dk = sliceIso(dateKey);
   if (!dk) return false;

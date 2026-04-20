@@ -7,7 +7,7 @@ import {
   SEED_TAGS,
   ALLOCATION_PROJECT_SEED,
 } from "../data/workspaceSeedConstants.js";
-import { SEED_DEPTS } from "../constants/departments.js";
+import { DEFAULT_DEPARTMENTS } from "../constants/departments.js";
 import {
   PROJECTS_SEED,
   SEED_CLIENTS,
@@ -86,7 +86,7 @@ function buildInitialSlices() {
       allocations: [],
       publicHolidayAllocations: [],
       roles: [...SEED_ROLES],
-      depts: [...SEED_DEPTS],
+      depts: [...DEFAULT_DEPARTMENTS],
       peopleTagOpts: [...SEED_TAGS],
       clients: [...SEED_CLIENTS],
       projectTagOpts: [...SEED_PROJECT_TAGS],
@@ -103,7 +103,7 @@ function buildInitialSlices() {
     allocations: [],
     publicHolidayAllocations: [],
     roles: [...SEED_ROLES],
-    depts: [...SEED_DEPTS],
+    depts: [...DEFAULT_DEPARTMENTS],
     peopleTagOpts: [...SEED_TAGS],
     clients: [...SEED_CLIENTS],
     projectTagOpts: [...SEED_PROJECT_TAGS],
@@ -116,7 +116,7 @@ function buildInitialSlices() {
 
 const seedFallbacks = {
   roles: SEED_ROLES,
-  depts: SEED_DEPTS,
+  depts: DEFAULT_DEPARTMENTS,
   clients: SEED_CLIENTS,
   peopleTagOpts: SEED_TAGS,
   projectTagOpts: SEED_PROJECT_TAGS,
@@ -327,7 +327,7 @@ export function syncPersonUpdate(person) {
       return updated;
     });
 }
-export function syncPeopleDelete(ids) {
+function syncPeopleDelete(ids) {
   if (!isSupabaseConfigured) return Promise.resolve();
   return Promise.resolve()
     .then(() => peopleApi.deletePeople(ids))
@@ -337,11 +337,11 @@ export function syncProjectCreate(project) {
   if (!isSupabaseConfigured) return Promise.resolve(project);
   return projectsApi.createProject(project);
 }
-export function syncProjectUpdate(project) {
+function syncProjectUpdate(project) {
   if (!isSupabaseConfigured) return Promise.resolve(project);
   return projectsApi.updateProject(project);
 }
-export function syncProjectsDelete(ids) {
+function syncProjectsDelete(ids) {
   if (!isSupabaseConfigured) return Promise.resolve();
   return projectsApi.deleteProjects(ids);
 }

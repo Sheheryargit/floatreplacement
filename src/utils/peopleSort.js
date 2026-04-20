@@ -51,7 +51,7 @@ export function comparePeopleForScheduleSort(a, b, sortId, peopleOrder, hoursMap
 }
 
 /** Weekdays between ISO date keys (inclusive). */
-export function countWeekdaysBetweenKeys(startKey, endKey) {
+function countWeekdaysBetweenKeys(startKey, endKey) {
   const parse = (k) => {
     const p = String(k).split("-").map(Number);
     if (p.length !== 3 || p.some((n) => !Number.isFinite(n))) return new Date();

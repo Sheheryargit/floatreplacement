@@ -27,7 +27,6 @@ import {
   FolderPlus,
   CalendarPlus,
   Star,
-  X,
   ArrowDownUp,
   Repeat2,
   StickyNote,
@@ -116,7 +115,6 @@ function LeaveTimelineGlyph({ leaveTypeId, className }) {
 }
 
 const VIEW_OPTIONS = [
-  { id: "day", label: "Days" },
   { id: "week", label: "Weeks" },
   { id: "month", label: "Months" },
 ];
@@ -217,47 +215,19 @@ function dateKeyLocal(dt) {
   return `${y}-${mo}-${day}`;
 }
 
-/** Day grid: 12 columns, each column = 2 hours starting at 08:00 (see buildScheduleModel). */
-const DAY_GRID_START_HOUR = 8;
-const DAY_COLUMN_HOURS = 2;
-/** Day grid: min span in column units (~24min) so 1h blocks stay visible. */
-const MIN_DAY_SPAN_COLUMNS = 0.2;
 /** Standard workday for width scaling in week/month view. */
 const STANDARD_DAY_HOURS = 7.5;
-/** Minimum span in column units for week/month (integer columns). */
+/** Minimum span in column units (integer columns). */
 const MIN_WEEK_MONTH_SPAN_COLS = 1;
 
 /**
  * Map allocation date range to visible column start + span.
- * `start` / `span` are in column index units (fractional allowed in day view).
+ * `start` / `span` are in column index units.
  */
-function layoutAllocation(alloc, scheduleModel, viewMode) {
-  const n = scheduleModel.columnCount;
+function layoutAllocation(alloc, scheduleModel) {
   const keys = scheduleModel.slots.map((s) => s.dateKey);
   const sk = alloc.startDate;
   const ek = alloc.endDate;
-
-  if (viewMode === "day") {
-    const anchorK = scheduleModel.anchorDateKey;
-    if (!anchorK || anchorK < sk || anchorK > ek) return null;
-    // Leave covers the entire day
-    if (alloc.isLeave) {
-      return { start: 0, span: n };
-    }
-    const hpd = Math.max(0, Number(alloc.hoursPerDay) || 0);
-    let spanCols = hpd <= 0 ? MIN_DAY_SPAN_COLUMNS : hpd / DAY_COLUMN_HOURS;
-    spanCols = Math.max(spanCols, MIN_DAY_SPAN_COLUMNS);
-    spanCols = Math.min(spanCols, n);
-    // Optional future: alloc.dayStartHour (0–24) anchors the block on the hourly grid.
-    const gridStart =
-      Number.isFinite(alloc.dayStartHour) && alloc.dayStartHour >= 0 && alloc.dayStartHour <= 24
-        ? Math.max(0, (alloc.dayStartHour - DAY_GRID_START_HOUR) / DAY_COLUMN_HOURS)
-        : 0;
-    let startCol = gridStart;
-    if (startCol + spanCols > n) startCol = Math.max(0, n - spanCols);
-    startCol = Math.min(startCol, Math.max(0, n - spanCols));
-    return { start: startCol, span: spanCols };
-  }
 
   let i0 = keys.findIndex((k) => k >= sk);
   if (i0 < 0) return null;
@@ -338,7 +308,7 @@ function assignAllocationStackLevels(segments) {
 }
 
 /** Visible timeline segments for an allocation (includes recurring occurrences). */
-function layoutsForAllocation(alloc, scheduleModel, viewMode) {
+function layoutsForAllocation(alloc, scheduleModel) {
   const out = [];
   let start = alloc.startDate;
   let end = alloc.endDate;
@@ -347,17 +317,13 @@ function layoutsForAllocation(alloc, scheduleModel, viewMode) {
   const maxMs = originMs + 800 * 864e5;
 
   for (let i = 0; i < 80; i++) {
-    const lay = layoutAllocation({ ...alloc, startDate: start, endDate: end }, scheduleModel, viewMode);
+    const lay = layoutAllocation({ ...alloc, startDate: start, endDate: end }, scheduleModel);
     if (lay) {
-      if (viewMode === "day") {
-        out.push({ ...lay, occ: i, weekPart: 0 });
-      } else {
-        const splits = splitLayoutByWorkWeek(lay, scheduleModel);
-        const weekSplitCount = splits.length;
-        splits.forEach((sli, partIdx) => {
-          out.push({ ...sli, occ: i, weekPart: partIdx, weekSplitCount });
-        });
-      }
+      const splits = splitLayoutByWorkWeek(lay, scheduleModel);
+      const weekSplitCount = splits.length;
+      splits.forEach((sli, partIdx) => {
+        out.push({ ...sli, occ: i, weekPart: partIdx, weekSplitCount });
+      });
     }
     if (repeatId === "none") break;
     const next = advanceRepeatWindow(start, end, repeatId);
@@ -412,41 +378,6 @@ function buildScheduleModel(viewMode, anchorDate, offsets = { prev: 0, next: 0 }
   const d = new Date(anchorDate);
   const y = d.getFullYear();
   const mo = d.getMonth();
-
-  if (viewMode === "day") {
-    const colsPerDay = 12;
-    const slots = [];
-    let title = "";
-
-    for (let o = -offsets.prev; o <= offsets.next; o++) {
-      const dt = addWeekdays(d, o);
-      if (o === 0) {
-        title = dt.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-      }
-      const anchorKey = dateKeyLocal(dt);
-
-      for (let i = 0; i < colsPerDay; i++) {
-        const rawH = 8 + i * 2;
-        const h = rawH >= 24 ? rawH - 24 : rawH;
-        slots.push({
-          main: `${String(h).padStart(2, "0")}:00`,
-          sub: null,
-          weekParity: o % 2 === 0 ? 0 : 1,
-          weekBlockStart: i === 0,
-          weekBlockEnd: i === colsPerDay - 1,
-          dateKey: anchorKey,
-        });
-      }
-    }
-
-    return {
-      columnCount: slots.length,
-      bandTitle: title,
-      bandSpans: null,
-      slots,
-      anchorDateKey: dateKeyLocal(d),
-    };
-  }
 
   let dates = [];
   let bandTitle = "";
@@ -613,22 +544,8 @@ function formatHourTotal(n) {
   return `${n.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}h`;
 }
 
-/** Date keys used for hour totals: anchor day only in day view; all visible columns in week/month / custom range. */
-function visibleDateKeysForHours(scheduleModel, viewMode, anchorDate) {
-  if (scheduleModel.aggregateAllSlots) {
-    const seen = new Set();
-    const ordered = [];
-    for (const s of scheduleModel.slots) {
-      if (!seen.has(s.dateKey)) {
-        seen.add(s.dateKey);
-        ordered.push(s.dateKey);
-      }
-    }
-    return ordered;
-  }
-  if (viewMode === "day") {
-    return [dateKeyLocal(anchorDate)];
-  }
+/** Date keys used for hour totals across the visible schedule slots. */
+function visibleDateKeysForHours(scheduleModel) {
   const seen = new Set();
   const ordered = [];
   for (const s of scheduleModel.slots) {
@@ -651,8 +568,8 @@ function sumWorkHoursOnDayForPersonList(personAllocations, dateKey) {
   return sum;
 }
 
-function computePersonHoursInViewFromList(personAllocations, scheduleModel, viewMode, anchorDate) {
-  const keys = visibleDateKeysForHours(scheduleModel, viewMode, anchorDate);
+function computePersonHoursInViewFromList(personAllocations, scheduleModel) {
+  const keys = visibleDateKeysForHours(scheduleModel);
   let t = 0;
   for (const dk of keys) {
     t += sumWorkHoursOnDayForPersonList(personAllocations, dk);
@@ -660,8 +577,8 @@ function computePersonHoursInViewFromList(personAllocations, scheduleModel, view
   return t;
 }
 
-function personHasOverloadInViewFromList(personAllocations, scheduleModel, viewMode, anchorDate) {
-  const keys = visibleDateKeysForHours(scheduleModel, viewMode, anchorDate);
+function personHasOverloadInViewFromList(personAllocations, scheduleModel) {
+  const keys = visibleDateKeysForHours(scheduleModel);
   for (const dk of keys) {
     const maxH = maxWorkHoursOnDayForPersonList(personAllocations, dk, STANDARD_DAY_HOURS);
     if (sumWorkHoursOnDayForPersonList(personAllocations, dk) > maxH + 1e-6) return true;
@@ -770,21 +687,6 @@ function allocationBarBorderRadiusPx(widthPct) {
   return 12;
 }
 
-function allocationCompactInitials(projectName, projectCode) {
-  const code = (projectCode || "").trim();
-  const name = (projectName || "").trim();
-  const parts = name.split(/\s+/).filter(Boolean);
-  // Numeric-only codes (e.g. "12") read wrong as micro label; prefer letters from the project name.
-  if (code.length >= 2 && !/^\d+$/.test(code)) return code.slice(0, 2).toUpperCase();
-  if (code.length >= 2 && /^\d+$/.test(code)) {
-    if (parts.length >= 2) return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
-    if (name.length >= 2) return name.slice(0, 2).toUpperCase();
-  }
-  if (parts.length >= 2) return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
-  if (parts.length === 1 && parts[0].length >= 2) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0]?.[0] || "?").toUpperCase();
-}
-
 function buildWorkAllocationTitle(alloc, projectName, hoursLabel) {
   const bits = [alloc.project || projectName, hoursLabel ? `${hoursLabel}/day` : ""];
   if (alloc.startDate === alloc.endDate) bits.push(alloc.startDate);
@@ -814,10 +716,9 @@ const TimelineRow = memo(function TimelineRow({
   const { theme } = useAppTheme();
   const t = T[theme];
   const reduceMotion = useReducedMotion();
-  const allocViewMode = scheduleModel.aggregateAllSlots ? "week" : viewMode;
 
-  const hoursKeys = visibleDateKeysForHours(scheduleModel, viewMode, anchorDate);
-  const hours = computePersonHoursInViewFromList(personAllocations, scheduleModel, viewMode, anchorDate);
+  const hoursKeys = visibleDateKeysForHours(scheduleModel);
+  const hours = computePersonHoursInViewFromList(personAllocations, scheduleModel);
   const rawCap = hoursKeys.reduce(
     (s, dk) => s + maxWorkHoursOnDayForPersonList(personAllocations, dk, STANDARD_DAY_HOURS),
     0
@@ -830,16 +731,11 @@ const TimelineRow = memo(function TimelineRow({
         : 0;
   const right =
     utilizationMode === "hours" ? `${hours.toFixed(hours % 1 ? 1 : 0)}h` : `${pct}%`;
-  const overloaded = personHasOverloadInViewFromList(
-    personAllocations,
-    scheduleModel,
-    viewMode,
-    anchorDate
-  );
+  const overloaded = personHasOverloadInViewFromList(personAllocations, scheduleModel);
   const noWorkingDaysInView = hoursKeys.length > 0 && rawCap < 1e-6;
 
   const rowSegments = personAllocations.flatMap((a) =>
-      layoutsForAllocation(a, scheduleModel, allocViewMode).map((lay) => ({
+      layoutsForAllocation(a, scheduleModel).map((lay) => ({
         a,
         lay,
         occIdx: lay.occ,
@@ -971,10 +867,9 @@ const TimelineRow = memo(function TimelineRow({
                 key={`lane-${p.id}-${idx}`}
                 className={
                   "lp-week-lane" +
-                  (allocViewMode !== "day" && slot.weekParity ? " lp-week-lane-b" : "") +
-                  (allocViewMode !== "day" && !slot.weekParity ? " lp-week-lane-a" : "") +
-                  (allocViewMode !== "day" && slot.weekBlockStart ? " lp-week-lane-block-start" : "") +
-                  (allocViewMode !== "day" && slot.weekBlockEnd ? " lp-week-lane-block-end" : "")
+                  (slot.weekParity ? " lp-week-lane-b" : " lp-week-lane-a") +
+                  (slot.weekBlockStart ? " lp-week-lane-block-start" : "") +
+                  (slot.weekBlockEnd ? " lp-week-lane-block-end" : "")
                 }
               />
             ))}
@@ -995,9 +890,8 @@ const TimelineRow = memo(function TimelineRow({
             >
               <AnimatePresence initial={false}>
                 {leaveSegments.map((seg, segIdx) => {
-                  const isDay = allocViewMode === "day";
-                  const colStart = isDay ? 1 : Math.max(1, Math.round(seg.lay.start) + 1);
-                  const colSpan = isDay ? nCols : Math.max(1, Math.round(seg.lay.span));
+                  const colStart = Math.max(1, Math.round(seg.lay.start) + 1);
+                  const colSpan = Math.max(1, Math.round(seg.lay.span));
                   const isDayOff = isAvailabilityDayOffAlloc(seg.a);
                   const lbl = isDayOff ? "Day Off" : seg.a.leaveType ? leaveLabel(seg.a.leaveType) : "Leave";
                   const typeId = isDayOff ? "day_off" : normalizeLeaveTypeId(seg.a.leaveType);
@@ -1119,22 +1013,11 @@ const TimelineRow = memo(function TimelineRow({
                       const innerWash = allocationBarInnerWash(barColor, theme);
 
                       const brPx = allocationBarBorderRadiusPx(widthPct);
-                      // Micro layout (code initials): only on **day** (hourly) grid where columns are time slots.
-                      // Week/month/custom range use many date columns → narrow width% → never use micro or we show
-                      // project codes (e.g. "12") instead of names when endless-scroll adds many weeks.
-                      // Week-split segments keep full label per segment via weekSplitCount when micro applies.
-                      const micro =
-                        allocViewMode === "day" &&
-                        widthPct < 5.5 &&
-                        (seg.lay.weekSplitCount ?? 1) <= 1;
-                      // Every non-micro bar uses the same compact two-line layout with
-                      // a consistent text style — short bars clip via overflow: hidden.
-                      // The thin border still helps the smallest bars stay legible.
-                      const compactBorder = !micro && calculatedHeight < 40;
+                      // Every bar uses the same compact two-line layout with a
+                      // consistent text style — short bars clip via overflow: hidden.
+                      // The thin border keeps the smallest bars legible.
+                      const compactBorder = calculatedHeight < 40;
                       const chrome = allocationBarChromeStyles(barColor, h, theme, { thin: compactBorder });
-                      const compactInitials = allocationCompactInitials(projectName, projectCode);
-                      const hoursFontW = 600 + Math.round(hnorm * 220);
-                      const clampedHw = Math.min(820, Math.max(600, hoursFontW));
 
                       const repeatOn = (seg.a.repeatId ?? "none") !== "none";
                       const hasNotes = Boolean((seg.a.notes || "").trim());
@@ -1177,9 +1060,7 @@ const TimelineRow = memo(function TimelineRow({
                           type="button"
                           className={
                             "lp-block lp-block-alloc lp-block-alloc-project lp-alloc-bar" +
-                            (micro ? " lp-alloc-bar--micro" : "") +
-                            (compactBorder ? " lp-alloc-bar--compact" : "") +
-                            (allocViewMode === "day" ? " lp-alloc-bar--day" : "")
+                            (compactBorder ? " lp-alloc-bar--compact" : "")
                           }
                           data-hours={h}
                           data-bar-h={calculatedHeight}
@@ -1201,53 +1082,34 @@ const TimelineRow = memo(function TimelineRow({
                             aria-hidden
                           />
                           <span className="lp-alloc-bar__body">
-                            {micro ? (
-                              <>
-                                <span className="lp-alloc-bar__micro-row">
-                                  <span className="lp-alloc-micro-initials">{compactInitials}</span>
-                                  <span className="lp-alloc-bar__micro-icons">
-                                    {repeatOn ? (
-                                      <Repeat2 size={11} strokeWidth={2.25} className="lp-alloc-bar__ic" aria-hidden />
-                                    ) : null}
-                                    {hasNotes ? (
-                                      <StickyNote size={11} strokeWidth={2.25} className="lp-alloc-bar__ic" aria-hidden />
-                                    ) : null}
-                                  </span>
+                            {/* Consistent compact layout for EVERY bar, regardless of hours.
+                                Line 1: project name (truncated). Line 2: code chip + hours + icons.
+                                Short bars (e.g. 0.5h) clip via overflow: hidden; tall bars
+                                display the full two-line block. */}
+                            <span className="lp-alloc-bar__line lp-alloc-bar__line--name">
+                              {projectName || hoursLabel}
+                            </span>
+                            <span className="lp-alloc-bar__line lp-alloc-bar__line--meta">
+                              {projectCode ? (
+                                <span
+                                  className="lp-alloc-code-chip"
+                                  style={projectCodeChipStyles(barColor, theme)}
+                                >
+                                  {projectCode}
                                 </span>
-                                <span className="lp-alloc-hours">{hoursLabel}</span>
-                              </>
-                            ) : (
-                              /* One consistent compact layout for EVERY bar, regardless of hours.
-                                 Line 1: project name (truncated). Line 2: code chip + hours + icons.
-                                 Short bars (e.g. 0.5h = 12px) clip via overflow: hidden; tall bars
-                                 display the full two-line block. Text style/size is the same across all. */
-                              <>
-                                <span className="lp-alloc-bar__line lp-alloc-bar__line--name">
-                                  {projectName || hoursLabel}
-                                </span>
-                                <span className="lp-alloc-bar__line lp-alloc-bar__line--meta">
-                                  {projectCode ? (
-                                    <span
-                                      className="lp-alloc-code-chip"
-                                      style={projectCodeChipStyles(barColor, theme)}
-                                    >
-                                      {projectCode}
-                                    </span>
+                              ) : null}
+                              <span className="lp-alloc-hours">{hoursLabel}</span>
+                              {(repeatOn || hasNotes) ? (
+                                <span className="lp-alloc-bar__icons">
+                                  {repeatOn ? (
+                                    <Repeat2 size={10} strokeWidth={2.25} className="lp-alloc-bar__ic" aria-hidden />
                                   ) : null}
-                                  <span className="lp-alloc-hours">{hoursLabel}</span>
-                                  {(repeatOn || hasNotes) ? (
-                                    <span className="lp-alloc-bar__icons">
-                                      {repeatOn ? (
-                                        <Repeat2 size={10} strokeWidth={2.25} className="lp-alloc-bar__ic" aria-hidden />
-                                      ) : null}
-                                      {hasNotes ? (
-                                        <StickyNote size={10} strokeWidth={2.25} className="lp-alloc-bar__ic" aria-hidden />
-                                      ) : null}
-                                    </span>
+                                  {hasNotes ? (
+                                    <StickyNote size={10} strokeWidth={2.25} className="lp-alloc-bar__ic" aria-hidden />
                                   ) : null}
                                 </span>
-                              </>
-                            )}
+                              ) : null}
+                            </span>
                           </span>
                         </button>
                       );
@@ -1394,8 +1256,8 @@ export default function LandingPage() {
   }, [people]);
 
   const scheduleVisibleKeys = useMemo(
-    () => visibleDateKeysForHours(scheduleModel, viewMode, anchorDate),
-    [scheduleModel, viewMode, anchorDate]
+    () => visibleDateKeysForHours(scheduleModel),
+    [scheduleModel]
   );
 
   const { schedulePeople, schedulePeopleHoursInView } = useMemo(() => {
@@ -1411,10 +1273,7 @@ export default function LandingPage() {
     const hoursMap = new Map();
     for (const p of list) {
       const pa = getPersonAllocations(allocationsByPerson, p.id);
-      hoursMap.set(
-        p.id,
-        computePersonHoursInViewFromList(pa, scheduleModel, viewMode, anchorDate)
-      );
+      hoursMap.set(p.id, computePersonHoursInViewFromList(pa, scheduleModel));
     }
     const sorted = [...list].sort((a, b) =>
       comparePeopleForScheduleSort(a, b, scheduleSort, peopleOrderMap, hoursMap)
@@ -1430,8 +1289,6 @@ export default function LandingPage() {
     allocationsByPerson,
     projects,
     scheduleModel,
-    viewMode,
-    anchorDate,
   ]);
 
   const projectByLabel = useMemo(() => {
@@ -1454,8 +1311,8 @@ export default function LandingPage() {
   );
 
   const visibleCapacityDays = useMemo(
-    () => Math.max(1, visibleDateKeysForHours(scheduleModel, viewMode, anchorDate).length),
-    [scheduleModel, viewMode, anchorDate]
+    () => Math.max(1, visibleDateKeysForHours(scheduleModel).length),
+    [scheduleModel]
   );
 
   const totalHours = useMemo(() => {
@@ -1467,7 +1324,7 @@ export default function LandingPage() {
   }, [schedulePeople, schedulePeopleHoursInView]);
 
   const teamCapacityHours = useMemo(() => {
-    const keys = visibleDateKeysForHours(scheduleModel, viewMode, anchorDate);
+    const keys = visibleDateKeysForHours(scheduleModel);
     let cap = 0;
     for (const p of schedulePeople) {
       const pa = getPersonAllocations(allocationsByPerson, p.id);
@@ -1476,7 +1333,7 @@ export default function LandingPage() {
       }
     }
     return Math.max(STANDARD_DAY_HOURS, cap);
-  }, [schedulePeople, allocationsByPerson, scheduleModel, viewMode, anchorDate]);
+  }, [schedulePeople, allocationsByPerson, scheduleModel]);
 
   const teamUtilPercent = useMemo(
     () => (teamCapacityHours > 0 ? Math.min(100, Math.round((totalHours / teamCapacityHours) * 100)) : 0),
@@ -1487,9 +1344,8 @@ export default function LandingPage() {
     if (customRange?.start && customRange?.end) {
       return `cr-${customRange.start}-${customRange.end}`;
     }
-    if (viewMode === "month") return `m-${anchorDate.getFullYear()}-${anchorDate.getMonth() + 1}`;
     if (viewMode === "week") return `w-${weekMondayKey(anchorDate)}`;
-    return `d-${dateKeyLocal(anchorDate)}`;
+    return `m-${anchorDate.getFullYear()}-${anchorDate.getMonth() + 1}`;
   }, [viewMode, anchorDate, customRange]);
 
   const prevViewModeRef = useRef(viewMode);
@@ -1510,8 +1366,7 @@ export default function LandingPage() {
   const navigatePrev = useCallback(() => {
     setCustomRange(null);
     setTimeRangePreset(null);
-    if (viewMode === "day") setAnchorDate((d) => addWeekdays(d, -1));
-    else if (viewMode === "week") setAnchorDate((d) => addDays(startOfWeekMonday(d), -7));
+    if (viewMode === "week") setAnchorDate((d) => addDays(startOfWeekMonday(d), -7));
     else setAnchorDate((d) => addMonths(d, -1));
     lastAnchorKey.current = null;
   }, [viewMode]);
@@ -1519,8 +1374,7 @@ export default function LandingPage() {
   const navigateNext = useCallback(() => {
     setCustomRange(null);
     setTimeRangePreset(null);
-    if (viewMode === "day") setAnchorDate((d) => addWeekdays(d, 1));
-    else if (viewMode === "week") setAnchorDate((d) => addDays(startOfWeekMonday(d), 7));
+    if (viewMode === "week") setAnchorDate((d) => addDays(startOfWeekMonday(d), 7));
     else setAnchorDate((d) => addMonths(d, 1));
     lastAnchorKey.current = null;
   }, [viewMode]);
@@ -1945,13 +1799,11 @@ export default function LandingPage() {
   const viewLabel = VIEW_OPTIONS.find((v) => v.id === viewMode)?.label ?? "Months";
 
   const colMinPx =
-    viewMode === "day"
-      ? 120
-      : scheduleModel.columnCount > 28
-        ? 88
-        : viewMode === "week"
-          ? 150
-          : 105;
+    scheduleModel.columnCount > 28
+      ? 88
+      : viewMode === "week"
+        ? 150
+        : 105;
   const gridTemplate = `repeat(${scheduleModel.columnCount}, minmax(${colMinPx}px, 1fr))`;
   const timelineMinWidthPx = scheduleModel.columnCount * colMinPx;
 
@@ -2604,10 +2456,9 @@ export default function LandingPage() {
                             className={
                               "lp-day-cell" +
                               (isToday ? " lp-day-is-today" : "") +
-                              (viewMode !== "day" && slot.weekParity ? " lp-day-week-b" : "") +
-                              (viewMode !== "day" && !slot.weekParity ? " lp-day-week-a" : "") +
-                              (viewMode !== "day" && slot.weekBlockStart ? " lp-day-week-start" : "") +
-                              (viewMode !== "day" && slot.weekBlockEnd ? " lp-day-week-end" : "")
+                              (slot.weekParity ? " lp-day-week-b" : " lp-day-week-a") +
+                              (slot.weekBlockStart ? " lp-day-week-start" : "") +
+                              (slot.weekBlockEnd ? " lp-day-week-end" : "")
                             }
                           >
                             <span className="lp-day-main">

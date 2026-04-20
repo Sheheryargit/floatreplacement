@@ -21,7 +21,7 @@ function projectToRow(p) {
   };
 }
 
-export function rowToProject(row) {
+function rowToProject(row) {
   if (!row) return null;
   const teamIds = Array.isArray(row.team_ids) ? row.team_ids.map(String) : [];
   return {

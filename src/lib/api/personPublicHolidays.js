@@ -49,7 +49,7 @@ export function rowsToSyntheticPublicHolidayAllocations(rows) {
   return list;
 }
 
-export async function fetchPersonPublicHolidays() {
+async function fetchPersonPublicHolidays() {
   if (!isSupabaseConfigured) return [];
   const { data, error } = await supabase
     .from("person_public_holidays")

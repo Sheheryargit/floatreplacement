@@ -24,7 +24,7 @@ function allocationToRow(a) {
   };
 }
 
-export function rowToAllocation(row) {
+function rowToAllocation(row) {
   if (!row) return null;
   const personIds = Array.isArray(row.allocation_people)
     ? row.allocation_people.map((r) => String(r.person_id)).filter(Boolean)

@@ -99,7 +99,3 @@ export function useSlapAnimation() {
   }
   return ctx;
 }
-
-export function useSlapAnimationOptional() {
-  return useContext(SlapContext);
-}

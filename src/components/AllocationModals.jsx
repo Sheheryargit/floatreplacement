@@ -7,9 +7,7 @@ import { normalizeLeaveTypeId, leaveAccentTheme, leavePanelStyleVars } from "../
 import "./AllocationModals.css";
 import { ALLOCATION_PROJECT_SEED } from "../data/workspaceSeedConstants.js";
 
-export { ALLOCATION_PROJECT_SEED };
-
-export const REPEAT_OPTIONS = [
+const REPEAT_OPTIONS = [
   { id: "none", label: "Doesn't repeat" },
   { id: "weekly", label: "Weekly" },
   { id: "every2weeks", label: "Every 2 weeks" },
@@ -22,7 +20,7 @@ export const REPEAT_OPTIONS = [
   { id: "yearly", label: "Yearly" },
 ];
 
-export const LEAVE_TYPES = [
+const LEAVE_TYPES = [
   { id: "annual", label: "Annual Leave" },
   { id: "sick", label: "Sick Leave" },
   { id: "personal", label: "Personal Leave" },
@@ -37,7 +35,7 @@ export function leaveLabel(id) {
   return LEAVE_TYPES.find((o) => o.id === id)?.label ?? "Annual Leave";
 }
 
-export function repeatLabel(id) {
+function repeatLabel(id) {
   return REPEAT_OPTIONS.find((o) => o.id === id)?.label ?? "Doesn't repeat";
 }
 
@@ -95,6 +93,7 @@ export function CreateAllocationModal({
   const [assignOpen, setAssignOpen] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
   const [projectCreateMode, setProjectCreateMode] = useState(false);
+  const [projectQuery, setProjectQuery] = useState("");
   const [newProjectLine, setNewProjectLine] = useState("");
 
   // Leave-specific state
@@ -149,6 +148,7 @@ export function CreateAllocationModal({
     setAssignOpen(false);
     setProjectOpen(false);
     setProjectCreateMode(false);
+    setProjectQuery("");
     setNewProjectLine("");
     setActiveTab(defaultTab === "leave" ? "leave" : "allocation");
     setLeaveType("annual");
@@ -166,6 +166,7 @@ export function CreateAllocationModal({
       if (projectWrapRef.current && !projectWrapRef.current.contains(e.target)) {
         setProjectOpen(false);
         setProjectCreateMode(false);
+        setProjectQuery("");
       }
       if (leaveTypeWrapRef.current && !leaveTypeWrapRef.current.contains(e.target)) setLeaveTypeOpen(false);
     }
@@ -193,6 +194,17 @@ export function CreateAllocationModal({
       return p.name.toLowerCase().includes(q);
     });
   }, [people, assignedIds, assignQuery]);
+
+  const projectOptions = useMemo(
+    () => (projects.length ? projects : ALLOCATION_PROJECT_SEED),
+    [projects]
+  );
+
+  const filteredProjects = useMemo(() => {
+    const q = projectQuery.trim().toLowerCase();
+    if (!q) return projectOptions;
+    return projectOptions.filter((p) => String(p).toLowerCase().includes(q));
+  }, [projectOptions, projectQuery]);
 
   const assignedPeople = useMemo(
     () => assignedIds.map((id) => people.find((p) => p.id === id)).filter(Boolean),
@@ -543,30 +555,56 @@ export function CreateAllocationModal({
                   </div>
                 ) : (
                   <>
-                    {(projects.length ? projects : ALLOCATION_PROJECT_SEED).map((p) => {
-                      const swatch = resolveColorForProjectLabel(p, projectRegistry);
-                      return (
-                        <button
-                          key={p}
-                          type="button"
-                          className={"lpam-menu-item" + (project === p ? " lpam-menu-item-active" : "")}
-                          style={{ color: t.text }}
-                          onClick={() => {
-                            setProject(p);
-                            setProjectOpen(false);
-                          }}
+                    <div
+                      className="lpam-menu-search"
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="text"
+                        className="lpam-input lpam-menu-search-input"
+                        style={{ borderColor: t.border, background: t.bg, color: t.text }}
+                        placeholder="Search projects…"
+                        value={projectQuery}
+                        onChange={(e) => setProjectQuery(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
+                    <div className="lpam-menu-scroll">
+                      {filteredProjects.length === 0 ? (
+                        <div
+                          className="lpam-menu-empty"
+                          style={{ color: t.textMuted }}
                         >
-                          <span className="lpam-menu-item-inner">
-                            <span
-                              className="lpam-project-swatch"
-                              style={{ background: swatch }}
-                              aria-hidden
-                            />
-                            <span className="lpam-menu-item-label">{p}</span>
-                          </span>
-                        </button>
-                      );
-                    })}
+                          No projects match “{projectQuery}”
+                        </div>
+                      ) : (
+                        filteredProjects.map((p) => {
+                          const swatch = resolveColorForProjectLabel(p, projectRegistry);
+                          return (
+                            <button
+                              key={p}
+                              type="button"
+                              className={"lpam-menu-item" + (project === p ? " lpam-menu-item-active" : "")}
+                              style={{ color: t.text }}
+                              onClick={() => {
+                                setProject(p);
+                                setProjectOpen(false);
+                                setProjectQuery("");
+                              }}
+                            >
+                              <span className="lpam-menu-item-inner">
+                                <span
+                                  className="lpam-project-swatch"
+                                  style={{ background: swatch }}
+                                  aria-hidden
+                                />
+                                <span className="lpam-menu-item-label">{p}</span>
+                              </span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
                     <div className="lpam-menu-divider" style={{ background: t.border }} />
                     <button
                       type="button"

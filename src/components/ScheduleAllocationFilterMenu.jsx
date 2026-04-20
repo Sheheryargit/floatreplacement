@@ -28,6 +28,7 @@ import {
   removeFilterRuleForField,
   countActiveFilterRules,
 } from "../utils/scheduleAllocationFilter.js";
+import { useAppTheme } from "../context/ThemeContext.jsx";
 import "../pages/ScheduleAllocationFilterMenu.css";
 
 const FIELD_ICONS = {
@@ -84,6 +85,21 @@ export function ScheduleAllocationFilterMenu({
   starredPeopleTags,
   toggleStarredPeopleTag,
 }) {
+  const { theme } = useAppTheme();
+  const isLight = theme === "light";
+  const applyBtnStyle = isLight
+    ? {
+        background: "#0077e6",
+        color: "#ffffff",
+        borderColor: "#0a5fb8",
+        boxShadow:
+          "inset 0 0 0 1px rgba(10,95,184,0.45), 0 2px 10px rgba(0,119,230,0.35)",
+      }
+    : undefined;
+  const clearBtnStyle = isLight
+    ? { color: "#1e2a3a" }
+    : undefined;
+
   const [screen, setScreen] = useState("root");
   const [drillField, setDrillField] = useState(null);
   const [drillOp, setDrillOp] = useState("in");
@@ -463,10 +479,20 @@ export function ScheduleAllocationFilterMenu({
           </div>
 
           <div className="lp-schedule-filter-drill-actions">
-            <button type="button" className="lp-schedule-filter-btn secondary" onClick={clearDrillField}>
+            <button
+              type="button"
+              className="lp-schedule-filter-btn secondary"
+              onClick={clearDrillField}
+              style={clearBtnStyle}
+            >
               Clear
             </button>
-            <button type="button" className="lp-schedule-filter-btn primary" onClick={applyDrill}>
+            <button
+              type="button"
+              className="lp-schedule-filter-btn primary"
+              onClick={applyDrill}
+              style={applyBtnStyle}
+            >
               Apply
             </button>
           </div>

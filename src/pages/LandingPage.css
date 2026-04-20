@@ -2276,23 +2276,6 @@ button.lp-block.lp-block-alloc.lp-alloc-bar {
   border-radius: inherit;
 }
 
-.lp-alloc-bar--day .lp-alloc-bar__underlay {
-  -webkit-mask-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    #000 10px,
-    #000 calc(100% - 10px),
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    #000 10px,
-    #000 calc(100% - 10px),
-    transparent 100%
-  );
-}
-
 .lp-alloc-bar__load {
   position: absolute;
   left: 0;
@@ -2319,12 +2302,6 @@ button.lp-block.lp-block-alloc.lp-alloc-bar {
   font-size: 11px;
   line-height: 1.15;
   letter-spacing: 0.01em;
-}
-
-.lp-alloc-bar--micro .lp-alloc-bar__body {
-  padding: 5px 8px;
-  gap: 3px;
-  justify-content: center;
 }
 
 /* Shorter bars use tighter padding so the compact text still fits. */
@@ -2378,38 +2355,6 @@ button.lp-block.lp-block-alloc.lp-alloc-bar {
   gap: 3px;
   opacity: 0.85;
   flex-shrink: 0;
-}
-
-.lp-alloc-bar__micro-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  width: 100%;
-}
-
-.lp-alloc-micro-initials {
-  font-weight: 800;
-  font-size: calc(var(--lp-block-font, 12px) + 1px);
-  letter-spacing: 0.06em;
-  line-height: 1.1;
-}
-
-.lp-alloc-bar__micro-icons {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-  opacity: 0.9;
-}
-
-.lp-alloc-bar__row-foot {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  margin-top: auto;
 }
 
 .lp-alloc-bar__icons {

@@ -12,9 +12,6 @@ import { Button } from "./ui/Button.jsx";
 import { tagChromaProps } from "../utils/tagChroma.js";
 import { projectToAllocationLabel, avatarGradientFromName } from "../utils/projectColors.js";
 import { toast } from "sonner";
-import { SEED_DEPTS } from "../constants/departments.js";
-import { SEED_ROLES, SEED_TAGS } from "../data/workspaceSeedConstants.js";
-import { PEOPLE_SEED } from "../data/peopleSeed.js";
 import { DepartmentSelector } from "./DepartmentSelector.jsx";
 import { FloatSelect } from "./ui/FloatSelect.jsx";
 import {
@@ -898,7 +895,7 @@ function ProjectsTab({
 }
 
 /* ═══════════════════ PERSON MODAL (Add + Edit) ═══════════════════ */
-export function PersonModal({
+function PersonModal({
   open,
   onClose,
   onSave,
@@ -1122,16 +1119,4 @@ export function PersonModal({
 }
 
 export default PersonModal;
-export {
-  T,
-  Confirm,
-  RowActions,
-  PEOPLE_SEED,
-  formToPerson,
-  personToForm,
-  SEED_ROLES,
-  SEED_DEPTS,
-  SEED_TAGS,
-  ini,
-  avGrad,
-};
+export { T, Confirm, RowActions, formToPerson, ini, avGrad };
