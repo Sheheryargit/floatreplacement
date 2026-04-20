@@ -51,11 +51,7 @@ import PersonModal, {
   avGrad,
 } from "../components/PersonModal.jsx";
 import { toast } from "sonner";
-import {
-  syncPersonAvailabilityFromForm,
-  dismissAvailabilityDayOffForPerson,
-  restoreAvailabilityDayOffForPerson,
-} from "../lib/api/personAvailability.js";
+import { syncPersonAvailabilityFromForm } from "../lib/api/personAvailability.js";
 import { previewAvailabilityHours } from "../utils/availabilityPreview.js";
 import {
   CreateAllocationModal,
@@ -312,15 +308,11 @@ function assignAllocationStackLevels(segments) {
 }
 
 /** Visible timeline segments for an allocation (includes recurring occurrences). */
-function layoutsForAllocation(alloc, scheduleModel, isDayOffDismissed) {
+function layoutsForAllocation(alloc, scheduleModel) {
   const out = [];
   let start = alloc.startDate;
   let end = alloc.endDate;
   const repeatId = alloc.repeatId ?? "none";
-  const avail = isAvailabilityDayOffAlloc(alloc);
-  const dismissPid = avail ? String(alloc.personIds?.[0] || alloc.personId || "") : "";
-  const dismissDow = avail ? availabilityDayOffDow(alloc.availabilitySlotKey) : null;
-  const canDismiss = avail && dismissPid && dismissDow != null && typeof isDayOffDismissed === "function";
 
   // Fast-forward a recurring series whose anchor is far before the visible window
   // (e.g. availability `avail_off:` rows anchored at 2024-01-02) straight into range,
@@ -341,16 +333,13 @@ function layoutsForAllocation(alloc, scheduleModel, isDayOffDismissed) {
   let occ = 0;
 
   for (let i = 0; i < 80; i++) {
-    const dismissed = canDismiss && isDayOffDismissed(dismissPid, start, dismissDow);
-    if (!dismissed) {
-      const lay = layoutAllocation({ ...alloc, startDate: start, endDate: end }, scheduleModel);
-      if (lay) {
-        const splits = splitLayoutByWorkWeek(lay, scheduleModel);
-        const weekSplitCount = splits.length;
-        splits.forEach((sli, partIdx) => {
-          out.push({ ...sli, occ, weekPart: partIdx, weekSplitCount, occurrenceDateKey: start });
-        });
-      }
+    const lay = layoutAllocation({ ...alloc, startDate: start, endDate: end }, scheduleModel);
+    if (lay) {
+      const splits = splitLayoutByWorkWeek(lay, scheduleModel);
+      const weekSplitCount = splits.length;
+      splits.forEach((sli, partIdx) => {
+        out.push({ ...sli, occ, weekPart: partIdx, weekSplitCount });
+      });
     }
     occ += 1;
     if (repeatId === "none") break;
@@ -360,13 +349,6 @@ function layoutsForAllocation(alloc, scheduleModel, isDayOffDismissed) {
     if (new Date(`${start}T12:00:00`).getTime() > maxMs) break;
   }
   return out;
-}
-
-function availabilityDayOffDow(slotKey) {
-  if (typeof slotKey !== "string") return null;
-  const parts = slotKey.split(":");
-  const n = Number(parts[parts.length - 1]);
-  return Number.isFinite(n) && n >= 1 && n <= 5 ? n : null;
 }
 
 function shortenAllocLabel(s, maxLen) {
@@ -746,9 +728,7 @@ const TimelineRow = memo(function TimelineRow({
   openCreateAllocation,
   openAllocationDetail,
   handleTimelineClick,
-  handleDeleteAllocation,
   todayDateKey,
-  isDayOffDismissed,
 }) {
   const { theme } = useAppTheme();
   const t = T[theme];
@@ -772,11 +752,10 @@ const TimelineRow = memo(function TimelineRow({
   const noWorkingDaysInView = hoursKeys.length > 0 && rawCap < 1e-6;
 
   const rowSegments = personAllocations.flatMap((a) =>
-      layoutsForAllocation(a, scheduleModel, isDayOffDismissed).map((lay) => ({
+      layoutsForAllocation(a, scheduleModel).map((lay) => ({
         a,
         lay,
         occIdx: lay.occ,
-        occurrenceDateKey: lay.occurrenceDateKey,
         segKey: `${a.id}-o${lay.occ}-wk${lay.weekPart ?? 0}-s${lay.start}-sp${lay.span}`,
         start: lay.start,
         span: lay.span,
@@ -788,14 +767,6 @@ const TimelineRow = memo(function TimelineRow({
 
   assignAllocationStackLevels(workSegments);
   const allocLaneCount = workSegments.length ? Math.max(...workSegments.map((s) => s.stack)) + 1 : 1;
-
-  // Lane-stack overlapping leave segments (e.g. public holiday + availability day-off
-  // on the same weekday) so they render side-by-side vertically instead of covering
-  // each other. Single leaves stay full-height (laneCount === 1).
-  assignAllocationStackLevels(leaveSegments);
-  const leaveLaneCount = leaveSegments.length
-    ? Math.max(...leaveSegments.map((s) => s.stack)) + 1
-    : 1;
 
   // Bars stack flush — no per-bar vertical padding and no gap between lanes — so
   // the stacked height of a person×day cell is literally the sum of their hours.
@@ -927,13 +898,11 @@ const TimelineRow = memo(function TimelineRow({
               style={{
                 display: "grid",
                 gridTemplateColumns: gridTemplate,
-                gridTemplateRows: `repeat(${leaveLaneCount}, 1fr)`,
                 gridColumn: 1,
                 gridRow: 1,
                 alignSelf: "stretch",
                 pointerEvents: "none",
                 zIndex: 1,
-                gap: leaveLaneCount > 1 ? "2px" : undefined,
               }}
             >
               <AnimatePresence initial={false}>
@@ -957,12 +926,11 @@ const TimelineRow = memo(function TimelineRow({
                       className={
                         "lp-leave-block lp-leave-block--" +
                         typeId +
-                        (onToday ? " lp-leave-block--today" : "") +
-                        (leaveLaneCount > 1 ? " lp-leave-block--compact" : "")
+                        (onToday ? " lp-leave-block--today" : "")
                       }
                       style={{
                         gridColumn: `${colStart} / span ${colSpan}`,
-                        gridRow: `${(seg.stack ?? 0) + 1} / span 1`,
+                        gridRow: 1,
                         alignSelf: "stretch",
                         pointerEvents: "auto",
                       }}
@@ -993,18 +961,9 @@ const TimelineRow = memo(function TimelineRow({
                       onClick={(e) => {
                         e.stopPropagation();
                         if (isDayOff) {
-                          const pid = String(seg.a.personIds?.[0] || seg.a.personId || "");
-                          const dow = availabilityDayOffDow(seg.a.availabilitySlotKey);
-                          const occDate = seg.occurrenceDateKey;
-                          if (pid && dow && occDate) {
-                            handleDeleteAllocation({
-                              ...seg.a,
-                              syntheticAvailabilityDayOff: true,
-                              occurrenceDateKey: occDate,
-                              occurrenceSlotDow: dow,
-                              occurrencePersonId: pid,
-                            });
-                          }
+                          toast.info(`${p.name} is not available this day`, {
+                            description: "Edit this person's weekly availability in their profile.",
+                          });
                           return;
                         }
                         openAllocationDetail(seg.a);
@@ -1208,8 +1167,6 @@ export default function LandingPage() {
     setPeopleTagOpts,
     allocations,
     publicHolidayAllocations,
-    availabilityDayOffDismissals,
-    setAvailabilityDayOffDismissals,
     setAllocations,
     projects,
     setProjects,
@@ -1238,25 +1195,6 @@ export default function LandingPage() {
   const scheduleAllocations = useMemo(
     () => mergeScheduleAllocations(allocations, publicHolidayAllocations),
     [allocations, publicHolidayAllocations]
-  );
-
-  const dayOffDismissalKeys = useMemo(() => {
-    const set = new Set();
-    for (const row of availabilityDayOffDismissals || []) {
-      const pid = row?.person_id != null ? String(row.person_id) : "";
-      const date = typeof row?.occurrence_date === "string"
-        ? row.occurrence_date.slice(0, 10)
-        : String(row?.occurrence_date || "").slice(0, 10);
-      const dow = Number(row?.slot_dow);
-      if (!pid || !date || !(dow >= 1 && dow <= 5)) continue;
-      set.add(`${pid}|${date}|${dow}`);
-    }
-    return set;
-  }, [availabilityDayOffDismissals]);
-
-  const isDayOffDismissed = useCallback(
-    (personId, dateKey, dow) => dayOffDismissalKeys.has(`${personId}|${dateKey}|${dow}`),
-    [dayOffDismissalKeys]
   );
 
   const allocationsByPerson = useMemo(
@@ -1754,56 +1692,6 @@ export default function LandingPage() {
 
   const handleDeleteAllocation = useCallback(
     async (alloc) => {
-      if (alloc?.syntheticAvailabilityDayOff) {
-        const personId = alloc.occurrencePersonId;
-        const occurrenceDate = alloc.occurrenceDateKey;
-        const slotDow = alloc.occurrenceSlotDow;
-        if (!personId || !occurrenceDate || !slotDow) return;
-        if (!isSupabaseConfigured) {
-          setAvailabilityDayOffDismissals((cur) => [
-            ...cur,
-            { person_id: personId, occurrence_date: occurrenceDate, slot_dow: slotDow },
-          ]);
-          toast.success("Non-working day removed for this date");
-          return;
-        }
-        try {
-          await dismissAvailabilityDayOffForPerson({ personId, occurrenceDate, slotDow });
-          setAvailabilityDayOffDismissals((cur) => [
-            ...cur.filter(
-              (r) =>
-                !(String(r.person_id) === personId &&
-                  String(r.occurrence_date).slice(0, 10) === occurrenceDate &&
-                  Number(r.slot_dow) === slotDow)
-            ),
-            { person_id: personId, occurrence_date: occurrenceDate, slot_dow: slotDow },
-          ]);
-          toast.success("Non-working day removed for this date", {
-            description: "The weekly pattern is unchanged.",
-            action: {
-              label: "Undo",
-              onClick: async () => {
-                try {
-                  await restoreAvailabilityDayOffForPerson({ personId, occurrenceDate, slotDow });
-                  setAvailabilityDayOffDismissals((cur) =>
-                    cur.filter(
-                      (r) =>
-                        !(String(r.person_id) === personId &&
-                          String(r.occurrence_date).slice(0, 10) === occurrenceDate &&
-                          Number(r.slot_dow) === slotDow)
-                    )
-                  );
-                } catch (e) {
-                  toast.error("Could not restore", { description: e?.message || String(e) });
-                }
-              },
-            },
-          });
-        } catch (e) {
-          toast.error("Delete failed", { description: e?.message || String(e) });
-        }
-        return;
-      }
       if (isAvailabilityDayOffAlloc(alloc)) {
         toast.info("Non-working days can't be deleted here", {
           description: "Edit this person's weekly availability in their profile.",
@@ -1841,7 +1729,7 @@ export default function LandingPage() {
         toast.error("Delete failed", { description: e?.message || String(e) });
       }
     },
-    [setAllocations, setPublicHolidayAllocations, setAvailabilityDayOffDismissals, syncAllocationDelete, refreshWorkspaceFromSupabase]
+    [setAllocations, setPublicHolidayAllocations, syncAllocationDelete, refreshWorkspaceFromSupabase]
   );
 
   const openAllocationDetail = useCallback((alloc) => {
@@ -2661,9 +2549,7 @@ export default function LandingPage() {
                         openCreateAllocation={openCreateAllocation}
                         openAllocationDetail={openAllocationDetail}
                         handleTimelineClick={handleTimelineClick}
-                        handleDeleteAllocation={handleDeleteAllocation}
                         todayDateKey={todayDateKey}
-                        isDayOffDismissed={isDayOffDismissed}
                       />
                     </div>
                   );
