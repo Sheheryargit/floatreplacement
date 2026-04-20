@@ -21,6 +21,7 @@ import {
   resolvePublicHolidayAllocations,
 } from "./publicHolidaySchedule.js";
 import { fetchPersonPublicHolidayDismissalsSafe } from "./personPublicHolidays.js";
+import { fetchAvailabilityDayOffDismissalsSafe } from "./personAvailability.js";
 
 /** Same window as the schedule workspace (keep in sync with partial realtime refreshes). */
 export function defaultWorkspaceAllocationWindow() {
@@ -55,6 +56,7 @@ export async function loadWorkspaceFromSupabaseOnce() {
     allocations,
     phResult,
     dismissResult,
+    availDayOffDismissResult,
     roles,
     depts,
     clients,
@@ -68,6 +70,7 @@ export async function loadWorkspaceFromSupabaseOnce() {
     fetchAllocations({ startDate: start, endDate: end }),
     fetchPersonPublicHolidaysSafe(),
     fetchPersonPublicHolidayDismissalsSafe(),
+    fetchAvailabilityDayOffDismissalsSafe(),
     fetchRoles(),
     fetchDepts(),
     fetchClients(),
@@ -90,6 +93,7 @@ export async function loadWorkspaceFromSupabaseOnce() {
     projects,
     allocations,
     publicHolidayAllocations,
+    availabilityDayOffDismissals: availDayOffDismissResult.rows,
     roles,
     depts,
     clients,

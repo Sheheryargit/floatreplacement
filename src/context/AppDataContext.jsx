@@ -85,6 +85,7 @@ function buildInitialSlices() {
       }),
       allocations: [],
       publicHolidayAllocations: [],
+      availabilityDayOffDismissals: [],
       roles: [...SEED_ROLES],
       depts: [...DEFAULT_DEPARTMENTS],
       peopleTagOpts: [...SEED_TAGS],
@@ -102,6 +103,7 @@ function buildInitialSlices() {
     projects: [],
     allocations: [],
     publicHolidayAllocations: [],
+    availabilityDayOffDismissals: [],
     roles: [...SEED_ROLES],
     depts: [...DEFAULT_DEPARTMENTS],
     peopleTagOpts: [...SEED_TAGS],
@@ -139,6 +141,9 @@ function mergeRemoteWorkspace(remote) {
     allocations: remote.allocations,
     publicHolidayAllocations: Array.isArray(remote.publicHolidayAllocations)
       ? remote.publicHolidayAllocations
+      : [],
+    availabilityDayOffDismissals: Array.isArray(remote.availabilityDayOffDismissals)
+      ? remote.availabilityDayOffDismissals
       : [],
     roles: remote.roles.length ? remote.roles : [...seedFallbacks.roles],
     depts: remote.depts.length ? remote.depts : [...seedFallbacks.depts],
@@ -224,6 +229,11 @@ export const useAppStore = create((set, get) => ({
     set({
       publicHolidayAllocations:
         typeof val === "function" ? val(get().publicHolidayAllocations) : val,
+    }),
+  setAvailabilityDayOffDismissals: (val) =>
+    set({
+      availabilityDayOffDismissals:
+        typeof val === "function" ? val(get().availabilityDayOffDismissals) : val,
     }),
   setExtraAllocationLabels: (val) =>
     set({ extraAllocationLabels: typeof val === "function" ? val(get().extraAllocationLabels) : val }),

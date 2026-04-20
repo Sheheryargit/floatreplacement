@@ -2894,6 +2894,28 @@ button.lp-block.lp-block-leave:hover {
   letter-spacing: 0.02em;
 }
 
+/* Half-height variant when a leave overlaps an off-day (or another leave) on
+ * the same date — used when leaveLaneCount > 1 so both lanes are visible. */
+.lp-leave-block--compact {
+  padding: 6px 10px;
+  margin: 1px 0;
+  gap: 6px;
+}
+
+.lp-leave-block--compact .lp-leave-block__label {
+  font-size: 11px;
+  gap: 1px;
+}
+
+.lp-leave-block--compact .lp-leave-block__dates {
+  font-size: 9px;
+}
+
+.lp-leave-block--compact .lp-leave-block__icon {
+  width: 14px;
+  height: 14px;
+}
+
 /* Annual — soft brand stripes + gradient */
 .lp-leave-block--annual {
   background:

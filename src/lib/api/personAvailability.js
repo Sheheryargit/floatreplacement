@@ -52,6 +52,60 @@ export async function recalculatePersonAvailability(personId) {
   return data;
 }
 
+/**
+ * Rows the user hid from the schedule for specific off-day occurrences
+ * (migration 021 `person_availability_day_off_dismissals`).
+ * @returns {{ rows: Array<{ person_id: string, occurrence_date: string, slot_dow: number }>, error: Error | null }}
+ */
+export async function fetchAvailabilityDayOffDismissalsSafe() {
+  if (!isSupabaseConfigured) return { rows: [], error: null };
+  try {
+    const { data, error } = await supabase
+      .from("person_availability_day_off_dismissals")
+      .select("person_id, occurrence_date, slot_dow");
+    if (error) throw error;
+    return { rows: data || [], error: null };
+  } catch (e) {
+    console.warn("[float] person_availability_day_off_dismissals fetch failed:", e?.message || String(e));
+    return { rows: [], error: e };
+  }
+}
+
+/** Hide one weekly off-day occurrence for one person. Idempotent (dupe inserts swallowed). */
+export async function dismissAvailabilityDayOffForPerson({ personId, occurrenceDate, slotDow }) {
+  if (!isSupabaseConfigured) return;
+  const dk = typeof occurrenceDate === "string"
+    ? occurrenceDate.slice(0, 10)
+    : String(occurrenceDate || "").slice(0, 10);
+  const dow = Number(slotDow);
+  if (!personId || !dk || !(dow >= 1 && dow <= 5)) return;
+  const { error } = await supabase.from("person_availability_day_off_dismissals").insert({
+    person_id: String(personId),
+    occurrence_date: dk,
+    slot_dow: dow,
+  });
+  if (error) {
+    const s = `${error.code ?? ""} ${error.message ?? ""}`.toLowerCase();
+    if (s.includes("23505") || s.includes("duplicate")) return;
+    throw error;
+  }
+}
+
+/** Undo a single-date dismissal (restores the off block for that day). */
+export async function restoreAvailabilityDayOffForPerson({ personId, occurrenceDate, slotDow }) {
+  if (!isSupabaseConfigured) return;
+  const dk = typeof occurrenceDate === "string"
+    ? occurrenceDate.slice(0, 10)
+    : String(occurrenceDate || "").slice(0, 10);
+  const dow = Number(slotDow);
+  if (!personId || !dk || !(dow >= 1 && dow <= 5)) return;
+  const { error } = await supabase
+    .from("person_availability_day_off_dismissals")
+    .delete()
+    .match({ person_id: String(personId), occurrence_date: dk, slot_dow: dow });
+  if (error) throw error;
+}
+
 /** Map profile form → server PUT (after person exists). */
 export async function syncPersonAvailabilityFromForm(personId, form) {
   if (!personId || !form) return null;
