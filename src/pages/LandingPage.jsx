@@ -960,6 +960,12 @@ const TimelineRow = memo(function TimelineRow({
                       whileTap={reduceMotion ? undefined : { scale: 0.99 }}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (isDayOff) {
+                          toast.info(`${p.name} is not available this day`, {
+                            description: "Edit this person's weekly availability in their profile.",
+                          });
+                          return;
+                        }
                         openAllocationDetail(seg.a);
                       }}
                     >
@@ -1686,6 +1692,12 @@ export default function LandingPage() {
 
   const handleDeleteAllocation = useCallback(
     async (alloc) => {
+      if (isAvailabilityDayOffAlloc(alloc)) {
+        toast.info("Non-working days can't be deleted here", {
+          description: "Edit this person's weekly availability in their profile.",
+        });
+        return;
+      }
       if (alloc?.syntheticPublicHoliday) {
         const pid = alloc.personIds?.[0];
         if (!pid) return;
