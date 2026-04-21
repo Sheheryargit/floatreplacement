@@ -7,6 +7,7 @@ import {
   memo,
   useLayoutEffect,
 } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useVirtualizer, measureElement as virtualMeasureElement } from "@tanstack/react-virtual";
 import {
   ChevronDown,
@@ -1153,6 +1154,8 @@ const TimelineRow = memo(function TimelineRow({
 }, timelineRowEqual);
 
 export default function LandingPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { theme } = useAppTheme();
   const t = T[theme];
 
@@ -1518,6 +1521,19 @@ export default function LandingPage() {
     setAllocPreselectProject(null);
     setAllocCreateOpen(true);
   }, []);
+
+  useEffect(() => {
+    const action = location.state?.quickCreate;
+    if (!action) return;
+
+    if (action === "allocation") {
+      openCreateAllocation(null);
+    } else if (action === "leave") {
+      openCreateLeaveForPerson(null);
+    }
+
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state, location.pathname, navigate, openCreateAllocation, openCreateLeaveForPerson]);
 
   const closeCreateAllocation = useCallback(() => {
     setAllocCreateOpen(false);

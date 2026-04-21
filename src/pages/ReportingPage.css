@@ -1,36 +1,53 @@
-/* ─── Base ──────────────────────────────────────────────────────────────── */
+/* ─── Reporting Page — aligned with design system ─────────────────────────── */
+/* Design tokens from LandingPage (T.dark / T.light) */
 
 .reporting-root {
+  --bg: #0f1117;
+  --surface: #181c26;
+  --surf-alt: #1e2235;
+  --border: #2a2f45;
+  --border-sub: #323852;
+  --text: #f0f2f8;
+  --text-soft: #9ba4b8;
+  --text-muted: #7b82a0;
+  --text-dim: #4a5168;
+  --accent: #0088ff;
+  --accent-txt: #ffffff;
+  --accent-glow: rgba(0, 136, 255, 0.15);
+
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: row;
   align-items: stretch;
-  background: var(--reporting-bg, #0b0e14);
-  color: var(--reporting-fg, #f8fafc);
-  transition: background var(--duration-slow) ease, color var(--duration-slow) ease;
+  background: var(--bg);
+  color: var(--text);
 }
 
 :root[data-theme="light"] .reporting-root {
-  --reporting-bg: #f8f9fb;
-  --reporting-fg: #0f172a;
+  --bg: #f8f9fb;
+  --surface: #ffffff;
+  --surf-alt: #f3f4f8;
+  --border: #e2e8f0;
+  --border-sub: #cbd5e1;
+  --text: #0f172a;
+  --text-soft: #64748b;
+  --text-muted: #94a3b8;
+  --text-dim: #cbd5e1;
+  --accent: #0088ff;
+  --accent-txt: #ffffff;
+  --accent-glow: rgba(0, 136, 255, 0.1);
 }
 
 .reporting-main {
   flex: 1;
   min-width: 0;
   overflow: auto;
-  padding: var(--space-8, 2rem) var(--space-8, 2rem) var(--space-10, 2.5rem);
-  max-width: 980px;
-}
-
-/* Full-width override for the new layout */
-.rp-full-main {
   max-width: 100%;
   padding: 0;
-  overflow: auto;
   display: flex;
   flex-direction: column;
+  background: var(--bg);
 }
 
 /* ─── Toolbar ────────────────────────────────────────────────────────────── */
@@ -40,65 +57,62 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 14px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-:root[data-theme="light"] .rp-toolbar {
-  border-bottom-color: rgba(15, 23, 42, 0.08);
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .rp-date-nav {
   display: flex;
   align-items: center;
   gap: 6px;
+  position: relative;
 }
 
 .rp-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px solid var(--border-sub);
   background: transparent;
-  color: #94a3b8;
+  color: var(--text-muted);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: all 0.15s;
 }
 
 .rp-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #f1f5f9;
-  border-color: rgba(255, 255, 255, 0.18);
-}
-
-:root[data-theme="light"] .rp-icon-btn {
-  border-color: rgba(15, 23, 42, 0.12);
-  color: #64748b;
-}
-
-:root[data-theme="light"] .rp-icon-btn:hover {
-  background: rgba(15, 23, 42, 0.05);
-  color: #0f172a;
+  background: var(--surf-alt);
+  color: var(--text);
+  border-color: var(--border);
 }
 
 .rp-date-label {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #94a3b8;
+  color: var(--text-soft);
   padding: 0 4px;
 }
 
-:root[data-theme="light"] .rp-date-label {
-  color: #475569;
+.rp-date-accent {
+  color: var(--accent);
+  font-weight: 600;
 }
 
-.rp-date-accent {
-  color: #6366f1;
-  font-weight: 600;
+.rp-date-label-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.rp-date-label-btn:hover {
+  background: var(--surf-alt);
+  border-color: var(--border);
 }
 
 :root[data-theme="light"] .rp-date-accent {
@@ -698,6 +712,65 @@
   text-align: right;
 }
 
+.rp-cell-link {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.rp-cell-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.rp-cell-link strong {
+  color: inherit;
+}
+
+.rp-active-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 16px 0;
+}
+
+.rp-active-filters-label {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+.rp-active-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border-sub);
+  background: var(--surf-alt);
+  color: var(--text);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  padding: 3px 9px;
+}
+
+.rp-active-filter-clear {
+  border: 1px solid var(--border-sub);
+  background: transparent;
+  color: var(--text-soft);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.rp-active-filter-clear:hover {
+  color: var(--text);
+  border-color: var(--border);
+  background: var(--surf-alt);
+}
+
 .rp-row:hover .rp-td {
   background: rgba(255, 255, 255, 0.02);
 }
@@ -861,6 +934,12 @@
     padding: 10px 12px;
   }
 
+  .rp-date-picker {
+    min-width: min(92vw, 380px);
+    left: 0;
+    right: auto;
+  }
+
   .rp-stat {
     padding: 12px 16px;
   }
@@ -1019,6 +1098,467 @@
   }
 
   .reporting-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── View Mode Selector ─────────────────────────────────────────────────── */
+
+.rp-view-mode-selector-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 16px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.rp-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.rp-quickadd-dropdown {
+  position: relative;
+}
+
+.rp-add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--accent) 70%, #ffffff 0%);
+  background: var(--accent);
+  color: #ffffff;
+  cursor: pointer;
+  transition: transform 0.15s, filter 0.15s;
+}
+
+.rp-add-btn:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+.rp-add-btn:active {
+  transform: translateY(0);
+}
+
+.rp-quickadd-options {
+  right: 0;
+  left: auto;
+}
+
+@media (max-width: 640px) {
+  .rp-view-mode-selector-container {
+    flex-wrap: wrap;
+  }
+
+  .rp-top-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+.rp-view-mode-selector {
+  display: flex;
+  gap: 2px;
+  background: var(--surf-alt);
+  border-radius: 10px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  width: fit-content;
+}
+
+.rp-view-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.rp-view-mode-btn:hover {
+  color: var(--text-soft);
+}
+
+.rp-view-mode-btn--active {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+:root[data-theme="light"] .rp-view-mode-btn--active {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.rp-view-mode-count {
+  background: var(--accent-glow);
+  color: var(--accent);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.rp-view-mode-btn--active .rp-view-mode-count {
+  background: var(--accent-glow);
+  color: var(--accent);
+}
+
+/* ─── Export Button ──────────────────────────────────────────────────────── */
+
+.rp-export-dropdown {
+  position: relative;
+}
+
+.rp-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.rp-export-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #f1f5f9;
+}
+
+:root[data-theme="light"] .rp-export-btn {
+  border-color: rgba(15, 23, 42, 0.12);
+  color: #64748b;
+}
+
+:root[data-theme="light"] .rp-export-btn:hover {
+  background: rgba(15, 23, 42, 0.05);
+  border-color: rgba(15, 23, 42, 0.18);
+  color: #0f172a;
+}
+
+.rp-export-options {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--dropdown-bg, rgba(30, 41, 59, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(8px);
+  min-width: 160px;
+  z-index: 1000;
+}
+
+:root[data-theme="light"] .rp-export-options {
+  --dropdown-bg: rgba(248, 249, 251, 0.95);
+  border-color: rgba(15, 23, 42, 0.12);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.rp-export-option {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: #cbd5e1;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.rp-export-option:first-child {
+  border-radius: 7px 7px 0 0;
+}
+
+.rp-export-option:last-child {
+  border-radius: 0 0 7px 7px;
+}
+
+.rp-export-option:hover {
+  background: rgba(45, 212, 191, 0.15);
+  color: #f1f5f9;
+}
+
+:root[data-theme="light"] .rp-export-option {
+  color: #64748b;
+}
+
+:root[data-theme="light"] .rp-export-option:hover {
+  background: rgba(13, 148, 136, 0.1);
+  color: #0f172a;
+}
+
+/* ─── Project Grouping Controls ──────────────────────────────────────────── */
+
+.rp-project-grouping {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rp-project-grouping-label {
+  font-size: 0.875rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+:root[data-theme="light"] .rp-project-grouping-label {
+  color: #94a3b8;
+}
+
+.rp-grouping-btn {
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.rp-grouping-btn:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #f1f5f9;
+}
+
+.rp-grouping-btn--active {
+  background: #2dd4bf;
+  border-color: #2dd4bf;
+  color: #0b0e14;
+}
+
+:root[data-theme="light"] .rp-grouping-btn {
+  border-color: rgba(15, 23, 42, 0.12);
+  color: #64748b;
+}
+
+:root[data-theme="light"] .rp-grouping-btn:hover {
+  border-color: rgba(15, 23, 42, 0.18);
+  color: #0f172a;
+}
+
+:root[data-theme="light"] .rp-grouping-btn--active {
+  background: #0d9488;
+  border-color: #0d9488;
+  color: #f8f9fb;
+}
+
+/* ─── Date Picker ───────────────────────────────────────────────────────────── */
+
+.rp-date-picker {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  min-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+:root[data-theme="light"] .rp-date-picker {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.rp-date-picker-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  margin-bottom: 4px;
+}
+
+.rp-date-picker-option {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.875rem;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+
+.rp-date-picker-option:hover {
+  background: var(--surf-alt);
+  color: var(--text);
+}
+
+.rp-date-picker-option.active {
+  background: var(--accent-glow);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.rp-date-picker-custom-row {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+}
+
+.rp-date-picker-select {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--surf-alt);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+}
+
+.rp-date-picker-select:focus {
+  outline: 2px solid var(--accent-glow);
+  border-color: var(--accent);
+}
+
+.rp-date-picker-custom-label {
+  min-width: 36px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.rp-date-picker-calendars {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 4px 8px 6px;
+}
+
+.rp-inline-calendar {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  padding: 8px;
+}
+
+.rp-inline-calendar-title {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.rp-inline-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.rp-inline-calendar-month {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.rp-inline-calendar-nav {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.rp-inline-calendar-nav:hover {
+  color: var(--text);
+  border-color: var(--border-sub);
+}
+
+.rp-inline-calendar-weekdays,
+.rp-inline-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.rp-inline-calendar-weekdays span {
+  text-align: center;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  font-weight: 700;
+  padding: 3px 0;
+}
+
+.rp-inline-calendar-day {
+  aspect-ratio: 1;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.rp-inline-calendar-day:hover {
+  background: var(--surf-alt);
+}
+
+.rp-inline-calendar-day.is-outside {
+  color: var(--text-dim);
+}
+
+.rp-inline-calendar-day.is-range {
+  background: var(--accent-glow);
+}
+
+.rp-inline-calendar-day.is-start,
+.rp-inline-calendar-day.is-end {
+  background: var(--accent);
+  color: var(--accent-txt);
+  border-color: var(--accent);
+}
+
+@media (max-width: 900px) {
+  .rp-date-picker-calendars {
     grid-template-columns: 1fr;
   }
 }
