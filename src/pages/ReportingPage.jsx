@@ -194,6 +194,10 @@ function allocationHours(alloc) {
   const workingDays = Number(alloc.workingDays) || 0;
   return hoursPerDay * workingDays;
 }
+
+function normalizeText(value) {
+  return (value || "").toString().trim().toLowerCase();
+}
  
 function breakdownKey(alloc, projects) {
   if (alloc.isLeave) return "Leave";
@@ -270,7 +274,7 @@ function StandardThead({ firstColLabel, showDept = true }) {
 }
  
 // ── Standard grouped row ──────────────────────────────────────────────────────
-function StandardRow({ row, idx, expanded, toggleRow, showDept = true }) {
+function StandardRow({ row, idx, expanded, toggleRow, showDept = true, onPersonClick }) {
   const isExpanded = expanded[row.id];
   const colSpan = showDept ? 11 : 10;
   return (
@@ -305,7 +309,18 @@ function StandardRow({ row, idx, expanded, toggleRow, showDept = true }) {
         {row.people?.length > 0
           ? row.people.map(person => (
               <div key={person.id} style={{ marginBottom: 6 }}>
-                <strong>{person.name}</strong>: Capacity {fmt(person.capacity)}, Scheduled {fmt(person.scheduled)}, Billable {fmt(person.billable)}
+                {onPersonClick ? (
+                  <button
+                    type="button"
+                    className="rp-cell-link"
+                    onClick={() => onPersonClick(person)}
+                  >
+                    <strong>{person.name}</strong>
+                  </button>
+                ) : (
+                  <strong>{person.name}</strong>
+                )}
+                : Capacity {fmt(person.capacity)}, Scheduled {fmt(person.scheduled)}, Billable {fmt(person.billable)}
               </div>
             ))
           : "No people assigned."}
@@ -370,6 +385,7 @@ export default function ReportingPage() {
   const [startMonthView, setStartMonthView] = useState(() => toMonthStart(getDateRangeForTimeframe('next-12-weeks').start));
   const [endMonthView, setEndMonthView] = useState(() => toMonthStart(getDateRangeForTimeframe('next-12-weeks').end));
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [drilldown, setDrilldown] = useState({ personId: null, personName: null, project: null, client: null });
   const dropdownRef = useRef();
   const exportRef = useRef();
   const quickAddRef = useRef();
@@ -415,6 +431,32 @@ export default function ReportingPage() {
     const all = FILTER_OPTIONS[filterType];
     return current.length === all.length ? 'All' : current.join(', ');
   }, [state.filters]);
+
+  const toggleDrilldown = useCallback((nextFilter) => {
+    setDrilldown((prev) => {
+      const samePerson = Object.prototype.hasOwnProperty.call(nextFilter, "personId")
+        && prev.personId === (nextFilter.personId || null);
+      const sameProject = Object.prototype.hasOwnProperty.call(nextFilter, "project")
+        && normalizeText(prev.project) === normalizeText(nextFilter.project);
+      const sameClient = Object.prototype.hasOwnProperty.call(nextFilter, "client")
+        && normalizeText(prev.client) === normalizeText(nextFilter.client);
+
+      if (samePerson || sameProject || sameClient) {
+        return { personId: null, personName: null, project: null, client: null };
+      }
+
+      return {
+        personId: nextFilter.personId || null,
+        personName: nextFilter.personName || null,
+        project: nextFilter.project || null,
+        client: nextFilter.client || null,
+      };
+    });
+  }, []);
+
+  const clearDrilldown = useCallback(() => {
+    setDrilldown({ personId: null, personName: null, project: null, client: null });
+  }, []);
 
   // ── Date Range Management ─────────────────────────────────────────────────
   const navigateDateRange = (direction) => {
@@ -528,9 +570,39 @@ export default function ReportingPage() {
     [activePeople, rangedAllocations, projectBillability, projects, totalCapacityHours]
   );
  
+  const projectClientByLabel = useMemo(() => {
+    const map = new Map();
+    for (const project of projects) {
+      map.set(projectToAllocationLabel(project), project.client || "—");
+    }
+    return map;
+  }, [projects]);
+
+  const filteredPersonRows = useMemo(() => {
+    const personIdFilter = drilldown.personId;
+    const projectFilter = normalizeText(drilldown.project);
+    const clientFilter = normalizeText(drilldown.client);
+
+    return personRows.filter((person) => {
+      if (personIdFilter && person.id !== personIdFilter) return false;
+
+      if (!projectFilter && !clientFilter) return true;
+      if (!person.allocations?.length) return false;
+
+      return person.allocations.some((alloc) => {
+        const projectLabel = (alloc.project || "").trim() || "Unspecified work";
+        const allocationClient = (alloc.client || "").trim() || projectClientByLabel.get(projectLabel) || "—";
+
+        if (projectFilter && normalizeText(projectLabel) !== projectFilter) return false;
+        if (clientFilter && normalizeText(allocationClient) !== clientFilter) return false;
+        return true;
+      });
+    });
+  }, [personRows, drilldown.personId, drilldown.project, drilldown.client, projectClientByLabel]);
+
   // ── Totals ──────────────────────────────────────────────────────────────────
   const totals = useMemo(() => {
-    const sums = personRows.reduce(
+    const sums = filteredPersonRows.reduce(
       (acc, p) => {
         acc.cap += p.capacity; acc.sch += p.scheduled;
         acc.bil += p.billable; acc.non += p.nonBillable;
@@ -540,12 +612,12 @@ export default function ReportingPage() {
       { cap: 0, sch: 0, bil: 0, non: 0, toff: 0, ot: 0 }
     );
     return { ...sums, unsch: Math.max(0, sums.cap - sums.sch - sums.toff) };
-  }, [personRows]);
+  }, [filteredPersonRows]);
  
   // ── Role rows ───────────────────────────────────────────────────────────────
   const roleRows = useMemo(() => {
     const groups = {};
-    personRows.forEach(person => {
+    filteredPersonRows.forEach(person => {
       const role = person.role || "Unassigned";
       if (!groups[role]) groups[role] = { capacity: 0, scheduled: 0, billable: 0, nonBillable: 0, timeOff: 0, overtime: 0, unscheduled: 0, people: [], scheduledCost: 0 };
       const g = groups[role];
@@ -557,12 +629,12 @@ export default function ReportingPage() {
       g.people.push(person);
     });
     return Object.entries(groups).map(([role, data]) => ({ id: role, name: role, ...data }));
-  }, [personRows]);
+  }, [filteredPersonRows]);
  
   // ── Dept rows ───────────────────────────────────────────────────────────────
   const deptRows = useMemo(() => {
     const groups = {};
-    personRows.forEach(person => {
+    filteredPersonRows.forEach(person => {
       const dept = person.dept;
       if (!groups[dept]) groups[dept] = { capacity: 0, scheduled: 0, billable: 0, nonBillable: 0, timeOff: 0, overtime: 0, unscheduled: 0, people: [], scheduledCost: 0 };
       const g = groups[dept];
@@ -574,15 +646,29 @@ export default function ReportingPage() {
       g.people.push(person);
     });
     return Object.entries(groups).map(([dept, data]) => ({ id: dept, name: dept, ...data }));
-  }, [personRows]);
+  }, [filteredPersonRows]);
  
   // ── Project rows ─────────────────────────────────────────────────────────────
   // Iterates person.allocations — already resolved, no need to re-run
   // allocationHasPersonSchedule. This is why it now shows data.
   const projectRows = useMemo(() => {
     const groups = {};
- 
-    for (const person of personRows) {
+    
+    // First, collect all projects and initialize their stats
+    for (const project of projects) {
+      const projectLabel = projectToAllocationLabel(project);
+      groups[projectLabel] = {
+        scheduled: 0,
+        billable: 0,
+        nonBillable: 0,
+        scheduledCost: 0,
+        personIds: new Set(),
+        projectMeta: project,
+      };
+    }
+    
+    // Then, accumulate allocations
+    for (const person of filteredPersonRows) {
       for (const alloc of person.allocations) {
         if (alloc.isLeave) continue;
         const projectLabel = (alloc.project || "").trim() || "Unspecified work";
@@ -590,7 +676,7 @@ export default function ReportingPage() {
         const isBillable = projectBillability.get(projectLabel) !== false;
  
         if (!groups[projectLabel]) {
-          groups[projectLabel] = { scheduled: 0, billable: 0, nonBillable: 0, scheduledCost: 0, personIds: new Set() };
+          groups[projectLabel] = { scheduled: 0, billable: 0, nonBillable: 0, scheduledCost: 0, personIds: new Set(), projectMeta: {} };
         }
         const g = groups[projectLabel];
         g.scheduled += hours;
@@ -601,8 +687,8 @@ export default function ReportingPage() {
     }
  
     return Object.entries(groups).map(([projectLabel, data]) => {
-      const projectMeta = projects.find(p => projectToAllocationLabel(p) === projectLabel) || {};
-      const persons = personRows.filter(p => data.personIds.has(p.id));
+      const projectMeta = data.projectMeta || {};
+      const persons = filteredPersonRows.filter(p => data.personIds.has(p.id));
       return {
         id: projectLabel,
         name: projectMeta.name || projectLabel,
@@ -616,14 +702,14 @@ export default function ReportingPage() {
         people: persons,
       };
     });
-  }, [personRows, projects, projectBillability]);
+  }, [filteredPersonRows, projects, projectBillability]);
  
   // ── Task rows ─────────────────────────────────────────────────────────────────
   // Same pattern — iterate person.allocations directly.
   const taskRows = useMemo(() => {
     const groups = {};
  
-    for (const person of personRows) {
+    for (const person of filteredPersonRows) {
       for (const alloc of person.allocations) {
         const category = getTaskCategory(alloc);
         const hours = allocationHours(alloc);
@@ -646,7 +732,7 @@ export default function ReportingPage() {
     }
  
     return Object.entries(groups).map(([category, data]) => {
-      const persons = personRows.filter(p => data.personIds.has(p.id));
+      const persons = filteredPersonRows.filter(p => data.personIds.has(p.id));
       const capacity = persons.reduce((sum, p) => sum + p.capacity, 0);
       return {
         id: category,
@@ -662,14 +748,14 @@ export default function ReportingPage() {
         people: persons,
       };
     });
-  }, [personRows, projectBillability]);
+  }, [filteredPersonRows, projectBillability]);
  
   // ── Time off rows ─────────────────────────────────────────────────────────────
   // Same pattern — iterate person.allocations directly.
   const timeOffRows = useMemo(() => {
     const groups = {};
  
-    for (const person of personRows) {
+    for (const person of filteredPersonRows) {
       for (const alloc of person.allocations) {
         if (!alloc.isLeave) continue;
         const type = alloc.leaveType || alloc.project || "Unspecified leave";
@@ -682,7 +768,7 @@ export default function ReportingPage() {
     }
  
     return Object.entries(groups).map(([type, data]) => {
-      const persons = personRows.filter(p => data.personIds.has(p.id));
+      const persons = filteredPersonRows.filter(p => data.personIds.has(p.id));
       return {
         id: type,
         name: type,
@@ -691,17 +777,17 @@ export default function ReportingPage() {
         people: persons,
       };
     });
-  }, [personRows]);
+  }, [filteredPersonRows]);
  
   // ── Tab counts ───────────────────────────────────────────────────────────────
   const tabCounts = useMemo(() => ({
-    People: activePeople.length,
+    People: filteredPersonRows.length,
     Roles: roleRows.length,
     Departments: deptRows.length,
     Projects: projectRows.length,
     Tasks: taskRows.length,
     "Time off": timeOffRows.length,
-  }), [activePeople.length, roleRows.length, deptRows.length, projectRows.length, taskRows.length, timeOffRows.length]);
+  }), [filteredPersonRows.length, roleRows.length, deptRows.length, projectRows.length, taskRows.length, timeOffRows.length]);
 
   // ── Project Grouping by Clients and Projects ──────────────────────────────────
   const projectGroupedByClient = useMemo(() => {
@@ -720,10 +806,56 @@ export default function ReportingPage() {
     return Object.entries(groups).map(([client, data]) => ({ id: client, name: client, ...data }));
   }, [projectRows]);
 
+  const visibleProjectRows = useMemo(() => {
+    const personIdFilter = drilldown.personId;
+    const projectFilter = normalizeText(drilldown.project);
+    const clientFilter = normalizeText(drilldown.client);
+
+    return projectRows.filter((row) => {
+      if (personIdFilter && !row.people.some((person) => person.id === personIdFilter)) return false;
+      if (projectFilter && normalizeText(row.id) !== projectFilter) return false;
+      if (clientFilter && normalizeText(row.client) !== clientFilter) return false;
+      return true;
+    });
+  }, [projectRows, drilldown.personId, drilldown.project, drilldown.client]);
+
+  const visibleClientRows = useMemo(() => {
+    const groups = {};
+    for (const project of visibleProjectRows) {
+      const client = project.client || "—";
+      if (!groups[client]) {
+        groups[client] = { scheduled: 0, billable: 0, nonBillable: 0, scheduledCost: 0, projects: [] };
+      }
+      groups[client].scheduled += project.scheduled;
+      groups[client].billable += project.billable;
+      groups[client].nonBillable += project.nonBillable;
+      groups[client].scheduledCost += project.scheduledCost;
+      groups[client].projects.push(project);
+    }
+    return Object.entries(groups).map(([client, data]) => ({ id: client, name: client, ...data }));
+  }, [visibleProjectRows]);
+
   const projectCountsByGrouping = useMemo(() => ({
-    projects: projectRows.length,
-    clients: projectGroupedByClient.length,
-  }), [projectRows.length, projectGroupedByClient.length]);
+    projects: visibleProjectRows.length,
+    clients: visibleClientRows.length,
+  }), [visibleProjectRows.length, visibleClientRows.length]);
+
+  const filteredRangedAllocations = useMemo(() => {
+    const personIdFilter = drilldown.personId;
+    const projectFilter = normalizeText(drilldown.project);
+    const clientFilter = normalizeText(drilldown.client);
+
+    return rangedAllocations.filter((alloc) => {
+      if (personIdFilter && !allocationHasPersonSchedule(alloc, personIdFilter)) return false;
+
+      const projectLabel = (alloc.project || "").trim() || "Unspecified work";
+      const allocationClient = (alloc.client || "").trim() || projectClientByLabel.get(projectLabel) || "—";
+
+      if (projectFilter && normalizeText(projectLabel) !== projectFilter) return false;
+      if (clientFilter && normalizeText(allocationClient) !== clientFilter) return false;
+      return true;
+    });
+  }, [rangedAllocations, drilldown.personId, drilldown.project, drilldown.client, projectClientByLabel]);
  
   // ── Chart ────────────────────────────────────────────────────────────────────
   const chartRange = useMemo(() => {
@@ -733,7 +865,7 @@ export default function ReportingPage() {
     endDate.setHours(23, 59, 59, 999);
  
     const grouped = new Map();
-    for (const alloc of rangedAllocations) {
+    for (const alloc of filteredRangedAllocations) {
       const allocDate = parseDate(alloc.startDate);
       if (!allocDate || allocDate < startDate || allocDate > endDate) continue;
       let key;
@@ -773,8 +905,8 @@ export default function ReportingPage() {
         data.push({ label: c.toLocaleDateString('en-AU', { month: 'short', year: '2-digit' }), ...v, total: v.billable + v.nonBillable + v.timeOff });
       }
     }
-    return { startDate, endDate, data, totalCapacity: totalCapacityHours * activePeople.length };
-  }, [rangedAllocations, state.viewType, projectBillability, totalCapacityHours, activePeople.length, dateRange.start, dateRange.end]);
+    return { startDate, endDate, data, totalCapacity: totalCapacityHours * filteredPersonRows.length };
+  }, [filteredRangedAllocations, state.viewType, projectBillability, totalCapacityHours, filteredPersonRows.length, dateRange.start, dateRange.end]);
  
   const toggleRow = useCallback((id) => {
     dispatch({ type: "TOGGLE_ROW", payload: id });
@@ -804,10 +936,8 @@ export default function ReportingPage() {
       "Time off / Holiday days",
     ];
     
-    const rows = chartRange.data.map((d, idx) => {
-      const dateObj = new Date(chartRange.startDate);
-      dateObj.setDate(dateObj.getDate() + idx);
-      const dateStr = formatDateDDMmmYY(dateObj);
+    const rows = chartRange.data.map((d) => {
+      const dateStr = d.label;
       
       const totalCapacity = chartRange.totalCapacity / chartRange.data.length;
       const totalScheduled = d.billable + d.nonBillable;
@@ -867,7 +997,7 @@ export default function ReportingPage() {
     ];
     
     const rows = [];
-    for (const person of personRows) {
+    for (const person of filteredPersonRows) {
       if (person.allocations.length === 0) {
         rows.push([
           person.name,
@@ -909,7 +1039,7 @@ export default function ReportingPage() {
             person.dept,
             "",
             person.capacity.toFixed(1),
-            alloc.client || "—",
+            alloc.client || projectClientByLabel.get((alloc.project || "").trim() || "Unspecified work") || "—",
             alloc.project || "—",
             alloc.projectCode || "—",
             alloc.task || "—",
@@ -1319,6 +1449,16 @@ export default function ReportingPage() {
             </button>
           </motion.div>
         )}
+
+        {(drilldown.personId || drilldown.project || drilldown.client) && (
+          <div className="rp-active-filters" role="status" aria-live="polite">
+            <span className="rp-active-filters-label">Filtered by:</span>
+            {drilldown.personName && <span className="rp-active-filter-chip">Person: {drilldown.personName}</span>}
+            {drilldown.project && <span className="rp-active-filter-chip">Project: {drilldown.project}</span>}
+            {drilldown.client && <span className="rp-active-filter-chip">Client: {drilldown.client}</span>}
+            <button type="button" className="rp-active-filter-clear" onClick={clearDrilldown}>Clear</button>
+          </div>
+        )}
  
         {/* ── Tables ── */}
         <motion.div className="rp-table-wrap" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: 0.2 }}>
@@ -1343,7 +1483,7 @@ export default function ReportingPage() {
                       <td className="rp-td rp-td--num"><SchedCell scheduled={totals.sch} capacity={totals.cap} /></td>
                       <td className="rp-td rp-td--num">{fmt(totals.bil * COST_PER_HOUR)}</td>
                     </tr>
-                    {personRows.map((person, idx) => {
+                    {filteredPersonRows.map((person, idx) => {
                       const isExpanded = state.expanded[person.id];
                       return (
                         <Fragment key={`person-${person.id}`}>
@@ -1353,7 +1493,15 @@ export default function ReportingPage() {
                                 <ChevronRight size={13} className={`rp-expand-icon ${isExpanded ? "rp-expand-icon--open" : ""}`} />
                               </button>
                             </td>
-                            <td className="rp-td rp-td--name">{person.name}</td>
+                            <td className="rp-td rp-td--name">
+                              <button
+                                type="button"
+                                className="rp-cell-link"
+                                onClick={() => toggleDrilldown({ personId: person.id, personName: person.name })}
+                              >
+                                {person.name}
+                              </button>
+                            </td>
                             <td className="rp-td rp-td--dept">{person.dept}</td>
                             <td className="rp-td rp-td--num">{fmt(person.capacity)}</td>
                             <td className="rp-td rp-td--num">{fmt(person.scheduled)}</td>
@@ -1367,7 +1515,16 @@ export default function ReportingPage() {
                           <DetailRow isExpanded={isExpanded} colSpan={11}>
                             {person.projectTotals.size > 0
                               ? Array.from(person.projectTotals.entries()).map(([label, hours]) => (
-                                  <div key={label} style={{ marginBottom: 6 }}><strong>{label}</strong>: {fmt(hours)}</div>
+                                  <div key={label} style={{ marginBottom: 6 }}>
+                                    <button
+                                      type="button"
+                                      className="rp-cell-link"
+                                      onClick={() => toggleDrilldown({ project: label })}
+                                    >
+                                      <strong>{label}</strong>
+                                    </button>
+                                    : {fmt(hours)}
+                                  </div>
                                 ))
                               : "No project breakdowns in this date range."}
                           </DetailRow>
@@ -1384,7 +1541,14 @@ export default function ReportingPage() {
                   <StandardThead firstColLabel="Role" />
                   <tbody>
                     {roleRows.map((row, idx) => (
-                      <StandardRow key={`role-${row.id}`} row={row} idx={idx} expanded={state.expanded} toggleRow={toggleRow} />
+                      <StandardRow
+                        key={`role-${row.id}`}
+                        row={row}
+                        idx={idx}
+                        expanded={state.expanded}
+                        toggleRow={toggleRow}
+                        onPersonClick={(person) => toggleDrilldown({ personId: person.id, personName: person.name })}
+                      />
                     ))}
                   </tbody>
                 </table>
@@ -1396,7 +1560,15 @@ export default function ReportingPage() {
                   <StandardThead firstColLabel="Department" showDept={false} />
                   <tbody>
                     {deptRows.map((row, idx) => (
-                      <StandardRow key={`dept-${row.id}`} row={row} idx={idx} expanded={state.expanded} toggleRow={toggleRow} showDept={false} />
+                      <StandardRow
+                        key={`dept-${row.id}`}
+                        row={row}
+                        idx={idx}
+                        expanded={state.expanded}
+                        toggleRow={toggleRow}
+                        showDept={false}
+                        onPersonClick={(person) => toggleDrilldown({ personId: person.id, personName: person.name })}
+                      />
                     ))}
                   </tbody>
                 </table>
@@ -1420,9 +1592,9 @@ export default function ReportingPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {projectRows.length === 0
+                    {visibleProjectRows.length === 0
                       ? <tr><td colSpan={10} className="rp-td"><div className="rp-empty-tab">No project data in this period.</div></td></tr>
-                      : projectRows.map((row, idx) => {
+                      : visibleProjectRows.map((row, idx) => {
                           const isExpanded = state.expanded[row.id];
                           return (
                             <Fragment key={`project-${row.id}`}>
@@ -1432,9 +1604,25 @@ export default function ReportingPage() {
                                     <ChevronRight size={13} className={`rp-expand-icon ${isExpanded ? "rp-expand-icon--open" : ""}`} />
                                   </button>
                                 </td>
-                                <td className="rp-td rp-td--name">{row.name}</td>
+                                <td className="rp-td rp-td--name">
+                                  <button
+                                    type="button"
+                                    className="rp-cell-link"
+                                    onClick={() => toggleDrilldown({ project: row.id })}
+                                  >
+                                    {row.name}
+                                  </button>
+                                </td>
                                 <td className="rp-td rp-td--dept">{row.code}</td>
-                                <td className="rp-td rp-td--dept">{row.client}</td>
+                                <td className="rp-td rp-td--dept">
+                                  <button
+                                    type="button"
+                                    className="rp-cell-link"
+                                    onClick={() => toggleDrilldown({ client: row.client })}
+                                  >
+                                    {row.client}
+                                  </button>
+                                </td>
                                 <td className="rp-td rp-td--dept">{row.owner}</td>
                                 <td className="rp-td rp-td--num">{fmt(row.scheduled)}</td>
                                 <td className="rp-td rp-td--num">{fmt(row.billable)}</td>
@@ -1446,7 +1634,14 @@ export default function ReportingPage() {
                                 {row.people.length > 0
                                   ? row.people.map(person => (
                                       <div key={person.id} style={{ marginBottom: 6 }}>
-                                        <strong>{person.name}</strong>: Scheduled {fmt(person.scheduled)}, Billable {fmt(person.billable)}
+                                        <button
+                                          type="button"
+                                          className="rp-cell-link"
+                                          onClick={() => toggleDrilldown({ personId: person.id, personName: person.name })}
+                                        >
+                                          <strong>{person.name}</strong>
+                                        </button>
+                                        : Scheduled {fmt(person.scheduled)}, Billable {fmt(person.billable)}
                                       </div>
                                     ))
                                   : "No people assigned."}
@@ -1466,7 +1661,15 @@ export default function ReportingPage() {
                     {taskRows.length === 0
                       ? <tr><td colSpan={10} className="rp-td"><div className="rp-empty-tab">No task data in this period.</div></td></tr>
                       : taskRows.map((row, idx) => (
-                          <StandardRow key={`task-${row.id}`} row={row} idx={idx} expanded={state.expanded} toggleRow={toggleRow} showDept={false} />
+                          <StandardRow
+                            key={`task-${row.id}`}
+                            row={row}
+                            idx={idx}
+                            expanded={state.expanded}
+                            toggleRow={toggleRow}
+                            showDept={false}
+                            onPersonClick={(person) => toggleDrilldown({ personId: person.id, personName: person.name })}
+                          />
                         ))}
                   </tbody>
                 </table>
@@ -1506,7 +1709,14 @@ export default function ReportingPage() {
                                 {row.people.length > 0
                                   ? row.people.map(person => (
                                       <div key={person.id} style={{ marginBottom: 6 }}>
-                                        <strong>{person.name}</strong>: {fmt(person.timeOff)} ({(person.timeOff / 7.5).toFixed(1)} days)
+                                        <button
+                                          type="button"
+                                          className="rp-cell-link"
+                                          onClick={() => toggleDrilldown({ personId: person.id, personName: person.name })}
+                                        >
+                                          <strong>{person.name}</strong>
+                                        </button>
+                                        : {fmt(person.timeOff)} ({(person.timeOff / 7.5).toFixed(1)} days)
                                       </div>
                                     ))
                                   : "No people on this leave type."}
@@ -1537,9 +1747,9 @@ export default function ReportingPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {projectRows.length === 0
+                    {visibleProjectRows.length === 0
                       ? <tr><td colSpan={9} className="rp-td"><div className="rp-empty-tab">No project data in this period.</div></td></tr>
-                      : projectRows.map((row, idx) => {
+                      : visibleProjectRows.map((row, idx) => {
                           const isExpanded = state.expanded[row.id];
                           const schedPct = row.scheduled > 0 ? Math.round((row.scheduled / row.scheduled) * 100) : 0;
                           return (
@@ -1550,9 +1760,25 @@ export default function ReportingPage() {
                                     <ChevronRight size={13} className={`rp-expand-icon ${isExpanded ? "rp-expand-icon--open" : ""}`} />
                                   </button>
                                 </td>
-                                <td className="rp-td rp-td--name">{row.name}</td>
+                                <td className="rp-td rp-td--name">
+                                  <button
+                                    type="button"
+                                    className="rp-cell-link"
+                                    onClick={() => toggleDrilldown({ project: row.id })}
+                                  >
+                                    {row.name}
+                                  </button>
+                                </td>
                                 <td className="rp-td rp-td--dept">{row.code}</td>
-                                <td className="rp-td rp-td--dept">{row.client}</td>
+                                <td className="rp-td rp-td--dept">
+                                  <button
+                                    type="button"
+                                    className="rp-cell-link"
+                                    onClick={() => toggleDrilldown({ client: row.client })}
+                                  >
+                                    {row.client}
+                                  </button>
+                                </td>
                                 <td className="rp-td rp-td--dept">—</td>
                                 <td className="rp-td rp-td--dept">{row.owner}</td>
                                 <td className="rp-td rp-td--num">—</td>
@@ -1576,6 +1802,7 @@ export default function ReportingPage() {
                 <table className="rp-table">
                   <thead>
                     <tr>
+                      <th className="rp-th rp-th--expand" />
                       <th className="rp-th rp-th--name">Client</th>
                       <th className="rp-th rp-th--num">Budget</th>
                       <th className="rp-th rp-th--num rp-th--accent">Scheduled Hours</th>
@@ -1583,17 +1810,49 @@ export default function ReportingPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {projectGroupedByClient.length === 0
-                      ? <tr><td colSpan={4} className="rp-td"><div className="rp-empty-tab">No client data in this period.</div></td></tr>
-                      : projectGroupedByClient.map((row, idx) => {
+                    {visibleClientRows.length === 0
+                      ? <tr><td colSpan={5} className="rp-td"><div className="rp-empty-tab">No client data in this period.</div></td></tr>
+                      : visibleClientRows.map((row, idx) => {
+                          const isExpanded = state.expanded[`client-${row.id}`];
                           const schedPct = row.scheduled > 0 ? 100 : 0;
                           return (
-                            <tr key={`client-${row.id}`} className={`rp-row ${idx % 2 === 0 ? "rp-row--even" : ""}`}>
-                              <td className="rp-td rp-td--name">{row.name}</td>
-                              <td className="rp-td rp-td--num">—</td>
-                              <td className="rp-td rp-td--num">{fmt(row.scheduled)}</td>
-                              <td className="rp-td rp-td--num">{schedPct}%</td>
-                            </tr>
+                            <Fragment key={`client-${row.id}`}>
+                              <tr className={`rp-row ${idx % 2 === 0 ? "rp-row--even" : ""}`}>
+                                <td className="rp-td rp-td--expand">
+                                  <button className="rp-expand-btn" onClick={() => toggleRow(`client-${row.id}`)} aria-label={isExpanded ? "Collapse" : "Expand"}>
+                                    <ChevronRight size={13} className={`rp-expand-icon ${isExpanded ? "rp-expand-icon--open" : ""}`} />
+                                  </button>
+                                </td>
+                                <td className="rp-td rp-td--name">
+                                  <button
+                                    type="button"
+                                    className="rp-cell-link"
+                                    onClick={() => toggleDrilldown({ client: row.name })}
+                                  >
+                                    {row.name}
+                                  </button>
+                                </td>
+                                <td className="rp-td rp-td--num">—</td>
+                                <td className="rp-td rp-td--num">{fmt(row.scheduled)}</td>
+                                <td className="rp-td rp-td--num">{schedPct}%</td>
+                              </tr>
+                              <DetailRow isExpanded={isExpanded} colSpan={5}>
+                                {row.projects.length > 0
+                                  ? row.projects.map((project) => (
+                                      <div key={`${row.id}-${project.id}`} style={{ marginBottom: 6 }}>
+                                        <button
+                                          type="button"
+                                          className="rp-cell-link"
+                                          onClick={() => toggleDrilldown({ project: project.id })}
+                                        >
+                                          <strong>{project.name}</strong>
+                                        </button>
+                                        {` (${project.code || "—"})`} - {fmt(project.scheduled)}
+                                      </div>
+                                    ))
+                                  : "No projects for this client in the selected period."}
+                              </DetailRow>
+                            </Fragment>
                           );
                         })}
                   </tbody>

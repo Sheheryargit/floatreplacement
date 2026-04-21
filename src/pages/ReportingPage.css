@@ -712,6 +712,65 @@
   text-align: right;
 }
 
+.rp-cell-link {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.rp-cell-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.rp-cell-link strong {
+  color: inherit;
+}
+
+.rp-active-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 16px 0;
+}
+
+.rp-active-filters-label {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+.rp-active-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border-sub);
+  background: var(--surf-alt);
+  color: var(--text);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  padding: 3px 9px;
+}
+
+.rp-active-filter-clear {
+  border: 1px solid var(--border-sub);
+  background: transparent;
+  color: var(--text-soft);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.rp-active-filter-clear:hover {
+  color: var(--text);
+  border-color: var(--border);
+  background: var(--surf-alt);
+}
+
 .rp-row:hover .rp-td {
   background: rgba(255, 255, 255, 0.02);
 }
