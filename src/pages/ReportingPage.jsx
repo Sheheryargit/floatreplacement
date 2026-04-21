@@ -1,18 +1,24 @@
-import { useState, useMemo, useRef, useEffect, Fragment } from "react";
+import { useState, useMemo, useRef, useEffect, Fragment, useReducer, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  Download,
+  Plus,
+  Users,
+  FolderOpen,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
 import { useAppData } from "../context/AppDataContext.jsx";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { allocationHasPersonSchedule } from "../utils/peopleSort.js";
 import { projectToAllocationLabel } from "../utils/projectColors.js";
+import { downloadCSV, arrayToCSV, formatDateDDMmmYY } from "../utils/reportingExport.js";
 import "./ReportingPage.css";
  
-const TABS = [
+const PEOPLE_TABS = [
   { key: "People" },
   { key: "Roles" },
   { key: "Departments" },
@@ -20,14 +26,21 @@ const TABS = [
   { key: "Tasks" },
   { key: "Time off" },
 ];
+
+const VIEW_MODES = [
+  { key: "People", icon: Users },
+  { key: "Projects", icon: FolderOpen }
+];
+
+const FILTER_OPTIONS = {
+  people: ['Employees', 'Contractors', 'Active', 'Archived', 'Unassigned'],
+  project: ['Draft', 'Tentative', 'Confirmed', 'Completed', 'Canceled'],
+  timeoff: ['Confirmed', 'Tentative'],
+};
  
 const fmt = (h) => h === 0 ? "0h" : `${h.toLocaleString()}h`;
 const pct = (a, b) => b === 0 ? "0%" : `${Math.round((a / b) * 100)}%`;
 const COST_PER_HOUR = 100;
- 
-const TIME_OFF_OPTIONS = ['Confirmed', 'Tentative'];
-const PROJECT_STATUS_OPTIONS = ['Draft', 'Tentative', 'Confirmed', 'Completed', 'Canceled'];
-const PEOPLE_OPTIONS = ['Employees', 'Contractors', 'Active', 'Archived', 'Unassigned'];
  
 function parseDate(value) {
   if (!value) return null;
@@ -42,7 +55,133 @@ function addDays(date, days) {
   next.setDate(next.getDate() + days);
   return next;
 }
+
+function addMonths(date, months) {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + months);
+  return next;
+}
+
+function sameDay(a, b) {
+  if (!a || !b) return false;
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function toMonthStart(date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function monthLabel(date) {
+  return date.toLocaleDateString("en-AU", { month: "long", year: "numeric" });
+}
+
+function buildCalendarDays(monthDate) {
+  const first = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const gridStart = addDays(first, -first.getDay());
+  return Array.from({ length: 42 }, (_, i) => {
+    const date = addDays(gridStart, i);
+    return {
+      date,
+      inMonth: date.getMonth() === monthDate.getMonth(),
+    };
+  });
+}
  
+function startOfWeek(date) {
+  const d = new Date(date);
+  d.setDate(d.getDate() - d.getDay());
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function endOfWeek(date) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + (6 - d.getDay()));
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+function startOfMonth(date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), 1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function endOfMonth(date) {
+  const d = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+function startOfQuarter(date) {
+  const quarter = Math.floor(date.getMonth() / 3);
+  const d = new Date(date.getFullYear(), quarter * 3, 1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function endOfQuarter(date) {
+  const quarter = Math.floor(date.getMonth() / 3);
+  const d = new Date(date.getFullYear(), (quarter + 1) * 3, 0);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+function startOfYear(date) {
+  const d = new Date(date.getFullYear(), 0, 1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function endOfYear(date) {
+  const d = new Date(date.getFullYear(), 11, 31);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+function getDateRangeForTimeframe(timeframe) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  switch (timeframe) {
+    case 'this-week':
+      return { start: startOfWeek(today), end: endOfWeek(today) };
+    case 'last-week': {
+      const lastWeekEnd = addDays(startOfWeek(today), -1);
+      return { start: startOfWeek(lastWeekEnd), end: endOfWeek(lastWeekEnd) };
+    }
+    case 'next-12-weeks': {
+      const end = addDays(today, 83);
+      end.setHours(23, 59, 59, 999);
+      return { start: today, end };
+    }
+    case 'this-month':
+      return { start: startOfMonth(today), end: endOfMonth(today) };
+    case 'last-month': {
+      const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      return { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) };
+    }
+    case 'this-quarter':
+      return { start: startOfQuarter(today), end: endOfQuarter(today) };
+    case 'last-quarter': {
+      const lastQuarterStart = new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3 - 3, 1);
+      return { start: startOfQuarter(lastQuarterStart), end: endOfQuarter(lastQuarterStart) };
+    }
+    case 'this-year':
+      return { start: startOfYear(today), end: endOfYear(today) };
+    case 'last-year': {
+      const lastYear = new Date(today.getFullYear() - 1, 0, 1);
+      return { start: startOfYear(lastYear), end: endOfYear(lastYear) };
+    }
+    default:
+      return { start: today, end: addDays(today, 84) };
+  }
+}
+
 function weekLabel(date) {
   return date.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
 }
@@ -178,42 +317,156 @@ function StandardRow({ row, idx, expanded, toggleRow, showDept = true }) {
 export default function ReportingPage() {
   const { theme } = useAppTheme();
   const { people, allocations, publicHolidayAllocations, projects } = useAppData();
-  const [activeTab, setActiveTab] = useState("People");
-  const [expanded, setExpanded] = useState({});
-  const [viewType, setViewType] = useState("weeks");
-  const [selectedTimeOff, setSelectedTimeOff] = useState(['confirmed', 'tentative']);
-  const [selectedProjectStatus, setSelectedProjectStatus] = useState(['Tentative', 'Confirmed', 'Completed']);
-  const [selectedPeople, setSelectedPeople] = useState(['Employees', 'Contractors', 'Active', 'Archived', 'Unassigned']);
-  const [openFilter, setOpenFilter] = useState(null);
+
+  // ── Consolidated State ────────────────────────────────────────────────────
+  const initialState = {
+    viewMode: "People",
+    activeTab: "People",
+    projectGrouping: "projects",
+    viewType: "weeks",
+    expanded: {},
+    openFilter: null,
+    openExport: false,
+    filters: {
+      people: FILTER_OPTIONS.people,
+      project: FILTER_OPTIONS.project,
+      timeoff: FILTER_OPTIONS.timeoff,
+    },
+  };
+
+  const stateReducer = useCallback((state, action) => {
+    switch (action.type) {
+      case "SET_VIEW_MODE":
+        return { ...state, viewMode: action.payload, activeTab: "People" };
+      case "SET_ACTIVE_TAB":
+        return { ...state, activeTab: action.payload };
+      case "SET_PROJECT_GROUPING":
+        return { ...state, projectGrouping: action.payload };
+      case "SET_VIEW_TYPE":
+        return { ...state, viewType: action.payload };
+      case "TOGGLE_ROW":
+        return { ...state, expanded: { ...state.expanded, [action.payload]: !state.expanded[action.payload] } };
+      case "SET_OPEN_FILTER":
+        return { ...state, openFilter: action.payload };
+      case "SET_OPEN_EXPORT":
+        return { ...state, openExport: action.payload };
+      case "UPDATE_FILTER":
+        return {
+          ...state,
+          filters: {
+            ...state.filters,
+            [action.filterType]: action.payload,
+          },
+        };
+      default:
+        return state;
+    }
+  }, []);
+
+  const [state, dispatch] = useReducer(stateReducer, initialState);
+  const [openQuickAdd, setOpenQuickAdd] = useState(false);
+  const [timeframeMode, setTimeframeMode] = useState('next-12-weeks');
+  const [dateRange, setDateRange] = useState(() => getDateRangeForTimeframe('next-12-weeks'));
+  const [startMonthView, setStartMonthView] = useState(() => toMonthStart(getDateRangeForTimeframe('next-12-weeks').start));
+  const [endMonthView, setEndMonthView] = useState(() => toMonthStart(getDateRangeForTimeframe('next-12-weeks').end));
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const dropdownRef = useRef();
+  const exportRef = useRef();
+  const quickAddRef = useRef();
+  const datePickerRef = useRef();
+  const navigate = useNavigate();
  
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setOpenFilter(null);
+        dispatch({ type: "SET_OPEN_FILTER", payload: null });
+      }
+      if (exportRef.current && !exportRef.current.contains(event.target)) {
+        dispatch({ type: "SET_OPEN_EXPORT", payload: false });
+      }
+      if (quickAddRef.current && !quickAddRef.current.contains(event.target)) {
+        setOpenQuickAdd(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
- 
-  const getFilterLabel = (type) => {
-    if (type === 'people') return selectedPeople.length === PEOPLE_OPTIONS.length ? 'All' : selectedPeople.join(', ');
-    if (type === 'project') return selectedProjectStatus.length === PROJECT_STATUS_OPTIONS.length ? 'All' : selectedProjectStatus.join(', ');
-    if (type === 'timeoff') return selectedTimeOff.length === TIME_OFF_OPTIONS.length ? 'All' : selectedTimeOff.join(', ');
-    return 'All';
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(event.target)) {
+        setDatePickerOpen(false);
+      }
+    };
+    if (datePickerOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [datePickerOpen]);
+
+  useEffect(() => {
+    setStartMonthView(toMonthStart(dateRange.start));
+    setEndMonthView(toMonthStart(dateRange.end));
+  }, [dateRange.start, dateRange.end]);
+
+  // ── Filter Label Helper ───────────────────────────────────────────────────
+  const getFilterLabel = useCallback((filterType) => {
+    const current = state.filters[filterType];
+    const all = FILTER_OPTIONS[filterType];
+    return current.length === all.length ? 'All' : current.join(', ');
+  }, [state.filters]);
+
+  // ── Date Range Management ─────────────────────────────────────────────────
+  const navigateDateRange = (direction) => {
+    setDateRange((prev) => {
+      const start = new Date(prev.start);
+      const end = new Date(prev.end);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      const msPerDay = 24 * 60 * 60 * 1000;
+      const days = Math.max(1, Math.floor((end.valueOf() - start.valueOf()) / msPerDay) + 1);
+      const delta = direction === 'next' ? days : -days;
+      const nextStart = addDays(start, delta);
+      const nextEnd = addDays(end, delta);
+      nextStart.setHours(0, 0, 0, 0);
+      nextEnd.setHours(23, 59, 59, 999);
+      return { start: nextStart, end: nextEnd };
+    });
+    setTimeframeMode('custom');
+  };
+
+  const handleTimeframeSelect = (mode) => {
+    if (mode === 'custom') {
+      setTimeframeMode('custom');
+      return;
+    }
+    const nextRange = getDateRangeForTimeframe(mode);
+    setDateRange(nextRange);
+    setTimeframeMode(mode);
+    setDatePickerOpen(false);
   };
  
   const totalCapacityHours = useMemo(() => {
-    if (viewType === 'days') return 4.3 * 5 * 7.5;
-    if (viewType === 'weeks') return 12 * 5 * 7.5;
+    if (state.viewType === 'days') return 4.3 * 5 * 7.5;
+    if (state.viewType === 'weeks') return 12 * 5 * 7.5;
     return 52 * 5 * 7.5;
-  }, [viewType]);
+  }, [state.viewType]);
  
   const scheduleAllocations = useMemo(
     () => [...allocations, ...publicHolidayAllocations],
     [allocations, publicHolidayAllocations]
   );
+
+  const rangedAllocations = useMemo(() => {
+    const start = new Date(dateRange.start);
+    const end = new Date(dateRange.end);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    return scheduleAllocations.filter((alloc) => {
+      const d = parseDate(alloc.startDate);
+      return d && d >= start && d <= end;
+    });
+  }, [scheduleAllocations, dateRange.start, dateRange.end]);
  
   const projectBillability = useMemo(() => {
     const map = new Map();
@@ -237,7 +490,7 @@ export default function ReportingPage() {
         const capacity = totalCapacityHours;
         let billable = 0, nonBillable = 0, timeOff = 0;
  
-        const allocationsForPerson = scheduleAllocations.filter((alloc) =>
+        const allocationsForPerson = rangedAllocations.filter((alloc) =>
           allocationHasPersonSchedule(alloc, person.id)
         );
  
@@ -272,7 +525,7 @@ export default function ReportingPage() {
           projectTotals,
         };
       }),
-    [activePeople, scheduleAllocations, projectBillability, projects, totalCapacityHours]
+    [activePeople, rangedAllocations, projectBillability, projects, totalCapacityHours]
   );
  
   // ── Totals ──────────────────────────────────────────────────────────────────
@@ -449,23 +702,43 @@ export default function ReportingPage() {
     Tasks: taskRows.length,
     "Time off": timeOffRows.length,
   }), [activePeople.length, roleRows.length, deptRows.length, projectRows.length, taskRows.length, timeOffRows.length]);
+
+  // ── Project Grouping by Clients and Projects ──────────────────────────────────
+  const projectGroupedByClient = useMemo(() => {
+    const groups = {};
+    for (const project of projectRows) {
+      const client = project.client || "—";
+      if (!groups[client]) {
+        groups[client] = { scheduled: 0, billable: 0, nonBillable: 0, scheduledCost: 0, projects: [] };
+      }
+      groups[client].scheduled += project.scheduled;
+      groups[client].billable += project.billable;
+      groups[client].nonBillable += project.nonBillable;
+      groups[client].scheduledCost += project.scheduledCost;
+      groups[client].projects.push(project);
+    }
+    return Object.entries(groups).map(([client, data]) => ({ id: client, name: client, ...data }));
+  }, [projectRows]);
+
+  const projectCountsByGrouping = useMemo(() => ({
+    projects: projectRows.length,
+    clients: projectGroupedByClient.length,
+  }), [projectRows.length, projectGroupedByClient.length]);
  
   // ── Chart ────────────────────────────────────────────────────────────────────
   const chartRange = useMemo(() => {
-    const dates = scheduleAllocations.map((a) => parseDate(a.startDate)).filter(Boolean);
-    const endDate = dates.length ? new Date(Math.max(...dates.map(d => d.valueOf()))) : new Date();
-    let startDate;
-    if (viewType === 'days') startDate = addDays(endDate, -30);
-    else if (viewType === 'weeks') startDate = addDays(endDate, -(12 * 7));
-    else startDate = addDays(endDate, -(12 * 30));
+    const startDate = new Date(dateRange.start);
+    const endDate = new Date(dateRange.end);
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
  
     const grouped = new Map();
-    for (const alloc of scheduleAllocations) {
+    for (const alloc of rangedAllocations) {
       const allocDate = parseDate(alloc.startDate);
       if (!allocDate || allocDate < startDate || allocDate > endDate) continue;
       let key;
-      if (viewType === 'days') key = allocDate.toISOString().split('T')[0];
-      else if (viewType === 'weeks') {
+      if (state.viewType === 'days') key = allocDate.toISOString().split('T')[0];
+      else if (state.viewType === 'weeks') {
         const ws = new Date(allocDate); ws.setDate(ws.getDate() - ws.getDay());
         key = ws.toISOString().split('T')[0];
       } else {
@@ -480,34 +753,189 @@ export default function ReportingPage() {
     }
  
     const data = [];
-    if (viewType === 'days') {
+    if (state.viewType === 'days') {
       for (let c = new Date(startDate); c <= endDate; c = addDays(c, 1)) {
         const key = c.toISOString().split('T')[0];
         const v = grouped.get(key) || { billable: 0, nonBillable: 0, timeOff: 0 };
         data.push({ label: c.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }), ...v, total: v.billable + v.nonBillable + v.timeOff });
       }
-    } else if (viewType === 'weeks') {
-      for (let c = new Date(startDate); c <= endDate; c = addDays(c, 7)) {
+    } else if (state.viewType === 'weeks') {
+      for (let c = startOfWeek(startDate); c <= endDate; c = addDays(c, 7)) {
         const ws = new Date(c); ws.setDate(ws.getDate() - ws.getDay());
         const key = ws.toISOString().split('T')[0];
         const v = grouped.get(key) || { billable: 0, nonBillable: 0, timeOff: 0 };
         data.push({ label: c.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }), ...v, total: v.billable + v.nonBillable + v.timeOff });
       }
     } else {
-      for (let c = new Date(startDate); c <= endDate; c = addDays(c, 30)) {
+      for (let c = new Date(startDate.getFullYear(), startDate.getMonth(), 1); c <= endDate; c = new Date(c.getFullYear(), c.getMonth() + 1, 1)) {
         const key = new Date(c.getFullYear(), c.getMonth(), 1).toISOString().split('T')[0];
         const v = grouped.get(key) || { billable: 0, nonBillable: 0, timeOff: 0 };
         data.push({ label: c.toLocaleDateString('en-AU', { month: 'short', year: '2-digit' }), ...v, total: v.billable + v.nonBillable + v.timeOff });
       }
     }
     return { startDate, endDate, data, totalCapacity: totalCapacityHours * activePeople.length };
-  }, [scheduleAllocations, viewType, projectBillability, totalCapacityHours, activePeople.length]);
+  }, [rangedAllocations, state.viewType, projectBillability, totalCapacityHours, activePeople.length, dateRange.start, dateRange.end]);
  
-  const toggleRow = (id) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  const toggleRow = useCallback((id) => {
+    dispatch({ type: "TOGGLE_ROW", payload: id });
+  }, []);
+
   const chartMax = useMemo(() => Math.max(...chartRange.data.map(d => d.total), 1), [chartRange.data]);
-  const chartStartLabel = chartRange.startDate ? weekLabel(chartRange.startDate) : "—";
-  const chartEndLabel = chartRange.endDate ? weekLabel(chartRange.endDate) : "—";
+  const chartStartLabel = dateRange.start ? weekLabel(dateRange.start) : "—";
+  const chartEndLabel = dateRange.end ? weekLabel(dateRange.end) : "—";
   const isDark = theme !== "light";
+
+  // ── Export Functions ─────────────────────────────────────────────────────────
+  const exportChartData = () => {
+    const header = [
+      "Date",
+      "Capacity hrs",
+      "Scheduled hrs",
+      "Scheduled %",
+      "Scheduled Billable hrs",
+      "Scheduled Billable %",
+      "Scheduled Non-billable hrs",
+      "Scheduled Non-billable %",
+      "Scheduled Tentative (all) hrs",
+      "Scheduled Tentative (all) %",
+      "Unscheduled hrs",
+      "Scheduled Overtime hrs",
+      "Time off / Holiday hrs",
+      "Time off / Holiday days",
+    ];
+    
+    const rows = chartRange.data.map((d, idx) => {
+      const dateObj = new Date(chartRange.startDate);
+      dateObj.setDate(dateObj.getDate() + idx);
+      const dateStr = formatDateDDMmmYY(dateObj);
+      
+      const totalCapacity = chartRange.totalCapacity / chartRange.data.length;
+      const totalScheduled = d.billable + d.nonBillable;
+      const schedPct = totalCapacity > 0 ? Math.round((totalScheduled / totalCapacity) * 100) : 0;
+      const billablePct = totalScheduled > 0 ? Math.round((d.billable / totalScheduled) * 100) : 0;
+      const nonbillablePct = totalScheduled > 0 ? Math.round((d.nonBillable / totalScheduled) * 100) : 0;
+      const timeoffDays = d.timeOff / 7.5;
+      
+      return [
+        dateStr,
+        totalCapacity.toFixed(1),
+        totalScheduled.toFixed(1),
+        `${schedPct}%`,
+        d.billable.toFixed(1),
+        `${billablePct}%`,
+        d.nonBillable.toFixed(1),
+        `${nonbillablePct}%`,
+        "0", // Tentative hrs - adjust if you have this data
+        "0%", // Tentative % - adjust if you have this data
+        "0", // Unscheduled - adjust if you have this data
+        "0", // Overtime - adjust if you have this data
+        d.timeOff.toFixed(1),
+        timeoffDays.toFixed(1),
+      ];
+    });
+    
+    const csv = arrayToCSV([header, ...rows]);
+    downloadCSV(csv, `chart-data-${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
+  const exportTableData = () => {
+    const header = [
+      "Person",
+      "Role",
+      "Department",
+      "Tags",
+      "Capacity hrs",
+      "Client",
+      "Project",
+      "Project code",
+      "Task",
+      "Time off",
+      "Holiday",
+      "Scheduled hrs",
+      "Scheduled billable hrs",
+      "Scheduled non-billable hrs",
+      "Scheduled tentative (all) hrs",
+      "Scheduled overtime (all) hrs",
+      "Unscheduled capacity (all) hrs",
+      "Time off hrs",
+      "Time off days",
+      "Holiday hrs",
+      "Holiday days",
+      "Scheduled % of capacity",
+      "Scheduled billable % of capacity",
+      "Scheduled billable % of scheduled",
+    ];
+    
+    const rows = [];
+    for (const person of personRows) {
+      if (person.allocations.length === 0) {
+        rows.push([
+          person.name,
+          person.role || "—",
+          person.dept,
+          "",
+          person.capacity.toFixed(1),
+          "—",
+          "—",
+          "—",
+          "—",
+          "—",
+          "—",
+          "0",
+          "0",
+          "0",
+          "0",
+          person.overtime.toFixed(1),
+          person.unscheduled.toFixed(1),
+          "0",
+          "0",
+          "0",
+          "0",
+          pct(0, person.capacity),
+          pct(0, person.capacity),
+          "0%",
+        ]);
+      } else {
+        for (const alloc of person.allocations) {
+          const hours = allocationHours(alloc);
+          const hours_days = hours / 7.5;
+          const schedPct = pct(person.scheduled, person.capacity);
+          const billablePct = pct(person.billable, person.capacity);
+          const billableOfSched = pct(person.billable, person.scheduled);
+          
+          rows.push([
+            person.name,
+            person.role || "—",
+            person.dept,
+            "",
+            person.capacity.toFixed(1),
+            alloc.client || "—",
+            alloc.project || "—",
+            alloc.projectCode || "—",
+            alloc.task || "—",
+            alloc.isLeave ? "Yes" : "—",
+            alloc.isHoliday ? "Yes" : "—",
+            person.scheduled.toFixed(1),
+            person.billable.toFixed(1),
+            person.nonBillable.toFixed(1),
+            "0", // Tentative - adjust if available
+            person.overtime.toFixed(1),
+            person.unscheduled.toFixed(1),
+            alloc.isLeave ? hours.toFixed(1) : "0",
+            alloc.isLeave ? hours_days.toFixed(1) : "0",
+            alloc.isHoliday ? hours.toFixed(1) : "0",
+            alloc.isHoliday ? hours_days.toFixed(1) : "0",
+            schedPct,
+            billablePct,
+            billableOfSched,
+          ]);
+        }
+      }
+    }
+    
+    const csv = arrayToCSV([header, ...rows]);
+    downloadCSV(csv, `table-data-${new Date().toISOString().split('T')[0]}.csv`);
+  };
  
   return (
     <div className="reporting-root" data-theme={theme === "light" ? "light" : "dark"}>
@@ -515,30 +943,224 @@ export default function ReportingPage() {
  
       <main className="reporting-main rp-full-main">
  
+        {/* ── Top View Mode Selector ── */}
+        <motion.div className="rp-view-mode-selector-container" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+          <div className="rp-view-mode-selector">
+            {VIEW_MODES.map(modeObj => {
+              const Icon = modeObj.icon;
+              const count = modeObj.key === "People" ? activePeople.length : projectRows.length;
+              const isActive = state.viewMode === modeObj.key;
+              return (
+                <button
+                  key={modeObj.key}
+                  className={`rp-view-mode-btn ${isActive ? "rp-view-mode-btn--active" : ""}`}
+                  onClick={() => dispatch({ type: "SET_VIEW_MODE", payload: modeObj.key })}
+                >
+                  <Icon size={14} />
+                  {modeObj.key}
+                  <span className="rp-view-mode-count">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="rp-top-actions">
+            <div className="rp-export-dropdown" ref={exportRef}>
+              <button
+                className="rp-export-btn"
+                onClick={() => dispatch({ type: "SET_OPEN_EXPORT", payload: !state.openExport })}
+                title="Export data"
+              >
+                <Download size={14} /> Export
+              </button>
+              {state.openExport && (
+                <div className="rp-export-options">
+                  <button className="rp-export-option" onClick={exportChartData}>Export Chart Data</button>
+                  <button className="rp-export-option" onClick={exportTableData}>Export Table Data</button>
+                </div>
+              )}
+            </div>
+
+            <div className="rp-quickadd-dropdown" ref={quickAddRef}>
+              <button
+                className="rp-add-btn"
+                onClick={() => setOpenQuickAdd((v) => !v)}
+                title="Quick add"
+                aria-label="Quick add"
+              >
+                <Plus size={14} />
+              </button>
+              {openQuickAdd && (
+                <div className="rp-export-options rp-quickadd-options">
+                  <button
+                    className="rp-export-option"
+                    onClick={() => {
+                      setOpenQuickAdd(false);
+                      navigate("/", { state: { quickCreate: "allocation" } });
+                    }}
+                  >
+                    Add allocation
+                  </button>
+                  <button
+                    className="rp-export-option"
+                    onClick={() => {
+                      setOpenQuickAdd(false);
+                      navigate("/", { state: { quickCreate: "leave" } });
+                    }}
+                  >
+                    Add leave
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </motion.div>
+
         {/* ── Toolbar ── */}
         <motion.div className="rp-toolbar" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
           <div className="rp-date-nav">
-            <button className="rp-icon-btn" aria-label="Previous period"><ChevronLeft size={14} /></button>
-            <button className="rp-icon-btn" aria-label="Next period"><ChevronRight size={14} /></button>
-            <span className="rp-date-label">
+            <button className="rp-icon-btn" onClick={() => navigateDateRange('prev')} aria-label="Previous period"><ChevronLeft size={14} /></button>
+            <button className="rp-icon-btn" onClick={() => navigateDateRange('next')} aria-label="Next period"><ChevronRight size={14} /></button>
+            <button className="rp-date-label rp-date-label-btn" onClick={() => setDatePickerOpen(!datePickerOpen)}>
               {chartStartLabel}{" – "}<span className="rp-date-accent">{chartEndLabel}</span>
-            </span>
-            <button className="rp-date-caret" aria-label="Open date picker"><ChevronDown size={13} /></button>
+            </button>
+            <button 
+              className="rp-date-caret" 
+              onClick={() => setDatePickerOpen(!datePickerOpen)}
+              aria-label="Open date picker"
+            >
+              <ChevronDown size={13} />
+            </button>
+            {datePickerOpen && (
+              <div className="rp-date-picker" ref={datePickerRef}>
+                <div className="rp-date-picker-title">Select Timeframe</div>
+                <div className="rp-date-picker-custom-row">
+                  <label className="rp-date-picker-custom-label" htmlFor="rp-timeframe-select">Range</label>
+                  <select
+                    id="rp-timeframe-select"
+                    className="rp-date-picker-select"
+                    value={timeframeMode}
+                    onChange={(e) => handleTimeframeSelect(e.target.value)}
+                  >
+                    <option value="custom">Custom</option>
+                    <option value="next-12-weeks">Next 12 Weeks</option>
+                    <option value="this-week">This Week</option>
+                    <option value="this-month">This Month</option>
+                    <option value="this-quarter">This Quarter</option>
+                    <option value="this-year">This Year</option>
+                    <option value="last-week">Last Week</option>
+                    <option value="last-month">Last Month</option>
+                    <option value="last-quarter">Last Quarter</option>
+                    <option value="last-year">Last Year</option>
+                  </select>
+                </div>
+                <div className="rp-date-picker-calendars">
+                  <div className="rp-inline-calendar">
+                    <div className="rp-inline-calendar-title">Start Date</div>
+                    <div className="rp-inline-calendar-header">
+                      <button className="rp-inline-calendar-nav" onClick={() => setStartMonthView((prev) => addMonths(prev, -1))} aria-label="Previous month">
+                        <ChevronLeft size={12} />
+                      </button>
+                      <span className="rp-inline-calendar-month">{monthLabel(startMonthView)}</span>
+                      <button className="rp-inline-calendar-nav" onClick={() => setStartMonthView((prev) => addMonths(prev, 1))} aria-label="Next month">
+                        <ChevronRight size={12} />
+                      </button>
+                    </div>
+                    <div className="rp-inline-calendar-weekdays">
+                      {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((label, i) => <span key={`sw-${i}`}>{label}</span>)}
+                    </div>
+                    <div className="rp-inline-calendar-grid">
+                      {buildCalendarDays(startMonthView).map(({ date, inMonth }) => {
+                        const inRange = date >= dateRange.start && date <= dateRange.end;
+                        const isStart = sameDay(date, dateRange.start);
+                        const isEnd = sameDay(date, dateRange.end);
+                        return (
+                          <button
+                            key={`start-${date.toISOString()}`}
+                            className={`rp-inline-calendar-day ${inMonth ? '' : 'is-outside'} ${inRange ? 'is-range' : ''} ${isStart ? 'is-start' : ''} ${isEnd ? 'is-end' : ''}`}
+                            onClick={() => {
+                              const nextStart = new Date(date);
+                              nextStart.setHours(0, 0, 0, 0);
+                              setTimeframeMode('custom');
+                              setDateRange((prev) => ({
+                                start: nextStart,
+                                end: prev.end < nextStart ? new Date(nextStart.getFullYear(), nextStart.getMonth(), nextStart.getDate(), 23, 59, 59, 999) : prev.end,
+                              }));
+                            }}
+                          >
+                            {date.getDate()}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="rp-inline-calendar">
+                    <div className="rp-inline-calendar-title">End Date</div>
+                    <div className="rp-inline-calendar-header">
+                      <button className="rp-inline-calendar-nav" onClick={() => setEndMonthView((prev) => addMonths(prev, -1))} aria-label="Previous month">
+                        <ChevronLeft size={12} />
+                      </button>
+                      <span className="rp-inline-calendar-month">{monthLabel(endMonthView)}</span>
+                      <button className="rp-inline-calendar-nav" onClick={() => setEndMonthView((prev) => addMonths(prev, 1))} aria-label="Next month">
+                        <ChevronRight size={12} />
+                      </button>
+                    </div>
+                    <div className="rp-inline-calendar-weekdays">
+                      {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((label, i) => <span key={`ew-${i}`}>{label}</span>)}
+                    </div>
+                    <div className="rp-inline-calendar-grid">
+                      {buildCalendarDays(endMonthView).map(({ date, inMonth }) => {
+                        const inRange = date >= dateRange.start && date <= dateRange.end;
+                        const isStart = sameDay(date, dateRange.start);
+                        const isEnd = sameDay(date, dateRange.end);
+                        return (
+                          <button
+                            key={`end-${date.toISOString()}`}
+                            className={`rp-inline-calendar-day ${inMonth ? '' : 'is-outside'} ${inRange ? 'is-range' : ''} ${isStart ? 'is-start' : ''} ${isEnd ? 'is-end' : ''}`}
+                            onClick={() => {
+                              const nextEnd = new Date(date);
+                              nextEnd.setHours(23, 59, 59, 999);
+                              setTimeframeMode('custom');
+                              setDateRange((prev) => ({
+                                start: prev.start > nextEnd ? new Date(nextEnd.getFullYear(), nextEnd.getMonth(), nextEnd.getDate()) : prev.start,
+                                end: nextEnd,
+                              }));
+                            }}
+                          >
+                            {date.getDate()}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <div className="rp-toolbar-right">
             <div className="rp-filters" ref={dropdownRef}>
               <div className="rp-filter-dropdown">
-                <button className="rp-filter-pill" onClick={() => setOpenFilter(openFilter === 'people' ? null : 'people')}>
+                <button 
+                  className="rp-filter-pill" 
+                  onClick={() => dispatch({ type: "SET_OPEN_FILTER", payload: state.openFilter === 'people' ? null : 'people' })}
+                >
                   People: {getFilterLabel('people')} <ChevronDown size={12} />
                 </button>
-                {openFilter === 'people' && (
+                {state.openFilter === 'people' && (
                   <div className="rp-filter-options">
-                    {PEOPLE_OPTIONS.map(option => (
+                    {FILTER_OPTIONS.people.map(option => (
                       <label key={option} className="rp-filter-option">
-                        <input type="checkbox" checked={selectedPeople.includes(option)}
-                          onChange={(e) => e.target.checked
-                            ? setSelectedPeople([...selectedPeople, option])
-                            : setSelectedPeople(selectedPeople.filter(s => s !== option))} />
+                        <input 
+                          type="checkbox" 
+                          checked={state.filters.people.includes(option)}
+                          onChange={(e) => {
+                            const updated = e.target.checked
+                              ? [...state.filters.people, option]
+                              : state.filters.people.filter(s => s !== option);
+                            dispatch({ type: "UPDATE_FILTER", filterType: 'people', payload: updated });
+                          }}
+                        />
                         {option}
                       </label>
                     ))}
@@ -546,17 +1168,26 @@ export default function ReportingPage() {
                 )}
               </div>
               <div className="rp-filter-dropdown">
-                <button className="rp-filter-pill" onClick={() => setOpenFilter(openFilter === 'project' ? null : 'project')}>
+                <button 
+                  className="rp-filter-pill" 
+                  onClick={() => dispatch({ type: "SET_OPEN_FILTER", payload: state.openFilter === 'project' ? null : 'project' })}
+                >
                   Project status: {getFilterLabel('project')} <ChevronDown size={12} />
                 </button>
-                {openFilter === 'project' && (
+                {state.openFilter === 'project' && (
                   <div className="rp-filter-options">
-                    {PROJECT_STATUS_OPTIONS.map(option => (
+                    {FILTER_OPTIONS.project.map(option => (
                       <label key={option} className="rp-filter-option">
-                        <input type="checkbox" checked={selectedProjectStatus.includes(option)}
-                          onChange={(e) => e.target.checked
-                            ? setSelectedProjectStatus([...selectedProjectStatus, option])
-                            : setSelectedProjectStatus(selectedProjectStatus.filter(s => s !== option))} />
+                        <input 
+                          type="checkbox" 
+                          checked={state.filters.project.includes(option)}
+                          onChange={(e) => {
+                            const updated = e.target.checked
+                              ? [...state.filters.project, option]
+                              : state.filters.project.filter(s => s !== option);
+                            dispatch({ type: "UPDATE_FILTER", filterType: 'project', payload: updated });
+                          }}
+                        />
                         {option}
                       </label>
                     ))}
@@ -564,17 +1195,26 @@ export default function ReportingPage() {
                 )}
               </div>
               <div className="rp-filter-dropdown">
-                <button className="rp-filter-pill" onClick={() => setOpenFilter(openFilter === 'timeoff' ? null : 'timeoff')}>
+                <button 
+                  className="rp-filter-pill" 
+                  onClick={() => dispatch({ type: "SET_OPEN_FILTER", payload: state.openFilter === 'timeoff' ? null : 'timeoff' })}
+                >
                   Time off: {getFilterLabel('timeoff')} <ChevronDown size={12} />
                 </button>
-                {openFilter === 'timeoff' && (
+                {state.openFilter === 'timeoff' && (
                   <div className="rp-filter-options">
-                    {TIME_OFF_OPTIONS.map(option => (
+                    {FILTER_OPTIONS.timeoff.map(option => (
                       <label key={option} className="rp-filter-option">
-                        <input type="checkbox" checked={selectedTimeOff.includes(option)}
-                          onChange={(e) => e.target.checked
-                            ? setSelectedTimeOff([...selectedTimeOff, option])
-                            : setSelectedTimeOff(selectedTimeOff.filter(s => s !== option))} />
+                        <input 
+                          type="checkbox" 
+                          checked={state.filters.timeoff.includes(option)}
+                          onChange={(e) => {
+                            const updated = e.target.checked
+                              ? [...state.filters.timeoff, option]
+                              : state.filters.timeoff.filter(s => s !== option);
+                            dispatch({ type: "UPDATE_FILTER", filterType: 'timeoff', payload: updated });
+                          }}
+                        />
                         {option}
                       </label>
                     ))}
@@ -583,7 +1223,11 @@ export default function ReportingPage() {
               </div>
             </div>
             <div className="rp-view-type-dropdown">
-              <select value={viewType} onChange={(e) => setViewType(e.target.value)} className="rp-view-type-select">
+              <select 
+                value={state.viewType} 
+                onChange={(e) => dispatch({ type: "SET_VIEW_TYPE", payload: e.target.value })}
+                className="rp-view-type-select"
+              >
                 <option value="days">Days</option>
                 <option value="weeks">Weeks</option>
                 <option value="months">Months</option>
@@ -602,7 +1246,7 @@ export default function ReportingPage() {
                 background: isDark ? "#2dd4bf" : "#0d9488",
                 borderRadius: "2px 2px 0 0",
                 minHeight: "6px",
-              }} title={`${viewType}: ${d.label}\nBillable: ${fmt(d.billable)}\nNon-billable: ${fmt(d.nonBillable)}\nTime off: ${fmt(d.timeOff)}\nTotal: ${fmt(d.total)}`} />
+              }} title={`${state.viewType}: ${d.label}\nBillable: ${fmt(d.billable)}\nNon-billable: ${fmt(d.nonBillable)}\nTime off: ${fmt(d.timeOff)}\nTotal: ${fmt(d.total)}`} />
             ))}
           </div>
         </motion.div>
@@ -648,209 +1292,314 @@ export default function ReportingPage() {
         </motion.div>
  
         {/* ── Tabs ── */}
-        <motion.div className="rp-tabs-row" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, delay: 0.15 }}>
-          {TABS.map(({ key }) => (
-            <button key={key} className={`rp-tab ${activeTab === key ? "rp-tab--active" : ""}`} onClick={() => setActiveTab(key)}>
-              {key}
-              {tabCounts[key] != null && <span className="rp-tab-count">{tabCounts[key]}</span>}
+        {state.viewMode === "People" ? (
+          <motion.div className="rp-tabs-row" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, delay: 0.15 }}>
+            {PEOPLE_TABS.map(({ key }) => (
+              <button key={key} className={`rp-tab ${state.activeTab === key ? "rp-tab--active" : ""}`} onClick={() => dispatch({ type: "SET_ACTIVE_TAB", payload: key })}>
+                {key}
+                {tabCounts[key] != null && <span className="rp-tab-count">{tabCounts[key]}</span>}
+              </button>
+            ))}
+          </motion.div>
+        ) : (
+          <motion.div className="rp-tabs-row" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, delay: 0.15 }}>
+            <button
+              className={`rp-tab ${state.projectGrouping === "projects" ? "rp-tab--active" : ""}`}
+              onClick={() => dispatch({ type: "SET_PROJECT_GROUPING", payload: "projects" })}
+            >
+              Projects
+              <span className="rp-tab-count">{projectCountsByGrouping.projects}</span>
             </button>
-          ))}
-        </motion.div>
+            <button
+              className={`rp-tab ${state.projectGrouping === "clients" ? "rp-tab--active" : ""}`}
+              onClick={() => dispatch({ type: "SET_PROJECT_GROUPING", payload: "clients" })}
+            >
+              Clients
+              <span className="rp-tab-count">{projectCountsByGrouping.clients}</span>
+            </button>
+          </motion.div>
+        )}
  
         {/* ── Tables ── */}
         <motion.div className="rp-table-wrap" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: 0.2 }}>
  
-          {/* ── People ── */}
-          {activeTab === "People" && (
-            <table className="rp-table">
-              <StandardThead firstColLabel="Person" />
-              <tbody>
-                <tr className="rp-row rp-row--totals">
-                  <td className="rp-td rp-td--expand" />
-                  <td className="rp-td rp-td--name rp-td--bold">Total</td>
-                  <td className="rp-td rp-td--muted">—</td>
-                  <td className="rp-td rp-td--num rp-td--bold">{fmt(totals.cap)}</td>
-                  <td className="rp-td rp-td--num">{fmt(totals.sch)}</td>
-                  <td className="rp-td rp-td--num">{fmt(totals.bil)}</td>
-                  <td className="rp-td rp-td--num">{fmt(totals.non)}</td>
-                  <td className="rp-td rp-td--num">{fmt(totals.toff)}</td>
-                  <td className="rp-td rp-td--num">{fmt(totals.ot)}</td>
-                  <td className="rp-td rp-td--num"><SchedCell scheduled={totals.sch} capacity={totals.cap} /></td>
-                  <td className="rp-td rp-td--num">{fmt(totals.bil * COST_PER_HOUR)}</td>
-                </tr>
-                {personRows.map((person, idx) => {
-                  const isExpanded = expanded[person.id];
-                  return (
-                    <Fragment key={`person-${person.id}`}>
-                      <tr className={`rp-row ${idx % 2 === 0 ? "rp-row--even" : ""}`}>
-                        <td className="rp-td rp-td--expand">
-                          <button className="rp-expand-btn" onClick={() => toggleRow(person.id)} aria-label={isExpanded ? "Collapse" : "Expand"}>
-                            <ChevronRight size={13} className={`rp-expand-icon ${isExpanded ? "rp-expand-icon--open" : ""}`} />
-                          </button>
-                        </td>
-                        <td className="rp-td rp-td--name">{person.name}</td>
-                        <td className="rp-td rp-td--dept">{person.dept}</td>
-                        <td className="rp-td rp-td--num">{fmt(person.capacity)}</td>
-                        <td className="rp-td rp-td--num">{fmt(person.scheduled)}</td>
-                        <td className="rp-td rp-td--num">{fmt(person.billable)}</td>
-                        <td className="rp-td rp-td--num">{fmt(person.nonBillable)}</td>
-                        <td className="rp-td rp-td--num">{fmt(person.timeOff)}</td>
-                        <td className="rp-td rp-td--num">{fmt(person.overtime)}</td>
-                        <td className="rp-td rp-td--num"><SchedCell scheduled={person.scheduled} capacity={person.capacity} /></td>
-                        <td className="rp-td rp-td--num">{fmt(person.billable * COST_PER_HOUR)}</td>
-                      </tr>
-                      <DetailRow isExpanded={isExpanded} colSpan={11}>
-                        {person.projectTotals.size > 0
-                          ? Array.from(person.projectTotals.entries()).map(([label, hours]) => (
-                              <div key={label} style={{ marginBottom: 6 }}><strong>{label}</strong>: {fmt(hours)}</div>
-                            ))
-                          : "No project breakdowns in this date range."}
-                      </DetailRow>
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
- 
-          {/* ── Roles ── */}
-          {activeTab === "Roles" && (
-            <table className="rp-table">
-              <StandardThead firstColLabel="Role" />
-              <tbody>
-                {roleRows.map((row, idx) => (
-                  <StandardRow key={`role-${row.id}`} row={row} idx={idx} expanded={expanded} toggleRow={toggleRow} />
-                ))}
-              </tbody>
-            </table>
-          )}
- 
-          {/* ── Departments ── */}
-          {activeTab === "Departments" && (
-            <table className="rp-table">
-              <StandardThead firstColLabel="Department" showDept={false} />
-              <tbody>
-                {deptRows.map((row, idx) => (
-                  <StandardRow key={`dept-${row.id}`} row={row} idx={idx} expanded={expanded} toggleRow={toggleRow} showDept={false} />
-                ))}
-              </tbody>
-            </table>
-          )}
- 
-          {/* ── Projects ── */}
-          {activeTab === "Projects" && (
-            <table className="rp-table">
-              <thead>
-                <tr>
-                  <th className="rp-th rp-th--expand" />
-                  <th className="rp-th rp-th--name">Project <ChevronDown size={12} className="rp-th-sort" /></th>
-                  <th className="rp-th">Code</th>
-                  <th className="rp-th">Client</th>
-                  <th className="rp-th">Owner</th>
-                  <th className="rp-th rp-th--num rp-th--accent">Scheduled</th>
-                  <th className="rp-th rp-th--num rp-th--accent">Billable</th>
-                  <th className="rp-th rp-th--num rp-th--accent">Non-billable</th>
-                  <th className="rp-th rp-th--num">Billable %</th>
-                  <th className="rp-th rp-th--num">Scheduled Cost</th>
-                </tr>
-              </thead>
-              <tbody>
-                {projectRows.length === 0
-                  ? <tr><td colSpan={10} className="rp-td"><div className="rp-empty-tab">No project data in this period.</div></td></tr>
-                  : projectRows.map((row, idx) => {
-                      const isExpanded = expanded[row.id];
+          {state.viewMode === "People" ? (
+            <>
+              {/* ── People ── */}
+              {state.activeTab === "People" && (
+                <table className="rp-table">
+                  <StandardThead firstColLabel="Person" />
+                  <tbody>
+                    <tr className="rp-row rp-row--totals">
+                      <td className="rp-td rp-td--expand" />
+                      <td className="rp-td rp-td--name rp-td--bold">Total</td>
+                      <td className="rp-td rp-td--muted">—</td>
+                      <td className="rp-td rp-td--num rp-td--bold">{fmt(totals.cap)}</td>
+                      <td className="rp-td rp-td--num">{fmt(totals.sch)}</td>
+                      <td className="rp-td rp-td--num">{fmt(totals.bil)}</td>
+                      <td className="rp-td rp-td--num">{fmt(totals.non)}</td>
+                      <td className="rp-td rp-td--num">{fmt(totals.toff)}</td>
+                      <td className="rp-td rp-td--num">{fmt(totals.ot)}</td>
+                      <td className="rp-td rp-td--num"><SchedCell scheduled={totals.sch} capacity={totals.cap} /></td>
+                      <td className="rp-td rp-td--num">{fmt(totals.bil * COST_PER_HOUR)}</td>
+                    </tr>
+                    {personRows.map((person, idx) => {
+                      const isExpanded = state.expanded[person.id];
                       return (
-                        <Fragment key={`project-${row.id}`}>
+                        <Fragment key={`person-${person.id}`}>
                           <tr className={`rp-row ${idx % 2 === 0 ? "rp-row--even" : ""}`}>
                             <td className="rp-td rp-td--expand">
-                              <button className="rp-expand-btn" onClick={() => toggleRow(row.id)} aria-label={isExpanded ? "Collapse" : "Expand"}>
+                              <button className="rp-expand-btn" onClick={() => toggleRow(person.id)} aria-label={isExpanded ? "Collapse" : "Expand"}>
                                 <ChevronRight size={13} className={`rp-expand-icon ${isExpanded ? "rp-expand-icon--open" : ""}`} />
                               </button>
                             </td>
-                            <td className="rp-td rp-td--name">{row.name}</td>
-                            <td className="rp-td rp-td--dept">{row.code}</td>
-                            <td className="rp-td rp-td--dept">{row.client}</td>
-                            <td className="rp-td rp-td--dept">{row.owner}</td>
-                            <td className="rp-td rp-td--num">{fmt(row.scheduled)}</td>
-                            <td className="rp-td rp-td--num">{fmt(row.billable)}</td>
-                            <td className="rp-td rp-td--num">{fmt(row.nonBillable)}</td>
-                            <td className="rp-td rp-td--num">{pct(row.billable, row.scheduled)}</td>
-                            <td className="rp-td rp-td--num">{fmt(row.scheduledCost)}</td>
+                            <td className="rp-td rp-td--name">{person.name}</td>
+                            <td className="rp-td rp-td--dept">{person.dept}</td>
+                            <td className="rp-td rp-td--num">{fmt(person.capacity)}</td>
+                            <td className="rp-td rp-td--num">{fmt(person.scheduled)}</td>
+                            <td className="rp-td rp-td--num">{fmt(person.billable)}</td>
+                            <td className="rp-td rp-td--num">{fmt(person.nonBillable)}</td>
+                            <td className="rp-td rp-td--num">{fmt(person.timeOff)}</td>
+                            <td className="rp-td rp-td--num">{fmt(person.overtime)}</td>
+                            <td className="rp-td rp-td--num"><SchedCell scheduled={person.scheduled} capacity={person.capacity} /></td>
+                            <td className="rp-td rp-td--num">{fmt(person.billable * COST_PER_HOUR)}</td>
                           </tr>
-                          <DetailRow isExpanded={isExpanded} colSpan={10}>
-                            {row.people.length > 0
-                              ? row.people.map(person => (
-                                  <div key={person.id} style={{ marginBottom: 6 }}>
-                                    <strong>{person.name}</strong>: Scheduled {fmt(person.scheduled)}, Billable {fmt(person.billable)}
-                                  </div>
+                          <DetailRow isExpanded={isExpanded} colSpan={11}>
+                            {person.projectTotals.size > 0
+                              ? Array.from(person.projectTotals.entries()).map(([label, hours]) => (
+                                  <div key={label} style={{ marginBottom: 6 }}><strong>{label}</strong>: {fmt(hours)}</div>
                                 ))
-                              : "No people assigned."}
+                              : "No project breakdowns in this date range."}
                           </DetailRow>
                         </Fragment>
                       );
                     })}
-              </tbody>
-            </table>
-          )}
+                  </tbody>
+                </table>
+              )}
  
-          {/* ── Tasks ── */}
-          {activeTab === "Tasks" && (
-            <table className="rp-table">
-              <StandardThead firstColLabel="Allocation Type" showDept={false} />
-              <tbody>
-                {taskRows.length === 0
-                  ? <tr><td colSpan={10} className="rp-td"><div className="rp-empty-tab">No task data in this period.</div></td></tr>
-                  : taskRows.map((row, idx) => (
-                      <StandardRow key={`task-${row.id}`} row={row} idx={idx} expanded={expanded} toggleRow={toggleRow} showDept={false} />
+              {/* ── Roles ── */}
+              {state.activeTab === "Roles" && (
+                <table className="rp-table">
+                  <StandardThead firstColLabel="Role" />
+                  <tbody>
+                    {roleRows.map((row, idx) => (
+                      <StandardRow key={`role-${row.id}`} row={row} idx={idx} expanded={state.expanded} toggleRow={toggleRow} />
                     ))}
-              </tbody>
-            </table>
-          )}
+                  </tbody>
+                </table>
+              )}
  
-          {/* ── Time off ── */}
-          {activeTab === "Time off" && (
-            <table className="rp-table">
-              <thead>
-                <tr>
-                  <th className="rp-th rp-th--expand" />
-                  <th className="rp-th rp-th--name">Leave Type <ChevronDown size={12} className="rp-th-sort" /></th>
-                  <th className="rp-th rp-th--num">People</th>
-                  <th className="rp-th rp-th--num">Total Days</th>
-                  <th className="rp-th rp-th--num">Total Hours</th>
-                </tr>
-              </thead>
-              <tbody>
-                {timeOffRows.length === 0
-                  ? <tr><td colSpan={5} className="rp-td"><div className="rp-empty-tab">No time off data in this period.</div></td></tr>
-                  : timeOffRows.map((row, idx) => {
-                      const isExpanded = expanded[row.id];
-                      return (
-                        <Fragment key={`timeoff-${row.id}`}>
-                          <tr className={`rp-row ${idx % 2 === 0 ? "rp-row--even" : ""}`}>
-                            <td className="rp-td rp-td--expand">
-                              <button className="rp-expand-btn" onClick={() => toggleRow(row.id)} aria-label={isExpanded ? "Collapse" : "Expand"}>
-                                <ChevronRight size={13} className={`rp-expand-icon ${isExpanded ? "rp-expand-icon--open" : ""}`} />
-                              </button>
-                            </td>
-                            <td className="rp-td rp-td--name">{row.name}</td>
-                            <td className="rp-td rp-td--num">{row.people.length}</td>
-                            <td className="rp-td rp-td--num">{row.totalDays.toFixed(1)}</td>
-                            <td className="rp-td rp-td--num">{fmt(row.totalHours)}</td>
-                          </tr>
-                          <DetailRow isExpanded={isExpanded} colSpan={5}>
-                            {row.people.length > 0
-                              ? row.people.map(person => (
-                                  <div key={person.id} style={{ marginBottom: 6 }}>
-                                    <strong>{person.name}</strong>: {fmt(person.timeOff)} ({(person.timeOff / 7.5).toFixed(1)} days)
-                                  </div>
-                                ))
-                              : "No people on this leave type."}
-                          </DetailRow>
-                        </Fragment>
-                      );
-                    })}
-              </tbody>
-            </table>
+              {/* ── Departments ── */}
+              {state.activeTab === "Departments" && (
+                <table className="rp-table">
+                  <StandardThead firstColLabel="Department" showDept={false} />
+                  <tbody>
+                    {deptRows.map((row, idx) => (
+                      <StandardRow key={`dept-${row.id}`} row={row} idx={idx} expanded={state.expanded} toggleRow={toggleRow} showDept={false} />
+                    ))}
+                  </tbody>
+                </table>
+              )}
+ 
+              {/* ── Projects ── */}
+              {state.activeTab === "Projects" && (
+                <table className="rp-table">
+                  <thead>
+                    <tr>
+                      <th className="rp-th rp-th--expand" />
+                      <th className="rp-th rp-th--name">Project <ChevronDown size={12} className="rp-th-sort" /></th>
+                      <th className="rp-th">Code</th>
+                      <th className="rp-th">Client</th>
+                      <th className="rp-th">Owner</th>
+                      <th className="rp-th rp-th--num rp-th--accent">Scheduled</th>
+                      <th className="rp-th rp-th--num rp-th--accent">Billable</th>
+                      <th className="rp-th rp-th--num rp-th--accent">Non-billable</th>
+                      <th className="rp-th rp-th--num">Billable %</th>
+                      <th className="rp-th rp-th--num">Scheduled Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {projectRows.length === 0
+                      ? <tr><td colSpan={10} className="rp-td"><div className="rp-empty-tab">No project data in this period.</div></td></tr>
+                      : projectRows.map((row, idx) => {
+                          const isExpanded = state.expanded[row.id];
+                          return (
+                            <Fragment key={`project-${row.id}`}>
+                              <tr className={`rp-row ${idx % 2 === 0 ? "rp-row--even" : ""}`}>
+                                <td className="rp-td rp-td--expand">
+                                  <button className="rp-expand-btn" onClick={() => toggleRow(row.id)} aria-label={isExpanded ? "Collapse" : "Expand"}>
+                                    <ChevronRight size={13} className={`rp-expand-icon ${isExpanded ? "rp-expand-icon--open" : ""}`} />
+                                  </button>
+                                </td>
+                                <td className="rp-td rp-td--name">{row.name}</td>
+                                <td className="rp-td rp-td--dept">{row.code}</td>
+                                <td className="rp-td rp-td--dept">{row.client}</td>
+                                <td className="rp-td rp-td--dept">{row.owner}</td>
+                                <td className="rp-td rp-td--num">{fmt(row.scheduled)}</td>
+                                <td className="rp-td rp-td--num">{fmt(row.billable)}</td>
+                                <td className="rp-td rp-td--num">{fmt(row.nonBillable)}</td>
+                                <td className="rp-td rp-td--num">{pct(row.billable, row.scheduled)}</td>
+                                <td className="rp-td rp-td--num">{fmt(row.scheduledCost)}</td>
+                              </tr>
+                              <DetailRow isExpanded={isExpanded} colSpan={10}>
+                                {row.people.length > 0
+                                  ? row.people.map(person => (
+                                      <div key={person.id} style={{ marginBottom: 6 }}>
+                                        <strong>{person.name}</strong>: Scheduled {fmt(person.scheduled)}, Billable {fmt(person.billable)}
+                                      </div>
+                                    ))
+                                  : "No people assigned."}
+                              </DetailRow>
+                            </Fragment>
+                          );
+                        })}
+                  </tbody>
+                </table>
+              )}
+ 
+              {/* ── Tasks ── */}
+              {state.activeTab === "Tasks" && (
+                <table className="rp-table">
+                  <StandardThead firstColLabel="Allocation Type" showDept={false} />
+                  <tbody>
+                    {taskRows.length === 0
+                      ? <tr><td colSpan={10} className="rp-td"><div className="rp-empty-tab">No task data in this period.</div></td></tr>
+                      : taskRows.map((row, idx) => (
+                          <StandardRow key={`task-${row.id}`} row={row} idx={idx} expanded={state.expanded} toggleRow={toggleRow} showDept={false} />
+                        ))}
+                  </tbody>
+                </table>
+              )}
+ 
+              {/* ── Time off ── */}
+              {state.activeTab === "Time off" && (
+                <table className="rp-table">
+                  <thead>
+                    <tr>
+                      <th className="rp-th rp-th--expand" />
+                      <th className="rp-th rp-th--name">Leave Type <ChevronDown size={12} className="rp-th-sort" /></th>
+                      <th className="rp-th rp-th--num">People</th>
+                      <th className="rp-th rp-th--num">Total Days</th>
+                      <th className="rp-th rp-th--num">Total Hours</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {timeOffRows.length === 0
+                      ? <tr><td colSpan={5} className="rp-td"><div className="rp-empty-tab">No time off data in this period.</div></td></tr>
+                      : timeOffRows.map((row, idx) => {
+                          const isExpanded = state.expanded[row.id];
+                          return (
+                            <Fragment key={`timeoff-${row.id}`}>
+                              <tr className={`rp-row ${idx % 2 === 0 ? "rp-row--even" : ""}`}>
+                                <td className="rp-td rp-td--expand">
+                                  <button className="rp-expand-btn" onClick={() => toggleRow(row.id)} aria-label={isExpanded ? "Collapse" : "Expand"}>
+                                    <ChevronRight size={13} className={`rp-expand-icon ${isExpanded ? "rp-expand-icon--open" : ""}`} />
+                                  </button>
+                                </td>
+                                <td className="rp-td rp-td--name">{row.name}</td>
+                                <td className="rp-td rp-td--num">{row.people.length}</td>
+                                <td className="rp-td rp-td--num">{row.totalDays.toFixed(1)}</td>
+                                <td className="rp-td rp-td--num">{fmt(row.totalHours)}</td>
+                              </tr>
+                              <DetailRow isExpanded={isExpanded} colSpan={5}>
+                                {row.people.length > 0
+                                  ? row.people.map(person => (
+                                      <div key={person.id} style={{ marginBottom: 6 }}>
+                                        <strong>{person.name}</strong>: {fmt(person.timeOff)} ({(person.timeOff / 7.5).toFixed(1)} days)
+                                      </div>
+                                    ))
+                                  : "No people on this leave type."}
+                              </DetailRow>
+                            </Fragment>
+                          );
+                        })}
+                  </tbody>
+                </table>
+              )}
+            </>
+          ) : (
+            <>
+              {/* ── Projects Grouping ── */}
+              {state.projectGrouping === "projects" && (
+                <table className="rp-table">
+                  <thead>
+                    <tr>
+                      <th className="rp-th rp-th--expand" />
+                      <th className="rp-th rp-th--name">Project <ChevronDown size={12} className="rp-th-sort" /></th>
+                      <th className="rp-th">Project Code</th>
+                      <th className="rp-th">Client</th>
+                      <th className="rp-th">Stage</th>
+                      <th className="rp-th">Owner</th>
+                      <th className="rp-th rp-th--num">Budget</th>
+                      <th className="rp-th rp-th--num rp-th--accent">Scheduled %</th>
+                      <th className="rp-th rp-th--num rp-th--accent">Scheduled Hours</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {projectRows.length === 0
+                      ? <tr><td colSpan={9} className="rp-td"><div className="rp-empty-tab">No project data in this period.</div></td></tr>
+                      : projectRows.map((row, idx) => {
+                          const isExpanded = state.expanded[row.id];
+                          const schedPct = row.scheduled > 0 ? Math.round((row.scheduled / row.scheduled) * 100) : 0;
+                          return (
+                            <Fragment key={`project-${row.id}`}>
+                              <tr className={`rp-row ${idx % 2 === 0 ? "rp-row--even" : ""}`}>
+                                <td className="rp-td rp-td--expand">
+                                  <button className="rp-expand-btn" onClick={() => toggleRow(row.id)} aria-label={isExpanded ? "Collapse" : "Expand"}>
+                                    <ChevronRight size={13} className={`rp-expand-icon ${isExpanded ? "rp-expand-icon--open" : ""}`} />
+                                  </button>
+                                </td>
+                                <td className="rp-td rp-td--name">{row.name}</td>
+                                <td className="rp-td rp-td--dept">{row.code}</td>
+                                <td className="rp-td rp-td--dept">{row.client}</td>
+                                <td className="rp-td rp-td--dept">—</td>
+                                <td className="rp-td rp-td--dept">{row.owner}</td>
+                                <td className="rp-td rp-td--num">—</td>
+                                <td className="rp-td rp-td--num">100%</td>
+                                <td className="rp-td rp-td--num">{fmt(row.scheduled)}</td>
+                              </tr>
+                              <DetailRow isExpanded={isExpanded} colSpan={9}>
+                                <div>
+                                  <strong>No Phases</strong>
+                                </div>
+                              </DetailRow>
+                            </Fragment>
+                          );
+                        })}
+                  </tbody>
+                </table>
+              )}
+
+              {/* ── Clients Grouping ── */}
+              {state.projectGrouping === "clients" && (
+                <table className="rp-table">
+                  <thead>
+                    <tr>
+                      <th className="rp-th rp-th--name">Client</th>
+                      <th className="rp-th rp-th--num">Budget</th>
+                      <th className="rp-th rp-th--num rp-th--accent">Scheduled Hours</th>
+                      <th className="rp-th rp-th--num rp-th--accent">Scheduled %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {projectGroupedByClient.length === 0
+                      ? <tr><td colSpan={4} className="rp-td"><div className="rp-empty-tab">No client data in this period.</div></td></tr>
+                      : projectGroupedByClient.map((row, idx) => {
+                          const schedPct = row.scheduled > 0 ? 100 : 0;
+                          return (
+                            <tr key={`client-${row.id}`} className={`rp-row ${idx % 2 === 0 ? "rp-row--even" : ""}`}>
+                              <td className="rp-td rp-td--name">{row.name}</td>
+                              <td className="rp-td rp-td--num">—</td>
+                              <td className="rp-td rp-td--num">{fmt(row.scheduled)}</td>
+                              <td className="rp-td rp-td--num">{schedPct}%</td>
+                            </tr>
+                          );
+                        })}
+                  </tbody>
+                </table>
+              )}
+            </>
           )}
  
         </motion.div>
