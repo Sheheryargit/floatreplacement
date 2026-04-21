@@ -14,6 +14,7 @@ import AppSideNav from "../components/navigation/AppSideNav.jsx";
 import { useAppData } from "../context/AppDataContext.jsx";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { allocationHasPersonSchedule } from "../utils/peopleSort.js";
+import { advanceRepeatWindow } from "../utils/allocationRepeatWindow.js";
 import { projectToAllocationLabel } from "../utils/projectColors.js";
 import { downloadCSV, arrayToCSV, formatDateDDMmmYY } from "../utils/reportingExport.js";
 import "./ReportingPage.css";
@@ -38,9 +39,40 @@ const FILTER_OPTIONS = {
   timeoff: ['Confirmed', 'Tentative'],
 };
  
-const fmt = (h) => h === 0 ? "0h" : `${h.toLocaleString()}h`;
+const fmt = (h) => {
+  if (!h || h === 0) return "0h";
+  const rounded = Math.round(h * 10) / 10;
+  return `${rounded.toLocaleString("en-AU")}h`;
+};
 const pct = (a, b) => b === 0 ? "0%" : `${Math.round((a / b) * 100)}%`;
 const COST_PER_HOUR = 100;
+
+const CHART_COLORS = {
+  billable:    "#22d3ee",
+  nonBillable: "#818cf8",
+  timeOff:     "#fbbf24",
+};
+
+function niceChartTicks(maxVal, targetCount = 5) {
+  if (maxVal <= 0) return [0];
+  const rawStep = maxVal / (targetCount - 1);
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const normalized = rawStep / magnitude;
+  const niceStep = normalized <= 1.5 ? 1 : normalized <= 3.5 ? 2 : normalized <= 7.5 ? 5 : 10;
+  const step = niceStep * magnitude;
+  const ticks = [0];
+  for (let v = step; v <= maxVal * 1.1 + step; v += step) {
+    ticks.push(Math.round(v));
+    if (ticks.length >= targetCount + 2) break;
+  }
+  return ticks;
+}
+
+function fmtYLabel(h) {
+  if (h >= 10000) return `${Math.round(h / 1000)}k`;
+  if (h >= 1000) return `${(h / 1000).toFixed(1)}k`;
+  return String(h);
+}
  
 function parseDate(value) {
   if (!value) return null;
@@ -195,8 +227,76 @@ function allocationHours(alloc) {
   return hoursPerDay * workingDays;
 }
 
+/** Count weekdays (Mon–Fri) between two Date objects (inclusive). */
+function countWeekdaysInRange(startDate, endDate) {
+  let n = 0;
+  const end = new Date(endDate);
+  for (const d = new Date(startDate); d <= end; d.setDate(d.getDate() + 1)) {
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) n++;
+  }
+  return n;
+}
+
+/**
+ * Hours attributed to a non-repeating allocation within [rangeStart, rangeEnd].
+ * Pro-rates by the fraction of working days that fall inside the range.
+ * For repeating occurrences (already clipped to one occurrence window) the
+ * full allocationHours() value is used as-is.
+ */
+function allocationHoursInRange(alloc, rangeStart, rangeEnd) {
+  if (!alloc) return 0;
+  // Repeating occurrences are already one-occurrence-sized — use full hours
+  if (alloc.repeatId && alloc.repeatId !== "none") return allocationHours(alloc);
+
+  const aStart = parseDate(alloc.startDate);
+  const aEnd = parseDate(alloc.endDate) ?? aStart;
+  if (!aStart || !aEnd) return 0;
+
+  // If perfectly contained, no need to pro-rate
+  if (aStart >= rangeStart && aEnd <= rangeEnd) return allocationHours(alloc);
+
+  const hoursPerDay = Number(alloc.hoursPerDay) || 0;
+  if (hoursPerDay > 0) {
+    const overlapStart = aStart < rangeStart ? rangeStart : aStart;
+    const overlapEnd = aEnd > rangeEnd ? rangeEnd : aEnd;
+    return hoursPerDay * countWeekdaysInRange(overlapStart, overlapEnd);
+  }
+
+  // Fall back: pro-rate totalHours by working-day fraction
+  const total = allocationHours(alloc);
+  const allocDays = countWeekdaysInRange(aStart, aEnd);
+  if (allocDays === 0) return total;
+  const overlapStart = aStart < rangeStart ? rangeStart : aStart;
+  const overlapEnd = aEnd > rangeEnd ? rangeEnd : aEnd;
+  const overlapDays = countWeekdaysInRange(overlapStart, overlapEnd);
+  return total * (overlapDays / allocDays);
+}
+
 function normalizeText(value) {
   return (value || "").toString().trim().toLowerCase();
+}
+
+/** Groups filteredPersonRows by a string key, summing all numeric stats. */
+function groupPeopleBy(rows, getKey) {
+  const groups = {};
+  for (const person of rows) {
+    const key = getKey(person);
+    if (!groups[key]) {
+      groups[key] = { capacity: 0, scheduled: 0, billable: 0, nonBillable: 0, timeOff: 0, overtime: 0, unscheduled: 0, scheduledCost: 0, people: [] };
+    }
+    const g = groups[key];
+    g.capacity     += person.capacity;
+    g.scheduled    += person.scheduled;
+    g.billable     += person.billable;
+    g.nonBillable  += person.nonBillable;
+    g.timeOff      += person.timeOff;
+    g.overtime     += person.overtime;
+    g.unscheduled  += person.unscheduled;
+    g.scheduledCost += person.billable * COST_PER_HOUR;
+    g.people.push(person);
+  }
+  return Object.entries(groups).map(([key, data]) => ({ id: key, name: key, ...data }));
 }
  
 function breakdownKey(alloc, projects) {
@@ -349,7 +449,7 @@ export default function ReportingPage() {
     },
   };
 
-  const stateReducer = useCallback((state, action) => {
+  const stateReducer = (state, action) => {
     switch (action.type) {
       case "SET_VIEW_MODE":
         return { ...state, viewMode: action.payload, activeTab: "People" };
@@ -376,7 +476,7 @@ export default function ReportingPage() {
       default:
         return state;
     }
-  }, []);
+  };
 
   const [state, dispatch] = useReducer(stateReducer, initialState);
   const [openQuickAdd, setOpenQuickAdd] = useState(false);
@@ -386,10 +486,13 @@ export default function ReportingPage() {
   const [endMonthView, setEndMonthView] = useState(() => toMonthStart(getDateRangeForTimeframe('next-12-weeks').end));
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [drilldown, setDrilldown] = useState({ personId: null, personName: null, project: null, client: null });
+  const [hoveredBar, setHoveredBar] = useState(null);
+  const [hoveredHoliday, setHoveredHoliday] = useState(null);
   const dropdownRef = useRef();
   const exportRef = useRef();
   const quickAddRef = useRef();
   const datePickerRef = useRef();
+  const chartRef = useRef();  
   const navigate = useNavigate();
  
   useEffect(() => {
@@ -458,8 +561,43 @@ export default function ReportingPage() {
     setDrilldown({ personId: null, personName: null, project: null, client: null });
   }, []);
 
+  const handleBarHover = useCallback((e, d, schedPct, bilPct, nonPct) => {
+    setHoveredBar({ d, x: e.clientX, y: e.clientY, schedPct, bilPct, nonPct });
+  }, []);
+
+  const handleHolidayEnter = useCallback((e, names) => {
+    setHoveredHoliday({ names, x: e.clientX, y: e.clientY });
+  }, []);
+
+  const handleHolidayLeave = useCallback(() => {
+    setHoveredHoliday(null);
+  }, []);
+
+  // ── Holiday buckets for chart X-axis dots ────────────────────────────────────
+  const holidaysByKey = useMemo(() => {
+    const map = new Map();
+    const start = new Date(dateRange.start); start.setHours(0, 0, 0, 0);
+    const end = new Date(dateRange.end); end.setHours(23, 59, 59, 999);
+    for (const alloc of publicHolidayAllocations) {
+      if (!alloc.syntheticPublicHoliday) continue;
+      const d = parseDate(alloc.startDate);
+      if (!d || d < start || d > end) continue;
+      let key;
+      if (state.viewType === 'days') key = d.toISOString().split('T')[0];
+      else if (state.viewType === 'weeks') {
+        const ws = new Date(d); ws.setDate(ws.getDate() - ws.getDay());
+        key = ws.toISOString().split('T')[0];
+      } else {
+        key = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+      }
+      if (!map.has(key)) map.set(key, new Set());
+      map.get(key).add(alloc.notes || "Public holiday");
+    }
+    return map;
+  }, [publicHolidayAllocations, dateRange.start, dateRange.end, state.viewType]);
+
   // ── Date Range Management ─────────────────────────────────────────────────
-  const navigateDateRange = (direction) => {
+  const navigateDateRange = useCallback((direction) => {
     setDateRange((prev) => {
       const start = new Date(prev.start);
       const end = new Date(prev.end);
@@ -475,9 +613,9 @@ export default function ReportingPage() {
       return { start: nextStart, end: nextEnd };
     });
     setTimeframeMode('custom');
-  };
+  }, []);
 
-  const handleTimeframeSelect = (mode) => {
+  const handleTimeframeSelect = useCallback((mode) => {
     if (mode === 'custom') {
       setTimeframeMode('custom');
       return;
@@ -486,13 +624,7 @@ export default function ReportingPage() {
     setDateRange(nextRange);
     setTimeframeMode(mode);
     setDatePickerOpen(false);
-  };
- 
-  const totalCapacityHours = useMemo(() => {
-    if (state.viewType === 'days') return 4.3 * 5 * 7.5;
-    if (state.viewType === 'weeks') return 12 * 5 * 7.5;
-    return 52 * 5 * 7.5;
-  }, [state.viewType]);
+  }, []);
  
   const scheduleAllocations = useMemo(
     () => [...allocations, ...publicHolidayAllocations],
@@ -500,14 +632,40 @@ export default function ReportingPage() {
   );
 
   const rangedAllocations = useMemo(() => {
-    const start = new Date(dateRange.start);
-    const end = new Date(dateRange.end);
-    start.setHours(0, 0, 0, 0);
-    end.setHours(23, 59, 59, 999);
-    return scheduleAllocations.filter((alloc) => {
-      const d = parseDate(alloc.startDate);
-      return d && d >= start && d <= end;
-    });
+    const rangeStart = new Date(dateRange.start);
+    const rangeEnd = new Date(dateRange.end);
+    rangeStart.setHours(0, 0, 0, 0);
+    rangeEnd.setHours(23, 59, 59, 999);
+    const rsKey = rangeStart.toISOString().slice(0, 10);
+    const reKey = rangeEnd.toISOString().slice(0, 10);
+
+    const result = [];
+    for (const alloc of scheduleAllocations) {
+      const s = parseDate(alloc.startDate);
+      if (!s) continue;
+      const e = parseDate(alloc.endDate) ?? s;
+
+      if (!alloc.repeatId || alloc.repeatId === "none") {
+        // Non-repeating: include if allocation window overlaps the selected range
+        if (s <= rangeEnd && e >= rangeStart) result.push(alloc);
+      } else {
+        // Repeating: walk occurrences and collect every one that overlaps the range
+        let ws = s.toISOString().slice(0, 10);
+        let we = e.toISOString().slice(0, 10);
+        for (let guard = 0; guard < 520; guard++) {
+          if (ws > reKey) break; // occurrence starts after range end — done
+          if (we >= rsKey) {
+            // This occurrence overlaps the range — push a clipped copy
+            result.push({ ...alloc, startDate: ws, endDate: we });
+          }
+          const next = advanceRepeatWindow(ws, we, alloc.repeatId);
+          if (!next) break;
+          ws = next.start;
+          we = next.end;
+        }
+      }
+    }
+    return result;
   }, [scheduleAllocations, dateRange.start, dateRange.end]);
  
   const projectBillability = useMemo(() => {
@@ -522,26 +680,39 @@ export default function ReportingPage() {
     () => people.filter((person) => !person.archived),
     [people]
   );
+
+  const rangeWeekdays = useMemo(() => {
+    const rangeStart = new Date(dateRange.start);
+    const rangeEnd = new Date(dateRange.end);
+    rangeStart.setHours(0, 0, 0, 0);
+    rangeEnd.setHours(23, 59, 59, 999);
+    return countWeekdaysInRange(rangeStart, rangeEnd);
+  }, [dateRange.start, dateRange.end]);
  
   // ── Person rows — source of truth for all tabs ───────────────────────────────
   // Each person row stores their resolved allocations so downstream tabs
   // don't need to re-run allocationHasPersonSchedule.
   const personRows = useMemo(
-    () =>
-      activePeople.map((person) => {
-        const capacity = totalCapacityHours;
+    () => {
+      const rangeStart = new Date(dateRange.start);
+      const rangeEnd = new Date(dateRange.end);
+      rangeStart.setHours(0, 0, 0, 0);
+      rangeEnd.setHours(23, 59, 59, 999);
+      return activePeople.map((person) => {
+        const capacity = rangeWeekdays * 7.5;
         let billable = 0, nonBillable = 0, timeOff = 0;
- 
-        const allocationsForPerson = rangedAllocations.filter((alloc) =>
-          allocationHasPersonSchedule(alloc, person.id)
-        );
- 
+
+        // Attach _rangedHours so projectRows/taskRows don't need to re-derive them
+        const allocationsForPerson = rangedAllocations
+          .filter((alloc) => allocationHasPersonSchedule(alloc, person.id))
+          .map((alloc) => ({ ...alloc, _rangedHours: allocationHoursInRange(alloc, rangeStart, rangeEnd) }));
+
         const projectTotals = new Map();
         for (const alloc of allocationsForPerson) {
-          const hours = allocationHours(alloc);
+          const hours = alloc._rangedHours;
           const key = breakdownKey(alloc, projects);
           projectTotals.set(key, (projectTotals.get(key) || 0) + hours);
- 
+
           if (alloc.isLeave) {
             timeOff += hours;
           } else {
@@ -550,7 +721,7 @@ export default function ReportingPage() {
             else billable += hours;
           }
         }
- 
+
         const scheduled = billable + nonBillable;
         return {
           ...person,
@@ -566,8 +737,9 @@ export default function ReportingPage() {
           allocations: allocationsForPerson,
           projectTotals,
         };
-      }),
-    [activePeople, rangedAllocations, projectBillability, projects, totalCapacityHours]
+      });
+    },
+    [activePeople, rangedAllocations, projectBillability, projects, rangeWeekdays, dateRange.start, dateRange.end]
   );
  
   const projectClientByLabel = useMemo(() => {
@@ -600,6 +772,12 @@ export default function ReportingPage() {
     });
   }, [personRows, drilldown.personId, drilldown.project, drilldown.client, projectClientByLabel]);
 
+  // ── Per-bar capacity for chart scaling (depends on filteredPersonRows) ───────
+  const capacityPerBar = useMemo(() => {
+    const perPerson = state.viewType === 'days' ? 7.5 : state.viewType === 'weeks' ? 37.5 : 157.5;
+    return perPerson * filteredPersonRows.length;
+  }, [state.viewType, filteredPersonRows.length]);
+
   // ── Totals ──────────────────────────────────────────────────────────────────
   const totals = useMemo(() => {
     const sums = filteredPersonRows.reduce(
@@ -615,42 +793,18 @@ export default function ReportingPage() {
   }, [filteredPersonRows]);
  
   // ── Role rows ───────────────────────────────────────────────────────────────
-  const roleRows = useMemo(() => {
-    const groups = {};
-    filteredPersonRows.forEach(person => {
-      const role = person.role || "Unassigned";
-      if (!groups[role]) groups[role] = { capacity: 0, scheduled: 0, billable: 0, nonBillable: 0, timeOff: 0, overtime: 0, unscheduled: 0, people: [], scheduledCost: 0 };
-      const g = groups[role];
-      g.capacity += person.capacity; g.scheduled += person.scheduled;
-      g.billable += person.billable; g.nonBillable += person.nonBillable;
-      g.timeOff += person.timeOff; g.overtime += person.overtime;
-      g.unscheduled += person.unscheduled;
-      g.scheduledCost += person.billable * COST_PER_HOUR;
-      g.people.push(person);
-    });
-    return Object.entries(groups).map(([role, data]) => ({ id: role, name: role, ...data }));
-  }, [filteredPersonRows]);
- 
+  const roleRows = useMemo(
+    () => groupPeopleBy(filteredPersonRows, (p) => p.role || "Unassigned"),
+    [filteredPersonRows]
+  );
+
   // ── Dept rows ───────────────────────────────────────────────────────────────
-  const deptRows = useMemo(() => {
-    const groups = {};
-    filteredPersonRows.forEach(person => {
-      const dept = person.dept;
-      if (!groups[dept]) groups[dept] = { capacity: 0, scheduled: 0, billable: 0, nonBillable: 0, timeOff: 0, overtime: 0, unscheduled: 0, people: [], scheduledCost: 0 };
-      const g = groups[dept];
-      g.capacity += person.capacity; g.scheduled += person.scheduled;
-      g.billable += person.billable; g.nonBillable += person.nonBillable;
-      g.timeOff += person.timeOff; g.overtime += person.overtime;
-      g.unscheduled += person.unscheduled;
-      g.scheduledCost += person.billable * COST_PER_HOUR;
-      g.people.push(person);
-    });
-    return Object.entries(groups).map(([dept, data]) => ({ id: dept, name: dept, ...data }));
-  }, [filteredPersonRows]);
- 
+  const deptRows = useMemo(
+    () => groupPeopleBy(filteredPersonRows, (p) => p.dept),
+    [filteredPersonRows]
+  );
+
   // ── Project rows ─────────────────────────────────────────────────────────────
-  // Iterates person.allocations — already resolved, no need to re-run
-  // allocationHasPersonSchedule. This is why it now shows data.
   const projectRows = useMemo(() => {
     const groups = {};
     
@@ -672,7 +826,7 @@ export default function ReportingPage() {
       for (const alloc of person.allocations) {
         if (alloc.isLeave) continue;
         const projectLabel = (alloc.project || "").trim() || "Unspecified work";
-        const hours = allocationHours(alloc);
+        const hours = alloc._rangedHours ?? allocationHours(alloc);
         const isBillable = projectBillability.get(projectLabel) !== false;
  
         if (!groups[projectLabel]) {
@@ -695,6 +849,7 @@ export default function ReportingPage() {
         code: projectMeta.code || "—",
         client: projectMeta.client || "—",
         owner: projectMeta.owner || "—",
+        stage: projectMeta.stage || null,
         scheduled: data.scheduled,
         billable: data.billable,
         nonBillable: data.nonBillable,
@@ -712,7 +867,7 @@ export default function ReportingPage() {
     for (const person of filteredPersonRows) {
       for (const alloc of person.allocations) {
         const category = getTaskCategory(alloc);
-        const hours = allocationHours(alloc);
+        const hours = alloc._rangedHours ?? allocationHours(alloc);
         const isBillable = projectBillability.get((alloc.project || "").trim()) !== false;
  
         if (!groups[category]) {
@@ -789,18 +944,13 @@ export default function ReportingPage() {
     "Time off": timeOffRows.length,
   }), [filteredPersonRows.length, roleRows.length, deptRows.length, projectRows.length, taskRows.length, timeOffRows.length]);
 
+  // projectRows is already scoped to filteredPersonRows (which applies personId + client drilldown).
+  // Only need to additionally filter by project name when drilling into a specific project.
   const visibleProjectRows = useMemo(() => {
-    const personIdFilter = drilldown.personId;
     const projectFilter = normalizeText(drilldown.project);
-    const clientFilter = normalizeText(drilldown.client);
-
-    return projectRows.filter((row) => {
-      if (personIdFilter && !row.people.some((person) => person.id === personIdFilter)) return false;
-      if (projectFilter && normalizeText(row.id) !== projectFilter) return false;
-      if (clientFilter && normalizeText(row.client) !== clientFilter) return false;
-      return true;
-    });
-  }, [projectRows, drilldown.personId, drilldown.project, drilldown.client]);
+    if (!projectFilter) return projectRows;
+    return projectRows.filter((row) => normalizeText(row.id) === projectFilter);
+  }, [projectRows, drilldown.project]);
 
   const visibleClientRows = useMemo(() => {
     const groups = {};
@@ -872,36 +1022,44 @@ export default function ReportingPage() {
       for (let c = new Date(startDate); c <= endDate; c = addDays(c, 1)) {
         const key = c.toISOString().split('T')[0];
         const v = grouped.get(key) || { billable: 0, nonBillable: 0, timeOff: 0 };
-        data.push({ label: c.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }), ...v, total: v.billable + v.nonBillable + v.timeOff });
+        data.push({ label: c.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }), key, ...v, total: v.billable + v.nonBillable + v.timeOff, holidays: Array.from(holidaysByKey.get(key) || []) });
       }
     } else if (state.viewType === 'weeks') {
       for (let c = startOfWeek(startDate); c <= endDate; c = addDays(c, 7)) {
         const ws = new Date(c); ws.setDate(ws.getDate() - ws.getDay());
         const key = ws.toISOString().split('T')[0];
         const v = grouped.get(key) || { billable: 0, nonBillable: 0, timeOff: 0 };
-        data.push({ label: c.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }), ...v, total: v.billable + v.nonBillable + v.timeOff });
+        data.push({ label: c.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }), key, ...v, total: v.billable + v.nonBillable + v.timeOff, holidays: Array.from(holidaysByKey.get(key) || []) });
       }
     } else {
       for (let c = new Date(startDate.getFullYear(), startDate.getMonth(), 1); c <= endDate; c = new Date(c.getFullYear(), c.getMonth() + 1, 1)) {
         const key = new Date(c.getFullYear(), c.getMonth(), 1).toISOString().split('T')[0];
         const v = grouped.get(key) || { billable: 0, nonBillable: 0, timeOff: 0 };
-        data.push({ label: c.toLocaleDateString('en-AU', { month: 'short', year: '2-digit' }), ...v, total: v.billable + v.nonBillable + v.timeOff });
+        data.push({ label: c.toLocaleDateString('en-AU', { month: 'short', year: '2-digit' }), key, ...v, total: v.billable + v.nonBillable + v.timeOff, holidays: Array.from(holidaysByKey.get(key) || []) });
       }
     }
-    return { startDate, endDate, data, totalCapacity: totalCapacityHours * filteredPersonRows.length };
-  }, [filteredRangedAllocations, state.viewType, projectBillability, totalCapacityHours, filteredPersonRows.length, dateRange.start, dateRange.end]);
+    return { startDate, endDate, data, totalCapacity: (filteredPersonRows[0]?.capacity ?? 0) * filteredPersonRows.length };
+  }, [filteredRangedAllocations, state.viewType, projectBillability, filteredPersonRows, dateRange.start, dateRange.end, holidaysByKey]);
  
   const toggleRow = useCallback((id) => {
     dispatch({ type: "TOGGLE_ROW", payload: id });
   }, []);
 
   const chartMax = useMemo(() => Math.max(...chartRange.data.map(d => d.total), 1), [chartRange.data]);
+  const yMax = useMemo(() => Math.max(chartMax, capacityPerBar, 1), [chartMax, capacityPerBar]);
+  const yTicks = useMemo(() => niceChartTicks(yMax), [yMax]);
+  const labelStep = useMemo(() => {
+    const n = chartRange.data.length;
+    if (n <= 20) return 1;
+    if (n <= 40) return 2;
+    if (n <= 84) return 7;
+    return 14;
+  }, [chartRange.data.length]);
   const chartStartLabel = dateRange.start ? weekLabel(dateRange.start) : "—";
   const chartEndLabel = dateRange.end ? weekLabel(dateRange.end) : "—";
-  const isDark = theme !== "light";
 
   // ── Export Functions ─────────────────────────────────────────────────────────
-  const exportChartData = () => {
+  const exportChartData = useCallback(() => {
     const header = [
       "Date",
       "Capacity hrs",
@@ -911,12 +1069,8 @@ export default function ReportingPage() {
       "Scheduled Billable %",
       "Scheduled Non-billable hrs",
       "Scheduled Non-billable %",
-      "Scheduled Tentative (all) hrs",
-      "Scheduled Tentative (all) %",
-      "Unscheduled hrs",
-      "Scheduled Overtime hrs",
-      "Time off / Holiday hrs",
-      "Time off / Holiday days",
+      "Time off hrs",
+      "Time off days",
     ];
     
     const rows = chartRange.data.map((d) => {
@@ -938,10 +1092,6 @@ export default function ReportingPage() {
         `${billablePct}%`,
         d.nonBillable.toFixed(1),
         `${nonbillablePct}%`,
-        "0", // Tentative hrs - adjust if you have this data
-        "0%", // Tentative % - adjust if you have this data
-        "0", // Unscheduled - adjust if you have this data
-        "0", // Overtime - adjust if you have this data
         d.timeOff.toFixed(1),
         timeoffDays.toFixed(1),
       ];
@@ -949,34 +1099,29 @@ export default function ReportingPage() {
     
     const csv = arrayToCSV([header, ...rows]);
     downloadCSV(csv, `chart-data-${new Date().toISOString().split('T')[0]}.csv`);
-  };
+  }, [chartRange, filteredPersonRows]);
 
-  const exportTableData = () => {
+  const exportTableData = useCallback(() => {
     const header = [
       "Person",
       "Role",
       "Department",
-      "Tags",
       "Capacity hrs",
       "Client",
       "Project",
       "Project code",
       "Task",
-      "Time off",
-      "Holiday",
+      "Is leave",
       "Scheduled hrs",
       "Scheduled billable hrs",
       "Scheduled non-billable hrs",
-      "Scheduled tentative (all) hrs",
-      "Scheduled overtime (all) hrs",
-      "Unscheduled capacity (all) hrs",
+      "Overtime hrs",
+      "Unscheduled hrs",
       "Time off hrs",
       "Time off days",
-      "Holiday hrs",
-      "Holiday days",
       "Scheduled % of capacity",
-      "Scheduled billable % of capacity",
-      "Scheduled billable % of scheduled",
+      "Billable % of capacity",
+      "Billable % of scheduled",
     ];
     
     const rows = [];
@@ -986,69 +1131,45 @@ export default function ReportingPage() {
           person.name,
           person.role || "—",
           person.dept,
-          "",
           person.capacity.toFixed(1),
-          "—",
-          "—",
-          "—",
-          "—",
-          "—",
-          "—",
-          "0",
-          "0",
-          "0",
-          "0",
+          "—", "—", "—", "—", "—",
+          "0", "0", "0",
           person.overtime.toFixed(1),
           person.unscheduled.toFixed(1),
-          "0",
-          "0",
-          "0",
-          "0",
-          pct(0, person.capacity),
-          pct(0, person.capacity),
-          "0%",
+          "0", "0",
+          pct(0, person.capacity), pct(0, person.capacity), "0%",
         ]);
       } else {
         for (const alloc of person.allocations) {
           const hours = allocationHours(alloc);
-          const hours_days = hours / 7.5;
-          const schedPct = pct(person.scheduled, person.capacity);
-          const billablePct = pct(person.billable, person.capacity);
-          const billableOfSched = pct(person.billable, person.scheduled);
-          
+          const hoursDays = (hours / 7.5).toFixed(1);
           rows.push([
             person.name,
             person.role || "—",
             person.dept,
-            "",
             person.capacity.toFixed(1),
-            alloc.client || projectClientByLabel.get((alloc.project || "").trim() || "Unspecified work") || "—",
+            alloc.client || projectClientByLabel.get((alloc.project || "").trim()) || "—",
             alloc.project || "—",
             alloc.projectCode || "—",
             alloc.task || "—",
-            alloc.isLeave ? "Yes" : "—",
-            alloc.isHoliday ? "Yes" : "—",
+            alloc.isLeave ? "Yes" : "No",
             person.scheduled.toFixed(1),
             person.billable.toFixed(1),
             person.nonBillable.toFixed(1),
-            "0", // Tentative - adjust if available
             person.overtime.toFixed(1),
             person.unscheduled.toFixed(1),
             alloc.isLeave ? hours.toFixed(1) : "0",
-            alloc.isLeave ? hours_days.toFixed(1) : "0",
-            alloc.isHoliday ? hours.toFixed(1) : "0",
-            alloc.isHoliday ? hours_days.toFixed(1) : "0",
-            schedPct,
-            billablePct,
-            billableOfSched,
+            alloc.isLeave ? hoursDays : "0",
+            pct(person.scheduled, person.capacity),
+            pct(person.billable, person.capacity),
+            pct(person.billable, person.scheduled),
           ]);
         }
       }
     }
-    
     const csv = arrayToCSV([header, ...rows]);
     downloadCSV(csv, `table-data-${new Date().toISOString().split('T')[0]}.csv`);
-  };
+  }, [filteredPersonRows, projectClientByLabel]);
  
   return (
     <div className="reporting-root" data-theme={theme === "light" ? "light" : "dark"}>
@@ -1135,7 +1256,7 @@ export default function ReportingPage() {
             <button className="rp-icon-btn" onClick={() => navigateDateRange('prev')} aria-label="Previous period"><ChevronLeft size={14} /></button>
             <button className="rp-icon-btn" onClick={() => navigateDateRange('next')} aria-label="Next period"><ChevronRight size={14} /></button>
             <button className="rp-date-label rp-date-label-btn" onClick={() => setDatePickerOpen(!datePickerOpen)}>
-              {chartStartLabel}{" – "}<span className="rp-date-accent">{chartEndLabel}</span>
+              <span className="rp-date-accent">{chartStartLabel}</span>{" – "}<span className="rp-date-accent">{chartEndLabel}</span>
             </button>
             <button 
               className="rp-date-caret" 
@@ -1346,23 +1467,151 @@ export default function ReportingPage() {
                 <option value="months">Months</option>
               </select>
             </div>
+            {/* Legend — inline with toolbar */}
+            <div className="rp-chart-legend rp-chart-legend--toolbar">
+              <span className="rp-chart-legend-item"><span className="rp-chart-legend-swatch" style={{ background: CHART_COLORS.billable }} />Billable</span>
+              <span className="rp-chart-legend-item"><span className="rp-chart-legend-swatch" style={{ background: CHART_COLORS.nonBillable }} />Non-billable</span>
+              <span className="rp-chart-legend-item"><span className="rp-chart-legend-swatch" style={{ background: CHART_COLORS.timeOff }} />Time off</span>
+              <span className="rp-chart-legend-item"><span className="rp-chart-legend-swatch rp-chart-legend-swatch--cap" />Capacity</span>
+              <span className="rp-chart-legend-item"><span className="rp-chart-legend-dot" />Public holiday</span>
+            </div>
           </div>
         </motion.div>
  
         {/* ── Chart ── */}
         <motion.div className="rp-chart-wrap" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4, delay: 0.05 }}>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: "8px", height: "260px", padding: "12px 8px" }}>
-            {chartRange.data.map((d, i) => (
-              <div key={i} style={{
-                flex: 1,
-                height: `${chartMax > 0 ? Math.max(6, (d.total / chartMax) * 220) : 6}px`,
-                background: isDark ? "#2dd4bf" : "#0d9488",
-                borderRadius: "2px 2px 0 0",
-                minHeight: "6px",
-              }} title={`${state.viewType}: ${d.label}\nBillable: ${fmt(d.billable)}\nNon-billable: ${fmt(d.nonBillable)}\nTime off: ${fmt(d.timeOff)}\nTotal: ${fmt(d.total)}`} />
-            ))}
+          <div className="rp-chart-body" ref={chartRef} onMouseLeave={() => { setHoveredBar(null); setHoveredHoliday(null); }}>
+
+            {/* Y-axis labels */}
+            <div className="rp-chart-yaxis">
+              {yTicks.map((tick) => (
+                <div key={tick} className="rp-chart-ytick" style={{ bottom: `${(tick / yMax) * 100}%` }}>
+                  {fmtYLabel(tick)}
+                </div>
+              ))}
+            </div>
+
+            {/* Chart plot + axes */}
+            <div className="rp-chart-main">
+              <div className="rp-chart-plot">
+                {/* Horizontal grid lines */}
+                {yTicks.map((tick) => (
+                  <div key={tick} className="rp-chart-gridline" style={{ bottom: `${(tick / yMax) * 100}%` }} />
+                ))}
+
+                {/* Bar columns */}
+                {chartRange.data.map((d, i) => {
+                  const capH  = Math.min((capacityPerBar / yMax) * 100, 100);
+                  const bilH  = yMax > 0 ? (d.billable    / yMax) * 100 : 0;
+                  const nonH  = yMax > 0 ? (d.nonBillable / yMax) * 100 : 0;
+                  const tofH  = yMax > 0 ? (d.timeOff     / yMax) * 100 : 0;
+                  const totalH = bilH + nonH + tofH;
+                  const sPct = capacityPerBar > 0 ? Math.round((d.total        / capacityPerBar) * 100) : 0;
+                  const bPct = capacityPerBar > 0 ? Math.round((d.billable     / capacityPerBar) * 100) : 0;
+                  const nPct = capacityPerBar > 0 ? Math.round((d.nonBillable  / capacityPerBar) * 100) : 0;
+                  return (
+                    <div key={i} className="rp-chart-bar-col">
+                      {/* Capacity ghost */}
+                      <div className="rp-chart-cap-bar" style={{ height: `${capH}%` }} />
+                      {/* Stacked segments (rendered bottom→top via column-reverse) */}
+                      {totalH > 0 && (
+                        <div
+                          className="rp-chart-stack"
+                          style={{ height: `${totalH}%` }}
+                          onMouseEnter={(e) => handleBarHover(e, d, sPct, bPct, nPct)}
+                        >
+                          {d.billable    > 0 && <div className="rp-chart-seg" style={{ flex: d.billable,    background: CHART_COLORS.billable    }} />}
+                          {d.nonBillable > 0 && <div className="rp-chart-seg" style={{ flex: d.nonBillable, background: CHART_COLORS.nonBillable }} />}
+                          {d.timeOff     > 0 && <div className="rp-chart-seg" style={{ flex: d.timeOff,     background: CHART_COLORS.timeOff     }} />}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* X-axis date labels */}
+              <div className="rp-chart-xaxis">
+                {chartRange.data.map((d, i) => (
+                  <div key={i} className={`rp-chart-xlabel${i % labelStep !== 0 ? " rp-chart-xlabel--hidden" : ""}`}>
+                    {d.label}
+                  </div>
+                ))}
+              </div>
+
+              {/* Holiday dots */}
+              <div className="rp-chart-holiday-row">
+                {chartRange.data.map((d, i) => (
+                  <div key={i} className="rp-chart-holiday-cell">
+                    {d.holidays?.length > 0 && (
+                      <div
+                        className="rp-chart-holiday-dot"
+                        onMouseEnter={(e) => handleHolidayEnter(e, d.holidays)}
+                        onMouseLeave={handleHolidayLeave}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Hover tooltip — position:fixed so it never bleeds into adjacent elements */}
+            {hoveredBar && (
+              <div
+                className="rp-chart-tooltip"
+                style={{
+                  left: Math.min(hoveredBar.x + 16, window.innerWidth - 225),
+                  top: Math.max(hoveredBar.y - 120, 8),
+                }}
+              >
+                <div className="rp-chart-tooltip-title">{hoveredBar.d.label}</div>
+                <div className="rp-chart-tooltip-row">
+                  <span className="rp-chart-tooltip-label">Capacity</span>
+                  <span className="rp-chart-tooltip-val">{fmt(capacityPerBar)}</span>
+                </div>
+                <div className="rp-chart-tooltip-row">
+                  <span className="rp-chart-tooltip-label">Scheduled <span className="rp-chart-tooltip-pct">{hoveredBar.schedPct}%</span></span>
+                  <span className="rp-chart-tooltip-val">{fmt(hoveredBar.d.total)}</span>
+                </div>
+                <div className="rp-chart-tooltip-row">
+                  <span className="rp-chart-tooltip-label">
+                    <span className="rp-chart-tooltip-swatch" style={{ background: CHART_COLORS.billable }} />
+                    Billable <span className="rp-chart-tooltip-pct">{hoveredBar.bilPct}%</span>
+                  </span>
+                  <span className="rp-chart-tooltip-val">{fmt(hoveredBar.d.billable)}</span>
+                </div>
+                <div className="rp-chart-tooltip-row">
+                  <span className="rp-chart-tooltip-label">
+                    <span className="rp-chart-tooltip-swatch" style={{ background: CHART_COLORS.nonBillable }} />
+                    Non-billable <span className="rp-chart-tooltip-pct">{hoveredBar.nonPct}%</span>
+                  </span>
+                  <span className="rp-chart-tooltip-val">{fmt(hoveredBar.d.nonBillable)}</span>
+                </div>
+                <div className="rp-chart-tooltip-row">
+                  <span className="rp-chart-tooltip-label">
+                    <span className="rp-chart-tooltip-swatch" style={{ background: CHART_COLORS.timeOff }} />
+                    Time off
+                  </span>
+                  <span className="rp-chart-tooltip-val">{fmt(hoveredBar.d.timeOff)}</span>
+                </div>
+              </div>
+            )}
           </div>
+
         </motion.div>
+
+        {/* Holiday tooltip — rendered outside chart, position:fixed */}
+        {hoveredHoliday && (
+          <div
+            className="rp-chart-holiday-tooltip"
+            style={{
+              left: Math.min(hoveredHoliday.x + 12, window.innerWidth - 240),
+              top: hoveredHoliday.y - 40,
+            }}
+          >
+            {hoveredHoliday.names.map((n, i) => <div key={i}>{n}</div>)}
+          </div>
+        )}
  
         {/* ── Stats Strip ── */}
         <motion.div className="rp-stats-strip" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: 0.1 }}>
@@ -1371,21 +1620,19 @@ export default function ReportingPage() {
             <span className="rp-stat-value">{fmt(totals.cap)}</span>
           </div>
           <div className="rp-stat-divider" />
-          <div className="rp-stat rp-stat--wide">
+          <div className="rp-stat">
             <span className="rp-stat-label">Scheduled <span className="rp-stat-pct">{pct(totals.sch, totals.cap)}</span></span>
             <span className="rp-stat-value">{fmt(totals.sch)}</span>
-            <div className="rp-stat-breakdown">
-              <span className="rp-swatch rp-swatch--billable" />
-              <span className="rp-stat-sub-label">Billable</span>
-              <span className="rp-stat-sub-val">{fmt(totals.bil)}</span>
-              <span className="rp-stat-sub-pct">{pct(totals.bil, totals.cap)}</span>
-            </div>
-            <div className="rp-stat-breakdown">
-              <span className="rp-swatch rp-swatch--nonbill" />
-              <span className="rp-stat-sub-label">Non-billable</span>
-              <span className="rp-stat-sub-val">{fmt(totals.non)}</span>
-              <span className="rp-stat-sub-pct">{pct(totals.non, totals.cap)}</span>
-            </div>
+          </div>
+          <div className="rp-stat-divider" />
+          <div className="rp-stat">
+            <span className="rp-stat-label"><span className="rp-swatch rp-swatch--billable" />Billable <span className="rp-stat-pct">{pct(totals.bil, totals.cap)}</span></span>
+            <span className="rp-stat-value">{fmt(totals.bil)}</span>
+          </div>
+          <div className="rp-stat-divider" />
+          <div className="rp-stat">
+            <span className="rp-stat-label"><span className="rp-swatch rp-swatch--nonbill" />Non-billable <span className="rp-stat-pct">{pct(totals.non, totals.cap)}</span></span>
+            <span className="rp-stat-value">{fmt(totals.non)}</span>
           </div>
           <div className="rp-stat-divider" />
           <div className="rp-stat">
@@ -1761,7 +2008,7 @@ export default function ReportingPage() {
                                     {row.client}
                                   </button>
                                 </td>
-                                <td className="rp-td rp-td--dept">—</td>
+                                <td className="rp-td rp-td--dept">{row.stage ? row.stage.charAt(0).toUpperCase() + row.stage.slice(1) : "—"}</td>
                                 <td className="rp-td rp-td--dept">{row.owner}</td>
                                 <td className="rp-td rp-td--num">—</td>
                                 <td className="rp-td rp-td--num">100%</td>
