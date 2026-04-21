@@ -789,23 +789,6 @@ export default function ReportingPage() {
     "Time off": timeOffRows.length,
   }), [filteredPersonRows.length, roleRows.length, deptRows.length, projectRows.length, taskRows.length, timeOffRows.length]);
 
-  // ── Project Grouping by Clients and Projects ──────────────────────────────────
-  const projectGroupedByClient = useMemo(() => {
-    const groups = {};
-    for (const project of projectRows) {
-      const client = project.client || "—";
-      if (!groups[client]) {
-        groups[client] = { scheduled: 0, billable: 0, nonBillable: 0, scheduledCost: 0, projects: [] };
-      }
-      groups[client].scheduled += project.scheduled;
-      groups[client].billable += project.billable;
-      groups[client].nonBillable += project.nonBillable;
-      groups[client].scheduledCost += project.scheduledCost;
-      groups[client].projects.push(project);
-    }
-    return Object.entries(groups).map(([client, data]) => ({ id: client, name: client, ...data }));
-  }, [projectRows]);
-
   const visibleProjectRows = useMemo(() => {
     const personIdFilter = drilldown.personId;
     const projectFilter = normalizeText(drilldown.project);
@@ -1751,7 +1734,6 @@ export default function ReportingPage() {
                       ? <tr><td colSpan={9} className="rp-td"><div className="rp-empty-tab">No project data in this period.</div></td></tr>
                       : visibleProjectRows.map((row, idx) => {
                           const isExpanded = state.expanded[row.id];
-                          const schedPct = row.scheduled > 0 ? Math.round((row.scheduled / row.scheduled) * 100) : 0;
                           return (
                             <Fragment key={`project-${row.id}`}>
                               <tr className={`rp-row ${idx % 2 === 0 ? "rp-row--even" : ""}`}>
