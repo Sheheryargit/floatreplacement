@@ -339,7 +339,7 @@ function layoutsForAllocation(alloc, scheduleModel) {
       const splits = splitLayoutByWorkWeek(lay, scheduleModel);
       const weekSplitCount = splits.length;
       splits.forEach((sli, partIdx) => {
-        out.push({ ...sli, occ, weekPart: partIdx, weekSplitCount });
+        out.push({ ...sli, occ, weekPart: partIdx, weekSplitCount, occStart: start, occEnd: end });
       });
     }
     occ += 1;
@@ -619,16 +619,35 @@ const PX_PER_HOUR = 22;            // slope: each extra hour adds 22px → 0.5h 
 const BAR_H_MIN_VISIBLE_PX = BAR_H_BASE_PX;
 const WEEK_CELL_FULL_DAY_PX = BAR_H_BASE_PX + BAR_H_NORM * PX_PER_HOUR; // 187px for a full day
 
+// Leave bars use a lower "full day" baseline so partial-day differences read clearly.
+// Treat ~5.5h leave as a visually "full" cell.
+const LEAVE_H_NORM = 5.5;
+const LEAVE_PX_PER_HOUR = (WEEK_CELL_FULL_DAY_PX - BAR_H_BASE_PX) / LEAVE_H_NORM;
+// Leave blocks should not occupy the whole day cell; keep them compact so the user can
+// still click empty space below to create allocations.
+const LEAVE_FIXED_HEIGHT_PX = 86;
+const LEAVE_CLICK_GAP_PX = 56;
+
 function allocationBarHeightPx(alloc) {
-  if (alloc?.isLeave) return 54;
   const raw = Math.max(0, parseFloat(alloc.hoursPerDay) || 0);
+  // Leave blocks default to a compact, readable height when hours/day isn't set.
+  if (alloc?.isLeave && raw <= 0) return 54;
   if (raw <= 0) return BAR_H_MIN_VISIBLE_PX;
   // Snap to 0.5h so equal allocations always render identically; tiny sub-0.5h
   // values (e.g. 0.08) still lift to the minimum visible bar without distorting
   // the rest of the scale.
   const snapped = Math.round(raw / BAR_H_STEP) * BAR_H_STEP;
   const effective = snapped < BAR_H_STEP ? BAR_H_STEP : snapped;
-  return Math.round(BAR_H_BASE_PX + effective * PX_PER_HOUR);
+  const h = Math.round(BAR_H_BASE_PX + effective * PX_PER_HOUR);
+  return alloc?.isLeave ? Math.max(54, h) : h;
+}
+
+function leaveBarHeightPx(alloc) {
+  const h = Math.max(0, parseFloat(alloc?.hoursPerDay) || 0);
+  // Full-day leave should cover the whole day cell.
+  if (h >= BAR_H_NORM - 1e-6) return WEEK_CELL_FULL_DAY_PX;
+  // Partial-day leave uses the compact card size.
+  return LEAVE_FIXED_HEIGHT_PX;
 }
 
 const timelineRowEqual = (prev, next) => {
@@ -641,6 +660,7 @@ const timelineRowEqual = (prev, next) => {
   if (prev.scheduleModel !== next.scheduleModel) return false;
   if (prev.projects !== next.projects) return false;
   if (prev.personAllocations !== next.personAllocations) return false;
+  if (prev.dismissedAvailOffKeys !== next.dismissedAvailOffKeys) return false;
 
   return true;
 };
@@ -730,6 +750,7 @@ const TimelineRow = memo(function TimelineRow({
   openAllocationDetail,
   handleTimelineClick,
   todayDateKey,
+  dismissedAvailOffKeys,
 }) {
   const { theme } = useAppTheme();
   const t = T[theme];
@@ -765,6 +786,19 @@ const TimelineRow = memo(function TimelineRow({
 
   const workSegments = rowSegments.filter((s) => !s.a.isLeave);
   const leaveSegments = rowSegments.filter((s) => s.a.isLeave);
+
+  const leaveMinH = useMemo(() => {
+    if (!leaveSegments.length) return 0;
+    let maxH = 0;
+    for (const seg of leaveSegments) {
+      const isDayOff = isAvailabilityDayOffAlloc(seg.a);
+      if (isDayOff) continue;
+      const hh = leaveBarHeightPx(seg.a);
+      if (hh > maxH) maxH = hh;
+    }
+    if (maxH <= 0) return 0;
+    return maxH >= WEEK_CELL_FULL_DAY_PX - 1 ? maxH : maxH + LEAVE_CLICK_GAP_PX;
+  }, [leaveSegments]);
 
   assignAllocationStackLevels(workSegments);
   const allocLaneCount = workSegments.length ? Math.max(...workSegments.map((s) => s.stack)) + 1 : 1;
@@ -876,6 +910,7 @@ const TimelineRow = memo(function TimelineRow({
             cursor: "pointer",
             ["--lp-alloc-lane-count"]: allocLaneCount,
             ["--lp-sched-alloc-content-h"]: `${schedAllocContentH}px`,
+            ["--lp-leave-min-h"]: leaveMinH > 0 ? `${leaveMinH}px` : undefined,
           }}
           onClick={(e) => handleTimelineClick(e, p, nCols)}
         >
@@ -911,14 +946,23 @@ const TimelineRow = memo(function TimelineRow({
                   const colStart = Math.max(1, Math.round(seg.lay.start) + 1);
                   const colSpan = Math.max(1, Math.round(seg.lay.span));
                   const isDayOff = isAvailabilityDayOffAlloc(seg.a);
-                  const lbl = isDayOff ? "Off" : seg.a.leaveType ? leaveLabel(seg.a.leaveType) : "Leave";
-                  const typeId = isDayOff ? "day_off" : normalizeLeaveTypeId(seg.a.leaveType);
-                  const onToday = leaveSpansToday(seg.a, todayDateKey);
+                  const occStart = seg?.lay?.occStart ?? seg.a.startDate;
+                  const occEnd = seg?.lay?.occEnd ?? seg.a.endDate;
+                  const allocUi = isDayOff ? { ...seg.a, startDate: occStart, endDate: occEnd } : seg.a;
+                  const dismissKey = isDayOff ? `${allocUi.personIds?.[0] ?? ""}|${allocUi.startDate}` : "";
+                  if (isDayOff && dismissedAvailOffKeys && dismissedAvailOffKeys.has(dismissKey)) return null;
+
+                  const lbl = isDayOff ? "Off" : allocUi.leaveType ? leaveLabel(allocUi.leaveType) : "Leave";
+                  const typeId = isDayOff ? "day_off" : normalizeLeaveTypeId(allocUi.leaveType);
+                  const onToday = leaveSpansToday(allocUi, todayDateKey);
                   const dateLine =
-                    seg.a.startDate === seg.a.endDate
-                      ? seg.a.startDate
-                      : `${seg.a.startDate} → ${seg.a.endDate}`;
-                  const hoverTitle = buildLeaveHoverTitle(seg.a, leaveLabel);
+                    allocUi.startDate === allocUi.endDate
+                      ? allocUi.startDate
+                      : `${allocUi.startDate} → ${allocUi.endDate}`;
+                  const leaveH = Math.max(0, parseFloat(allocUi.hoursPerDay) || 0);
+                  const leaveHoursLabel = !isDayOff && leaveH > 0 ? `${leaveH}h` : "";
+                  const hoverTitle = buildLeaveHoverTitle(allocUi, leaveLabel);
+                  const leaveBarH = leaveBarHeightPx(allocUi);
                   return (
                     <motion.button
                       key={`${seg.a.id}-occ-${seg.occIdx}`}
@@ -932,10 +976,13 @@ const TimelineRow = memo(function TimelineRow({
                       style={{
                         gridColumn: `${colStart} / span ${colSpan}`,
                         gridRow: 1,
-                        alignSelf: "stretch",
+                        alignSelf: "start",
+                        height: `${leaveBarH}px`,
+                        minHeight: `${leaveBarH}px`,
+                        maxHeight: `${leaveBarH}px`,
                         pointerEvents: "auto",
                       }}
-                      aria-label={allocationAriaLabel(seg.a)}
+                      aria-label={allocationAriaLabel(allocUi)}
                       title={hoverTitle}
                       initial={
                         reduceMotion
@@ -955,29 +1002,25 @@ const TimelineRow = memo(function TimelineRow({
                       exit={
                         reduceMotion
                           ? { opacity: 0 }
+                          : isDayOff
+                            ? { opacity: 0, transition: { duration: 0 } }
                           : { opacity: 0, y: -6, scale: 0.98, transition: { duration: 0.2 } }
                       }
                       whileHover={reduceMotion ? undefined : { scale: 1.015 }}
                       whileTap={reduceMotion ? undefined : { scale: 0.99 }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (isDayOff) {
-                          toast.info(`${p.name} is not available this day`, {
-                            description: "Edit this person's weekly availability in their profile.",
-                          });
-                          return;
-                        }
-                        openAllocationDetail(seg.a);
+                        openAllocationDetail(allocUi);
                       }}
                     >
                       {!isDayOff && (
-                        <LeaveTimelineGlyph leaveTypeId={seg.a.leaveType} className="lp-leave-block__icon" />
+                        <LeaveTimelineGlyph leaveTypeId={allocUi.leaveType} className="lp-leave-block__icon" />
                       )}
                       <span className="lp-leave-block__label">
-                        <span>{lbl}</span>
-                        {!isDayOff && (
-                          <span className="lp-leave-block__dates">{dateLine}</span>
-                        )}
+                        <span>
+                          {lbl}
+                          {leaveHoursLabel ? <span className="lp-leave-block__hours">{leaveHoursLabel}</span> : null}
+                        </span>
                       </span>
                     </motion.button>
                   );
@@ -1204,6 +1247,29 @@ export default function LandingPage() {
     () => buildAllocationsByPerson(scheduleAllocations),
     [scheduleAllocations]
   );
+
+  const [dismissedAvailOffKeys, setDismissedAvailOffKeys] = useState(() => {
+    try {
+      if (typeof window === "undefined") return new Set();
+      const raw = window.localStorage.getItem("float.dismissedAvailOff.v1");
+      const arr = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(arr) ? arr.map(String) : []);
+    } catch {
+      return new Set();
+    }
+  });
+
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      window.localStorage.setItem(
+        "float.dismissedAvailOff.v1",
+        JSON.stringify([...dismissedAvailOffKeys])
+      );
+    } catch {
+      // ignore storage failures (private mode, quota, etc.)
+    }
+  }, [dismissedAvailOffKeys]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState(null);
@@ -1556,16 +1622,6 @@ export default function LandingPage() {
       const colIndex = Math.min(Math.max(0, Math.floor(x / colWidth)), nCols - 1);
       const slot = scheduleModel.slots[colIndex];
       const clickedDate = slot?.dateKey ?? null;
-      if (person && clickedDate) {
-        const pa = getPersonAllocations(allocationsByPerson, person.id);
-        const maxH = maxWorkHoursOnDayForPersonList(pa, clickedDate, STANDARD_DAY_HOURS);
-        if (maxH < 1e-6) {
-          toast.error(`${person.name} is not available that day`, {
-            description: "That date is covered by leave or recurring unavailability.",
-          });
-          return;
-        }
-      }
       openCreateAllocation(person, clickedDate);
     },
     [scheduleModel, openCreateAllocation, allocationsByPerson]
@@ -1709,9 +1765,21 @@ export default function LandingPage() {
   const handleDeleteAllocation = useCallback(
     async (alloc) => {
       if (isAvailabilityDayOffAlloc(alloc)) {
-        toast.info("Non-working days can't be deleted here", {
-          description: "Edit this person's weekly availability in their profile.",
-        });
+        const pid = alloc?.personIds?.[0] ?? "";
+        const dk = String(alloc?.startDate ?? "").slice(0, 10);
+        if (pid && dk) {
+          const key = `${pid}|${dk}`;
+          setDismissedAvailOffKeys((prev) => {
+            const next = new Set(prev);
+            next.add(key);
+            return next;
+          });
+          toast.success("Off block removed", {
+            description: "This hides just that day. Weekly availability stays unchanged.",
+          });
+        } else {
+          toast.error("Couldn't remove this block");
+        }
         return;
       }
       if (alloc?.syntheticPublicHoliday) {
@@ -1745,7 +1813,13 @@ export default function LandingPage() {
         toast.error("Delete failed", { description: e?.message || String(e) });
       }
     },
-    [setAllocations, setPublicHolidayAllocations, syncAllocationDelete, refreshWorkspaceFromSupabase]
+    [
+      setAllocations,
+      setPublicHolidayAllocations,
+      syncAllocationDelete,
+      refreshWorkspaceFromSupabase,
+      setDismissedAvailOffKeys,
+    ]
   );
 
   const openAllocationDetail = useCallback((alloc) => {
@@ -2566,6 +2640,7 @@ export default function LandingPage() {
                         openAllocationDetail={openAllocationDetail}
                         handleTimelineClick={handleTimelineClick}
                         todayDateKey={todayDateKey}
+                        dismissedAvailOffKeys={dismissedAvailOffKeys}
                       />
                     </div>
                   );

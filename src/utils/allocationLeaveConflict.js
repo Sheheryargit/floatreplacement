@@ -8,6 +8,10 @@ import { allocationHasPersonSchedule } from "./peopleSort.js";
  */
 function leaveBlocksWorkAllocation(a) {
   if (!a?.isLeave) return false;
+  // Weekly "off" blocks generated from availability are informational — users may still
+  // roster work on those days for one-off scenarios.
+  const k = a.availabilitySlotKey;
+  if (typeof k === "string" && k.startsWith("avail_off:")) return false;
   if (a.syntheticPublicHoliday === true) return false;
   if (a.leaveType === "public_holiday") return false;
   return true;

@@ -100,6 +100,7 @@ export function CreateAllocationModal({
   const [leaveType, setLeaveType] = useState("annual");
   const [leaveTypeOpen, setLeaveTypeOpen] = useState(false);
   const [leaveNotes, setLeaveNotes] = useState("");
+  const [leaveHoursPerDay, setLeaveHoursPerDay] = useState("7.5");
 
   const repeatWrapRef = useRef(null);
   const assignWrapRef = useRef(null);
@@ -119,6 +120,9 @@ export function CreateAllocationModal({
       if (editAllocation.isLeave) {
         setLeaveType(editAllocation.leaveType || "annual");
         setLeaveNotes(editAllocation.notes || "");
+        setLeaveHoursPerDay(
+          editAllocation.hoursPerDay != null ? String(editAllocation.hoursPerDay) : "7.5"
+        );
       }
       setAssignedIds(editAllocation.personIds || (editAllocation.personId != null ? [editAllocation.personId] : []));
       return;
@@ -154,6 +158,7 @@ export function CreateAllocationModal({
     setLeaveType("annual");
     setLeaveTypeOpen(false);
     setLeaveNotes("");
+    setLeaveHoursPerDay("7.5");
     if (preselectPerson) setAssignedIds([preselectPerson.id]);
     else if (people[0]) setAssignedIds([people[0].id]);
     else setAssignedIds([]);
@@ -185,6 +190,11 @@ export function CreateAllocationModal({
     const h = parseFloat(hoursPerDay, 10) || 0;
     return Math.round(workingDays * h * 100) / 100;
   }, [workingDays, hoursPerDay]);
+
+  const leaveTotalHours = useMemo(() => {
+    const h = parseFloat(leaveHoursPerDay, 10) || 0;
+    return Math.round(workingDays * h * 100) / 100;
+  }, [workingDays, leaveHoursPerDay]);
 
   const assignablePeople = useMemo(() => {
     const q = assignQuery.trim().toLowerCase();
@@ -236,6 +246,7 @@ export function CreateAllocationModal({
   if (!open) return null;
 
   const isSyntheticPhEdit = editAllocation?.syntheticPublicHoliday === true;
+  const editingLeave = !!editAllocation && !!editAllocation.isLeave;
 
   const handleSave = () => {
     if (activeTab === "allocation") {
@@ -262,8 +273,8 @@ export function CreateAllocationModal({
         personIds: assignedIds,
         startDate,
         endDate,
-        hoursPerDay: 0,
-        totalHours: 0,
+        hoursPerDay: parseFloat(leaveHoursPerDay, 10) || 0,
+        totalHours: leaveTotalHours,
         workingDays,
         project: leaveLabel(leaveType),
         notes: leaveNotes.trim(),
@@ -315,13 +326,23 @@ export function CreateAllocationModal({
           <div className="lpam-tabs lpam-tabs--motion" style={{ borderColor: t.border }}>
             <button
               type="button"
-              className={"lpam-tab" + (activeTab === "allocation" ? " lpam-tab-active" : "")}
+              className={
+                "lpam-tab" +
+                (activeTab === "allocation" ? " lpam-tab-active" : "") +
+                (editingLeave ? " lpam-tab-disabled" : "")
+              }
               style={{
                 color: activeTab === "allocation" ? t.accent : t.textSoft,
                 borderBottomColor: "transparent",
                 position: "relative",
+                opacity: editingLeave ? 0.45 : 1,
+                cursor: editingLeave ? "not-allowed" : "pointer",
               }}
-              onClick={() => setActiveTab("allocation")}
+              disabled={editingLeave}
+              onClick={() => {
+                if (editingLeave) return;
+                setActiveTab("allocation");
+              }}
             >
               Allocation
               {activeTab === "allocation" ? (
@@ -736,6 +757,35 @@ export function CreateAllocationModal({
               <p className="lpam-duration" style={{ color: t.textSoft, marginTop: 12 }}>
                 Duration: {workingDays === 1 ? "1 working day" : `${workingDays} working days`}
               </p>
+              <div className="lpam-row lpam-row-split" style={{ marginTop: 10 }}>
+                <div className="lpam-field lpam-grow">
+                  <label className="lpam-label" style={{ color: t.textMuted }}>Per day</label>
+                  <div className="lpam-inline">
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      value={leaveHoursPerDay}
+                      onChange={(e) => setLeaveHoursPerDay(e.target.value)}
+                      className="lpam-input lpam-input-sm"
+                      style={{
+                        borderColor: t.borderIn || t.border,
+                        background: t.bg,
+                        color: t.text,
+                      }}
+                    />
+                    <span className="lpam-suffix" style={{ color: t.textMuted }}>
+                      h/day
+                    </span>
+                  </div>
+                </div>
+                <div className="lpam-field">
+                  <label className="lpam-label" style={{ color: t.textMuted }}>Total hours</label>
+                  <div className="lpam-total-pill" style={{ background: t.bg, borderColor: t.border, color: t.text }}>
+                    {leaveTotalHours}
+                  </div>
+                </div>
+              </div>
               <div className="lpam-dates">
                 <input
                   type="date"
@@ -833,7 +883,11 @@ export function CreateAllocationModal({
               type="button"
               className={"lpam-btn lpam-btn-primary" + (activeTab === "leave" ? " lpam-btn-leave" : "")}
               onClick={handleSave}
-              disabled={workingDays <= 0 || (activeTab === "allocation" && parseFloat(hoursPerDay) <= 0)}
+              disabled={
+                workingDays <= 0 ||
+                (activeTab === "allocation" && parseFloat(hoursPerDay) <= 0) ||
+                (activeTab === "leave" && parseFloat(leaveHoursPerDay) <= 0)
+              }
               style={{
                 background:
                   activeTab === "leave"
@@ -930,6 +984,20 @@ export function AllocationDetailModal({ open, allocation, assigneeNames, onClose
                   aria-hidden
                 />
                 {allocation.leaveType ? leaveLabel(allocation.leaveType) : allocation.project}
+              </div>
+            </div>
+            <div className="lpam-detail-metrics" style={{ marginTop: 6 }}>
+              <div>
+                <div className="lpam-detail-label" style={{ color: t.textMuted }}>
+                  Hours/day
+                </div>
+                <div className="lpam-detail-value">{allocation.hoursPerDay ?? 0}</div>
+              </div>
+              <div>
+                <div className="lpam-detail-label" style={{ color: t.textMuted }}>
+                  Total hours
+                </div>
+                <div className="lpam-detail-value">{allocation.totalHours ?? 0}</div>
               </div>
             </div>
             <div className="lpam-detail-section">

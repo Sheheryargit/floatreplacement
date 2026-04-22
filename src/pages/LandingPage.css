@@ -1964,6 +1964,7 @@ button.lp-person-identity-hit {
   /* Match lane/grid row min-height so the timeline column always grows with stacked allocations. */
   min-height: max(
     var(--lp-row-h),
+    var(--lp-leave-min-h, 0px),
     var(
       --lp-sched-alloc-content-h,
       calc(var(--lp-alloc-lane-count, 1) * var(--lp-alloc-lane-h) + var(--lp-alloc-row-pad-vertical))
@@ -1983,6 +1984,7 @@ button.lp-person-identity-hit {
   align-self: stretch;
   min-height: max(
     var(--lp-row-h),
+    var(--lp-leave-min-h, 0px),
     var(
       --lp-sched-alloc-content-h,
       calc(var(--lp-alloc-lane-count, 1) * var(--lp-alloc-lane-h) + var(--lp-alloc-row-pad-vertical))
@@ -2036,6 +2038,7 @@ button.lp-person-identity-hit {
   display: grid;
   min-height: max(
     var(--lp-row-h),
+    var(--lp-leave-min-h, 0px),
     var(
       --lp-sched-alloc-content-h,
       calc(var(--lp-alloc-lane-count, 1) * var(--lp-alloc-lane-h) + var(--lp-alloc-row-pad-vertical))
@@ -2834,12 +2837,11 @@ button.lp-block.lp-block-leave:hover {
   justify-content: flex-start;
   gap: 8px;
   margin: 2px 0;
-  padding: 14px 12px;
-  min-height: 100%;
+  padding: 8px 9px;
   cursor: pointer;
   border: none;
   text-align: left;
-  border-radius: 10px;
+  border-radius: 9px;
   overflow: hidden;
   box-sizing: border-box;
   transition:
@@ -2887,11 +2889,46 @@ button.lp-block.lp-block-leave:hover {
   min-width: 0;
 }
 
+.lp-leave-block__label > span:first-child {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 7px;
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.34);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  width: fit-content;
+  max-width: 100%;
+}
+
 .lp-leave-block__dates {
   font-size: 10px;
   font-weight: 600;
   opacity: 0.78;
   letter-spacing: 0.02em;
+}
+
+.lp-leave-block__hours {
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.92;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lp-root[data-theme="light"] .lp-leave-block__label > span:first-child {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(2, 6, 23, 0.08);
+  text-shadow: none;
+}
+
+.lp-root[data-theme="light"] .lp-leave-block--annual {
+  color: #064e3b;
 }
 
 /* Annual — soft brand stripes + gradient */
