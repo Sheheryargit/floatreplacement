@@ -273,6 +273,30 @@ function allocationHoursInRange(alloc, rangeStart, rangeEnd) {
   return total * (overlapDays / allocDays);
 }
 
+/**
+ * Capacity hours for a person over a date range, respecting their working-day
+ * pattern (availMon–availFri) and hours per day from user_availability.
+ * Falls back to 7.5 h/day on all weekdays if no availability data is set.
+ */
+function personCapacityInRange(person, rangeStart, rangeEnd) {
+  const hpd = person.hoursPerDay ?? 7.5;
+  // Map JS getDay() (0=Sun…6=Sat) to person availability flags
+  const worksDow = [
+    false,                        // Sunday
+    person.availMon ?? true,      // Monday
+    person.availTue ?? true,      // Tuesday
+    person.availWed ?? true,      // Wednesday
+    person.availThu ?? true,      // Thursday
+    person.availFri ?? true,      // Friday
+    false,                        // Saturday
+  ];
+  let days = 0;
+  for (const d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
+    if (worksDow[d.getDay()]) days++;
+  }
+  return days * hpd;
+}
+
 function normalizeText(value) {
   return (value || "").toString().trim().toLowerCase();
 }
@@ -681,14 +705,6 @@ export default function ReportingPage() {
     [people]
   );
 
-  const rangeWeekdays = useMemo(() => {
-    const rangeStart = new Date(dateRange.start);
-    const rangeEnd = new Date(dateRange.end);
-    rangeStart.setHours(0, 0, 0, 0);
-    rangeEnd.setHours(23, 59, 59, 999);
-    return countWeekdaysInRange(rangeStart, rangeEnd);
-  }, [dateRange.start, dateRange.end]);
- 
   // ── Person rows — source of truth for all tabs ───────────────────────────────
   // Each person row stores their resolved allocations so downstream tabs
   // don't need to re-run allocationHasPersonSchedule.
@@ -699,7 +715,7 @@ export default function ReportingPage() {
       rangeStart.setHours(0, 0, 0, 0);
       rangeEnd.setHours(23, 59, 59, 999);
       return activePeople.map((person) => {
-        const capacity = rangeWeekdays * 7.5;
+        const capacity = personCapacityInRange(person, rangeStart, rangeEnd);
         let billable = 0, nonBillable = 0, timeOff = 0;
 
         // Attach _rangedHours so projectRows/taskRows don't need to re-derive them
@@ -739,7 +755,7 @@ export default function ReportingPage() {
         };
       });
     },
-    [activePeople, rangedAllocations, projectBillability, projects, rangeWeekdays, dateRange.start, dateRange.end]
+    [activePeople, rangedAllocations, projectBillability, projects, dateRange.start, dateRange.end]
   );
  
   const projectClientByLabel = useMemo(() => {
@@ -774,9 +790,12 @@ export default function ReportingPage() {
 
   // ── Per-bar capacity for chart scaling (depends on filteredPersonRows) ───────
   const capacityPerBar = useMemo(() => {
-    const perPerson = state.viewType === 'days' ? 7.5 : state.viewType === 'weeks' ? 37.5 : 157.5;
-    return perPerson * filteredPersonRows.length;
-  }, [state.viewType, filteredPersonRows.length]);
+    // Sum each person's actual weekly hours, then scale to the bar period
+    const totalWeeklyHours = filteredPersonRows.reduce((sum, p) => sum + (p.weeklyHours ?? 37.5), 0);
+    if (state.viewType === 'weeks') return totalWeeklyHours;
+    if (state.viewType === 'days') return totalWeeklyHours / 5;
+    return totalWeeklyHours * (365.25 / 12 / 7); // average weeks per month
+  }, [state.viewType, filteredPersonRows]);
 
   // ── Totals ──────────────────────────────────────────────────────────────────
   const totals = useMemo(() => {

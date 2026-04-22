@@ -52,6 +52,19 @@ export async function recalculatePersonAvailability(personId) {
   return data;
 }
 
+/**
+ * Bulk-fetch all availability rows (for workspace load — no N+1).
+ * Returns an array of raw rows from user_availability.
+ */
+export async function fetchAllAvailability() {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase
+    .from("user_availability")
+    .select("person_id, employment_type, weekly_hours, hours_per_day, mon, tue, wed, thu, fri");
+  if (error) throw error;
+  return data || [];
+}
+
 /** Map profile form → server PUT (after person exists). */
 export async function syncPersonAvailabilityFromForm(personId, form) {
   if (!personId || !form) return null;

@@ -21,6 +21,7 @@ import {
   resolvePublicHolidayAllocations,
 } from "./publicHolidaySchedule.js";
 import { fetchPersonPublicHolidayDismissalsSafe } from "./personPublicHolidays.js";
+import { fetchAllAvailability } from "./personAvailability.js";
 
 /** Same window as the schedule workspace (keep in sync with partial realtime refreshes). */
 export function defaultWorkspaceAllocationWindow() {
@@ -50,7 +51,7 @@ export async function loadWorkspaceFromSupabaseOnce() {
   const { start, end } = defaultWorkspaceAllocationWindow();
 
   const [
-    people,
+    rawPeople,
     projectsRaw,
     allocations,
     phResult,
@@ -62,6 +63,7 @@ export async function loadWorkspaceFromSupabaseOnce() {
     projectTagOpts,
     extraAllocationLabels,
     workspaceSettings,
+    availabilityRows,
   ] = await Promise.all([
     fetchPeople(),
     fetchProjects(),
@@ -75,7 +77,24 @@ export async function loadWorkspaceFromSupabaseOnce() {
     fetchProjectTags(),
     fetchAllocationLabels(),
     fetchWorkspaceSettings(),
+    fetchAllAvailability(),
   ]);
+
+  // Merge availability into people so capacity calcs are per-person
+  const availMap = new Map(availabilityRows.map((a) => [a.person_id, a]));
+  const people = rawPeople.map((p) => {
+    const a = availMap.get(p.id);
+    return {
+      ...p,
+      weeklyHours: a ? Number(a.weekly_hours) : 37.5,
+      hoursPerDay: a ? Number(a.hours_per_day) : 7.5,
+      availMon: a ? !!a.mon : true,
+      availTue: a ? !!a.tue : true,
+      availWed: a ? !!a.wed : true,
+      availThu: a ? !!a.thu : true,
+      availFri: a ? !!a.fri : true,
+    };
+  });
 
   const publicHolidayAllocations = await resolvePublicHolidayAllocations(
     people,
