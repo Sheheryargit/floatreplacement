@@ -34,6 +34,7 @@ export function FloatSelect({
   options = [],
   placeholder = "Select an option",
   renderOption,
+  renderSelected,
   creatable = true,
   searchPlaceholder = "Search or type to add new…",
   placement = "below",
@@ -160,6 +161,7 @@ export function FloatSelect({
   };
 
   const isPlaceholder = !selectedLabel;
+  const selectedOpt = useMemo(() => norm.find((n) => n.value === value || String(n.value) === String(value)), [norm, value]);
 
   return (
     <div className="float-select" ref={ref}>
@@ -182,7 +184,7 @@ export function FloatSelect({
         onKeyDown={onTriggerKeyDown}
       >
         <span className="float-select-trigger-label">
-          {selectedLabel || placeholder}
+          {renderSelected && selectedOpt ? renderSelected(selectedOpt.raw, t) : (selectedLabel || placeholder)}
         </span>
         <ChevronDown
           size={16}

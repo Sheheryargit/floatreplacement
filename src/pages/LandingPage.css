@@ -3216,3 +3216,25 @@ button.lp-block.lp-block-leave:hover {
     transform: none;
   }
 }
+
+/* Public holiday overlay styling */
+.lp-public-holiday-block {
+  transform-origin: center center;
+}
+
+.lp-public-holiday-block:hover {
+  filter: saturate(1.08) brightness(1.05);
+  box-shadow:
+    0 8px 18px rgba(245, 158, 11, 0.24),
+    0 2px 7px rgba(0, 0, 0, 0.18);
+}
+
+/* Styling for allocations covered by public holidays */
+.lp-alloc-bar-covered-by-holiday {
+  opacity: 0.6;
+  filter: grayscale(0.3);
+}
+
+.lp-alloc-bar-covered-by-holiday .lp-alloc-hours {
+  display: none;
+}

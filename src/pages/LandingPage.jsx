@@ -612,6 +612,7 @@ function personHasOverloadInViewFromList(personAllocations, scheduleModel) {
  * A full 7.5h working day lands near `BASE + 7.5 * STEP` px; overloaded days
  * overflow visibly as the stack exceeds one cell's worth of height.
  */
+const TABLE_ROW_ENTER_ANIM_MAX = 32;
 const BAR_H_NORM = 7.5;
 const BAR_H_STEP = 0.5;
 const BAR_H_BASE_PX = 22;          // readable floor for 0.5h bars
@@ -784,8 +785,9 @@ const TimelineRow = memo(function TimelineRow({
       }))
     );
 
-  const workSegments = rowSegments.filter((s) => !s.a.isLeave);
-  const leaveSegments = rowSegments.filter((s) => s.a.isLeave);
+  const workSegments = rowSegments.filter((s) => !s.a.isLeave && !s.a.syntheticPublicHoliday);
+  const leaveSegments = rowSegments.filter((s) => s.a.isLeave && !s.a.syntheticPublicHoliday);
+  const publicHolidaySegments = rowSegments.filter((s) => s.a.syntheticPublicHoliday);
 
   const leaveMinH = useMemo(() => {
     if (!leaveSegments.length) return 0;
@@ -802,6 +804,16 @@ const TimelineRow = memo(function TimelineRow({
 
   assignAllocationStackLevels(workSegments);
   const allocLaneCount = workSegments.length ? Math.max(...workSegments.map((s) => s.stack)) + 1 : 1;
+
+  // Helper function to check if a work segment is covered by any public holiday
+  const isWorkSegmentCoveredByPublicHoliday = (seg) => {
+    for (const phSeg of publicHolidaySegments) {
+      if (seg.lay.start < phSeg.lay.start + phSeg.lay.span && seg.lay.start + seg.lay.span > phSeg.lay.start) {
+        return true;
+      }
+    }
+    return false;
+  };
 
   // Bars stack flush — no per-bar vertical padding and no gap between lanes — so
   // the stacked height of a person×day cell is literally the sum of their hours.
@@ -825,7 +837,7 @@ const TimelineRow = memo(function TimelineRow({
       className={
         "lp-sched-row" + (overloaded ? " lp-sched-row-overloaded" : "")
       }
-      style={{ ["--animation-order"]: i }}
+      style={{ ["--animation-order"]: Math.min(i, TABLE_ROW_ENTER_ANIM_MAX) }}
     >
       <div className="lp-sched-person">
         <div className="lp-person-row-shell">
@@ -1094,7 +1106,7 @@ const TimelineRow = memo(function TimelineRow({
                       const hasNotes = Boolean((seg.a.notes || "").trim());
                       const tip = buildWorkAllocationTitle(seg.a, projectName, hoursLabel);
 
-                      const enterDelayMs = reduceMotion ? 0 : Math.min(i, 28) * 22 + stackIdx * 10 + segJ * 38;
+                      const enterDelayMs = reduceMotion ? 0 : stackIdx * 8 + segJ * 15;
 
                       const baseStyle = {
                         position: "absolute",
@@ -1125,13 +1137,16 @@ const TimelineRow = memo(function TimelineRow({
                         animationDelay: enterDelayMs ? `${enterDelayMs}ms` : undefined,
                       };
 
+                      const isCovered = isWorkSegmentCoveredByPublicHoliday(seg);
+
                       return (
                         <button
                           key={seg.segKey}
                           type="button"
                           className={
                             "lp-block lp-block-alloc lp-block-alloc-project lp-alloc-bar" +
-                            (compactBorder ? " lp-alloc-bar--compact" : "")
+                            (compactBorder ? " lp-alloc-bar--compact" : "") +
+                            (isCovered ? " lp-alloc-bar-covered-by-holiday" : "")
                           }
                           data-hours={h}
                           data-bar-h={calculatedHeight}
@@ -1189,6 +1204,158 @@ const TimelineRow = memo(function TimelineRow({
                 );
               })}
             </div>
+
+            {publicHolidaySegments.length > 0 && (
+              <div
+                className="lp-public-holiday-overlay"
+                style={{ 
+                  gridColumn: "1 / -1", 
+                  display: "grid",
+                  gridTemplateColumns: gridTemplate,
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  width: "100%",
+                  gap: 0,
+                  padding: "12px 0",
+                  pointerEvents: "none"
+                }}
+              >
+                {publicHolidaySegments.map((seg) => {
+                  const startCol = Math.max(0, Math.min(seg.lay.start, Math.max(0, nCols - 1)));
+                  const spanClamped = Math.max(
+                    0,
+                    Math.min(seg.lay.span, nCols - startCol)
+                  );
+                  const colStartFrac = nCols > 0 ? startCol / nCols : 0;
+                  const colWidthFrac = nCols > 0 ? spanClamped / nCols : 0;
+                  const leftPct = colStartFrac * 100;
+                  const widthPct = colWidthFrac * 100;
+                  const holidayLabel = seg.a.notes || "Public holiday";
+                  const holidayBarHeight = Math.round(WEEK_CELL_FULL_DAY_PX * 0.5);
+
+                  return (
+                    <button
+                      key={seg.segKey}
+                      type="button"
+                      className="lp-block lp-block-alloc lp-block-alloc-project lp-alloc-bar lp-public-holiday-block"
+                      style={{
+                        position: "absolute",
+                        left: `${leftPct}%`,
+                        width: `${widthPct}%`,
+                        top: 0,
+                        "--alloc-bar-h": `${holidayBarHeight}px`,
+                        height: `${holidayBarHeight}px`,
+                        minHeight: `${holidayBarHeight}px`,
+                        maxHeight: `${holidayBarHeight}px`,
+                        pointerEvents: "auto",
+                        cursor: "pointer",
+                        transition:
+                          "height 0.35s cubic-bezier(0.22, 1, 0.36, 1), left 0.35s cubic-bezier(0.22, 1, 0.36, 1), width 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease, transform 0.2s ease, filter 0.2s ease",
+                        zIndex: 999,
+                        borderColor: "rgba(245, 158, 11, 0.92)",
+                        borderWidth: "2px",
+                        borderStyle: "solid",
+                        color: theme === "light" ? "#6a3900" : "#ffd7a3",
+                        background: "transparent",
+                        boxSizing: "border-box",
+                        overflow: "hidden",
+                        padding: 0,
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openAllocationDetail(seg.a);
+                      }}
+                      title={holidayLabel}
+                    >
+                      <span
+                        className="lp-alloc-bar__underlay"
+                        style={{
+                          background:
+                            theme === "light"
+                              ? "linear-gradient(180deg, rgba(245, 158, 11, 0.36), rgba(245, 158, 11, 0.2))"
+                              : "linear-gradient(180deg, rgba(245, 158, 11, 0.32), rgba(245, 158, 11, 0.16))",
+                        }}
+                        aria-hidden
+                      />
+                      <span
+                        className="lp-alloc-bar__load"
+                        style={{
+                          background: `linear-gradient(to top, ${hexToRgba("#f59e0b", theme === "light" ? 0.28 : 0.38)}, ${hexToRgba("#f59e0b", 0)})`,
+                          height: "72%",
+                        }}
+                        aria-hidden
+                      />
+                      <span className="lp-alloc-bar__body">
+                        <span className="lp-alloc-bar__line lp-alloc-bar__line--name">
+                          Public Holiday
+                        </span>
+                        <span className="lp-alloc-bar__line lp-alloc-bar__line--meta">
+                          <span className="lp-alloc-code-chip" style={projectCodeChipStyles("#f59e0b", theme)}>
+                            HOLIDAY
+                          </span>
+                          <span className="lp-alloc-hours">Day Off</span>
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {workSegments.some((s) => isWorkSegmentCoveredByPublicHoliday(s)) && (
+              <div
+                className="lp-covered-alloc-hours-layer"
+                style={{
+                  gridColumn: "1 / -1",
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  width: "100%",
+                  pointerEvents: "none",
+                  zIndex: 1000,
+                }}
+              >
+                {workSegments
+                  .filter((s) => isWorkSegmentCoveredByPublicHoliday(s))
+                  .map((seg) => {
+                    const startCol = Math.max(0, Math.min(seg.lay.start, Math.max(0, nCols - 1)));
+                    const spanClamped = Math.max(0, Math.min(seg.lay.span, nCols - startCol));
+                    const colStartFrac = nCols > 0 ? startCol / nCols : 0;
+                    const colWidthFrac = nCols > 0 ? spanClamped / nCols : 0;
+                    const leftPct = colStartFrac * 100;
+                    const widthPct = colWidthFrac * 100;
+                    const h = Math.max(0, parseFloat(seg.a.hoursPerDay) || 0);
+                    const hStr = Number.isInteger(h) ? String(h) : String(h);
+                    const hoursLabel = `${hStr}h`;
+                    const barHeight = allocationBarHeightPx(seg.a);
+
+                    return (
+                      <div
+                        key={`hours-${seg.segKey}`}
+                        style={{
+                          position: "absolute",
+                          left: `${leftPct}%`,
+                          width: `${widthPct}%`,
+                          top: `${Math.max(4, barHeight - 18)}px`,
+                          fontSize: "11px",
+                          fontWeight: "700",
+                          color: "rgba(245, 158, 11, 0.95)",
+                          textAlign: "right",
+                          paddingRight: "6px",
+                          textShadow: "0 1px 2px rgba(0, 0, 0, 0.5)",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {hoursLabel}
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -2699,6 +2866,7 @@ export default function LandingPage() {
         projects={allocationProjectOptions}
         projectRegistry={projects}
         onAddProject={addAllocationProjectLabel}
+        publicHolidayAllocations={publicHolidayAllocations}
         t={t}
       />
 

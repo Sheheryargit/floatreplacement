@@ -307,7 +307,8 @@ export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,c
               placeholder="Select owner"
               creatable={false}
               searchPlaceholder="Search owners…"
-              renderOption={(o,th)=>o?(<div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:26,height:26,borderRadius:7,background:avGrad(o.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff"}}>{o.initials}</div><span style={{fontWeight:500,color:th.text}}>{o.name}</span></div>):null}
+              renderOption={(o,th)=>o?(<div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:26,height:26,borderRadius:7,background:avGrad(o.label),display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff",flexShrink:0}}>{ini(o.label)}</div><span style={{fontWeight:500,color:th.text}}>{o.label}</span></div>):null}
+              renderSelected={(o,th)=>{const nm=o?.label||"";return nm?(<div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:22,height:22,borderRadius:6,background:avGrad(nm),display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:"#fff",flexShrink:0}}>{ini(nm)}</div><span>{nm}</span></div>):null;}}
             />
 
             <label style={Lbl(t)}><span style={{display:"inline-flex",alignItems:"center",gap:6}}><Circle size={14}/> Stage</span></label>

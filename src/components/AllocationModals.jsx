@@ -76,6 +76,7 @@ export function CreateAllocationModal({
   editAllocation,
   onEditAllocation,
   defaultTab = "allocation",
+  publicHolidayAllocations = [],
   t,
 }) {
   const reduceMotion = useReducedMotion();
@@ -92,9 +93,7 @@ export function CreateAllocationModal({
   const [assignQuery, setAssignQuery] = useState("");
   const [assignOpen, setAssignOpen] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
-  const [projectCreateMode, setProjectCreateMode] = useState(false);
   const [projectQuery, setProjectQuery] = useState("");
-  const [newProjectLine, setNewProjectLine] = useState("");
 
   // Leave-specific state
   const [leaveType, setLeaveType] = useState("annual");
@@ -151,9 +150,7 @@ export function CreateAllocationModal({
     setAssignQuery("");
     setAssignOpen(false);
     setProjectOpen(false);
-    setProjectCreateMode(false);
     setProjectQuery("");
-    setNewProjectLine("");
     setActiveTab(defaultTab === "leave" ? "leave" : "allocation");
     setLeaveType("annual");
     setLeaveTypeOpen(false);
@@ -170,7 +167,6 @@ export function CreateAllocationModal({
       if (assignWrapRef.current && !assignWrapRef.current.contains(e.target)) setAssignOpen(false);
       if (projectWrapRef.current && !projectWrapRef.current.contains(e.target)) {
         setProjectOpen(false);
-        setProjectCreateMode(false);
         setProjectQuery("");
       }
       if (leaveTypeWrapRef.current && !leaveTypeWrapRef.current.contains(e.target)) setLeaveTypeOpen(false);
@@ -231,15 +227,36 @@ export function CreateAllocationModal({
     setAssignedIds((prev) => prev.filter((x) => x !== id));
   }, []);
 
-  const submitNewProject = useCallback(() => {
-    const line = newProjectLine.trim();
-    if (!line || !onAddProject) return;
-    onAddProject(line);
-    setProject(line);
-    setNewProjectLine("");
-    setProjectCreateMode(false);
-    setProjectOpen(false);
-  }, [newProjectLine, onAddProject]);
+  // Check for public holiday overlaps
+  const publicHolidayOverlaps = useMemo(() => {
+    if (activeTab === "leave" || !startDate || !endDate || assignedIds.length === 0) return [];
+    const pStart = String(startDate).slice(0, 10);
+    const pEnd = String(endDate).slice(0, 10);
+    const assignedSet = new Set(assignedIds.map((id) => String(id)));
+    const overlaps = [];
+    const seenHolidayKeys = new Set();
+    for (const ph of publicHolidayAllocations) {
+      const phPeople = Array.isArray(ph.personIds)
+        ? ph.personIds.map((id) => String(id))
+        : ph.personId != null
+          ? [String(ph.personId)]
+          : [];
+      const matchesAssignee = phPeople.some((pid) => assignedSet.has(pid));
+      if (!matchesAssignee) continue;
+
+      const phStart = String(ph.startDate).slice(0, 10);
+      const phEnd = String(ph.endDate).slice(0, 10);
+      if (pStart <= phEnd && pEnd >= phStart) {
+        const key = `${phStart}|${phEnd}|${String(ph.notes || "Public holiday").trim()}`;
+        if (seenHolidayKeys.has(key)) continue;
+        seenHolidayKeys.add(key);
+        overlaps.push(ph);
+      }
+    }
+    return overlaps;
+  }, [activeTab, startDate, endDate, publicHolidayAllocations, assignedIds]);
+
+
 
   const leaveAccent = useMemo(() => leaveAccentTheme(leaveType), [leaveType]);
 
@@ -427,6 +444,25 @@ export function CreateAllocationModal({
           <p className="lpam-duration" style={{ color: t.textSoft, marginTop: "8px" }}>
             Duration: {workingDays === 1 ? "1 working day" : `${workingDays} working days`}
           </p>
+          {publicHolidayOverlaps.length > 0 && (
+            <div style={{ 
+              marginTop: "12px", 
+              padding: "10px 12px", 
+              background: "rgba(245, 158, 11, 0.08)", 
+              borderLeft: "3px solid rgb(245, 158, 11)", 
+              borderRadius: "4px",
+              color: "rgb(180, 120, 0)"
+            }}>
+              <p style={{ margin: "0 0 6px 0", fontSize: "13px", fontWeight: "500" }}>
+                ⚠ Public holiday overlap
+              </p>
+              <p style={{ margin: 0, fontSize: "12px", lineHeight: "1.4" }}>
+                {publicHolidayOverlaps.length === 1
+                  ? `This allocation overlaps with: ${publicHolidayOverlaps[0].notes || "Public holiday"}`
+                  : `This allocation overlaps with ${publicHolidayOverlaps.length} public holidays`}
+              </p>
+            </div>
+          )}
           <div className="lpam-dates">
             <input
               type="date"
@@ -494,18 +530,6 @@ export function CreateAllocationModal({
             <label className="lpam-label" style={{ color: t.textMuted }}>
               Project
             </label>
-            <button
-              type="button"
-              className="lpam-link"
-              style={{ color: t.accent }}
-              onClick={() => {
-                setProjectOpen(true);
-                setProjectCreateMode(true);
-                setNewProjectLine("");
-              }}
-            >
-              Add project
-            </button>
           </div>
           <div className="lpam-dropdown-wrap lpam-dropdown-full" ref={projectWrapRef}>
             <button
@@ -513,10 +537,7 @@ export function CreateAllocationModal({
               className="lpam-input lpam-project-trigger"
               style={{ borderColor: t.borderIn || t.border, background: t.surface, color: t.text, boxShadow: "0 1px 3px rgba(0,0,0,0.02)" }}
               aria-expanded={projectOpen}
-              onClick={() => {
-                setProjectOpen((o) => !o);
-                if (projectOpen) setProjectCreateMode(false);
-              }}
+              onClick={() => setProjectOpen((o) => !o)}
             >
               <span className="lpam-project-trigger-inner">
                 {project ? (
@@ -535,47 +556,7 @@ export function CreateAllocationModal({
                 className="lpam-menu lpam-menu-project"
                 style={{ background: t.surface, borderColor: t.border }}
               >
-                {projectCreateMode ? (
-                  <div className="lpam-project-create" onMouseDown={(e) => e.stopPropagation()}>
-                    <p className="lpam-project-create-hint" style={{ color: t.textMuted }}>
-                      Use format <strong style={{ color: t.textSoft }}>Code / Project name</strong>
-                    </p>
-                    <input
-                      type="text"
-                      value={newProjectLine}
-                      onChange={(e) => setNewProjectLine(e.target.value)}
-                      placeholder="e.g. ACME / Website redesign"
-                      className="lpam-input"
-                      style={{ borderColor: t.border, background: t.bg, color: t.text }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") submitNewProject();
-                      }}
-                      autoFocus
-                    />
-                    <div className="lpam-project-create-actions">
-                      <button
-                        type="button"
-                        className="lpam-btn lpam-btn-tiny lpam-btn-primary"
-                        style={{ background: t.accent, color: t.accentTxt }}
-                        onClick={submitNewProject}
-                      >
-                        Add &amp; select
-                      </button>
-                      <button
-                        type="button"
-                        className="lpam-btn lpam-btn-tiny lpam-btn-secondary"
-                        style={{ borderColor: t.border, background: t.btnSec, color: t.textSoft }}
-                        onClick={() => {
-                          setProjectCreateMode(false);
-                          setNewProjectLine("");
-                        }}
-                      >
-                        Back
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
+                <>
                     <div
                       className="lpam-menu-search"
                       onMouseDown={(e) => e.stopPropagation()}
@@ -626,20 +607,7 @@ export function CreateAllocationModal({
                         })
                       )}
                     </div>
-                    <div className="lpam-menu-divider" style={{ background: t.border }} />
-                    <button
-                      type="button"
-                      className="lpam-menu-item lpam-menu-item-accent"
-                      style={{ color: t.accent }}
-                      onClick={() => {
-                        setProjectCreateMode(true);
-                        setNewProjectLine("");
-                      }}
-                    >
-                      + Create new project…
-                    </button>
-                  </>
-                )}
+                </>
               </div>
             )}
           </div>

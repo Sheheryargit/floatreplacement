@@ -22,6 +22,17 @@
   align-items: stretch;
   background: var(--bg);
   color: var(--text);
+  overflow-y: auto;
+}
+
+/* Sidebar sticky within the page-level scroll of reporting-root */
+.reporting-root .app-sidenav {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  overflow-y: auto;
+  flex-shrink: 0;
 }
 
 :root[data-theme="light"] .reporting-root {
@@ -42,7 +53,7 @@
 .reporting-main {
   flex: 1;
   min-width: 0;
-  overflow: auto;
+  overflow-x: auto;
   max-width: 100%;
   padding: 0;
   display: flex;
@@ -302,7 +313,7 @@
 /* ─── Chart ──────────────────────────────────────────────────────────────── */
 
 .rp-chart-wrap {
-  padding: 16px 20px 8px;
+  padding: 16px 0 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
@@ -310,19 +321,300 @@
   border-bottom-color: rgba(15, 23, 42, 0.08);
 }
 
-.rp-chart-legend {
+/* Two-column: y-axis labels | plot area */
+.rp-chart-body {
   display: flex;
-  gap: 16px;
-  justify-content: center;
-  margin: 8px 20px;
+  gap: 0;
+  padding: 0 16px;
+  position: relative;
+  user-select: none;
+  overflow: hidden;
 }
 
+/* Y-axis */
+.rp-chart-yaxis {
+  width: 40px;
+  flex-shrink: 0;
+  position: relative;
+  height: 200px;
+}
+
+.rp-chart-ytick {
+  position: absolute;
+  right: 6px;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  transform: translateY(50%);
+  text-align: right;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+/* Right side: plot + x-axis + holiday row */
+.rp-chart-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Plot area (bars + grid lines) */
+.rp-chart-plot {
+  position: relative;
+  height: 200px;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Horizontal grid lines */
+.rp-chart-gridline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--border);
+  pointer-events: none;
+}
+
+/* Each bar column */
+.rp-chart-bar-col {
+  flex: 1;
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+/* Capacity ghost outline bar */
+.rp-chart-cap-bar {
+  position: absolute;
+  bottom: 0;
+  left: 4%;
+  right: 4%;
+  border-radius: 2px 2px 0 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-bottom: none;
+  pointer-events: none;
+}
+
+:root[data-theme="light"] .rp-chart-cap-bar {
+  border-color: rgba(15, 23, 42, 0.2);
+}
+
+/* Stacked bar */
+.rp-chart-stack {
+  position: relative;
+  width: 76%;
+  display: flex;
+  flex-direction: column-reverse;
+  border-radius: 2px 2px 0 0;
+  overflow: hidden;
+  cursor: crosshair;
+  z-index: 1;
+  transition: filter 0.12s;
+  min-height: 2px;
+}
+
+.rp-chart-stack:hover {
+  filter: brightness(1.18);
+}
+
+.rp-chart-seg {
+  width: 100%;
+  min-height: 1px;
+  flex-shrink: 0;
+}
+
+/* X-axis date labels */
+.rp-chart-xaxis {
+  display: flex;
+  gap: 2px;
+  margin-top: 5px;
+}
+
+.rp-chart-xlabel {
+  flex: 1;
+  text-align: center;
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.rp-chart-xlabel--hidden {
+  visibility: hidden;
+}
+
+/* Holiday dot row */
+.rp-chart-holiday-row {
+  display: flex;
+  gap: 2px;
+  margin-top: 3px;
+  padding-bottom: 10px;
+}
+
+.rp-chart-holiday-cell {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 8px;
+}
+
+.rp-chart-holiday-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6b7280;
+  cursor: help;
+  transition: transform 0.1s, background 0.1s;
+}
+
+.rp-chart-holiday-dot:hover {
+  transform: scale(1.6);
+  background: #9ca3af;
+}
+
+/* Holiday names tooltip — position:fixed */
+.rp-chart-holiday-tooltip {
+  position: fixed;
+  background: var(--surface);
+  border: 1px solid var(--border-sub);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  color: var(--text);
+  pointer-events: none;
+  z-index: 9999;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  line-height: 1.6;
+  max-width: 260px;
+  white-space: normal;
+}
+
+/* Hover tooltip — position:fixed so it never bleeds over adjacent UI */
+.rp-chart-tooltip {
+  position: fixed;
+  background: var(--surface);
+  border: 1px solid var(--border-sub);
+  border-radius: 8px;
+  padding: 10px 14px;
+  pointer-events: none;
+  z-index: 9999;
+  min-width: 200px;
+  font-size: 0.77rem;
+  color: var(--text);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  line-height: 1.65;
+}
+
+:root[data-theme="light"] .rp-chart-tooltip {
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.12);
+}
+
+.rp-chart-tooltip-title {
+  font-weight: 600;
+  margin-bottom: 7px;
+  font-size: 0.8rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 5px;
+}
+
+.rp-chart-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.rp-chart-tooltip-label {
+  color: var(--text-soft);
+}
+
+.rp-chart-tooltip-val {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-chart-tooltip-pct {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.rp-chart-tooltip-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+/* Legend */
+.rp-chart-legend {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  padding: 8px 16px;
+  flex-wrap: wrap;
+}
+
+/* Toolbar variant — no extra padding, no centring */
+.rp-chart-legend--toolbar {
+  padding: 0;
+  justify-content: flex-start;
+  gap: 12px;
+  margin-left: 4px;
+  border-left: 1px solid var(--border);
+  padding-left: 14px;
+}
+
+.rp-chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+.rp-chart-legend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.rp-chart-legend-swatch--cap {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+:root[data-theme="light"] .rp-chart-legend-swatch--cap {
+  border-color: rgba(15, 23, 42, 0.3);
+}
+
+.rp-chart-legend-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #6b7280;
+  flex-shrink: 0;
+}
+
+/* Legacy / existing legend classes kept for compat */
 .rp-legend-item {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 0.8rem;
-  color: var(--reporting-fg);
+  color: var(--text-soft);
 }
 
 .rp-legend-swatch {
@@ -330,23 +622,6 @@
   height: 12px;
   border-radius: 2px;
   flex-shrink: 0;
-}
-
-/* ─── Tooltip ────────────────────────────────────────────────────────────── */
-
-.rp-tooltip {
-  background: #1e293b;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 10px 13px;
-  font-size: 0.78rem;
-  min-width: 160px;
-}
-
-:root[data-theme="light"] .rp-tooltip {
-  background: #ffffff;
-  border-color: rgba(15, 23, 42, 0.12);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
 }
 
 .rp-tooltip-label {
@@ -391,6 +666,7 @@
 .rp-stats-strip {
   display: flex;
   align-items: stretch;
+  justify-content: center;
   gap: 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   min-height: 90px;
@@ -470,8 +746,8 @@
   flex-shrink: 0;
 }
 
-.rp-swatch--billable  { background: #2dd4bf; }
-.rp-swatch--nonbill   { background: #60a5fa; }
+.rp-swatch--billable  { background: #22d3ee; }
+.rp-swatch--nonbill   { background: #818cf8; }
 
 .rp-stat-sub-label { flex: 1; }
 
@@ -573,7 +849,8 @@
 
 .rp-table-wrap {
   overflow-x: auto;
-  flex: 1;
+  flex: none;
+  padding-bottom: 32px;
 }
 
 .rp-table {
@@ -593,8 +870,8 @@
   white-space: nowrap;
   position: sticky;
   top: 0;
-  background: #0d1117;
-  z-index: 1;
+  background: var(--bg);
+  z-index: 2;
 }
 
 :root[data-theme="light"] .rp-th {
