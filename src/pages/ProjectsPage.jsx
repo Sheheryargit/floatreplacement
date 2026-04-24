@@ -52,13 +52,6 @@ const STAGES = [
   { value:"cancelled", label:"Cancelled", color:"#ff4d6a", desc:"Mark as inactive, stop tracking." },
 ];
 const PROJECT_COLORS = PROJECT_COLOR_PALETTE;
-const SEED_OWNERS = [
-  { id:"jf",name:"Jane Foster",initials:"JF" },{ id:"dc",name:"David Chen",initials:"DC" },
-  { id:"tp",name:"Tina Park",initials:"TP" },{ id:"jc",name:"James Clark",initials:"JC" },
-  { id:"bh",name:"Ben Harris",initials:"BH" },{ id:"ss",name:"Sarah Singh",initials:"SS" },
-  { id:"lm",name:"Lisa Morales",initials:"LM" },{ id:"gw",name:"George Wang",initials:"GW" },
-  { id:"sy",name:"Sheher Yar",initials:"SY" },
-];
 
 /* ═══════════════════ HELPERS ═══════════════════ */
 const ini = (n) => { if(!n)return""; const p=n.trim().split(/\s+/); return p.length===1?(p[0][0]||"").toUpperCase():(p[0][0]+p[p.length-1][0]).toUpperCase(); };
@@ -96,6 +89,11 @@ function Confirm({open,onYes,onNo,title,desc,yesLabel,yesIcon:YI,yesDanger,t}){
 }
 
 const CLIENT_NONE = "__client_none__";
+const coerceOwnerId = (value) => {
+  if (value === null || value === undefined || value === "") return "";
+  const asNum = Number(value);
+  return Number.isNaN(asNum) ? value : asNum;
+};
 
 /* ═══════════════════ TAG INPUT ═══════════════════ */
 function CTagInput({tags,setTags,options,t,tagIsDark}){
@@ -256,10 +254,17 @@ function RowActions({ project, onEdit, onArchive, onDelete, t }) {
 /* ═══════════════════ PROJECT MODAL ═══════════════════ */
 const Lbl=t=>({fontSize:13,color:t.textMuted,fontWeight:600,whiteSpace:"nowrap"});
 
-const defProject={name:"",code:"",owner:"sy",stage:"draft",billable:true,client:"",tags:[],startDate:"",endDate:"",notes:"",teamIds:[],managerEdit:false,color:"#6c8cff"};
+const defProject={name:"",code:"",owner:"",stage:"draft",billable:true,client:"",tags:[],startDate:"",endDate:"",notes:"",teamIds:[],managerEdit:false,color:"#6c8cff"};
 
 export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,clients,setClients,tagOpts,setTagOpts,t,tagIsDark=true}){
   const[form,setForm]=useState(null);const ref=useRef(null);const isEdit=!!editProject;
+  const ownerOptions = useMemo(
+    () =>
+      [...people]
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
+        .map((p) => ({ label: p.name, value: String(p.id), raw: p })),
+    [people]
+  );
   useEffect(()=>{if(!open)return;if(editProject)setForm({...editProject,teamIds:[...(editProject.teamIds||[])]});else setForm({...defProject,color:PROJECT_COLORS[Math.floor(Math.random()*PROJECT_COLORS.length)]});},[open,editProject?.id]);
   if(!open||!form)return null;
   const upd=p=>setForm({...form,...p});
@@ -301,9 +306,9 @@ export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,c
             <label style={Lbl(t)}><span style={{display:"inline-flex",alignItems:"center",gap:6}}><User size={14}/> Owner</span></label>
             <FloatSelect
               t={t}
-              value={form.owner}
-              onChange={(id)=>{const o=SEED_OWNERS.find(x=>x.id===id);if(o)upd({owner:o.id});}}
-              options={SEED_OWNERS.map((o)=>({ label:o.name, value:o.id, raw:o }))}
+              value={form.owner===null||form.owner===undefined?"":String(form.owner)}
+              onChange={(id)=>upd({owner:coerceOwnerId(id)})}
+              options={ownerOptions}
               placeholder="Select owner"
               creatable={false}
               searchPlaceholder="Search owners…"
@@ -497,7 +502,7 @@ export default function ProjectsPage(){
               {["Project","Code","Client","Tags","Stage","Team","Start","End","Owner",""].map((h,i)=>(<th key={i} style={{textAlign:"left",padding:"14px 12px",fontSize:11,fontWeight:700,color:t.textMuted,textTransform:"uppercase",letterSpacing:0.8,whiteSpace:"nowrap",width:i===9?48:undefined}}>{h}</th>))}
             </tr></thead>
             <tbody>
-              {filtered.map((p,idx)=>{const sel=selected.has(p.id);const stg=STAGES.find(s=>s.value===p.stage)||STAGES[0];const owner=SEED_OWNERS.find(o=>o.id===p.owner);const teamPeople=p.teamIds.map(id=>people.find(x=>x.id===id)).filter(Boolean);return(
+              {filtered.map((p,idx)=>{const sel=selected.has(p.id);const stg=STAGES.find(s=>s.value===p.stage)||STAGES[0];const owner=people.find(o=>String(o.id)===String(p.owner));const teamPeople=p.teamIds.map(id=>people.find(x=>x.id===id)).filter(Boolean);return(
                 <tr key={p.id} onClick={()=>openEdit(p)} style={{borderBottom:`1px solid ${t.border}`,background:sel?t.selRow:"transparent",cursor:"pointer",transition:"background 0.12s",animation:mounted&&idx<TABLE_ROW_ENTER_ANIM_MAX?`rowIn 0.35s ease-out ${idx*0.025}s both`:"none"}} onMouseEnter={e=>{if(!sel)e.currentTarget.style.background=t.rowHov;}} onMouseLeave={e=>{if(!sel)e.currentTarget.style.background=sel?t.selRow:"transparent";}}>
                   <td style={{padding:"12px 14px"}} onClick={e=>e.stopPropagation()}><input type="checkbox" checked={sel} onChange={()=>toggleSel(p.id)} style={{accentColor:t.chk,cursor:"pointer",width:16,height:16}}/></td>
                   <td style={{padding:"12px 12px"}}><div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:4,height:28,borderRadius:2,background:p.color,flexShrink:0}}/><span style={{fontWeight:600,color:p.archived?t.textMuted:t.text,fontSize:14}}>{p.name}</span></div></td>
@@ -508,7 +513,7 @@ export default function ProjectsPage(){
                   <td style={{padding:"12px 12px"}}>{teamPeople.length>0?(<div style={{display:"flex",alignItems:"center"}}>{teamPeople.slice(0,3).map((tp,j)=>(<div key={tp.id} style={{width:26,height:26,borderRadius:7,background:avGrad(tp.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:"#fff",marginLeft:j>0?-6:0,border:`2px solid ${t.surface}`,position:"relative",zIndex:3-j}} title={tp.name}>{ini(tp.name)}</div>))}{teamPeople.length>3&&<span style={{fontSize:11,color:t.textMuted,marginLeft:4,fontWeight:600}}>+{teamPeople.length-3}</span>}</div>):<span style={{color:t.textDim,fontSize:12}}>—</span>}</td>
                   <td style={{padding:"12px 12px",color:t.textSoft,fontSize:12,whiteSpace:"nowrap"}}>{fmtDate(p.startDate)}</td>
                   <td style={{padding:"12px 12px",color:t.textSoft,fontSize:12,whiteSpace:"nowrap"}}>{fmtDate(p.endDate)}</td>
-                  <td style={{padding:"12px 12px"}}>{owner&&<div style={{width:28,height:28,borderRadius:8,background:avGrad(owner.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff"}} title={owner.name}>{owner.initials}</div>}</td>
+                  <td style={{padding:"12px 12px"}}>{owner&&<div style={{width:28,height:28,borderRadius:8,background:avGrad(owner.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff"}} title={owner.name}>{ini(owner.name)}</div>}</td>
                   <td style={{padding:"12px 8px"}} onClick={e=>e.stopPropagation()}><RowActions project={p} t={t} onEdit={()=>openEdit(p)} onArchive={()=>archiveProject(p.id)} onDelete={()=>{setSelected(new Set([p.id]));setConfirmDel(true);}}/></td>
                 </tr>);})}
               {filtered.length===0&&(<tr><td colSpan={11} style={{textAlign:"center",padding:"56px 20px"}}>{viewTab==="archived"?<><Archive size={32} style={{color:t.textDim,marginBottom:12}}/><div style={{color:t.textMuted,fontSize:15,fontWeight:600}}>No archived projects</div><div style={{color:t.textDim,fontSize:13,marginTop:4}}>Archived projects will appear here</div></>:<><Search size={32} style={{color:t.textDim,marginBottom:12}}/><div style={{color:t.textMuted,fontSize:15,fontWeight:600}}>{search?"No projects match your search":"No projects yet"}</div><div style={{color:t.textDim,fontSize:13,marginTop:4}}>{search?"Try a different search term":"Click \"Add project\" to get started"}</div></>}</td></tr>)}
