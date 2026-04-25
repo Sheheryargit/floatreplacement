@@ -716,6 +716,14 @@ const TimelineRow = memo(function TimelineRow({
 
   const hoursKeys = visibleDateKeysForHours(scheduleModel);
   const hours = computePersonHoursInViewFromList(personAllocations, scheduleModel);
+  const maxDailyBookedHours = useMemo(() => {
+    if (!hoursKeys.length) return 0;
+    let mx = 0;
+    for (const dk of hoursKeys) {
+      mx = Math.max(mx, sumWorkHoursOnDayForPersonList(personAllocations, dk));
+    }
+    return mx;
+  }, [hoursKeys, personAllocations, scheduleModel]);
   const rawCap = hoursKeys.reduce(
     (s, dk) => s + maxWorkHoursOnDayForPersonList(personAllocations, dk, STANDARD_DAY_HOURS),
     0
@@ -727,7 +735,9 @@ const TimelineRow = memo(function TimelineRow({
         ? 100
         : 0;
   const right =
-    utilizationMode === "hours" ? `${hours.toFixed(hours % 1 ? 1 : 0)}h` : `${pct}%`;
+    utilizationMode === "hours"
+      ? `${maxDailyBookedHours.toFixed(maxDailyBookedHours % 1 ? 1 : 0)}h/d`
+      : `${pct}%`;
   const overloaded = personHasOverloadInViewFromList(personAllocations, scheduleModel);
   const noWorkingDaysInView = hoursKeys.length > 0 && rawCap < 1e-6;
 
@@ -935,7 +945,18 @@ const TimelineRow = memo(function TimelineRow({
               </div>
             </div>
           </div>
-          <button type="button" className="lp-person-row lp-person-hours-hit" onClick={() => openEdit(p)}>
+          <button
+            type="button"
+            className="lp-person-row lp-person-hours-hit"
+            onClick={() => openEdit(p)}
+            title={
+              utilizationMode === "hours"
+                ? `${hours.toFixed(hours % 1 ? 1 : 0)}h total in view · peak ${maxDailyBookedHours.toFixed(
+                    maxDailyBookedHours % 1 ? 1 : 0
+                  )}h/day`
+                : `${pct}% utilization in view`
+            }
+          >
             <span className={"lp-person-hours" + (overloaded ? " lp-person-hours-overloaded" : "")}>
               {right}
             </span>
