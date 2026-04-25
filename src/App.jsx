@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import React, { lazy, Suspense } from "react";
 import { BrowserRouter, useLocation, useRoutes, Navigate } from "react-router-dom";
 import { MotionConfig } from "framer-motion";
 import { ThemeProvider, useAppTheme } from "./context/ThemeContext.jsx";
@@ -46,6 +46,37 @@ function WorkspaceReady({ children }) {
   return children;
 }
 
+class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error) {
+    // Keep console signal for debugging in dev.
+    console.error("[alloc8] App crashed:", error);
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    const msg = this.state.error?.message || String(this.state.error);
+    return (
+      <div style={{ padding: 24, color: "var(--color-text, #fff)" }}>
+        <h2 style={{ margin: 0, fontSize: 18 }}>App error</h2>
+        <p style={{ opacity: 0.85, marginTop: 8, marginBottom: 0 }}>
+          {msg}
+        </p>
+        {import.meta.env.DEV ? (
+          <pre style={{ marginTop: 12, whiteSpace: "pre-wrap", opacity: 0.75 }}>
+            {this.state.error?.stack || ""}
+          </pre>
+        ) : null}
+      </div>
+    );
+  }
+}
+
 function AnimatedRoutes() {
   const location = useLocation();
   const element = useRoutes(workspaceRoutes, location);
@@ -80,16 +111,18 @@ function AuthGate() {
   }
   return (
     <>
-      <WorkspaceReady>
-        <SlapAnimationProvider>
-          <Suspense fallback={null}>
-            <CommandPalette />
-          </Suspense>
-          <div className="app-viewport">
-            <AnimatedRoutes />
-          </div>
-        </SlapAnimationProvider>
-      </WorkspaceReady>
+      <AppErrorBoundary>
+        <WorkspaceReady>
+          <SlapAnimationProvider>
+            <Suspense fallback={null}>
+              <CommandPalette />
+            </Suspense>
+            <div className="app-viewport">
+              <AnimatedRoutes />
+            </div>
+          </SlapAnimationProvider>
+        </WorkspaceReady>
+      </AppErrorBoundary>
       <ThemedToaster />
     </>
   );

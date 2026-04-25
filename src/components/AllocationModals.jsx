@@ -66,6 +66,7 @@ export function CreateAllocationModal({
   onClose,
   onCreate,
   onCreateLeave,
+  allocations = [],
   people,
   preselectPerson,
   preselectDate,
@@ -177,9 +178,82 @@ export function CreateAllocationModal({
     }
   }, [open]);
 
+  function dateKeyLocal(dt) {
+    const x = new Date(dt);
+    const y = x.getFullYear();
+    const mo = String(x.getMonth() + 1).padStart(2, "0");
+    const day = String(x.getDate()).padStart(2, "0");
+    return `${y}-${mo}-${day}`;
+  }
+
+  function allocationHasPerson(a, personId) {
+    const pid = String(personId ?? "");
+    if (!pid) return false;
+    if (Array.isArray(a?.personIds) && a.personIds.map(String).includes(pid)) return true;
+    if (a?.personId != null && String(a.personId) === pid) return true;
+    return false;
+  }
+
+  function countWorkingDaysExcludingOffDays(start, end) {
+    if (!start || !end) return 0;
+    const assignees = (assignedIds || []).map((id) => String(id)).filter(Boolean);
+    // Multi-assignee allocations store one shared record; time-off is per-person.
+    // Apply off-day skipping only when there is exactly one assignee.
+    if (assignees.length !== 1) return countWorkingDaysBetween(start, end);
+    const pid = assignees[0];
+
+    const offDayKeys = new Set();
+
+    for (const ph of publicHolidayAllocations || []) {
+      if (!allocationHasPerson(ph, pid)) continue;
+      const dk = String(ph.startDate || "").slice(0, 10);
+      if (dk) offDayKeys.add(dk);
+    }
+
+    for (const a of allocations || []) {
+      if (!a?.isLeave) continue;
+      if (!allocationHasPerson(a, pid)) continue;
+      const s = String(a.startDate || "").slice(0, 10);
+      const e = String(a.endDate || "").slice(0, 10);
+      if (!s || !e) continue;
+      const ds = new Date(s);
+      ds.setHours(0, 0, 0, 0);
+      const de = new Date(e);
+      de.setHours(0, 0, 0, 0);
+      if (de < ds) continue;
+      const x = new Date(ds);
+      while (x <= de) {
+        offDayKeys.add(dateKeyLocal(x));
+        x.setDate(x.getDate() + 1);
+      }
+    }
+
+    const a = new Date(start);
+    a.setHours(0, 0, 0, 0);
+    const b = new Date(end);
+    b.setHours(0, 0, 0, 0);
+    if (b < a) return 0;
+
+    let n = 0;
+    const x = new Date(a);
+    while (x <= b) {
+      const d = x.getDay();
+      if (d !== 0 && d !== 6) {
+        const dk = dateKeyLocal(x);
+        if (!offDayKeys.has(dk)) n++;
+      }
+      x.setDate(x.getDate() + 1);
+    }
+    return n;
+  }
+
   const workingDays = useMemo(
-    () => (startDate && endDate ? countWorkingDaysBetween(startDate, endDate) : 0),
-    [startDate, endDate]
+    () => {
+      if (!startDate || !endDate) return 0;
+      if (activeTab === "leave") return countWorkingDaysBetween(startDate, endDate);
+      return countWorkingDaysExcludingOffDays(startDate, endDate);
+    },
+    [startDate, endDate, activeTab, assignedIds, allocations, publicHolidayAllocations]
   );
 
   const totalHours = useMemo(() => {

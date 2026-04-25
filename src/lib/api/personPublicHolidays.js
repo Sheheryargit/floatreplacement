@@ -29,13 +29,15 @@ export function rowsToSyntheticPublicHolidayAllocations(rows) {
     const dk = isoFromHolidayDate(row.holiday_date);
     if (!dk) continue;
     const name = (row.name || "Public holiday").trim() || "Public holiday";
+    const dayHours = 7.5;
     list.push({
       id: syntheticPublicHolidayId(pid, dk, name),
       personIds: [pid],
       startDate: dk,
       endDate: dk,
-      hoursPerDay: 0,
-      totalHours: 0,
+      hoursPerDay: dayHours,
+      totalHours: dayHours,
+      workingDays: 1,
       project: "",
       notes: name,
       isLeave: true,

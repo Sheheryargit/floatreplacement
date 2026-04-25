@@ -630,24 +630,40 @@ const LEAVE_FIXED_HEIGHT_PX = 86;
 const LEAVE_CLICK_GAP_PX = 56;
 
 function allocationBarHeightPx(alloc) {
-  const raw = Math.max(0, parseFloat(alloc.hoursPerDay) || 0);
-  // Leave blocks default to a compact, readable height when hours/day isn't set.
-  if (alloc?.isLeave && raw <= 0) return 54;
+  const raw = Math.max(0, parseFloat(alloc?.hoursPerDay) || 0);
   if (raw <= 0) return BAR_H_MIN_VISIBLE_PX;
-  // Snap to 0.5h so equal allocations always render identically; tiny sub-0.5h
-  // values (e.g. 0.08) still lift to the minimum visible bar without distorting
-  // the rest of the scale.
   const snapped = Math.round(raw / BAR_H_STEP) * BAR_H_STEP;
   const effective = snapped < BAR_H_STEP ? BAR_H_STEP : snapped;
-  const h = Math.round(BAR_H_BASE_PX + effective * PX_PER_HOUR);
-  return alloc?.isLeave ? Math.max(54, h) : h;
+  return Math.round(BAR_H_BASE_PX + effective * PX_PER_HOUR);
+}
+
+function workTileHeightPxForDensity(density) {
+  // Must stay in sync with `--lp-block-max-h` in `LandingPage.css`.
+  if (density === "compact") return 50;
+  if (density === "spacious") return 76;
+  return 58; // comfortable (default)
+}
+
+function clampedSegmentGeometry(lay, nCols) {
+  const safeCols = Math.max(0, Math.floor(nCols || 0));
+  if (!lay || safeCols <= 0) {
+    return {
+      startCol: 0,
+      spanClamped: 0,
+      leftPct: 0,
+      widthPct: 0,
+    };
+  }
+  const startCol = Math.max(0, Math.min(Math.floor(lay.start || 0), Math.max(0, safeCols - 1)));
+  const spanClamped = Math.max(0, Math.min(Math.floor(lay.span || 0), safeCols - startCol));
+  const leftPct = (startCol / safeCols) * 100;
+  const widthPct = (spanClamped / safeCols) * 100;
+  return { startCol, spanClamped, leftPct, widthPct };
 }
 
 function leaveBarHeightPx(alloc) {
-  const h = Math.max(0, parseFloat(alloc?.hoursPerDay) || 0);
-  // Full-day leave should cover the whole day cell.
-  if (h >= BAR_H_NORM - 1e-6) return WEEK_CELL_FULL_DAY_PX;
-  // Partial-day leave uses the compact card size.
+  // Legacy: leave tiles used variable heights. Schedule now uses consistent tile sizing
+  // across work + leave + public holidays, so this is no longer used for rendering.
   return LEAVE_FIXED_HEIGHT_PX;
 }
 
@@ -735,6 +751,43 @@ function buildWorkAllocationTitle(alloc, projectName, hoursLabel) {
   return bits.filter(Boolean).join(" · ");
 }
 
+function splitLayoutByOffDays(lay, scheduleModel, offDayColSet) {
+  if (!lay || !scheduleModel?.slots?.length) return [];
+  const i0 = Math.max(0, Math.floor(lay.start || 0));
+  const i1 = Math.min(scheduleModel.slots.length - 1, i0 + Math.max(0, Math.floor(lay.span || 0)) - 1);
+  if (i1 < i0) return [];
+
+  const pieces = [];
+  let curStart = null;
+  let curEnd = null;
+
+  for (let idx = i0; idx <= i1; idx++) {
+    const isOff = offDayColSet?.has?.(idx) === true;
+
+    if (isOff) {
+      if (curStart != null && curEnd != null && curEnd >= curStart) {
+        pieces.push({ start: curStart, span: curEnd - curStart + 1 });
+      }
+      curStart = null;
+      curEnd = null;
+      continue;
+    }
+
+    if (curStart == null) {
+      curStart = idx;
+      curEnd = idx;
+    } else {
+      curEnd = idx;
+    }
+  }
+
+  if (curStart != null && curEnd != null && curEnd >= curStart) {
+    pieces.push({ start: curStart, span: curEnd - curStart + 1 });
+  }
+
+  return pieces;
+}
+
 const TimelineRow = memo(function TimelineRow({
   p,
   i,
@@ -744,6 +797,7 @@ const TimelineRow = memo(function TimelineRow({
   viewMode,
   anchorDate,
   utilizationMode,
+  density,
   gridTemplate,
   nCols,
   openEdit,
@@ -774,36 +828,81 @@ const TimelineRow = memo(function TimelineRow({
   const overloaded = personHasOverloadInViewFromList(personAllocations, scheduleModel);
   const noWorkingDaysInView = hoursKeys.length > 0 && rawCap < 1e-6;
 
-  const rowSegments = personAllocations.flatMap((a) =>
-      layoutsForAllocation(a, scheduleModel).map((lay) => ({
-        a,
-        lay,
-        occIdx: lay.occ,
-        segKey: `${a.id}-o${lay.occ}-wk${lay.weekPart ?? 0}-s${lay.start}-sp${lay.span}`,
-        start: lay.start,
-        span: lay.span,
-      }))
-    );
+  // Build leave + public holiday segments first (they render as-is and define off-day gaps).
+  const baseLeaveAndHolidaySegments = personAllocations.flatMap((a) => {
+    const lays = layoutsForAllocation(a, scheduleModel);
+    if (!lays.length) return [];
+    if (!a.isLeave && !a.syntheticPublicHoliday) return [];
+    return lays.map((lay) => ({
+      a,
+      lay,
+      occIdx: lay.occ,
+      segKey: `${a.id}-o${lay.occ}-wk${lay.weekPart ?? 0}-s${lay.start}-sp${lay.span}`,
+      start: lay.start,
+      span: lay.span,
+    }));
+  });
 
-  const workSegments = rowSegments.filter((s) => !s.a.isLeave && !s.a.syntheticPublicHoliday);
-  const leaveSegments = rowSegments.filter((s) => s.a.isLeave && !s.a.syntheticPublicHoliday);
-  const publicHolidaySegments = rowSegments.filter((s) => s.a.syntheticPublicHoliday);
+  const leaveSegments = baseLeaveAndHolidaySegments.filter((s) => s.a.isLeave && !s.a.syntheticPublicHoliday);
+  const publicHolidaySegments = baseLeaveAndHolidaySegments.filter((s) => s.a.syntheticPublicHoliday);
+
+  const offDayColSet = useMemo(() => {
+    const set = new Set();
+    for (const seg of baseLeaveAndHolidaySegments) {
+      const start = Math.max(0, Math.floor(seg?.lay?.start ?? seg?.start ?? 0));
+      const span = Math.max(0, Math.floor(seg?.lay?.span ?? seg?.span ?? 0));
+      const end = Math.min(scheduleModel?.slots?.length ? scheduleModel.slots.length - 1 : -1, start + span - 1);
+      if (end < start) continue;
+      for (let idx = start; idx <= end; idx++) set.add(idx);
+    }
+    return set;
+  }, [baseLeaveAndHolidaySegments, scheduleModel]);
+
+  // Compute stacks on the *unsplit* work envelopes, then split by off days while preserving stack.
+  const workEnvelopeSegments = personAllocations.flatMap((a) => {
+    const lays = layoutsForAllocation(a, scheduleModel);
+    if (!lays.length) return [];
+    if (a.isLeave || a.syntheticPublicHoliday) return [];
+    return lays.map((lay) => ({
+      a,
+      lay,
+      occIdx: lay.occ,
+      segKeyBase: `${a.id}-o${lay.occ}-wk${lay.weekPart ?? 0}`,
+      start: lay.start,
+      span: lay.span,
+    }));
+  });
+
+  assignAllocationStackLevels(workEnvelopeSegments);
+
+  const workSegments = workEnvelopeSegments.flatMap((env) => {
+    const pieces = splitLayoutByOffDays(env.lay, scheduleModel, offDayColSet);
+    return pieces.map((piece, pieceIdx) => {
+      const lay2 = { ...env.lay, start: piece.start, span: piece.span };
+      return {
+        a: env.a,
+        lay: lay2,
+        occIdx: env.occIdx,
+        segKey: `${env.segKeyBase}-p${pieceIdx}-s${piece.start}-sp${piece.span}`,
+        start: piece.start,
+        span: piece.span,
+        stack: env.stack,
+      };
+    });
+  });
 
   const leaveMinH = useMemo(() => {
     if (!leaveSegments.length) return 0;
-    let maxH = 0;
-    for (const seg of leaveSegments) {
-      const isDayOff = isAvailabilityDayOffAlloc(seg.a);
-      if (isDayOff) continue;
-      const hh = leaveBarHeightPx(seg.a);
-      if (hh > maxH) maxH = hh;
-    }
-    if (maxH <= 0) return 0;
-    return maxH >= WEEK_CELL_FULL_DAY_PX - 1 ? maxH : maxH + LEAVE_CLICK_GAP_PX;
-  }, [leaveSegments]);
+    return workTileHeightPxForDensity(density) + LEAVE_CLICK_GAP_PX;
+  }, [leaveSegments, density]);
 
-  assignAllocationStackLevels(workSegments);
-  const allocLaneCount = workSegments.length ? Math.max(...workSegments.map((s) => s.stack)) + 1 : 1;
+  const allocLaneCount = workEnvelopeSegments.length
+    ? Math.max(...workEnvelopeSegments.map((s) => s.stack)) + 1
+    : 1;
+  const leaveTileH = workTileHeightPxForDensity(density);
+  const maxWorkBlockH = workSegments.length
+    ? Math.max(...workSegments.map((s) => allocationBarHeightPx(s.a)))
+    : leaveTileH;
 
   // Helper function to check if a work segment is covered by any public holiday
   const isWorkSegmentCoveredByPublicHoliday = (seg) => {
@@ -815,8 +914,7 @@ const TimelineRow = memo(function TimelineRow({
     return false;
   };
 
-  // Bars stack flush — no per-bar vertical padding and no gap between lanes — so
-  // the stacked height of a person×day cell is literally the sum of their hours.
+  // Row height scales with max tile height per lane.
   const LANE_STACK_GAP = 2;
   const BAR_VPAD = 0;
   const ROW_ALLOC_PAD = 24;
@@ -951,6 +1049,8 @@ const TimelineRow = memo(function TimelineRow({
                 alignSelf: "stretch",
                 pointerEvents: "none",
                 zIndex: 1,
+                // Match the work + holiday layers so tiles align on the same baseline.
+                padding: "12px 0",
               }}
             >
               <AnimatePresence initial={false}>
@@ -974,7 +1074,85 @@ const TimelineRow = memo(function TimelineRow({
                   const leaveH = Math.max(0, parseFloat(allocUi.hoursPerDay) || 0);
                   const leaveHoursLabel = !isDayOff && leaveH > 0 ? `${leaveH}h` : "";
                   const hoverTitle = buildLeaveHoverTitle(allocUi, leaveLabel);
-                  const leaveBarH = leaveBarHeightPx(allocUi);
+                  const leaveBarH = maxWorkBlockH;
+
+                  // Render real `public_holiday` leave rows with the same gold tile UI as
+                  // synthetic public holidays so visuals are consistent.
+                  const isPublicHolidayLeave =
+                    !isDayOff && String(allocUi.leaveType || "") === "public_holiday";
+                  if (isPublicHolidayLeave) {
+                    return (
+                      <button
+                        key={`${seg.a.id}-occ-${seg.occIdx}`}
+                        type="button"
+                        className="lp-block lp-block-alloc lp-block-alloc-project lp-alloc-bar lp-public-holiday-block"
+                        style={{
+                          // Override `.lp-block { position:absolute; top:12px; }` so this grid-item
+                          // aligns with work blocks in the same row.
+                          position: "relative",
+                          top: 0,
+                          left: 0,
+                          gridColumn: `${colStart} / span ${colSpan}`,
+                          gridRow: 1,
+                          alignSelf: "start",
+                          height: `${leaveBarH}px`,
+                          minHeight: `${leaveBarH}px`,
+                          maxHeight: `${leaveBarH}px`,
+                          margin: 0,
+                          pointerEvents: "auto",
+                          cursor: "pointer",
+                          "--alloc-bar-h": `${leaveBarH}px`,
+                          borderColor: "rgba(245, 158, 11, 0.92)",
+                          borderWidth: "2px",
+                          borderStyle: "solid",
+                          color: theme === "light" ? "#6a3900" : "#ffd7a3",
+                          background: "transparent",
+                          boxSizing: "border-box",
+                          overflow: "hidden",
+                          padding: 0,
+                        }}
+                        aria-label={allocationAriaLabel(allocUi)}
+                        title={hoverTitle}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openAllocationDetail(allocUi);
+                        }}
+                      >
+                        <span
+                          className="lp-alloc-bar__underlay"
+                          style={{
+                            background:
+                              theme === "light"
+                                ? "linear-gradient(180deg, rgba(245, 158, 11, 0.36), rgba(245, 158, 11, 0.2))"
+                                : "linear-gradient(180deg, rgba(245, 158, 11, 0.32), rgba(245, 158, 11, 0.16))",
+                          }}
+                          aria-hidden
+                        />
+                        <span
+                          className="lp-alloc-bar__load"
+                          style={{
+                            background: `linear-gradient(to top, ${hexToRgba("#f59e0b", theme === "light" ? 0.28 : 0.38)}, ${hexToRgba("#f59e0b", 0)})`,
+                            height: "72%",
+                          }}
+                          aria-hidden
+                        />
+                        <span className="lp-alloc-bar__body">
+                          <span className="lp-alloc-bar__line lp-alloc-bar__line--name">
+                            Public Holiday
+                          </span>
+                          <span className="lp-alloc-bar__line lp-alloc-bar__line--meta">
+                            <span className="lp-alloc-code-chip" style={projectCodeChipStyles("#f59e0b", theme)}>
+                              HOLIDAY
+                            </span>
+                            <span className="lp-alloc-hours">
+                              {`${Math.max(0, parseFloat(seg.a.hoursPerDay) || 0)}h`}
+                            </span>
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  }
+
                   return (
                     <motion.button
                       key={`${seg.a.id}-occ-${seg.occIdx}`}
@@ -992,6 +1170,7 @@ const TimelineRow = memo(function TimelineRow({
                         height: `${leaveBarH}px`,
                         minHeight: `${leaveBarH}px`,
                         maxHeight: `${leaveBarH}px`,
+                        margin: 0,
                         pointerEvents: "auto",
                       }}
                       aria-label={allocationAriaLabel(allocUi)}
@@ -1062,8 +1241,6 @@ const TimelineRow = memo(function TimelineRow({
 
                 if (laneSegs.length === 0) return null;
 
-                const laneMinH = Math.max(...laneSegs.map((s) => allocationBarHeightPx(s.a))) + BAR_VPAD;
-
                 return (
                   <div
                     key={stackIdx}
@@ -1071,19 +1248,13 @@ const TimelineRow = memo(function TimelineRow({
                     style={{
                       position: "relative",
                       width: "100%",
-                      minHeight: `${laneMinH}px`,
+                      minHeight: `${Math.max(
+                        ...laneSegs.map((s) => allocationBarHeightPx(s.a))
+                      )}px`,
                     }}
                   >
                     {laneSegs.map((seg, segJ) => {
-                      const startCol = Math.max(0, Math.min(seg.lay.start, Math.max(0, nCols - 1)));
-                      const spanClamped = Math.max(
-                        0,
-                        Math.min(seg.lay.span, nCols - startCol)
-                      );
-                      const colStartFrac = nCols > 0 ? startCol / nCols : 0;
-                      const colWidthFrac = nCols > 0 ? spanClamped / nCols : 0;
-                      const leftPct = colStartFrac * 100;
-                      const widthPct = colWidthFrac * 100;
+                      const geo = clampedSegmentGeometry(seg.lay, nCols);
                       const z = 20 + seg.stack * 20 + seg.occIdx + Math.floor(seg.lay.start);
 
                       const h = Math.max(0, parseFloat(seg.a.hoursPerDay) || 0);
@@ -1095,10 +1266,9 @@ const TimelineRow = memo(function TimelineRow({
                       const fg = contrastingTextColor(barColor);
                       const innerWash = allocationBarInnerWash(barColor, theme);
 
-                      const brPx = allocationBarBorderRadiusPx(widthPct);
+                      const brPx = allocationBarBorderRadiusPx(geo.widthPct);
                       // Every bar uses the same compact two-line layout with a
                       // consistent text style — short bars clip via overflow: hidden.
-                      // The thin border keeps the smallest bars legible.
                       const compactBorder = calculatedHeight < 40;
                       const chrome = allocationBarChromeStyles(barColor, h, theme, { thin: compactBorder });
 
@@ -1110,8 +1280,8 @@ const TimelineRow = memo(function TimelineRow({
 
                       const baseStyle = {
                         position: "absolute",
-                        left: `${leftPct}%`,
-                        width: `${widthPct}%`,
+                        left: `${geo.leftPct}%`,
+                        width: `${geo.widthPct}%`,
                         top: 0,
                         zIndex: z,
                         // Pin a hard height so a 1h / 2h / 3h bar cannot grow to fit content —
@@ -1223,17 +1393,9 @@ const TimelineRow = memo(function TimelineRow({
                 }}
               >
                 {publicHolidaySegments.map((seg) => {
-                  const startCol = Math.max(0, Math.min(seg.lay.start, Math.max(0, nCols - 1)));
-                  const spanClamped = Math.max(
-                    0,
-                    Math.min(seg.lay.span, nCols - startCol)
-                  );
-                  const colStartFrac = nCols > 0 ? startCol / nCols : 0;
-                  const colWidthFrac = nCols > 0 ? spanClamped / nCols : 0;
-                  const leftPct = colStartFrac * 100;
-                  const widthPct = colWidthFrac * 100;
+                  const geo = clampedSegmentGeometry(seg.lay, nCols);
                   const holidayLabel = seg.a.notes || "Public holiday";
-                  const holidayBarHeight = Math.round(WEEK_CELL_FULL_DAY_PX * 0.5);
+                  const holidayBarHeight = maxWorkBlockH;
 
                   return (
                     <button
@@ -1242,8 +1404,8 @@ const TimelineRow = memo(function TimelineRow({
                       className="lp-block lp-block-alloc lp-block-alloc-project lp-alloc-bar lp-public-holiday-block"
                       style={{
                         position: "absolute",
-                        left: `${leftPct}%`,
-                        width: `${widthPct}%`,
+                        left: `${geo.leftPct}%`,
+                        width: `${geo.widthPct}%`,
                         top: 0,
                         "--alloc-bar-h": `${holidayBarHeight}px`,
                         height: `${holidayBarHeight}px`,
@@ -1295,7 +1457,9 @@ const TimelineRow = memo(function TimelineRow({
                           <span className="lp-alloc-code-chip" style={projectCodeChipStyles("#f59e0b", theme)}>
                             HOLIDAY
                           </span>
-                          <span className="lp-alloc-hours">Day Off</span>
+                          <span className="lp-alloc-hours">
+                            {`${Math.max(0, parseFloat(seg.a.hoursPerDay) || 0)}h`}
+                          </span>
                         </span>
                       </span>
                     </button>
@@ -1321,12 +1485,7 @@ const TimelineRow = memo(function TimelineRow({
                 {workSegments
                   .filter((s) => isWorkSegmentCoveredByPublicHoliday(s))
                   .map((seg) => {
-                    const startCol = Math.max(0, Math.min(seg.lay.start, Math.max(0, nCols - 1)));
-                    const spanClamped = Math.max(0, Math.min(seg.lay.span, nCols - startCol));
-                    const colStartFrac = nCols > 0 ? startCol / nCols : 0;
-                    const colWidthFrac = nCols > 0 ? spanClamped / nCols : 0;
-                    const leftPct = colStartFrac * 100;
-                    const widthPct = colWidthFrac * 100;
+                    const geo = clampedSegmentGeometry(seg.lay, nCols);
                     const h = Math.max(0, parseFloat(seg.a.hoursPerDay) || 0);
                     const hStr = Number.isInteger(h) ? String(h) : String(h);
                     const hoursLabel = `${hStr}h`;
@@ -1337,8 +1496,8 @@ const TimelineRow = memo(function TimelineRow({
                         key={`hours-${seg.segKey}`}
                         style={{
                           position: "absolute",
-                          left: `${leftPct}%`,
-                          width: `${widthPct}%`,
+                          left: `${geo.leftPct}%`,
+                          width: `${geo.widthPct}%`,
                           top: `${Math.max(4, barHeight - 18)}px`,
                           fontSize: "11px",
                           fontWeight: "700",
@@ -1796,7 +1955,7 @@ export default function LandingPage() {
 
   const handleCreateAllocation = useCallback(
     async (payload) => {
-      // ── Block allocation if any assigned person is on leave during these dates ──
+      // ── Allow allocations across leave: skip off-days in totals, warn instead of blocking ──
       if (!payload.isLeave) {
         const pStart = payload.startDate;
         const pEnd = payload.endDate;
@@ -1820,10 +1979,10 @@ export default function LandingPage() {
               overlap.start === overlap.end
                 ? overlap.start
                 : `${overlap.start} → ${overlap.end}`;
-            toast.error(
-              `Cannot allocate ${personName} — they are on ${leaveTypeName} (${rangeLabel})`
-            );
-            return;
+            toast.warning(`Allocation includes time off for ${personName}`, {
+              description: `${leaveTypeName} (${rangeLabel}). Allocation will still be created; off days are skipped in working-day totals.`,
+              duration: 4200,
+            });
           }
         }
       }
@@ -1860,7 +2019,7 @@ export default function LandingPage() {
 
   const handleEditAllocation = useCallback(
     async (payload, id) => {
-      // ── Block allocation if any assigned person is on leave during these dates ──
+      // ── Allow allocations across leave: skip off-days in totals, warn instead of blocking ──
       if (!payload.isLeave) {
         const pStart = payload.startDate;
         const pEnd = payload.endDate;
@@ -1885,10 +2044,10 @@ export default function LandingPage() {
               overlap.start === overlap.end
                 ? overlap.start
                 : `${overlap.start} → ${overlap.end}`;
-            toast.error(
-              `Cannot allocate ${personName} — they are on ${leaveTypeName} (${rangeLabel})`
-            );
-            return;
+            toast.warning(`Allocation includes time off for ${personName}`, {
+              description: `${leaveTypeName} (${rangeLabel}). Allocation will still be saved; off days are skipped in working-day totals.`,
+              duration: 4200,
+            });
           }
         }
       }
@@ -2800,6 +2959,7 @@ export default function LandingPage() {
                         viewMode={viewMode}
                         anchorDate={anchorDate}
                         utilizationMode={utilizationMode}
+                        density={density}
                         gridTemplate={gridTemplate}
                         nCols={scheduleModel.columnCount}
                         openEdit={openEdit}
@@ -2856,6 +3016,7 @@ export default function LandingPage() {
         onClose={closeCreateAllocation}
         onCreate={handleCreateAllocation}
         onCreateLeave={handleCreateAllocation}
+        allocations={scheduleAllocations}
         people={schedulePeople}
         preselectPerson={allocPreselectPerson}
         preselectDate={allocPreselectDate}
