@@ -44,6 +44,17 @@ import {
 } from "lucide-react";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useSchedulePageData } from "../hooks/useSchedulePageData.js";
+import {
+  assignAllocationStackLevels,
+  BAR_H_BASE_PX,
+  BAR_H_NORM,
+  PX_PER_HOUR,
+  allocationBarHeightPx,
+  workTileHeightPxForDensity,
+  clampedSegmentGeometry,
+  splitLayoutByOffDays,
+} from "../schedule/renderModel/index.js";
+import { useTimelineScrollController } from "../schedule/useTimelineScrollController.js";
 import { ProjectModal } from "./ProjectsPage.jsx";
 import PersonModal, {
   T,
@@ -272,40 +283,6 @@ function splitLayoutByWorkWeek(lay, scheduleModel) {
     span: Math.max(MIN_WEEK_MONTH_SPAN_COLS, i1 - segStart + 1),
   });
   return segments.length > 0 ? segments : [lay];
-}
-
-/** Greedy lane assignment for overlapping [start, start+span) intervals. Mutates segments with .stack.
- *  Primary sort is by hours ascending so that — when stacked in the same cell — the
- *  smallest allocation sits at the top and the largest at the bottom, giving the
- *  visual "fill gauge" a clean pyramid shape. Falls back to start/span to keep
- *  the greedy packer deterministic for non-overlapping intervals. */
-function assignAllocationStackLevels(segments) {
-  const hoursOf = (seg) => Math.max(0, parseFloat(seg?.a?.hoursPerDay) || 0);
-  const sorted = [...segments].sort((a, b) => {
-    const ha = hoursOf(a);
-    const hb = hoursOf(b);
-    if (ha !== hb) return ha - hb;
-    if (a.start !== b.start) return a.start - b.start;
-    return b.span - a.span;
-  });
-  const laneEnds = [];
-  for (const seg of sorted) {
-    const s = seg.start;
-    const e = seg.start + seg.span;
-    let placed = false;
-    for (let k = 0; k < laneEnds.length; k++) {
-      if (laneEnds[k] <= s + 1e-9) {
-        seg.stack = k;
-        laneEnds[k] = e;
-        placed = true;
-        break;
-      }
-    }
-    if (!placed) {
-      seg.stack = laneEnds.length;
-      laneEnds.push(e);
-    }
-  }
 }
 
 /** Visible timeline segments for an allocation (includes recurring occurrences). */
@@ -613,12 +590,7 @@ function personHasOverloadInViewFromList(personAllocations, scheduleModel) {
  * overflow visibly as the stack exceeds one cell's worth of height.
  */
 const TABLE_ROW_ENTER_ANIM_MAX = 32;
-const BAR_H_NORM = 7.5;
-const BAR_H_STEP = 0.5;
-const BAR_H_BASE_PX = 22;          // readable floor for 0.5h bars
-const PX_PER_HOUR = 22;            // slope: each extra hour adds 22px → 0.5h step = 11px
-const BAR_H_MIN_VISIBLE_PX = BAR_H_BASE_PX;
-const WEEK_CELL_FULL_DAY_PX = BAR_H_BASE_PX + BAR_H_NORM * PX_PER_HOUR; // 187px for a full day
+const WEEK_CELL_FULL_DAY_PX = BAR_H_BASE_PX + BAR_H_NORM * PX_PER_HOUR;
 
 // Leave bars use a lower "full day" baseline so partial-day differences read clearly.
 // Treat ~5.5h leave as a visually "full" cell.
@@ -628,38 +600,6 @@ const LEAVE_PX_PER_HOUR = (WEEK_CELL_FULL_DAY_PX - BAR_H_BASE_PX) / LEAVE_H_NORM
 // still click empty space below to create allocations.
 const LEAVE_FIXED_HEIGHT_PX = 86;
 const LEAVE_CLICK_GAP_PX = 56;
-
-function allocationBarHeightPx(alloc) {
-  const raw = Math.max(0, parseFloat(alloc?.hoursPerDay) || 0);
-  if (raw <= 0) return BAR_H_MIN_VISIBLE_PX;
-  const snapped = Math.round(raw / BAR_H_STEP) * BAR_H_STEP;
-  const effective = snapped < BAR_H_STEP ? BAR_H_STEP : snapped;
-  return Math.round(BAR_H_BASE_PX + effective * PX_PER_HOUR);
-}
-
-function workTileHeightPxForDensity(density) {
-  // Must stay in sync with `--lp-block-max-h` in `LandingPage.css`.
-  if (density === "compact") return 50;
-  if (density === "spacious") return 76;
-  return 58; // comfortable (default)
-}
-
-function clampedSegmentGeometry(lay, nCols) {
-  const safeCols = Math.max(0, Math.floor(nCols || 0));
-  if (!lay || safeCols <= 0) {
-    return {
-      startCol: 0,
-      spanClamped: 0,
-      leftPct: 0,
-      widthPct: 0,
-    };
-  }
-  const startCol = Math.max(0, Math.min(Math.floor(lay.start || 0), Math.max(0, safeCols - 1)));
-  const spanClamped = Math.max(0, Math.min(Math.floor(lay.span || 0), safeCols - startCol));
-  const leftPct = (startCol / safeCols) * 100;
-  const widthPct = (spanClamped / safeCols) * 100;
-  return { startCol, spanClamped, leftPct, widthPct };
-}
 
 function leaveBarHeightPx(alloc) {
   // Legacy: leave tiles used variable heights. Schedule now uses consistent tile sizing
@@ -749,43 +689,6 @@ function buildWorkAllocationTitle(alloc, projectName, hoursLabel) {
   const n = (alloc.notes || "").trim();
   if (n) bits.push(n.length > 120 ? `${n.slice(0, 120)}…` : n);
   return bits.filter(Boolean).join(" · ");
-}
-
-function splitLayoutByOffDays(lay, scheduleModel, offDayColSet) {
-  if (!lay || !scheduleModel?.slots?.length) return [];
-  const i0 = Math.max(0, Math.floor(lay.start || 0));
-  const i1 = Math.min(scheduleModel.slots.length - 1, i0 + Math.max(0, Math.floor(lay.span || 0)) - 1);
-  if (i1 < i0) return [];
-
-  const pieces = [];
-  let curStart = null;
-  let curEnd = null;
-
-  for (let idx = i0; idx <= i1; idx++) {
-    const isOff = offDayColSet?.has?.(idx) === true;
-
-    if (isOff) {
-      if (curStart != null && curEnd != null && curEnd >= curStart) {
-        pieces.push({ start: curStart, span: curEnd - curStart + 1 });
-      }
-      curStart = null;
-      curEnd = null;
-      continue;
-    }
-
-    if (curStart == null) {
-      curStart = idx;
-      curEnd = idx;
-    } else {
-      curEnd = idx;
-    }
-  }
-
-  if (curStart != null && curEnd != null && curEnd >= curStart) {
-    pieces.push({ start: curStart, span: curEnd - curStart + 1 });
-  }
-
-  return pieces;
 }
 
 const TimelineRow = memo(function TimelineRow({
@@ -890,6 +793,35 @@ const TimelineRow = memo(function TimelineRow({
       };
     });
   });
+
+  // Dev-only invariants to catch geometry/stack bugs early (prevents "silent" canvas breakage).
+  if (import.meta.env.DEV) {
+    const colCount = Math.max(0, Math.floor(scheduleModel?.slots?.length || 0));
+    const assertLayOk = (seg, kind) => {
+      const st = Math.floor(seg?.lay?.start ?? -1);
+      const sp = Math.floor(seg?.lay?.span ?? 0);
+      if (colCount <= 0) return;
+      if (!(Number.isFinite(st) && Number.isFinite(sp) && sp >= 0)) {
+        throw new Error(`[Schedule] invalid ${kind} layout for ${p?.id || "?"}: start/span not finite`);
+      }
+      if (sp > 0 && (st < 0 || st >= colCount)) {
+        throw new Error(`[Schedule] out-of-bounds ${kind} start for ${p?.id || "?"}: ${st}/${colCount}`);
+      }
+    };
+
+    for (const s of workSegments) assertLayOk(s, "work");
+    for (const s of leaveSegments) assertLayOk(s, "leave");
+    for (const s of publicHolidaySegments) assertLayOk(s, "holiday");
+
+    // Lanes should be compact 0..N-1.
+    const stacks = workEnvelopeSegments.map((s) => s.stack).filter((n) => Number.isFinite(n));
+    const maxStack = stacks.length ? Math.max(...stacks) : -1;
+    for (const st of stacks) {
+      if (st < 0 || st > maxStack) {
+        throw new Error(`[Schedule] invalid lane index for ${p?.id || "?"}: ${st}`);
+      }
+    }
+  }
 
   const leaveMinH = useMemo(() => {
     if (!leaveSegments.length) return 0;
@@ -1617,8 +1549,6 @@ export default function LandingPage() {
   const prevOffsets = useRef(timelineOffsets);
   const prevColCount = useRef(0);
   const scheduleViewportRef = useRef(null);
-  /** Coalesces horizontal scroll to one layout read per frame (fewer setState calls while scrolling). */
-  const timelineScrollRafRef = useRef(null);
   const lastAnchorKey = useRef(null);
 
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
@@ -1807,6 +1737,12 @@ export default function LandingPage() {
     setAnchorDate(new Date());
     setTimelineOffsets({ prev: 1, next: 2 });
     lastAnchorKey.current = null;
+
+    // Fallback: Some browsers can temporarily desync horizontal scroll + virtualization
+    // during the "Today" jump. A hard reload is the simplest, reliable reset.
+    if (typeof window !== "undefined") {
+      window.setTimeout(() => window.location.reload(), 0);
+    }
   }, []);
 
   const applyTimeRangePreset = useCallback((presetId) => {
@@ -2256,59 +2192,16 @@ export default function LandingPage() {
   const gridTemplate = `repeat(${scheduleModel.columnCount}, minmax(${colMinPx}px, 1fr))`;
   const timelineMinWidthPx = scheduleModel.columnCount * colMinPx;
 
-  // Inject timeline columns and maintain perfect scroll locks
-  useLayoutEffect(() => {
-    if (!scheduleViewportRef.current || scheduleModel.columnCount === 0) return;
-    const el = scheduleViewportRef.current;
-
-    // 1. Initial/Anchor jump: if the anchor date completely changed (e.g. clicked < > Next/Prev)
-    if (scheduleModel.anchorDateKey !== lastAnchorKey.current) {
-      const slotIdx = scheduleModel.slots.findIndex(s => s.dateKey >= scheduleModel.anchorDateKey);
-      if (slotIdx >= 0) {
-        el.scrollLeft = slotIdx * colMinPx;
-      }
-      lastAnchorKey.current = scheduleModel.anchorDateKey;
-    }
-    // 2. Endless scroll jump: if we just dynamically added months to the PAST (left)
-    else if (prevColCount.current > 0 && scheduleModel.columnCount > prevColCount.current) {
-      if (timelineOffsets.prev > prevOffsets.current.prev) {
-        const addedCols = scheduleModel.columnCount - prevColCount.current;
-        el.scrollLeft += addedCols * colMinPx;
-      }
-    }
-
-    prevColCount.current = scheduleModel.columnCount;
-    prevOffsets.current = timelineOffsets;
-  }, [scheduleModel, timelineOffsets, colMinPx]);
-
-  const handleTimelineScroll = useCallback((e) => {
-    const el = e.currentTarget;
-    if (timelineScrollRafRef.current != null) return;
-    timelineScrollRafRef.current = requestAnimationFrame(() => {
-      timelineScrollRafRef.current = null;
-      const thresholdBase = 250;
-
-      // Left endless load
-      if (el.scrollLeft < thresholdBase) {
-        setTimelineOffsets((o) => (o.prev < 36 ? { ...o, prev: o.prev + 1 } : o));
-      }
-
-      // Right endless load
-      if (el.scrollLeft + el.clientWidth > el.scrollWidth - thresholdBase) {
-        setTimelineOffsets((o) => (o.next < 36 ? { ...o, next: o.next + 1 } : o));
-      }
-    });
-  }, []);
-
-  useEffect(
-    () => () => {
-      if (timelineScrollRafRef.current != null) {
-        cancelAnimationFrame(timelineScrollRafRef.current);
-        timelineScrollRafRef.current = null;
-      }
-    },
-    []
-  );
+  const { onTimelineScroll } = useTimelineScrollController({
+    scheduleViewportRef,
+    scheduleModel,
+    colMinPx,
+    timelineOffsets,
+    setTimelineOffsets,
+    prevOffsetsRef: prevOffsets,
+    prevColCountRef: prevColCount,
+    lastAnchorKeyRef: lastAnchorKey,
+  });
 
   const scheduleFirefox =
     typeof navigator !== "undefined" && /firefox/i.test(navigator.userAgent || "");
@@ -2846,7 +2739,7 @@ export default function LandingPage() {
           <div
             className="lp-schedule-viewport"
             ref={scheduleViewportRef}
-            onScroll={handleTimelineScroll}
+            onScroll={onTimelineScroll}
             style={{
               "--lp-cols": scheduleModel.columnCount,
               "--lp-col-min": `${colMinPx}px`,
