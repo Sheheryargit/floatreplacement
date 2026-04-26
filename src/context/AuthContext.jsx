@@ -7,12 +7,25 @@ import {
   useEffect,
 } from "react";
 
+
+// CHANGE: when SSO is implemented
 const STORAGE_KEY = "float_auth_session";
 
 /** When `true` in `.env.local`, skip the login gate (useful while SSO is UI-only). */
 const loginSkipAuth = import.meta.env.VITE_LOGIN_SKIP_AUTH === "true";
 
 const AuthContext = createContext(null);
+
+// CHANGE: when SSO is implemented
+const PERSISTED_USER_KEY = "float_current_user";
+function loadPersistedUser() {
+  try {
+    const raw = localStorage.getItem(PERSISTED_USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 export function AuthProvider({ children }) {
   const [ok, setOk] = useState(() => {
@@ -24,22 +37,41 @@ export function AuthProvider({ children }) {
     }
   });
 
+  // CHANGE: when SSO is implemented
+  const [currentUser, setCurrentUser] = useState(() => {
+    if (loginSkipAuth) return loadPersistedUser();
+    try {
+      return sessionStorage.getItem(STORAGE_KEY) === "1"
+        ? loadPersistedUser()
+        : null;
+    } catch {
+      return null;
+    }
+  });
+
+  // CHANGE: when SSO is implemented 
   const unlock = useCallback(() => {
     try {
       sessionStorage.setItem(STORAGE_KEY, "1");
+      localStorage.setItem(PERSISTED_USER_KEY, JSON.stringify(person));
     } catch {
       /* ignore */
     }
+    setCurrentUser(person);
     setOk(true);
   }, []);
 
+
+  // CHANGE: when SSO is implemented
   const lock = useCallback(() => {
     try {
       sessionStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(PERSISTED_USER_KEY);
     } catch {
       /* ignore */
     }
     setOk(false);
+    setCurrentUser(null);
   }, []);
 
   useEffect(() => {
@@ -51,8 +83,8 @@ export function AuthProvider({ children }) {
   }, [lock]);
 
   const value = useMemo(
-    () => ({ isAuthenticated: ok, unlock, lock }),
-    [ok, unlock, lock]
+    () => ({ isAuthenticated: ok, currentUser, unlock, lock }),
+    [ok, currentUser, unlock, lock]
   );
 
   return (
