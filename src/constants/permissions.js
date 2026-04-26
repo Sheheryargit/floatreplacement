@@ -10,10 +10,12 @@ export const USER_ROLES = {
 };
 
 /**
- * Comprehensive permissions matrix for each role
+ * Permissions matrix for each role
  * Structure: { [page]: { [action]: boolean } }
  */
-export const ROLE_PERMISSIONS = {
+
+
+export const PERMISSIONS = {
   member: {
     // Landing Page / Schedule View
     schedule: {
@@ -69,7 +71,7 @@ export const ROLE_PERMISSIONS = {
       viewReporting: false,
     },
 
-    // Settings, Help, Notifications (same for all)
+    // Settings, Help, Notifications
     settings: {
       accessSettings: true,
       accessHelp: true,
@@ -204,29 +206,14 @@ export const ROLE_PERMISSIONS = {
   },
 };
 
-/**
- * Get permissions for a specific role and page
- * @param {string} role - User's role (member, manager, admin)
- * @param {string} page - Page/feature name (e.g., 'schedule', 'peoplePage')
- * @returns {Object} Permissions object for that role/page
- */
-export function getPagePermissions(role, page) {
-  const permissions = ROLE_PERMISSIONS[role];
-  if (!permissions) {
-    console.warn(`Unknown role: ${role}`);
-    return ROLE_PERMISSIONS.member[page] || {};
-  }
-  return permissions[page] || {};
-}
 
 /**
- * Check if a user has a specific permission
- * @param {string} role - User's role
- * @param {string} page - Page/feature name
- * @param {string} action - Action to check
- * @returns {boolean} Whether user can perform this action
+ * Check if a role has permission to perform an action on a page
+ * @param {*} role The access level of the user (e.g., "member", "manager", "admin")
+ * @param {*} page The page or feature being accessed (e.g., "schedule", "personModal", "peoplePage", "projectsPage", "reporting", "settings")
+ * @param {*} action The action being performed (e.g., "viewSelf", "editOthers", "createPerson")
+ * @returns 
  */
-export function hasPermission(role, page, action) {
-  const permissions = getPagePermissions(role, page);
-  return permissions[action] === true;
+export function can(role, page, action) {
+  return PERMISSIONS[role]?.[page]?.[action] ?? false;
 }
