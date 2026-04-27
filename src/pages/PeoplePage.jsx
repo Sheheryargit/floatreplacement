@@ -322,6 +322,9 @@ export default function PeoplePage() {
     return people.filter((p) => {
       if (p.archived !== isArch) return false;
 
+      /** Check permissions */
+      if (!can(role, 'people', 'viewAll') && p.id !== currentUser?.id) return false;
+
       if (search) {
         const s = search.toLowerCase();
         const role = (p.role || "").toLowerCase();
@@ -402,6 +405,8 @@ export default function PeoplePage() {
     advTypes,
     advAccess,
     advWorkTypes,
+    role,
+    currentUser?.id,
   ]);
 
   const peopleOrderMap = useMemo(() => {
