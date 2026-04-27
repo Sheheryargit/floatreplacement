@@ -50,7 +50,7 @@ export function AuthProvider({ children }) {
   });
 
   // CHANGE: when SSO is implemented 
-  const unlock = useCallback(() => {
+  const unlock = useCallback((person) => {
     try {
       sessionStorage.setItem(STORAGE_KEY, "1");
       localStorage.setItem(PERSISTED_USER_KEY, JSON.stringify(person));
