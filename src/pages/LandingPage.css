@@ -2848,6 +2848,26 @@ button.lp-block.lp-block-leave:hover {
     0 2px 14px rgba(0, 0, 0, 0.18);
 }
 
+.lp-leave-block::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    -38deg,
+    rgba(100, 116, 139, 0.18),
+    rgba(100, 116, 139, 0.18) 4px,
+    rgba(148, 163, 184, 0.06) 4px,
+    rgba(148, 163, 184, 0.06) 10px
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.lp-leave-block > * {
+  position: relative;
+  z-index: 1;
+}
+
 .lp-leave-block:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -3087,6 +3107,29 @@ button.lp-block.lp-block-leave:hover {
   background: linear-gradient(125deg, rgba(254, 249, 195, 0.95), rgba(253, 230, 138, 0.55));
 }
 
+.lp-leave-block--readonly {
+  cursor: not-allowed;
+}
+
+.lp-leave-block--public_holiday.lp-leave-block--readonly {
+  filter: grayscale(0.55) saturate(0.6) brightness(0.92);
+  position: relative;
+}
+
+.lp-leave-block--public_holiday.lp-leave-block--readonly .lp-leave-block__icon {
+  opacity: 0.62;
+}
+
+.lp-leave-block--public_holiday.lp-leave-block--readonly .lp-leave-block__label > span:first-child,
+.lp-leave-block--public_holiday.lp-leave-block--readonly .lp-leave-block__hours {
+  color: rgba(226, 232, 240, 0.86);
+}
+
+.lp-root[data-theme="light"] .lp-leave-block--public_holiday.lp-leave-block--readonly .lp-leave-block__label > span:first-child,
+.lp-root[data-theme="light"] .lp-leave-block--public_holiday.lp-leave-block--readonly .lp-leave-block__hours {
+  color: rgba(71, 85, 105, 0.9);
+}
+
 /* Non-working weekday (part-time availability) — minimal, quiet "off" block */
 .lp-leave-block--day_off {
   background-color: transparent;
@@ -3210,18 +3253,6 @@ button.lp-block.lp-block-leave:hover {
   .lp-leave-block:active {
     transform: none;
   }
-}
-
-/* Public holiday overlay styling */
-.lp-public-holiday-block {
-  transform-origin: center center;
-}
-
-.lp-public-holiday-block:hover {
-  filter: saturate(1.08) brightness(1.05);
-  box-shadow:
-    0 8px 18px rgba(245, 158, 11, 0.24),
-    0 2px 7px rgba(0, 0, 0, 0.18);
 }
 
 /* Styling for allocations covered by public holidays */
