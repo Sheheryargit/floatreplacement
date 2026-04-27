@@ -12,6 +12,15 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
     },
   },
+  server: {
+    // Ensure browser never reuses stale JS/CSS while developing.
+    headers: {
+      "Cache-Control": "no-store",
+    },
+    // Prefer a stable port; Vite will fall back if it's taken.
+    port: 5173,
+    strictPort: false,
+  },
   build: {
     rollupOptions: {
       output: {

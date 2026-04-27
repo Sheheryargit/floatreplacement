@@ -32,7 +32,5 @@ export const SEED_TAGS = [
 ];
 
 export const ALLOCATION_PROJECT_SEED = [
-  "ASF / ASF Managed Services",
-  "ARTC / Cloud Managed Services",
-  "Internal / Admin & Ops",
+  // Intentionally blank: legacy project labels are no longer seeded.
 ];

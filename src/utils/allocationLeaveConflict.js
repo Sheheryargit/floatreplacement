@@ -3,8 +3,7 @@ import { allocationHasPersonSchedule } from "./peopleSort.js";
 
 /**
  * Whether a leave row should block rostering **work** on overlapping dates.
- * Regional/calendar public holidays (synthetic rows + leave type `public_holiday`) do not block —
- * teams can still schedule billable work on those days if needed.
+ * Public holidays behave like off days for schedule capacity + rendering.
  */
 function leaveBlocksWorkAllocation(a) {
   if (!a?.isLeave) return false;
@@ -12,8 +11,6 @@ function leaveBlocksWorkAllocation(a) {
   // roster work on those days for one-off scenarios.
   const k = a.availabilitySlotKey;
   if (typeof k === "string" && k.startsWith("avail_off:")) return false;
-  if (a.syntheticPublicHoliday === true) return false;
-  if (a.leaveType === "public_holiday") return false;
   return true;
 }
 
