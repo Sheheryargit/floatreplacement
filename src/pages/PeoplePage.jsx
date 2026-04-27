@@ -463,8 +463,8 @@ export default function PeoplePage() {
     setNestOpen((o) => ({ ...o, [key]: !o[key] }));
   }, []);
 
-  const activeCount = people.filter((p)=>!p.archived).length;
-  const archivedCount = people.filter((p)=>p.archived).length;
+  const activeCount = filteredSorted.filter((p)=>!p.archived).length;
+  const archivedCount = filteredSorted.filter((p)=>p.archived).length;
 
   const toggleSel=(id)=>setSelected((p)=>{ const n=new Set(p); n.has(id)?n.delete(id):n.add(id); return n; });
   const toggleAll=()=>setSelected(selected.size===filteredSorted.length?new Set():new Set(filteredSorted.map((p)=>p.id)));

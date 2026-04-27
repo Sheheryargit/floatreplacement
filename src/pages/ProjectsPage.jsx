@@ -452,8 +452,8 @@ export default function ProjectsPage(){
       }
 
       if(!search)return true;const s=search.toLowerCase();return p.name.toLowerCase().includes(s)||p.client.toLowerCase().includes(s)||p.code.toLowerCase().includes(s)||p.tags.some(tg=>tg.toLowerCase().includes(s));});},[projects,search,viewTab,role,currentUser?.id]);
-  const activeCount=projects.filter(p=>!p.archived).length;
-  const archivedCount=projects.filter(p=>p.archived).length;
+  const activeCount=filtered.filter(p=>!p.archived).length;
+  const archivedCount=filtered.filter(p=>p.archived).length;
   const toggleSel=id=>setSelected(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
   const toggleAll=()=>setSelected(selected.size===filtered.length?new Set():new Set(filtered.map(p=>p.id)));
   const doDelete=async()=>{const c=selected.size;const ids=[...selected];const prev=projects;setProjects(projects.filter(p=>!selected.has(p.id)));setSelected(new Set());setConfirmDel(false);try{if(isSupabaseConfigured) await syncProjectsDelete(ids);toast.error(`${c} project${c===1?"":"s"} removed`);}catch(e){setProjects(prev);toast.error("Delete failed",{description:e?.message||String(e)});} };
