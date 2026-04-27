@@ -15,6 +15,8 @@ import { motion } from "framer-motion";
 import { useAppDialog } from "../../context/AppDialogContext.jsx";
 import { useSlapAnimation } from "../../context/SlapAnimationContext.jsx";
 import { useAppTheme } from "../../context/ThemeContext.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
+import { can } from "../../constants/permissions.js";
 import "./AppSideNav.css";
 
 const COLLAPSE_KEY = "alloc8-sidenav-collapsed";
@@ -23,7 +25,7 @@ const NAV = [
   { to: "/", end: true, icon: CalendarDays, label: "Schedule" },
   { to: "/people", icon: Users, label: "People" },
   { to: "/projects", icon: FolderOpen, label: "Projects" },
-  { to: "/report", icon: BarChart3, label: "Report" },
+  { to: "/report", icon: BarChart3, label: "Report", requiresPermission: { page: "reporting", action: "accessPage" } },
 ];
 
 const V2_MODAL = {
@@ -37,6 +39,7 @@ function AppSideNav() {
   const { openDialog } = useAppDialog();
   const { triggerSlap } = useSlapAnimation();
   const { theme } = useAppTheme();
+  const { currentUser } = useAuth();
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -45,6 +48,11 @@ function AppSideNav() {
       return false;
     }
   });
+
+  // Filter nav items based on permissions
+  const visibleNav = NAV.filter(
+    (item) => !item.requiresPermission || can(currentUser?.access, item.requiresPermission.page, item.requiresPermission.action)
+  );
 
   useEffect(() => {
     try {
@@ -128,7 +136,7 @@ function AppSideNav() {
       </div>
 
       <nav className="app-sidenav-links">
-        {NAV.map((item) => {
+        {visibleNav.map((item) => {
           const Icon = item.icon;
           if (item.soon) {
             return (
