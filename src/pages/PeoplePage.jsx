@@ -47,6 +47,8 @@ import { CreateAllocationModal, leaveLabel } from "../components/AllocationModal
 import { resolveColorForProjectLabel } from "../utils/projectColors.js";
 import { findLeaveOverlapWithWorkRange } from "../utils/allocationLeaveConflict.js";
 import { mergeScheduleAllocations } from "../utils/scheduleAllocationsMerge.js";
+import { useAuth } from "../context/AuthContext.jsx";
+import { can } from "../constants/permissions.js";
 import "./PeoplePage.css";
 
 /** Cap staggered row enter animations — large tables stay responsive */
@@ -79,6 +81,8 @@ function toggleArr(list, v) {
    APP
    ═══════════════════════════════════════════════════════════ */
 export default function PeoplePage() {
+  const { currentUser } = useAuth();
+  const role = currentUser?.access || "member";
   const { theme: mode } = useAppTheme();
   const t = T[mode];
 
@@ -802,9 +806,11 @@ export default function PeoplePage() {
             <Button type="button" variant="secondary" size="md" style={{ display: "flex", alignItems: "center", gap: 7 }}>
               <Download size={14} /> Import
             </Button>
-            <Button type="button" variant="primary" size="md" onClick={openAdd} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            {can(role, 'people', 'createPerson') && (
+              <Button type="button" variant="primary" size="md" onClick={openAdd} style={{ display: "flex", alignItems: "center", gap: 7 }}>
               <UserPlus size={14} /> Add person
-            </Button>
+              </Button>
+            )}
           </div>
         </header>
 
@@ -866,7 +872,7 @@ export default function PeoplePage() {
                 </div>
               )}
             </div>
-          {selected.size>0 && (
+          {selected.size>0 && can(role, 'people', 'deletePerson') && (
             <Button
               type="button"
               variant="destructive"
@@ -893,7 +899,9 @@ export default function PeoplePage() {
           <table>
             <thead>
               <tr style={{ borderBottom:`2px solid ${t.border}` }}>
-                <th style={{ width:48,padding:"14px 14px" }}><input type="checkbox" checked={selected.size===filteredSorted.length&&filteredSorted.length>0} onChange={toggleAll} style={{ accentColor:t.chk,cursor:"pointer",width:16,height:16 }}/></th>
+                {can(role, 'people', 'deletePerson') && (
+                  <th style={{ width:48,padding:"14px 14px" }}><input type="checkbox" checked={selected.size===filteredSorted.length&&filteredSorted.length>0} onChange={toggleAll} style={{ accentColor:t.chk,cursor:"pointer",width:16,height:16 }}/></th>
+                )}
                 {["Name","Role","Department","Access","Tags","Type",""].map((h,i)=>(
                   <th key={i} style={{ textAlign:"left",padding:"14px 16px",fontSize:11,fontWeight:700,color:t.textMuted,textTransform:"uppercase",letterSpacing:0.8,width:i===6?52:undefined }}>{h}</th>
                 ))}
@@ -918,9 +926,11 @@ export default function PeoplePage() {
                       if (!sel) e.currentTarget.style.background = sel ? t.selRow : "transparent";
                     }}
                   >
-                    <td style={{ padding:"12px 14px" }} onClick={(e)=>e.stopPropagation()}>
-                      <input type="checkbox" checked={sel} onChange={()=>toggleSel(p.id)} style={{ accentColor:t.chk,cursor:"pointer",width:16,height:16 }}/>
-                    </td>
+                    {can(role, 'people', 'deletePerson') && (
+                      <td style={{ padding:"12px 14px" }} onClick={(e)=>e.stopPropagation()}>
+                        <input type="checkbox" checked={sel} onChange={()=>toggleSel(p.id)} style={{ accentColor:t.chk,cursor:"pointer",width:16,height:16 }}/>
+                      </td>
+                    )}
                     <td style={{ padding:"12px 16px" }}>
                       <div style={{ display:"flex",alignItems:"center",gap:12 }}>
                         <div style={{ width:34,height:34,borderRadius:10,background:avGrad(p.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"#fff",flexShrink:0,boxShadow:"0 2px 8px rgba(0,0,0,0.15)",opacity:p.archived?0.5:1 }}>{ini(p.name)}</div>
@@ -945,13 +955,14 @@ export default function PeoplePage() {
                       <RowActions person={p} t={t}
                         onEdit={()=>openEdit(p)}
                         onArchive={()=>archivePerson(p.id)}
-                        onDelete={()=>{ setSelected(new Set([p.id])); setConfirmDel(true); }}/>
+                        onDelete={() => { setSelected(new Set([p.id])); setConfirmDel(true); }}
+                        canDelete={can(role, 'people', 'deletePerson')} />
                     </td>
                   </tr>
                 );
               })}
               {filteredSorted.length===0 && (
-                <tr><td colSpan={8} style={{ textAlign:"center",padding:"56px 20px" }}>
+                <tr><td colSpan={can(role, 'people', 'deletePerson') ? 8 : 7} style={{ textAlign:"center",padding:"56px 20px" }}>
                   {viewTab==="archived"
                     ? <><Archive size={32} style={{ color:t.textDim,marginBottom:12 }}/><div style={{ color:t.textMuted,fontSize:15,fontWeight:600 }}>No archived people</div><div style={{ color:t.textDim,fontSize:13,marginTop:4 }}>Archived team members will appear here</div></>
                     : <><Search size={32} style={{ color:t.textDim,marginBottom:12 }}/><div style={{ color:t.textMuted,fontSize:15,fontWeight:600 }}>{search||advActiveCount?"No people match filters":"No people yet"}</div><div style={{ color:t.textDim,fontSize:13,marginTop:4 }}>{search||advActiveCount?"Try adjusting search or open Filters to clear criteria":"Click \"Add person\" to get started"}</div></>

@@ -20,7 +20,7 @@ export const PERMISSIONS = {
     // Landing Page / Schedule View
     schedule: {
       viewSelf: true,
-      viewOthers: false,
+      viewAll: false,
       editSelfAllocation: false,
       editOthersAllocation: false,
       editSelfLeave: true,
@@ -36,7 +36,7 @@ export const PERMISSIONS = {
     // Person Modal
     personModal: {
       viewSelf: true,
-      viewOthers: false,
+      viewAll: false,
       editSelf: false,
       editOthers: false,
       editSelfTimeOff: true,
@@ -46,7 +46,7 @@ export const PERMISSIONS = {
     // People Page
     peoplePage: {
       viewSelf: true,
-      viewOthers: false,
+      viewAll: false,
       editSelf: true,
       editOthers: false,
       createPerson: false,
@@ -83,7 +83,7 @@ export const PERMISSIONS = {
     // Landing Page / Schedule View
     schedule: {
       viewSelf: true,
-      viewOthers: true,
+      viewAll: true,
       editSelfAllocation: true,
       editOthersAllocation: true,
       editSelfLeave: true,
@@ -99,7 +99,7 @@ export const PERMISSIONS = {
     // Person Modal
     personModal: {
       viewSelf: true,
-      viewOthers: true,
+      viewAll: true,
       editSelf: false,
       editOthers: true,
       editSelfTimeOff: true,
@@ -109,7 +109,7 @@ export const PERMISSIONS = {
     // People Page
     peoplePage: {
       viewSelf: true,
-      viewOthers: true,
+      viewAll: true,
       editSelf: true,
       editOthers: true,
       createPerson: false,
@@ -146,7 +146,7 @@ export const PERMISSIONS = {
     // Landing Page / Schedule View
     schedule: {
       viewSelf: true,
-      viewOthers: true,
+      viewAll: true,
       editSelfAllocation: true,
       editOthersAllocation: true,
       editSelfLeave: true,
@@ -162,7 +162,7 @@ export const PERMISSIONS = {
     // Person Modal
     personModal: {
       viewSelf: true,
-      viewOthers: true,
+      viewAll: true,
       editSelf: true,
       editOthers: true,
       editSelfTimeOff: true,
@@ -172,7 +172,7 @@ export const PERMISSIONS = {
     // People Page
     peoplePage: {
       viewSelf: true,
-      viewOthers: true,
+      viewAll: true,
       editSelf: true,
       editOthers: true,
       createPerson: true,
