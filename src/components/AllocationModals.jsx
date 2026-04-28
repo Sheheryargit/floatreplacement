@@ -1150,10 +1150,7 @@ export function AllocationDetailModal({ open, allocation, assigneeNames, onClose
                   e.currentTarget.style.filter = "";
                   e.currentTarget.style.transform = "";
                 }}
-                onClick={() => {
-                  onDelete(allocation);
-                  onClose();
-                }}
+                onClick={handleDelete}
               >
                 Delete
               </button>

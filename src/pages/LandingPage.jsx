@@ -1416,7 +1416,7 @@ const TimelineRow = memo(function TimelineRow({
                     <button
                       key={seg.segKey}
                       type="button"
-                      className="lp-leave-block lp-leave-block--public_holiday lp-leave-block--readonly"
+                      className="lp-leave-block lp-leave-block--public_holiday"
                       style={{
                         position: "absolute",
                         left: `${geo.leftPct}%`,
@@ -1433,9 +1433,9 @@ const TimelineRow = memo(function TimelineRow({
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
+                        openAllocationDetail(seg.a);
                       }}
-                      aria-disabled="true"
-                      title={`${holidayLabel} (Read-only)`}
+                      title={`${holidayLabel} · Click for details`}
                     >
                       <LeaveTimelineGlyph leaveTypeId="public_holiday" className="lp-leave-block__icon" />
                       <span className="lp-leave-block__label">
