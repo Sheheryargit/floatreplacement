@@ -864,7 +864,20 @@ const TimelineRow = memo(function TimelineRow({
     }));
   });
 
-  const publicHolidaySegments = baseLeaveAndHolidaySegments.filter(
+  const blockingLeaveAndHolidaySegments = useMemo(() => {
+    if (!dismissedAvailOffKeys || dismissedAvailOffKeys.size === 0) {
+      return baseLeaveAndHolidaySegments;
+    }
+    return baseLeaveAndHolidaySegments.filter((seg) => {
+      if (!isAvailabilityDayOffAlloc(seg?.a)) return true;
+      const pid = String(seg?.a?.personIds?.[0] ?? "");
+      const dk = String(seg?.lay?.occStart ?? seg?.a?.startDate ?? "").slice(0, 10);
+      if (!pid || !dk) return true;
+      return !dismissedAvailOffKeys.has(`${pid}|${dk}`);
+    });
+  }, [baseLeaveAndHolidaySegments, dismissedAvailOffKeys]);
+
+  const publicHolidaySegments = blockingLeaveAndHolidaySegments.filter(
     (s) => s.a.syntheticPublicHoliday || String(s.a.leaveType || "") === "public_holiday"
   );
 
@@ -899,7 +912,7 @@ const TimelineRow = memo(function TimelineRow({
 
   const offDayColSet = useMemo(() => {
     const set = new Set();
-    for (const seg of baseLeaveAndHolidaySegments) {
+    for (const seg of blockingLeaveAndHolidaySegments) {
       const start = Math.max(0, Math.floor(seg?.lay?.start ?? seg?.start ?? 0));
       const span = Math.max(0, Math.floor(seg?.lay?.span ?? seg?.span ?? 0));
       const end = Math.min(scheduleModel?.slots?.length ? scheduleModel.slots.length - 1 : -1, start + span - 1);
@@ -907,7 +920,7 @@ const TimelineRow = memo(function TimelineRow({
       for (let idx = start; idx <= end; idx++) set.add(idx);
     }
     return set;
-  }, [baseLeaveAndHolidaySegments, scheduleModel]);
+  }, [blockingLeaveAndHolidaySegments, scheduleModel]);
 
   // Compute stacks on the *unsplit* work envelopes, then split by off days while preserving stack.
   const workEnvelopeSegments = personAllocations.flatMap((a) => {
@@ -945,7 +958,7 @@ const TimelineRow = memo(function TimelineRow({
     const segSpan = Math.max(0, Math.floor(seg?.lay?.span ?? seg?.span ?? 0));
     const segEnd = segStart + segSpan - 1;
     if (segEnd < segStart) return false;
-    return !baseLeaveAndHolidaySegments.some((offSeg) => {
+    return !blockingLeaveAndHolidaySegments.some((offSeg) => {
       const offStart = Math.max(0, Math.floor(offSeg?.lay?.start ?? offSeg?.start ?? 0));
       const offSpan = Math.max(0, Math.floor(offSeg?.lay?.span ?? offSeg?.span ?? 0));
       const offEnd = offStart + offSpan - 1;
@@ -1115,7 +1128,7 @@ const TimelineRow = memo(function TimelineRow({
             ["--lp-sched-alloc-content-h"]: `${schedAllocContentH}px`,
             ["--lp-leave-min-h"]: leaveMinH > 0 ? `${leaveMinH}px` : undefined,
           }}
-          onClick={(e) => handleTimelineClick(e, p, nCols, offDayColSet)}
+          onClick={(e) => handleTimelineClick(e, p, nCols)}
         >
           <div className="lp-grid-week-lanes" style={{ gridTemplateColumns: gridTemplate }} aria-hidden>
             {scheduleModel.slots.map((slot, idx) => (
@@ -1877,7 +1890,7 @@ export default function LandingPage() {
 
   /** Click on empty timeline space → open allocation modal with person + date */
   const handleTimelineClick = useCallback(
-    (e, person, nCols, blockedColSet) => {
+    (e, person, nCols) => {
       // Don't open if user clicked on an existing allocation block
       if (e.target.closest(".lp-block") || e.target.closest(".lp-leave-block")) return;
       const row = e.currentTarget;
@@ -1885,12 +1898,11 @@ export default function LandingPage() {
       const x = e.clientX - rect.left;
       const colWidth = rect.width / nCols;
       const colIndex = Math.min(Math.max(0, Math.floor(x / colWidth)), nCols - 1);
-      if (blockedColSet?.has(colIndex)) return;
       const slot = scheduleModel.slots[colIndex];
       const clickedDate = slot?.dateKey ?? null;
       openCreateAllocation(person, clickedDate);
     },
-    [scheduleModel, openCreateAllocation, allocationsByPerson]
+    [scheduleModel, openCreateAllocation]
   );
 
   const handleCreateAllocation = useCallback(
@@ -2051,8 +2063,12 @@ export default function LandingPage() {
       if (alloc?.syntheticPublicHoliday) {
         const pid = alloc.personIds?.[0];
         if (!pid) return;
+        let removedHoliday = null;
+        setPublicHolidayAllocations((cur) => {
+          removedHoliday = cur.find((a) => a.id === alloc.id) || null;
+          return cur.filter((a) => a.id !== alloc.id);
+        });
         if (!isSupabaseConfigured) {
-          setPublicHolidayAllocations((cur) => cur.filter((a) => a.id !== alloc.id));
           toast.success("Public holiday removed from schedule");
           return;
         }
@@ -2065,6 +2081,12 @@ export default function LandingPage() {
           await refreshWorkspaceFromSupabase();
           toast.success("Public holiday removed from schedule");
         } catch (e) {
+          if (removedHoliday) {
+            setPublicHolidayAllocations((cur) => {
+              if (cur.some((a) => a.id === removedHoliday.id)) return cur;
+              return [...cur, removedHoliday];
+            });
+          }
           toast.error("Delete failed", { description: e?.message || String(e) });
         }
         return;
