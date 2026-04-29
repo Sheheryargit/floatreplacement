@@ -5,9 +5,11 @@ import {
   ChevronRight,
   ChevronDown,
   Download,
+  Filter,
   Plus,
   Users,
   FolderOpen,
+  Search,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
@@ -38,13 +40,20 @@ const VIEW_MODES = [
   { key: "Projects", icon: FolderOpen }
 ];
 
-// Static filter option lists used both to render checkboxes AND to detect "all selected" state.
-// Having them here as a constant means the filter label helper can compare against the full list
-// without needing to derive it from the data (which would change when the data changes).
-const FILTER_OPTIONS = {
-  people: ['Employees', 'Contractors', 'Active', 'Archived', 'Unassigned'],
-  project: ['Draft', 'Tentative', 'Confirmed', 'Completed', 'Canceled'],
-  timeoff: ['Confirmed', 'Tentative'],
+const ADVANCED_FILTER_CATEGORIES = [
+  { key: "person", label: "Person" },
+  { key: "department", label: "Department" },
+  { key: "role", label: "Role" },
+  { key: "project", label: "Project" },
+  { key: "client", label: "Client" },
+];
+
+const EMPTY_ADVANCED_FILTERS = {
+  person: [],
+  department: [],
+  role: [],
+  project: [],
+  client: [],
 };
  
 // fmt — formats a raw hour number into a human-readable string like "37.5h".
@@ -386,6 +395,16 @@ function normalizeText(value) {
   return (value || "").toString().trim().toLowerCase();
 }
 
+function uniqueSorted(values) {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => (value || "").toString().trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
+}
+
 // Generic grouping helper used by roleRows, deptRows etc.
 // Why generic: Roles, Departments, and Tasks all need the same pattern — group person rows
 // by a string key and sum their numeric fields. A single function avoids duplicating the
@@ -519,39 +538,87 @@ function sortRows(rows, sortConfig, accessorMap) {
     .map((entry) => entry.row);
 }
 
-// FilterDropdown — renders a labelled filter pill + collapsible checkbox list.
-// Extracted so the three filter pills (People, Project, Time-off) share one definition
-// instead of repeating ~20 lines of identical JSX per pill.
-function FilterDropdown({ label, filterType, openFilter, filters, dispatch }) {
-  const allOptions = FILTER_OPTIONS[filterType];
-  const selected = filters[filterType];
-  // Show "All" when every option is checked; otherwise list the active selections.
-  const filterLabel = selected.length === allOptions.length ? 'All' : selected.join(', ');
+function AdvancedFilterDropdown({
+  openFilter,
+  dispatch,
+  searchText,
+  onSearchChange,
+  activeCategory,
+  onCategoryChange,
+  options,
+  selected,
+  onToggleOption,
+  totalSelections,
+  onClearFilters,
+}) {
+  const categoryLabel = ADVANCED_FILTER_CATEGORIES.find((category) => category.key === activeCategory)?.label || "Category";
+  const buttonLabel = totalSelections > 0 || searchText.trim()
+    ? `Search / Filter (${totalSelections}${searchText.trim() ? " + search" : ""})`
+    : "Search / Filter";
+
   return (
-    <div className="rp-filter-dropdown">
+    <div className="rp-filter-dropdown rp-filter-dropdown--advanced">
       <button
         className="rp-filter-pill"
-        onClick={() => dispatch({ type: "SET_OPEN_FILTER", payload: openFilter === filterType ? null : filterType })}
+        onClick={() => dispatch({ type: "SET_OPEN_FILTER", payload: openFilter === "advanced" ? null : "advanced" })}
       >
-        {label}: {filterLabel} <ChevronDown size={12} />
+        <span className="rp-filter-pill-icons" aria-hidden="true">
+          <Search size={13} className="rp-filter-pill-icon" />
+          <Filter size={13} className="rp-filter-pill-icon" />
+        </span>
+        {buttonLabel} <ChevronDown size={12} />
       </button>
-      {openFilter === filterType && (
-        <div className="rp-filter-options">
-          {allOptions.map(option => (
-            <label key={option} className="rp-filter-option">
+
+      {openFilter === "advanced" && (
+        <div className="rp-filter-options rp-filter-options--advanced">
+          <div className="rp-filter-search-wrap">
+            <input
+              type="search"
+              className="rp-filter-search-input"
+              placeholder="Search people, departments, roles, projects..."
+              value={searchText}
+              onChange={(event) => onSearchChange(event.target.value)}
+            />
+          </div>
+
+          <div className="rp-filter-category-row">
+            <span className="rp-filter-category-label">Category</span>
+            <select
+              className="rp-filter-category-select"
+              value={activeCategory}
+              onChange={(event) => onCategoryChange(event.target.value)}
+            >
+              {ADVANCED_FILTER_CATEGORIES.map((category) => (
+                <option key={category.key} value={category.key}>{category.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="rp-filter-category-caption">
+            Select one or more {categoryLabel.toLowerCase()} options
+          </div>
+
+          <div className="rp-filter-options-list">
+            {options.length === 0 && (
+              <div className="rp-filter-empty">No options available for this period.</div>
+            )}
+            {options.map((option) => (
+              <label key={option} className="rp-filter-option">
               <input
                 type="checkbox"
                 checked={selected.includes(option)}
-                onChange={(e) => {
-                  const updated = e.target.checked
-                    ? [...selected, option]
-                    : selected.filter(s => s !== option);
-                  dispatch({ type: "UPDATE_FILTER", filterType, payload: updated });
-                }}
+                onChange={(event) => onToggleOption(activeCategory, option, event.target.checked)}
               />
               {option}
             </label>
-          ))}
+            ))}
+          </div>
+
+          <div className="rp-filter-actions">
+            <button type="button" className="rp-filter-clear-btn" onClick={onClearFilters}>
+              Clear filters
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -568,11 +635,6 @@ const initialState = {
   expanded: {},
   openFilter: null,
   openExport: false,
-  filters: {
-    people: FILTER_OPTIONS.people,
-    project: FILTER_OPTIONS.project,
-    timeoff: FILTER_OPTIONS.timeoff,
-  },
   tableSorts: {},
 };
 
@@ -594,11 +656,6 @@ function stateReducer(state, action) {
       return { ...state, openFilter: action.payload };
     case "SET_OPEN_EXPORT":
       return { ...state, openExport: action.payload };
-    case "UPDATE_FILTER":
-      return {
-        ...state,
-        filters: { ...state.filters, [action.filterType]: action.payload },
-      };
     case "TOGGLE_TABLE_SORT": {
       const { tableKey, column } = action.payload;
       const prev = state.tableSorts[tableKey] || { column: null, direction: null };
@@ -857,6 +914,9 @@ export default function ReportingPage() {
 
   // openQuickAdd is separate from the reducer because it doesn't interact with other UI state.
   const [openQuickAdd, setOpenQuickAdd] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [activeFilterCategory, setActiveFilterCategory] = useState("person");
+  const [selectedCategoryFilters, setSelectedCategoryFilters] = useState(EMPTY_ADVANCED_FILTERS);
 
   // timeframeMode tracks which preset is active ("this-month", "next-12-weeks", "custom" etc.).
   // It's separate from dateRange so pressing prev/next can switch to "custom" without
@@ -961,6 +1021,21 @@ export default function ReportingPage() {
   // clearDrilldown — explicit reset used by breadcrumb/clear buttons in the UI.
   const clearDrilldown = useCallback(() => {
     setDrilldown({ personId: null, personName: null, project: null, client: null });
+  }, []);
+
+  const toggleCategoryFilterOption = useCallback((category, option, checked) => {
+    setSelectedCategoryFilters((prev) => {
+      const current = prev[category] || [];
+      const next = checked
+        ? current.includes(option) ? current : [...current, option]
+        : current.filter((value) => value !== option);
+      return { ...prev, [category]: next };
+    });
+  }, []);
+
+  const clearToolbarFilters = useCallback(() => {
+    setSearchText("");
+    setSelectedCategoryFilters(EMPTY_ADVANCED_FILTERS);
   }, []);
 
   // Stores the hovered bar's data + mouse position for the floating tooltip.
@@ -1164,7 +1239,7 @@ export default function ReportingPage() {
     },
     [activePeople, rangedAllocations, projectBillability, projects, dateRange.start, dateRange.end]
   );
- 
+
   // Maps each project label → its client name for O(1) client lookups in filteredPersonRows
   // and filteredRangedAllocations. Built alongside projectBillability so both fast-lookup
   // Maps are ready before any allocation iteration begins.
@@ -1176,6 +1251,87 @@ export default function ReportingPage() {
     return map;
   }, [projects]);
 
+  const filterOptionsByCategory = useMemo(() => {
+    const projectOptions = [];
+    const clientOptions = [];
+
+    for (const person of personRows) {
+      for (const alloc of person.allocations || []) {
+        if (alloc.isLeave) continue;
+        const project = (alloc.project || "").trim() || "Unspecified work";
+        const client = (alloc.client || "").trim() || projectClientByLabel.get(project) || "—";
+        projectOptions.push(project);
+        clientOptions.push(client);
+      }
+    }
+
+    const options = {
+      person: uniqueSorted(personRows.map((person) => person.name)),
+      department: uniqueSorted(personRows.map((person) => person.dept || "—")),
+      role: uniqueSorted(personRows.map((person) => person.role || "Unassigned")),
+      project: uniqueSorted(projectOptions),
+      client: uniqueSorted(clientOptions),
+    };
+
+    // Keep selected options visible even if they don't exist in the currently scoped date range.
+    for (const category of Object.keys(EMPTY_ADVANCED_FILTERS)) {
+      options[category] = uniqueSorted([...(options[category] || []), ...(selectedCategoryFilters[category] || [])]);
+    }
+    return options;
+  }, [personRows, projectClientByLabel, selectedCategoryFilters]);
+
+  const toolbarFilteredPersonRows = useMemo(() => {
+    const query = normalizeText(searchText);
+    const selectedSets = {
+      person: new Set((selectedCategoryFilters.person || []).map(normalizeText)),
+      department: new Set((selectedCategoryFilters.department || []).map(normalizeText)),
+      role: new Set((selectedCategoryFilters.role || []).map(normalizeText)),
+      project: new Set((selectedCategoryFilters.project || []).map(normalizeText)),
+      client: new Set((selectedCategoryFilters.client || []).map(normalizeText)),
+    };
+
+    return personRows.filter((person) => {
+      const normalizedName = normalizeText(person.name);
+      const normalizedDept = normalizeText(person.dept || "—");
+      const normalizedRole = normalizeText(person.role || "Unassigned");
+
+      const personProjects = [];
+      const personClients = [];
+      for (const alloc of person.allocations || []) {
+        if (alloc.isLeave) continue;
+        const project = (alloc.project || "").trim() || "Unspecified work";
+        const client = (alloc.client || "").trim() || projectClientByLabel.get(project) || "—";
+        personProjects.push(normalizeText(project));
+        personClients.push(normalizeText(client));
+      }
+
+      if (selectedSets.person.size > 0 && !selectedSets.person.has(normalizedName)) return false;
+      if (selectedSets.department.size > 0 && !selectedSets.department.has(normalizedDept)) return false;
+      if (selectedSets.role.size > 0 && !selectedSets.role.has(normalizedRole)) return false;
+
+      if (selectedSets.project.size > 0) {
+        const hasProjectMatch = personProjects.some((project) => selectedSets.project.has(project));
+        if (!hasProjectMatch) return false;
+      }
+
+      if (selectedSets.client.size > 0) {
+        const hasClientMatch = personClients.some((client) => selectedSets.client.has(client));
+        if (!hasClientMatch) return false;
+      }
+
+      if (!query) return true;
+
+      const searchableFields = [
+        person.name,
+        person.dept,
+        person.role,
+        ...personProjects,
+        ...personClients,
+      ];
+      return searchableFields.some((field) => normalizeText(field).includes(query));
+    });
+  }, [personRows, selectedCategoryFilters, searchText, projectClientByLabel]);
+ 
   // Applies drilldown filters to the person rows so all tabs reflect the same focus.
   // Why filter at this level: every tab (Roles, Departments, Projects, Tasks, Time off)
   // derives from filteredPersonRows, so narrowing here automatically updates all tabs
@@ -1187,7 +1343,7 @@ export default function ReportingPage() {
     const projectFilter = normalizeText(drilldown.project);
     const clientFilter = normalizeText(drilldown.client);
 
-    return personRows.filter((person) => {
+    return toolbarFilteredPersonRows.filter((person) => {
       if (personIdFilter && person.id !== personIdFilter) return false;
 
       if (!projectFilter && !clientFilter) return true;
@@ -1202,7 +1358,13 @@ export default function ReportingPage() {
         return true;
       });
     });
-  }, [personRows, drilldown.personId, drilldown.project, drilldown.client, projectClientByLabel]);
+  }, [toolbarFilteredPersonRows, drilldown.personId, drilldown.project, drilldown.client, projectClientByLabel]);
+
+  const hasToolbarFilters = useMemo(() => {
+    const hasSearch = searchText.trim().length > 0;
+    const hasCategorySelections = Object.values(selectedCategoryFilters).some((values) => values.length > 0);
+    return hasSearch || hasCategorySelections;
+  }, [searchText, selectedCategoryFilters]);
 
   // ── Per-bar capacity for chart scaling ───────────────────────────────────────
   // Estimates how many hours the visible team should work per chart bar (day/week/month).
@@ -1802,6 +1964,22 @@ export default function ReportingPage() {
             })}
           </div>
 
+          <div className="rp-view-mode-filter" ref={dropdownRef}>
+            <AdvancedFilterDropdown
+              openFilter={state.openFilter}
+              dispatch={dispatch}
+              searchText={searchText}
+              onSearchChange={setSearchText}
+              activeCategory={activeFilterCategory}
+              onCategoryChange={setActiveFilterCategory}
+              options={filterOptionsByCategory[activeFilterCategory] || []}
+              selected={selectedCategoryFilters[activeFilterCategory] || []}
+              onToggleOption={toggleCategoryFilterOption}
+              totalSelections={Object.values(selectedCategoryFilters).reduce((sum, values) => sum + values.length, 0)}
+              onClearFilters={clearToolbarFilters}
+            />
+          </div>
+
           <div className="rp-top-actions">
             <div className="rp-export-dropdown" ref={exportRef}>
               <button
@@ -1977,12 +2155,6 @@ export default function ReportingPage() {
             )}
           </div>
           <div className="rp-toolbar-right">
-            <div className="rp-filters" ref={dropdownRef}>
-              {/* Each FilterDropdown renders its own pill + collapsible checkbox list. */}
-              <FilterDropdown label="People" filterType="people" openFilter={state.openFilter} filters={state.filters} dispatch={dispatch} />
-              <FilterDropdown label="Project status" filterType="project" openFilter={state.openFilter} filters={state.filters} dispatch={dispatch} />
-              <FilterDropdown label="Time off" filterType="timeoff" openFilter={state.openFilter} filters={state.filters} dispatch={dispatch} />
-            </div>
             <div className="rp-view-type-dropdown">
               <select 
                 value={state.viewType} 
@@ -2207,13 +2379,22 @@ export default function ReportingPage() {
           </motion.div>
         )}
 
-        {(drilldown.personId || drilldown.project || drilldown.client) && (
+        {(drilldown.personId || drilldown.project || drilldown.client || hasToolbarFilters) && (
           <div className="rp-active-filters" role="status" aria-live="polite">
             <span className="rp-active-filters-label">Filtered by:</span>
             {drilldown.personName && <span className="rp-active-filter-chip">Person: {drilldown.personName}</span>}
             {drilldown.project && <span className="rp-active-filter-chip">Project: {drilldown.project}</span>}
             {drilldown.client && <span className="rp-active-filter-chip">Client: {drilldown.client}</span>}
-            <button type="button" className="rp-active-filter-clear" onClick={clearDrilldown}>Clear</button>
+            {searchText.trim() && <span className="rp-active-filter-chip">Search: {searchText.trim()}</span>}
+            {Object.entries(selectedCategoryFilters).flatMap(([category, values]) =>
+              values.map((value) => (
+                <span key={`${category}-${value}`} className="rp-active-filter-chip">
+                  {(ADVANCED_FILTER_CATEGORIES.find((item) => item.key === category)?.label || category)}: {value}
+                </span>
+              ))
+            )}
+            <button type="button" className="rp-active-filter-clear" onClick={clearToolbarFilters}>Clear filters</button>
+            <button type="button" className="rp-active-filter-clear" onClick={clearDrilldown}>Clear drilldown</button>
           </div>
         )}
  
