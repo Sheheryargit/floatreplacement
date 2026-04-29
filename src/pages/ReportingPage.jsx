@@ -999,7 +999,7 @@ export default function ReportingPage() {
   const toggleDrilldown = useCallback((nextFilter) => {
     setDrilldown((prev) => {
       const samePerson = Object.prototype.hasOwnProperty.call(nextFilter, "personId")
-        && prev.personId === (nextFilter.personId || null);
+        && String(prev.personId ?? "") === String(nextFilter.personId ?? "");
       const sameProject = Object.prototype.hasOwnProperty.call(nextFilter, "project")
         && normalizeText(prev.project) === normalizeText(nextFilter.project);
       const sameClient = Object.prototype.hasOwnProperty.call(nextFilter, "client")
@@ -1036,6 +1036,7 @@ export default function ReportingPage() {
   const clearToolbarFilters = useCallback(() => {
     setSearchText("");
     setSelectedCategoryFilters(EMPTY_ADVANCED_FILTERS);
+    setDrilldown({ personId: null, personName: null, project: null, client: null });
   }, []);
 
   // Stores the hovered bar's data + mouse position for the floating tooltip.
@@ -1344,7 +1345,7 @@ export default function ReportingPage() {
     const clientFilter = normalizeText(drilldown.client);
 
     return toolbarFilteredPersonRows.filter((person) => {
-      if (personIdFilter && person.id !== personIdFilter) return false;
+      if (personIdFilter && String(person.id) !== String(personIdFilter)) return false;
 
       if (!projectFilter && !clientFilter) return true;
       if (!person.allocations?.length) return false;
@@ -1365,21 +1366,6 @@ export default function ReportingPage() {
     const hasCategorySelections = Object.values(selectedCategoryFilters).some((values) => values.length > 0);
     return hasSearch || hasCategorySelections;
   }, [searchText, selectedCategoryFilters]);
-
-  // ── Per-bar capacity for chart scaling ───────────────────────────────────────
-  // Estimates how many hours the visible team should work per chart bar (day/week/month).
-  // Why needed: the chart draws a capacity reference line so you can visually compare
-  // actual scheduled hours against available hours for each bar period.
-  // How: sums weekly hours across all filtered people, then scales to the bar period:
-  //   - weeks: raw weekly total
-  //   - days: weekly total ÷ 5 (one working day)
-  //   - months: weekly total × average weeks per month (365.25 ÷ 12 ÷ 7)
-  const capacityPerBar = useMemo(() => {
-    const totalWeeklyHours = filteredPersonRows.reduce((sum, p) => sum + (p.weeklyHours ?? 37.5), 0);
-    if (state.viewType === 'weeks') return totalWeeklyHours;
-    if (state.viewType === 'days') return totalWeeklyHours / 5;
-    return totalWeeklyHours * (365.25 / 12 / 7); // average weeks per month
-  }, [state.viewType, filteredPersonRows]);
 
   // ── Totals ──────────────────────────────────────────────────────────────────
   // Sums all numeric fields across filteredPersonRows for the stats strip at the top of the tables.
@@ -1719,15 +1705,26 @@ export default function ReportingPage() {
     [visibleClientRows, state.tableSorts.clientsView]
   );
 
-  // Filters rangedAllocations by the active drilldown for chart data.
-  // Why separate from filteredPersonRows: the chart bins allocations directly (not via person rows),
-  // so it needs its own filtered allocation list that respects the same drilldown as the tables.
+  // Filters rangedAllocations to the same people currently visible in the tables,
+  // then applies active drilldown filters for project/client/person.
+  // This keeps chart bars consistent with top Search/Filter + table selections.
   const filteredRangedAllocations = useMemo(() => {
     const personIdFilter = drilldown.personId;
     const projectFilter = normalizeText(drilldown.project);
     const clientFilter = normalizeText(drilldown.client);
+    const allowedPersonIds = new Set(filteredPersonRows.map((person) => String(person.id)));
 
     return rangedAllocations.filter((alloc) => {
+      // Respect toolbar/table scope first: allocation must belong to at least one visible person.
+      const allocPersonIds = Array.isArray(alloc.personIds)
+        ? alloc.personIds.map((id) => String(id))
+        : alloc.personId != null
+          ? [String(alloc.personId)]
+          : [];
+      if (allocPersonIds.length === 0) return false;
+      const inVisibleScope = allocPersonIds.some((id) => allowedPersonIds.has(id));
+      if (!inVisibleScope) return false;
+
       if (personIdFilter && !allocationHasPersonSchedule(alloc, personIdFilter)) return false;
 
       const projectLabel = (alloc.project || "").trim() || "Unspecified work";
@@ -1737,7 +1734,7 @@ export default function ReportingPage() {
       if (clientFilter && normalizeText(allocationClient) !== clientFilter) return false;
       return true;
     });
-  }, [rangedAllocations, drilldown.personId, drilldown.project, drilldown.client, projectClientByLabel]);
+  }, [rangedAllocations, filteredPersonRows, drilldown.personId, drilldown.project, drilldown.client, projectClientByLabel]);
  
   // ── Chart ────────────────────────────────────────────────────────────────────
   // Bins all filtered allocations into day/week/month buckets and splits each bucket
@@ -1789,8 +1786,22 @@ export default function ReportingPage() {
         data.push({ label: c.toLocaleDateString('en-AU', { month: 'short', year: '2-digit' }), key, ...v, total: v.billable + v.nonBillable + v.timeOff, holidays: Array.from(holidaysByKey.get(key) || []) });
       }
     }
-    return { startDate, endDate, data, totalCapacity: (filteredPersonRows[0]?.capacity ?? 0) * filteredPersonRows.length };
+    return {
+      startDate,
+      endDate,
+      data,
+      totalCapacity: filteredPersonRows.reduce((sum, person) => sum + (person.capacity || 0), 0),
+    };
   }, [filteredRangedAllocations, state.viewType, projectBillability, filteredPersonRows, dateRange.start, dateRange.end, holidaysByKey]);
+
+  // ── Per-bar capacity for chart scaling ───────────────────────────────────────
+  // Uses total visible capacity divided across rendered bars for a consistent
+  // capacity reference line in the chart and exports.
+  const capacityPerBar = useMemo(() => {
+    const bars = chartRange.data.length;
+    if (bars <= 0) return 0;
+    return chartRange.totalCapacity / bars;
+  }, [chartRange.totalCapacity, chartRange.data.length]);
  
   const toggleRow = useCallback((id) => {
     dispatch({ type: "TOGGLE_ROW", payload: id });
@@ -1837,7 +1848,7 @@ export default function ReportingPage() {
     const rows = chartRange.data.map((d) => {
       const dateStr = d.label;
       
-      const totalCapacity = chartRange.totalCapacity / chartRange.data.length;
+      const totalCapacity = capacityPerBar;
       const totalScheduled = d.billable + d.nonBillable;
       const schedPct = totalCapacity > 0 ? Math.round((totalScheduled / totalCapacity) * 100) : 0;
       const billablePct = totalScheduled > 0 ? Math.round((d.billable / totalScheduled) * 100) : 0;
@@ -1861,7 +1872,7 @@ export default function ReportingPage() {
     const csv = arrayToCSV([header, ...rows]);
     downloadCSV(csv, `chart-data-${new Date().toISOString().split('T')[0]}.csv`);
   // filteredPersonRows is intentionally omitted — this callback only reads chartRange.
-  }, [chartRange]);
+  }, [chartRange, capacityPerBar]);
 
   // Exports the full detail table as a CSV — one row per person-allocation combination.
   // Why per-allocation (not per-person): stakeholders often need to see which project
