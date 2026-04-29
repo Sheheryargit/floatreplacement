@@ -441,6 +441,36 @@ function getTaskCategory(alloc) {
   if (days >= 1) return "1 day/week";
   return "Ad hoc";
 }
+
+function classifyLeaveType(alloc) {
+  const raw = `${alloc?.leaveType || ""} ${alloc?.project || ""} ${alloc?.notes || ""}`
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .trim();
+
+  if (raw.includes("public holiday")) return "Public Holiday";
+  if (
+    raw.includes("parental")
+    || raw.includes("maternity")
+    || raw.includes("paternity")
+    || raw.includes("adoption")
+  ) return "Parental Leave";
+  if (raw.includes("carer") || raw.includes("carers")) return "Carers Leave";
+  if (raw.includes("sick")) return "Sick Leave";
+  if (raw.includes("study")) return "Study Leave";
+  if (raw.includes("annual")) return "Annual Leave";
+  return "Other";
+}
+
+const CANONICAL_LEAVE_TYPES = [
+  "Annual Leave",
+  "Carers Leave",
+  "Parental Leave",
+  "Public Holiday",
+  "Sick Leave",
+  "Study Leave",
+  "Other",
+];
  
 // getBucketKey — maps a Date to the ISO-string key for the current chart viewType bucket.
 // Extracted to eliminate three verbatim copies of this 5-line branch in holidaysByKey,
@@ -454,6 +484,39 @@ function getBucketKey(date, viewType) {
   }
   // months — clamp to the 1st of the month
   return new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
+}
+
+function compareSortValues(a, b) {
+  const aIsNil = a == null;
+  const bIsNil = b == null;
+  if (aIsNil && bIsNil) return 0;
+  if (aIsNil) return 1;
+  if (bIsNil) return -1;
+
+  if (typeof a === "number" && typeof b === "number") {
+    return a - b;
+  }
+
+  return String(a).localeCompare(String(b), "en-AU", {
+    numeric: true,
+    sensitivity: "base",
+  });
+}
+
+function sortRows(rows, sortConfig, accessorMap) {
+  if (!sortConfig?.column || !sortConfig?.direction) return rows;
+  const accessor = accessorMap[sortConfig.column];
+  if (!accessor) return rows;
+  const multiplier = sortConfig.direction === "desc" ? -1 : 1;
+
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => {
+      const cmp = compareSortValues(accessor(a.row), accessor(b.row));
+      if (cmp !== 0) return cmp * multiplier;
+      return a.index - b.index;
+    })
+    .map((entry) => entry.row);
 }
 
 // FilterDropdown — renders a labelled filter pill + collapsible checkbox list.
@@ -510,6 +573,7 @@ const initialState = {
     project: FILTER_OPTIONS.project,
     timeoff: FILTER_OPTIONS.timeoff,
   },
+  tableSorts: {},
 };
 
 // UI state reducer — defined at module scope so it is a stable function reference.
@@ -535,6 +599,25 @@ function stateReducer(state, action) {
         ...state,
         filters: { ...state.filters, [action.filterType]: action.payload },
       };
+    case "TOGGLE_TABLE_SORT": {
+      const { tableKey, column } = action.payload;
+      const prev = state.tableSorts[tableKey] || { column: null, direction: null };
+      let next;
+      if (prev.column !== column) {
+        next = { column, direction: "asc" };
+      } else if (prev.direction === "asc") {
+        next = { column, direction: "desc" };
+      } else {
+        next = { column: null, direction: null };
+      }
+      return {
+        ...state,
+        tableSorts: {
+          ...state.tableSorts,
+          [tableKey]: next,
+        },
+      };
+    }
     default:
       return state;
   }
@@ -570,34 +653,133 @@ function DetailRow({ isExpanded, colSpan, children }) {
 // Guards division by zero (capacity = 0 for archived/unavailable people).
 function SchedCell({ scheduled, capacity }) {
   const schedPct = capacity > 0 ? Math.round((scheduled / capacity) * 100) : 0;
+  const isOverScheduled = schedPct > 100;
   return (
-    <div className="rp-sched-cell">
-      <span>{schedPct}%</span>
+    <div className={`rp-sched-cell${isOverScheduled ? " rp-sched-cell--over" : ""}`}>
+      <span className="rp-sched-label">{schedPct}%</span>
       <div className="rp-sched-bar-wrap">
         <div className="rp-sched-bar" style={{ width: `${schedPct}%` }} />
       </div>
     </div>
   );
 }
+
+function SortableHeader({
+  label,
+  direction,
+  onClick,
+  className = "",
+  align = "left",
+}) {
+  return (
+    <button
+      type="button"
+      className={`rp-th-btn ${align === "right" ? "rp-th-btn--num" : ""} ${direction ? "is-active" : ""} ${className}`.trim()}
+      onClick={onClick}
+      aria-label={`Sort by ${label}`}
+      aria-sort={direction === "asc" ? "ascending" : direction === "desc" ? "descending" : "none"}
+    >
+      <span>{label}</span>
+      <ChevronDown
+        size={12}
+        className={`rp-th-sort ${direction === "asc" ? "rp-th-sort--asc" : ""} ${direction === "desc" ? "rp-th-sort--desc" : ""}`.trim()}
+      />
+    </button>
+  );
+}
  
 // ── Standard thead ────────────────────────────────────────────────────────────
-function StandardThead({ firstColLabel, showDept = true }) {
+function StandardThead({ firstColLabel, showDept = true, tableKey, tableSorts, onSort }) {
+  const sortDirection = (column) => {
+    const tableSort = tableSorts?.[tableKey];
+    if (!tableSort || tableSort.column !== column) return null;
+    return tableSort.direction;
+  };
+
   return (
     <thead>
       <tr>
         <th className="rp-th rp-th--expand" />
         <th className="rp-th rp-th--name">
-          {firstColLabel} <ChevronDown size={12} className="rp-th-sort" />
+          <SortableHeader
+            label={firstColLabel}
+            direction={sortDirection("name")}
+            onClick={() => onSort(tableKey, "name")}
+          />
         </th>
-        {showDept && <th className="rp-th">Department</th>}
-        <th className="rp-th rp-th--num">Capacity</th>
-        <th className="rp-th rp-th--num rp-th--accent">Scheduled</th>
-        <th className="rp-th rp-th--num rp-th--accent">Billable</th>
-        <th className="rp-th rp-th--num rp-th--accent">Non-billable</th>
-        <th className="rp-th rp-th--num">Time off</th>
-        <th className="rp-th rp-th--num">Overtime</th>
-        <th className="rp-th rp-th--num">Sched.&nbsp;%</th>
-        <th className="rp-th rp-th--num">Scheduled Cost</th>
+        {showDept && (
+          <th className="rp-th">
+            <SortableHeader
+              label="Department"
+              direction={sortDirection("dept")}
+              onClick={() => onSort(tableKey, "dept")}
+            />
+          </th>
+        )}
+        <th className="rp-th rp-th--num">
+          <SortableHeader
+            label="Capacity"
+            direction={sortDirection("capacity")}
+            onClick={() => onSort(tableKey, "capacity")}
+            align="right"
+          />
+        </th>
+        <th className="rp-th rp-th--num rp-th--accent">
+          <SortableHeader
+            label="Scheduled"
+            direction={sortDirection("scheduled")}
+            onClick={() => onSort(tableKey, "scheduled")}
+            align="right"
+          />
+        </th>
+        <th className="rp-th rp-th--num rp-th--accent">
+          <SortableHeader
+            label="Billable"
+            direction={sortDirection("billable")}
+            onClick={() => onSort(tableKey, "billable")}
+            align="right"
+          />
+        </th>
+        <th className="rp-th rp-th--num rp-th--accent">
+          <SortableHeader
+            label="Non-billable"
+            direction={sortDirection("nonBillable")}
+            onClick={() => onSort(tableKey, "nonBillable")}
+            align="right"
+          />
+        </th>
+        <th className="rp-th rp-th--num">
+          <SortableHeader
+            label="Time off"
+            direction={sortDirection("timeOff")}
+            onClick={() => onSort(tableKey, "timeOff")}
+            align="right"
+          />
+        </th>
+        <th className="rp-th rp-th--num">
+          <SortableHeader
+            label="Overtime"
+            direction={sortDirection("overtime")}
+            onClick={() => onSort(tableKey, "overtime")}
+            align="right"
+          />
+        </th>
+        <th className="rp-th rp-th--num">
+          <SortableHeader
+            label="Sched. %"
+            direction={sortDirection("scheduledPct")}
+            onClick={() => onSort(tableKey, "scheduledPct")}
+            align="right"
+          />
+        </th>
+        <th className="rp-th rp-th--num">
+          <SortableHeader
+            label="Scheduled Cost"
+            direction={sortDirection("scheduledCost")}
+            onClick={() => onSort(tableKey, "scheduledCost")}
+            align="right"
+          />
+        </th>
       </tr>
     </thead>
   );
@@ -1186,11 +1368,16 @@ export default function ReportingPage() {
   // Only isLeave allocations are included — work allocations are ignored in this tab.
   const timeOffRows = useMemo(() => {
     const groups = {};
+
+    // Pre-seed categories so they stay visible even when they have zero hours.
+    for (const leaveType of CANONICAL_LEAVE_TYPES) {
+      groups[leaveType] = { totalHours: 0, personIds: new Set() };
+    }
  
     for (const person of filteredPersonRows) {
       for (const alloc of person.allocations) {
         if (!alloc.isLeave) continue;
-        const type = alloc.leaveType || alloc.project || "Unspecified leave";
+        const type = classifyLeaveType(alloc);
         const hours = allocationHours(alloc);
  
         if (!groups[type]) groups[type] = { totalHours: 0, personIds: new Set() };
@@ -1254,6 +1441,121 @@ export default function ReportingPage() {
     projects: visibleProjectRows.length,
     clients: visibleClientRows.length,
   }), [visibleProjectRows.length, visibleClientRows.length]);
+
+  const handleTableSort = useCallback((tableKey, column) => {
+    dispatch({ type: "TOGGLE_TABLE_SORT", payload: { tableKey, column } });
+  }, []);
+
+  const sortedPersonRows = useMemo(
+    () => sortRows(filteredPersonRows, state.tableSorts.people, {
+      name: (row) => row.name,
+      dept: (row) => row.dept,
+      capacity: (row) => row.capacity,
+      scheduled: (row) => row.scheduled,
+      billable: (row) => row.billable,
+      nonBillable: (row) => row.nonBillable,
+      timeOff: (row) => row.timeOff,
+      overtime: (row) => row.overtime,
+      scheduledPct: (row) => (row.capacity > 0 ? row.scheduled / row.capacity : 0),
+      scheduledCost: (row) => row.billable * COST_PER_HOUR,
+    }),
+    [filteredPersonRows, state.tableSorts.people]
+  );
+
+  const sortedRoleRows = useMemo(
+    () => sortRows(roleRows, state.tableSorts.roles, {
+      name: (row) => row.name,
+      dept: (row) => row.dept,
+      capacity: (row) => row.capacity,
+      scheduled: (row) => row.scheduled,
+      billable: (row) => row.billable,
+      nonBillable: (row) => row.nonBillable,
+      timeOff: (row) => row.timeOff,
+      overtime: (row) => row.overtime,
+      scheduledPct: (row) => (row.capacity > 0 ? row.scheduled / row.capacity : 0),
+      scheduledCost: (row) => row.scheduledCost,
+    }),
+    [roleRows, state.tableSorts.roles]
+  );
+
+  const sortedDeptRows = useMemo(
+    () => sortRows(deptRows, state.tableSorts.departments, {
+      name: (row) => row.name,
+      dept: (row) => row.dept,
+      capacity: (row) => row.capacity,
+      scheduled: (row) => row.scheduled,
+      billable: (row) => row.billable,
+      nonBillable: (row) => row.nonBillable,
+      timeOff: (row) => row.timeOff,
+      overtime: (row) => row.overtime,
+      scheduledPct: (row) => (row.capacity > 0 ? row.scheduled / row.capacity : 0),
+      scheduledCost: (row) => row.scheduledCost,
+    }),
+    [deptRows, state.tableSorts.departments]
+  );
+
+  const sortedTaskRows = useMemo(
+    () => sortRows(taskRows, state.tableSorts.tasks, {
+      name: (row) => row.name,
+      dept: (row) => row.dept,
+      capacity: (row) => row.capacity,
+      scheduled: (row) => row.scheduled,
+      billable: (row) => row.billable,
+      nonBillable: (row) => row.nonBillable,
+      timeOff: (row) => row.timeOff,
+      overtime: (row) => row.overtime,
+      scheduledPct: (row) => (row.capacity > 0 ? row.scheduled / row.capacity : 0),
+      scheduledCost: (row) => row.scheduledCost,
+    }),
+    [taskRows, state.tableSorts.tasks]
+  );
+
+  const sortedVisibleProjectRowsForPeople = useMemo(
+    () => sortRows(visibleProjectRows, state.tableSorts.peopleProjects, {
+      name: (row) => row.name,
+      code: (row) => row.code,
+      client: (row) => row.client,
+      owner: (row) => row.owner,
+      scheduled: (row) => row.scheduled,
+      billable: (row) => row.billable,
+      nonBillable: (row) => row.nonBillable,
+      billablePct: (row) => (row.scheduled > 0 ? row.billable / row.scheduled : 0),
+      scheduledCost: (row) => row.scheduledCost,
+    }),
+    [visibleProjectRows, state.tableSorts.peopleProjects]
+  );
+
+  const sortedTimeOffRows = useMemo(
+    () => sortRows(timeOffRows, state.tableSorts.timeOff, {
+      name: (row) => row.name,
+      peopleCount: (row) => row.people.length,
+      totalDays: (row) => row.totalDays,
+      totalHours: (row) => row.totalHours,
+    }),
+    [timeOffRows, state.tableSorts.timeOff]
+  );
+
+  const sortedVisibleProjectRowsForProjectsView = useMemo(
+    () => sortRows(visibleProjectRows, state.tableSorts.projectsView, {
+      name: (row) => row.name,
+      code: (row) => row.code,
+      client: (row) => row.client,
+      stage: (row) => row.stage || "",
+      owner: (row) => row.owner,
+      scheduled: (row) => row.scheduled,
+      scheduledPct: () => 1,
+    }),
+    [visibleProjectRows, state.tableSorts.projectsView]
+  );
+
+  const sortedVisibleClientRows = useMemo(
+    () => sortRows(visibleClientRows, state.tableSorts.clientsView, {
+      name: (row) => row.name,
+      scheduled: (row) => row.scheduled,
+      scheduledPct: (row) => (row.scheduled > 0 ? 1 : 0),
+    }),
+    [visibleClientRows, state.tableSorts.clientsView]
+  );
 
   // Filters rangedAllocations by the active drilldown for chart data.
   // Why separate from filteredPersonRows: the chart bins allocations directly (not via person rows),
@@ -1923,7 +2225,12 @@ export default function ReportingPage() {
               {/* ── People ── */}
               {state.activeTab === "People" && (
                 <table className="rp-table">
-                  <StandardThead firstColLabel="Person" />
+                  <StandardThead
+                    firstColLabel="Person"
+                    tableKey="people"
+                    tableSorts={state.tableSorts}
+                    onSort={handleTableSort}
+                  />
                   <tbody>
                     <tr className="rp-row rp-row--totals">
                       <td className="rp-td rp-td--expand" />
@@ -1938,7 +2245,7 @@ export default function ReportingPage() {
                       <td className="rp-td rp-td--num"><SchedCell scheduled={totals.sch} capacity={totals.cap} /></td>
                       <td className="rp-td rp-td--num">{fmt(totals.bil * COST_PER_HOUR)}</td>
                     </tr>
-                    {filteredPersonRows.map((person, idx) => {
+                    {sortedPersonRows.map((person, idx) => {
                       const isExpanded = state.expanded[person.id];
                       return (
                         <Fragment key={`person-${person.id}`}>
@@ -1993,9 +2300,14 @@ export default function ReportingPage() {
               {/* ── Roles ── */}
               {state.activeTab === "Roles" && (
                 <table className="rp-table">
-                  <StandardThead firstColLabel="Role" />
+                  <StandardThead
+                    firstColLabel="Role"
+                    tableKey="roles"
+                    tableSorts={state.tableSorts}
+                    onSort={handleTableSort}
+                  />
                   <tbody>
-                    {roleRows.map((row, idx) => (
+                    {sortedRoleRows.map((row, idx) => (
                       <StandardRow
                         key={`role-${row.id}`}
                         row={row}
@@ -2012,9 +2324,15 @@ export default function ReportingPage() {
               {/* ── Departments ── */}
               {state.activeTab === "Departments" && (
                 <table className="rp-table">
-                  <StandardThead firstColLabel="Department" showDept={false} />
+                  <StandardThead
+                    firstColLabel="Department"
+                    showDept={false}
+                    tableKey="departments"
+                    tableSorts={state.tableSorts}
+                    onSort={handleTableSort}
+                  />
                   <tbody>
-                    {deptRows.map((row, idx) => (
+                    {sortedDeptRows.map((row, idx) => (
                       <StandardRow
                         key={`dept-${row.id}`}
                         row={row}
@@ -2035,21 +2353,80 @@ export default function ReportingPage() {
                   <thead>
                     <tr>
                       <th className="rp-th rp-th--expand" />
-                      <th className="rp-th rp-th--name">Project <ChevronDown size={12} className="rp-th-sort" /></th>
-                      <th className="rp-th">Code</th>
-                      <th className="rp-th">Client</th>
-                      <th className="rp-th">Owner</th>
-                      <th className="rp-th rp-th--num rp-th--accent">Scheduled</th>
-                      <th className="rp-th rp-th--num rp-th--accent">Billable</th>
-                      <th className="rp-th rp-th--num rp-th--accent">Non-billable</th>
-                      <th className="rp-th rp-th--num">Billable %</th>
-                      <th className="rp-th rp-th--num">Scheduled Cost</th>
+                      <th className="rp-th rp-th--name">
+                        <SortableHeader
+                          label="Project"
+                          direction={state.tableSorts.peopleProjects?.column === "name" ? state.tableSorts.peopleProjects?.direction : null}
+                          onClick={() => handleTableSort("peopleProjects", "name")}
+                        />
+                      </th>
+                      <th className="rp-th">
+                        <SortableHeader
+                          label="Code"
+                          direction={state.tableSorts.peopleProjects?.column === "code" ? state.tableSorts.peopleProjects?.direction : null}
+                          onClick={() => handleTableSort("peopleProjects", "code")}
+                        />
+                      </th>
+                      <th className="rp-th">
+                        <SortableHeader
+                          label="Client"
+                          direction={state.tableSorts.peopleProjects?.column === "client" ? state.tableSorts.peopleProjects?.direction : null}
+                          onClick={() => handleTableSort("peopleProjects", "client")}
+                        />
+                      </th>
+                      <th className="rp-th">
+                        <SortableHeader
+                          label="Owner"
+                          direction={state.tableSorts.peopleProjects?.column === "owner" ? state.tableSorts.peopleProjects?.direction : null}
+                          onClick={() => handleTableSort("peopleProjects", "owner")}
+                        />
+                      </th>
+                      <th className="rp-th rp-th--num rp-th--accent">
+                        <SortableHeader
+                          label="Scheduled"
+                          direction={state.tableSorts.peopleProjects?.column === "scheduled" ? state.tableSorts.peopleProjects?.direction : null}
+                          onClick={() => handleTableSort("peopleProjects", "scheduled")}
+                          align="right"
+                        />
+                      </th>
+                      <th className="rp-th rp-th--num rp-th--accent">
+                        <SortableHeader
+                          label="Billable"
+                          direction={state.tableSorts.peopleProjects?.column === "billable" ? state.tableSorts.peopleProjects?.direction : null}
+                          onClick={() => handleTableSort("peopleProjects", "billable")}
+                          align="right"
+                        />
+                      </th>
+                      <th className="rp-th rp-th--num rp-th--accent">
+                        <SortableHeader
+                          label="Non-billable"
+                          direction={state.tableSorts.peopleProjects?.column === "nonBillable" ? state.tableSorts.peopleProjects?.direction : null}
+                          onClick={() => handleTableSort("peopleProjects", "nonBillable")}
+                          align="right"
+                        />
+                      </th>
+                      <th className="rp-th rp-th--num">
+                        <SortableHeader
+                          label="Billable %"
+                          direction={state.tableSorts.peopleProjects?.column === "billablePct" ? state.tableSorts.peopleProjects?.direction : null}
+                          onClick={() => handleTableSort("peopleProjects", "billablePct")}
+                          align="right"
+                        />
+                      </th>
+                      <th className="rp-th rp-th--num">
+                        <SortableHeader
+                          label="Scheduled Cost"
+                          direction={state.tableSorts.peopleProjects?.column === "scheduledCost" ? state.tableSorts.peopleProjects?.direction : null}
+                          onClick={() => handleTableSort("peopleProjects", "scheduledCost")}
+                          align="right"
+                        />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleProjectRows.length === 0
+                    {sortedVisibleProjectRowsForPeople.length === 0
                       ? <tr><td colSpan={10} className="rp-td"><div className="rp-empty-tab">No project data in this period.</div></td></tr>
-                      : visibleProjectRows.map((row, idx) => {
+                      : sortedVisibleProjectRowsForPeople.map((row, idx) => {
                           const isExpanded = state.expanded[row.id];
                           return (
                             <Fragment key={`project-${row.id}`}>
@@ -2111,11 +2488,17 @@ export default function ReportingPage() {
               {/* ── Tasks ── */}
               {state.activeTab === "Tasks" && (
                 <table className="rp-table">
-                  <StandardThead firstColLabel="Allocation Type" showDept={false} />
+                  <StandardThead
+                    firstColLabel="Allocation Type"
+                    showDept={false}
+                    tableKey="tasks"
+                    tableSorts={state.tableSorts}
+                    onSort={handleTableSort}
+                  />
                   <tbody>
-                    {taskRows.length === 0
+                    {sortedTaskRows.length === 0
                       ? <tr><td colSpan={10} className="rp-td"><div className="rp-empty-tab">No task data in this period.</div></td></tr>
-                      : taskRows.map((row, idx) => (
+                      : sortedTaskRows.map((row, idx) => (
                           <StandardRow
                             key={`task-${row.id}`}
                             row={row}
@@ -2136,16 +2519,43 @@ export default function ReportingPage() {
                   <thead>
                     <tr>
                       <th className="rp-th rp-th--expand" />
-                      <th className="rp-th rp-th--name">Leave Type <ChevronDown size={12} className="rp-th-sort" /></th>
-                      <th className="rp-th rp-th--num">People</th>
-                      <th className="rp-th rp-th--num">Total Days</th>
-                      <th className="rp-th rp-th--num">Total Hours</th>
+                      <th className="rp-th rp-th--name">
+                        <SortableHeader
+                          label="Leave Type"
+                          direction={state.tableSorts.timeOff?.column === "name" ? state.tableSorts.timeOff?.direction : null}
+                          onClick={() => handleTableSort("timeOff", "name")}
+                        />
+                      </th>
+                      <th className="rp-th rp-th--num">
+                        <SortableHeader
+                          label="People"
+                          direction={state.tableSorts.timeOff?.column === "peopleCount" ? state.tableSorts.timeOff?.direction : null}
+                          onClick={() => handleTableSort("timeOff", "peopleCount")}
+                          align="right"
+                        />
+                      </th>
+                      <th className="rp-th rp-th--num">
+                        <SortableHeader
+                          label="Total Days"
+                          direction={state.tableSorts.timeOff?.column === "totalDays" ? state.tableSorts.timeOff?.direction : null}
+                          onClick={() => handleTableSort("timeOff", "totalDays")}
+                          align="right"
+                        />
+                      </th>
+                      <th className="rp-th rp-th--num">
+                        <SortableHeader
+                          label="Total Hours"
+                          direction={state.tableSorts.timeOff?.column === "totalHours" ? state.tableSorts.timeOff?.direction : null}
+                          onClick={() => handleTableSort("timeOff", "totalHours")}
+                          align="right"
+                        />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {timeOffRows.length === 0
+                    {sortedTimeOffRows.length === 0
                       ? <tr><td colSpan={5} className="rp-td"><div className="rp-empty-tab">No time off data in this period.</div></td></tr>
-                      : timeOffRows.map((row, idx) => {
+                      : sortedTimeOffRows.map((row, idx) => {
                           const isExpanded = state.expanded[row.id];
                           return (
                             <Fragment key={`timeoff-${row.id}`}>
@@ -2191,20 +2601,64 @@ export default function ReportingPage() {
                   <thead>
                     <tr>
                       <th className="rp-th rp-th--expand" />
-                      <th className="rp-th rp-th--name">Project <ChevronDown size={12} className="rp-th-sort" /></th>
-                      <th className="rp-th">Project Code</th>
-                      <th className="rp-th">Client</th>
-                      <th className="rp-th">Stage</th>
-                      <th className="rp-th">Owner</th>
+                      <th className="rp-th rp-th--name">
+                        <SortableHeader
+                          label="Project"
+                          direction={state.tableSorts.projectsView?.column === "name" ? state.tableSorts.projectsView?.direction : null}
+                          onClick={() => handleTableSort("projectsView", "name")}
+                        />
+                      </th>
+                      <th className="rp-th">
+                        <SortableHeader
+                          label="Project Code"
+                          direction={state.tableSorts.projectsView?.column === "code" ? state.tableSorts.projectsView?.direction : null}
+                          onClick={() => handleTableSort("projectsView", "code")}
+                        />
+                      </th>
+                      <th className="rp-th">
+                        <SortableHeader
+                          label="Client"
+                          direction={state.tableSorts.projectsView?.column === "client" ? state.tableSorts.projectsView?.direction : null}
+                          onClick={() => handleTableSort("projectsView", "client")}
+                        />
+                      </th>
+                      <th className="rp-th">
+                        <SortableHeader
+                          label="Stage"
+                          direction={state.tableSorts.projectsView?.column === "stage" ? state.tableSorts.projectsView?.direction : null}
+                          onClick={() => handleTableSort("projectsView", "stage")}
+                        />
+                      </th>
+                      <th className="rp-th">
+                        <SortableHeader
+                          label="Owner"
+                          direction={state.tableSorts.projectsView?.column === "owner" ? state.tableSorts.projectsView?.direction : null}
+                          onClick={() => handleTableSort("projectsView", "owner")}
+                        />
+                      </th>
                       <th className="rp-th rp-th--num">Budget</th>
-                      <th className="rp-th rp-th--num rp-th--accent">Scheduled %</th>
-                      <th className="rp-th rp-th--num rp-th--accent">Scheduled Hours</th>
+                      <th className="rp-th rp-th--num rp-th--accent">
+                        <SortableHeader
+                          label="Scheduled %"
+                          direction={state.tableSorts.projectsView?.column === "scheduledPct" ? state.tableSorts.projectsView?.direction : null}
+                          onClick={() => handleTableSort("projectsView", "scheduledPct")}
+                          align="right"
+                        />
+                      </th>
+                      <th className="rp-th rp-th--num rp-th--accent">
+                        <SortableHeader
+                          label="Scheduled Hours"
+                          direction={state.tableSorts.projectsView?.column === "scheduled" ? state.tableSorts.projectsView?.direction : null}
+                          onClick={() => handleTableSort("projectsView", "scheduled")}
+                          align="right"
+                        />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleProjectRows.length === 0
+                    {sortedVisibleProjectRowsForProjectsView.length === 0
                       ? <tr><td colSpan={9} className="rp-td"><div className="rp-empty-tab">No project data in this period.</div></td></tr>
-                      : visibleProjectRows.map((row, idx) => {
+                      : sortedVisibleProjectRowsForProjectsView.map((row, idx) => {
                           const isExpanded = state.expanded[row.id];
                           return (
                             <Fragment key={`project-${row.id}`}>
@@ -2257,16 +2711,36 @@ export default function ReportingPage() {
                   <thead>
                     <tr>
                       <th className="rp-th rp-th--expand" />
-                      <th className="rp-th rp-th--name">Client</th>
+                      <th className="rp-th rp-th--name">
+                        <SortableHeader
+                          label="Client"
+                          direction={state.tableSorts.clientsView?.column === "name" ? state.tableSorts.clientsView?.direction : null}
+                          onClick={() => handleTableSort("clientsView", "name")}
+                        />
+                      </th>
                       <th className="rp-th rp-th--num">Budget</th>
-                      <th className="rp-th rp-th--num rp-th--accent">Scheduled Hours</th>
-                      <th className="rp-th rp-th--num rp-th--accent">Scheduled %</th>
+                      <th className="rp-th rp-th--num rp-th--accent">
+                        <SortableHeader
+                          label="Scheduled Hours"
+                          direction={state.tableSorts.clientsView?.column === "scheduled" ? state.tableSorts.clientsView?.direction : null}
+                          onClick={() => handleTableSort("clientsView", "scheduled")}
+                          align="right"
+                        />
+                      </th>
+                      <th className="rp-th rp-th--num rp-th--accent">
+                        <SortableHeader
+                          label="Scheduled %"
+                          direction={state.tableSorts.clientsView?.column === "scheduledPct" ? state.tableSorts.clientsView?.direction : null}
+                          onClick={() => handleTableSort("clientsView", "scheduledPct")}
+                          align="right"
+                        />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleClientRows.length === 0
+                    {sortedVisibleClientRows.length === 0
                       ? <tr><td colSpan={5} className="rp-td"><div className="rp-empty-tab">No client data in this period.</div></td></tr>
-                      : visibleClientRows.map((row, idx) => {
+                      : sortedVisibleClientRows.map((row, idx) => {
                           const isExpanded = state.expanded[`client-${row.id}`];
                           const schedPct = row.scheduled > 0 ? 100 : 0;
                           return (

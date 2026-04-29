@@ -9,13 +9,11 @@ import {
 } from "../data/workspaceSeedConstants.js";
 import { DEFAULT_DEPARTMENTS } from "../constants/departments.js";
 import {
-  PROJECTS_SEED,
   SEED_CLIENTS,
   SEED_PROJECT_TAGS,
 } from "../data/projectsSeed.js";
 import {
   projectToAllocationLabel,
-  resolveColorForProjectLabel,
 } from "../utils/projectColors.js";
 import { loadWorkspaceFromSupabase } from "../lib/api/loadWorkspace.js";
 import {
@@ -61,28 +59,12 @@ function clonePeople() {
   return PEOPLE_SEED.map((p) => ({ ...p, tags: [...p.tags] }));
 }
 
-function cloneProjects() {
-  return PROJECTS_SEED.map((p) => ({
-    ...p,
-    tags: [...p.tags],
-    teamIds: [...(p.teamIds || [])],
-  }));
-}
-
 /** Offline / no env: full in-memory seed. Supabase: empty core until fetch completes. */
 function buildInitialSlices() {
   if (!isSupabaseConfigured) {
     return {
       people: clonePeople(),
-      projects: cloneProjects().map((p) => {
-        const label = projectToAllocationLabel({ ...p, id: p.id });
-        const hasHex =
-          p.color && typeof p.color === "string" && /^#([0-9A-Fa-f]{6})$/.test(p.color.trim());
-        return {
-          ...p,
-          color: hasHex ? p.color.trim() : resolveColorForProjectLabel(label, []),
-        };
-      }),
+      projects: [],
       allocations: [],
       publicHolidayAllocations: [],
       roles: [...SEED_ROLES],

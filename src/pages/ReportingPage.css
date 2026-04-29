@@ -901,6 +901,39 @@
   color: #475569;
 }
 
+.rp-th-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.rp-th-btn--num {
+  width: 100%;
+  justify-content: flex-end;
+}
+
+.rp-th-btn.is-active {
+  color: #cbd5e1;
+}
+
+:root[data-theme="light"] .rp-th-btn.is-active {
+  color: #334155;
+}
+
+.rp-th-sort--asc {
+  transform: rotate(180deg);
+}
+
+.rp-th-sort--desc {
+  transform: rotate(0deg);
+}
+
 .rp-td {
   padding: 10px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
@@ -1108,6 +1141,18 @@
   min-width: 80px;
 }
 
+.rp-sched-label {
+  color: inherit;
+}
+
+.rp-sched-cell--over .rp-sched-label {
+  color: #fca5a5;
+}
+
+:root[data-theme="light"] .rp-sched-cell--over .rp-sched-label {
+  color: #b91c1c;
+}
+
 .rp-sched-bar-wrap {
   width: 28px;
   height: 3px;
@@ -1121,12 +1166,24 @@
   background: rgba(15, 23, 42, 0.1);
 }
 
+.rp-sched-cell--over .rp-sched-bar-wrap {
+  background: rgba(248, 113, 113, 0.24);
+}
+
+:root[data-theme="light"] .rp-sched-cell--over .rp-sched-bar-wrap {
+  background: rgba(239, 68, 68, 0.2);
+}
+
 .rp-sched-bar {
   height: 100%;
   background: #6366f1;
   border-radius: 2px;
   max-width: 100%;
   transition: width 0.4s ease;
+}
+
+.rp-sched-cell--over .rp-sched-bar {
+  background: #ef4444;
 }
 
 /* ─── Empty tab ──────────────────────────────────────────────────────────── */
