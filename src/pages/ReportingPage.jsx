@@ -1879,6 +1879,11 @@ export default function ReportingPage() {
   // each hour was on, not just the person totals. The flat format works in any pivot tool.
   // People with no allocations still get a row (with 0h) so they're visible as unscheduled.
   const exportTableData = useCallback(() => {
+    const csvBlank = (value) => {
+      if (value == null) return "";
+      return value === "—" ? "" : value;
+    };
+
     const header = [
       "Person",
       "Role",
@@ -1906,10 +1911,10 @@ export default function ReportingPage() {
       if (person.allocations.length === 0) {
         rows.push([
           person.name,
-          person.role || "—",
+          csvBlank(person.role),
           person.dept,
           person.capacity.toFixed(1),
-          "—", "—", "—", "—", "—",
+          "", "", "", "", "",
           "0", "0", "0",
           person.overtime.toFixed(1),
           person.unscheduled.toFixed(1),
@@ -1922,13 +1927,13 @@ export default function ReportingPage() {
           const hoursDays = (hours / 7.5).toFixed(1);
           rows.push([
             person.name,
-            person.role || "—",
+            csvBlank(person.role),
             person.dept,
             person.capacity.toFixed(1),
-            alloc.client || projectClientByLabel.get((alloc.project || "").trim()) || "—",
-            alloc.project || "—",
-            alloc.projectCode || "—",
-            alloc.task || "—",
+            csvBlank(alloc.client || projectClientByLabel.get((alloc.project || "").trim())),
+            csvBlank(alloc.project),
+            csvBlank(alloc.projectCode),
+            csvBlank(alloc.task),
             alloc.isLeave ? "Yes" : "No",
             person.scheduled.toFixed(1),
             person.billable.toFixed(1),
