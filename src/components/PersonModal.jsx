@@ -12,6 +12,7 @@ import { Button } from "./ui/Button.jsx";
 import { tagChromaProps } from "../utils/tagChroma.js";
 import { projectToAllocationLabel, avatarGradientFromName } from "../utils/projectColors.js";
 import { toast } from "sonner";
+import { useAuth } from "../context/AuthContext.jsx";
 import { DepartmentSelector } from "./DepartmentSelector.jsx";
 import { FloatSelect } from "./ui/FloatSelect.jsx";
 import {
@@ -919,15 +920,41 @@ function PersonModal({
   tagTheme = "dark",
 }) {
   const tagIsDark = tagTheme === "dark";
-  const [tab, setTab] = useState(0);
+  const { currentUser } = useAuth();
+  const role = (currentUser?.access).toLowerCase();
+  const [tabKey, setTabKey] = useState('info');
   const [form, setForm] = useState(null);
   const [dirty, setDirty] = useState(false);
   const ref = useRef(null);
   const isEdit = !!editPerson;
+  const isSelf = editPerson?.id === currentUser?.id;
+
+  /** Check Permissions */
+  const visibleTabs = useMemo(() => {
+    if (role === 'admin') {
+      // Admin can see all tabs
+      return MODAL_TABS;
+    } else if (isSelf) {
+      // Member/Manager editing self: only "Time Off" tab
+      return MODAL_TABS.filter(tab => tab.key === 'timeoff');
+    } else if (role === 'manager') {
+      // Manager editing others
+      return MODAL_TABS;
+    } else {
+      return [];
+    }
+  }, [role, isSelf]);
+
+  useEffect(() => {
+    const isTabVisible = visibleTabs.some(t => t.key === tabKey);
+    if (!isTabVisible && visibleTabs.length > 0) {
+      setTabKey(visibleTabs[0].key);
+    }
+  }, [visibleTabs, tabKey]);
 
   useEffect(() => {
     if (open) {
-      setTab(0);
+      setTabKey(visibleTabs[0]?.key || 'info');
       setForm(editPerson ? personToForm(editPerson) : {
         name:"",email:"",role:"No role",costRate:"0",billRate:"0",
         department:"No department",tags:[],type:"Employee",access:"none",
@@ -936,7 +963,7 @@ function PersonModal({
       });
       setDirty(false);
     }
-  }, [open, editPerson]);
+  }, [open, editPerson, visibleTabs]);
 
   useEffect(() => {
     if (!open || !editPerson?.id || !isSupabaseConfigured) return undefined;
@@ -995,8 +1022,22 @@ function PersonModal({
                 style={{ background:"transparent",border:"none",outline:"none",fontSize:26,fontWeight:700,color:t.text,width:"100%",padding:0,marginBottom:6,letterSpacing:-0.3 }}/>
               <div style={{ display:"flex",alignItems:"center",gap:6 }}>
                 <Mail size={14} style={{ color:t.textDim,flexShrink:0 }}/>
-                <input value={form.email} onChange={(e)=>updateForm({email:e.target.value})} placeholder="Email address"
-                  style={{ background:"transparent",border:"none",outline:"none",fontSize:14,color:t.textMuted,width:"100%",padding:0 }}/>
+                <input 
+                  value={form.email} 
+                  onChange={(e)=>updateForm({email:e.target.value})} 
+                  placeholder="Email address"
+                  disabled={isSelf && role !== 'admin'}
+                  style={{ 
+                    background:"transparent",
+                    border:"none",
+                    outline:"none",
+                    fontSize:14,
+                    color:isSelf && role !== 'admin' ? t.textDim : t.textMuted,
+                    width:"100%",
+                    padding:0,
+                    cursor: isSelf && role !== 'admin' ? 'not-allowed' : 'text',
+                    opacity: isSelf && role !== 'admin' ? 0.6 : 1,
+                  }}/>
               </div>
             </div>
             <div style={{
@@ -1007,12 +1048,12 @@ function PersonModal({
           </div>
 
           {/* Tabs — fixed equal-width grid */}
-          <div style={{ display:"grid",gridTemplateColumns:`repeat(${MODAL_TABS.length}, 1fr)`,gap:4,marginTop:20,borderBottom:`2px solid ${t.border}`,paddingBottom:0,position:"relative" }}>
-            {MODAL_TABS.map((mt, i) => {
+          <div style={{ display:"grid",gridTemplateColumns:`repeat(${visibleTabs.length}, 1fr)`,gap:4,marginTop:20,borderBottom:`2px solid ${t.border}`,paddingBottom:0,position:"relative" }}>
+            {visibleTabs.map((mt) => {
               const Icon = mt.icon;
-              const active = tab === i;
+              const active = tabKey === mt.key;
               return (
-                <button key={mt.key} type="button" onClick={() => setTab(i)} style={{
+                <button key={mt.key} type="button" onClick={() => setTabKey(mt.key)} style={{
                   position:"relative",
                   padding:"10px 4px",fontSize:12,fontWeight:active?700:500,cursor:"pointer",
                   background:active?t.tabActiveBg:"transparent",border:"none",
@@ -1049,9 +1090,9 @@ function PersonModal({
 
         {/* Content — scrollable */}
         <div style={{ padding:"22px 32px 10px",overflowY:"auto",flex:1,minHeight:0 }}>
-          {tab===0 && <InfoTab form={form} setForm={setFormWrap} roles={roles} setRoles={setRoles} depts={depts} setDepts={setDepts} tagOpts={tagOpts} setTagOpts={setTagOpts} t={t} tagIsDark={tagIsDark} pickerKey={editPerson?.id ?? "new"}/>}
-          {tab===1 && <AccessTab form={form} setForm={setFormWrap} t={t}/>}
-          {tab===2 && (
+          {tabKey==='info' && <InfoTab form={form} setForm={setFormWrap} roles={roles} setRoles={setRoles} depts={depts} setDepts={setDepts} tagOpts={tagOpts} setTagOpts={setTagOpts} t={t} tagIsDark={tagIsDark} pickerKey={editPerson?.id ?? "new"}/>}
+          {tabKey==='access' && <AccessTab form={form} setForm={setFormWrap} t={t}/>}
+          {tabKey==='availability' && (
             <AvailabilityTab
               form={form}
               setForm={setFormWrap}
@@ -1061,7 +1102,7 @@ function PersonModal({
               tagTheme={tagTheme}
             />
           )}
-          {tab===3 && (
+          {tabKey==='timeoff' && (
             <TimeOffTab
               form={form}
               setForm={setFormWrap}
@@ -1071,7 +1112,7 @@ function PersonModal({
               onOpenCreateLeave={onOpenCreateLeave}
             />
           )}
-          {tab===4 && (
+          {tabKey==='projects' && (
             <ProjectsTab
               t={t}
               editPerson={editPerson}

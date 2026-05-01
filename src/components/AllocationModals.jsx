@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from "framer-motion";
 import { X, ChevronDown, ArrowLeftRight, Zap, Trash2, Palmtree } from "lucide-react";
+import { useAuth } from "../context/AuthContext.jsx";
 import { resolveColorForProjectLabel } from "../utils/projectColors.js";
 import { normalizeLeaveTypeId, leaveAccentTheme, leavePanelStyleVars } from "../utils/leaveVisuals.js";
 import "./AllocationModals.css";
@@ -81,6 +82,8 @@ export function CreateAllocationModal({
   t,
 }) {
   const reduceMotion = useReducedMotion();
+  const { currentUser } = useAuth();
+  const role = (currentUser?.access).toLowerCase();
   const hoursMode = "Hours";
   const [activeTab, setActiveTab] = useState("allocation");
   const [hoursPerDay, setHoursPerDay] = useState("7.5");
@@ -95,6 +98,28 @@ export function CreateAllocationModal({
   const [assignOpen, setAssignOpen] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
   const [projectQuery, setProjectQuery] = useState("");
+
+  /** Check Permissions */
+  const visibleAllocationTabs = useMemo(() => {
+    if (role === 'admin') {
+      // Admin can create both allocation and leave for anyone
+      return ['allocation', 'leave'];
+    } else if (role === 'manager') {
+      // Manager can only create allocation for people they own
+      // If only assigning to self, restrict to leave only
+      const assigningSelf = assignedIds.length === 1 && assignedIds[0] === currentUser?.id;
+      return assigningSelf ? ['leave'] : ['allocation', 'leave'];
+    } else {
+      // Member can only create leave for themselves
+      return ['leave'];
+    }
+  }, [role, currentUser?.id, assignedIds]);
+
+  useEffect(() => {
+    if (!visibleAllocationTabs.includes(activeTab) && visibleAllocationTabs.length > 0) {
+      setActiveTab(visibleAllocationTabs[0]);
+    }
+  }, [visibleAllocationTabs, activeTab]);
 
   // Leave-specific state
   const [leaveType, setLeaveType] = useState("annual");
@@ -415,57 +440,61 @@ export function CreateAllocationModal({
 
         <LayoutGroup id="lpam-create-tabs">
           <div className="lpam-tabs lpam-tabs--motion" style={{ borderColor: t.border }}>
-            <button
-              type="button"
-              className={
-                "lpam-tab" +
-                (activeTab === "allocation" ? " lpam-tab-active" : "") +
-                (editingLeave ? " lpam-tab-disabled" : "")
-              }
-              style={{
-                color: activeTab === "allocation" ? t.accent : t.textSoft,
-                borderBottomColor: "transparent",
-                position: "relative",
-                opacity: editingLeave ? 0.45 : 1,
-                cursor: editingLeave ? "not-allowed" : "pointer",
-              }}
-              disabled={editingLeave}
-              onClick={() => {
-                if (editingLeave) return;
-                setActiveTab("allocation");
-              }}
-            >
-              Allocation
-              {activeTab === "allocation" ? (
-                <motion.span
-                  layoutId="lpam-create-tab-line"
-                  className="lpam-tab-line"
-                  style={{ background: t.accent }}
-                  transition={{ type: "spring", stiffness: 400, damping: 34 }}
-                />
-              ) : null}
-            </button>
-            <button
-              type="button"
-              className={"lpam-tab" + (activeTab === "leave" ? " lpam-tab-active" : "")}
-              style={{
-                color: activeTab === "leave" ? leaveAccent.solid : t.textSoft,
-                borderBottomColor: "transparent",
-                position: "relative",
-              }}
-              onClick={() => setActiveTab("leave")}
-            >
-              <Palmtree size={14} style={{ marginRight: 5 }} />
-              Leave
-              {activeTab === "leave" ? (
-                <motion.span
-                  layoutId="lpam-create-tab-line"
-                  className="lpam-tab-line"
-                  style={{ background: leaveAccent.solid }}
-                  transition={{ type: "spring", stiffness: 400, damping: 34 }}
-                />
-              ) : null}
-            </button>
+            {visibleAllocationTabs.includes('allocation') && (
+              <button
+                type="button"
+                className={
+                  "lpam-tab" +
+                  (activeTab === "allocation" ? " lpam-tab-active" : "") +
+                  (editingLeave ? " lpam-tab-disabled" : "")
+                }
+                style={{
+                  color: activeTab === "allocation" ? t.accent : t.textSoft,
+                  borderBottomColor: "transparent",
+                  position: "relative",
+                  opacity: editingLeave ? 0.45 : 1,
+                  cursor: editingLeave ? "not-allowed" : "pointer",
+                }}
+                disabled={editingLeave}
+                onClick={() => {
+                  if (editingLeave) return;
+                  setActiveTab("allocation");
+                }}
+              >
+                Allocation
+                {activeTab === "allocation" ? (
+                  <motion.span
+                    layoutId="lpam-create-tab-line"
+                    className="lpam-tab-line"
+                    style={{ background: t.accent }}
+                    transition={{ type: "spring", stiffness: 400, damping: 34 }}
+                  />
+                ) : null}
+              </button>
+            )}
+            {visibleAllocationTabs.includes('leave') && (
+              <button
+                type="button"
+                className={"lpam-tab" + (activeTab === "leave" ? " lpam-tab-active" : "")}
+                style={{
+                  color: activeTab === "leave" ? leaveAccent.solid : t.textSoft,
+                  borderBottomColor: "transparent",
+                  position: "relative",
+                }}
+                onClick={() => setActiveTab("leave")}
+              >
+                <Palmtree size={14} style={{ marginRight: 5 }} />
+                Leave
+                {activeTab === "leave" ? (
+                  <motion.span
+                    layoutId="lpam-create-tab-line"
+                    className="lpam-tab-line"
+                    style={{ background: leaveAccent.solid }}
+                    transition={{ type: "spring", stiffness: 400, damping: 34 }}
+                  />
+                ) : null}
+              </button>
+            )}
           </div>
         </LayoutGroup>
 
