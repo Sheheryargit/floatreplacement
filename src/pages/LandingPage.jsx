@@ -95,6 +95,8 @@ import { buildAllocationsByPerson, getPersonAllocations } from "../utils/allocat
 import { mergeScheduleAllocations } from "../utils/scheduleAllocationsMerge.js";
 import { isSupabaseConfigured } from "../lib/supabase.js";
 import { dismissPublicHolidayForPerson } from "../lib/api/personPublicHolidays.js";
+import { useAuth } from "../context/AuthContext.jsx";
+import { can } from "../constants/permissions.js";
 import {
   normalizeLeaveTypeId,
   leaveTimelineIconKey,
@@ -1461,6 +1463,8 @@ export default function LandingPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme } = useAppTheme();
+  const { currentUser } = useAuth();
+  const role = (currentUser?.access).toLowerCase();
   const t = T[theme];
 
   const {
@@ -1617,6 +1621,25 @@ export default function LandingPage() {
 
   const { schedulePeople, schedulePeopleHoursInView } = useMemo(() => {
     let list = people.filter((p) => !p.archived);
+    
+    /* Check Permissions */
+    if (role === 'admin') {
+      // Admin sees everyone
+    } else if (role === 'manager') {
+      // Manager sees self and people on projects they own
+      list = list.filter((p) => {
+        const isSelf = p.id === currentUser?.id;
+        const isOnOwnedProject = projects.some(proj => 
+          String(proj.owner) === String(currentUser?.id) &&
+          proj.teamIds && proj.teamIds.includes(p.id)
+        );
+        return isSelf || isOnOwnedProject;
+      });
+    } else {
+      // Member sees only self
+      list = list.filter((p) => p.id === currentUser?.id);
+    }
+    
     list = list.filter((p) =>
       personMatchesScheduleFilter(p, scheduleFilterRules, {
         allocations: scheduleAllocations,
@@ -1644,6 +1667,8 @@ export default function LandingPage() {
     allocationsByPerson,
     projects,
     scheduleModel,
+    role,
+    currentUser?.id,
   ]);
 
   const projectByLabel = useMemo(() => {
@@ -2491,38 +2516,41 @@ export default function LandingPage() {
                 <Share size={18} />
               </button>
 
-              <div className="lp-dropdown-wrap" ref={addWrapRef}>
-                <button
-                  type="button"
-                  className="lp-sched-add-btn"
-                  aria-label="Add new"
-                  aria-expanded={addMenuOpen}
-                  onClick={() => {
-                    setAddMenuOpen((o) => !o);
-                    setViewMenuOpen(false);
-                    setDensityOpen(false);
-                  }}
-                  style={{
-                    transform: addMenuOpen ? "rotate(45deg)" : "none",
-                    transition: "transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28)",
-                  }}
-                >
-                  <Plus size={16} strokeWidth={2.5} />
-                </button>
-                {addMenuOpen && (
+              {(can(role, 'schedule', 'createProject') || can(role, 'schedule', 'createPerson')) && (
+                <div className="lp-dropdown-wrap" ref={addWrapRef}>
+                  <button
+                    type="button"
+                    className="lp-sched-add-btn"
+                    aria-label="Add new"
+                    aria-expanded={addMenuOpen}
+                    onClick={() => {
+                      setAddMenuOpen((o) => !o);
+                      setViewMenuOpen(false);
+                      setDensityOpen(false);
+                    }}
+                    style={{
+                      transform: addMenuOpen ? "rotate(45deg)" : "none",
+                      transition: "transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28)",
+                    }}
+                  >
+                    <Plus size={16} strokeWidth={2.5} />
+                  </button>
+                  {addMenuOpen && (
                   <div className="lp-popover lp-popover-add" style={{ right: 0, minWidth: "200px", zIndex: 100 }}>
                     <div className="lp-popover-title">Create New</div>
-                    <button
-                      type="button"
-                      className="lp-popover-item"
-                      onClick={() => {
-                        setAddMenuOpen(false);
-                        openAdd();
-                      }}
-                    >
-                      <UserPlus size={16} strokeWidth={1.8} className="lp-popover-icon" />
-                      Person
-                    </button>
+                    {role === "admin" && (
+                      <button
+                        type="button"
+                        className="lp-popover-item"
+                        onClick={() => {
+                          setAddMenuOpen(false);
+                          openAdd();
+                        }}
+                      >
+                        <UserPlus size={16} strokeWidth={1.8} className="lp-popover-icon" />
+                        Person
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="lp-popover-item"
@@ -2549,14 +2577,17 @@ export default function LandingPage() {
                   </div>
                 )}
               </div>
+              )}
             </div>
           </div>
 
           <div className="lp-subbar">
             <div className="lp-subbar-people">
-              <button type="button" className="lp-icon-btn" aria-label="Add person" onClick={openAdd}>
-                <UserPlus size={18} />
-              </button>
+              {can(role, 'schedule', 'createPerson') && (
+                <button type="button" className="lp-icon-btn" aria-label="Add person" onClick={openAdd}>
+                  <UserPlus size={18} />
+                </button>
+              )}
               <div className="lp-dropdown-wrap" ref={sortWrapRef}>
                 <button
                   type="button"
