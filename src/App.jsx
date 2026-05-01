@@ -37,7 +37,7 @@ const ReportingPage = lazy(() => import("./pages/ReportingPage.jsx"));
  */
 function RequirePermission({ page, action, children }) {
   const { currentUser } = useAuth();
-  const allowed = can(currentUser?.access, page, action);
+  const allowed = can((currentUser?.access).toLowerCase(), page, action);
   if (!allowed) return <Navigate to="/" replace />;
   return children;
 }
