@@ -82,7 +82,7 @@ function toggleArr(list, v) {
    ═══════════════════════════════════════════════════════════ */
 export default function PeoplePage() {
   const { currentUser } = useAuth();
-  const role = currentUser?.access || "member";
+  const role = (currentUser?.access).toLowerCase();
   const { theme: mode } = useAppTheme();
   const t = T[mode];
 
@@ -323,7 +323,20 @@ export default function PeoplePage() {
       if (p.archived !== isArch) return false;
 
       /** Check permissions */
-      if (!can(role, 'people', 'viewAll') && p.id !== currentUser?.id) return false;
+      if (role === 'admin') {
+        // Admin sees everyone
+      } else if (role === 'manager') {
+        // Manager sees self and people on projects they own
+        const isSelf = p.id === currentUser?.id;
+        const isOnOwnedProject = projects.some(proj => 
+          String(proj.owner) === String(currentUser?.id) &&
+          proj.teamIds && proj.teamIds.includes(p.id)
+        );
+        if (!isSelf && !isOnOwnedProject) return false;
+      } else {
+        // Member sees only self
+        if (p.id !== currentUser?.id) return false;
+      }
 
       if (search) {
         const s = search.toLowerCase();
@@ -407,6 +420,7 @@ export default function PeoplePage() {
     advWorkTypes,
     role,
     currentUser?.id,
+    projects,
   ]);
 
   const peopleOrderMap = useMemo(() => {
@@ -463,8 +477,8 @@ export default function PeoplePage() {
     setNestOpen((o) => ({ ...o, [key]: !o[key] }));
   }, []);
 
-  const activeCount = filteredSorted.filter((p)=>!p.archived).length;
-  const archivedCount = filteredSorted.filter((p)=>p.archived).length;
+  const activeCount = people.filter((p)=>!p.archived).length;
+  const archivedCount = people.filter((p)=>p.archived).length;
 
   const toggleSel=(id)=>setSelected((p)=>{ const n=new Set(p); n.has(id)?n.delete(id):n.add(id); return n; });
   const toggleAll=()=>setSelected(selected.size===filteredSorted.length?new Set():new Set(filteredSorted.map((p)=>p.id)));

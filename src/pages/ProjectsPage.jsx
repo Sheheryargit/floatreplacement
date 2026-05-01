@@ -416,7 +416,7 @@ export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,c
 export default function ProjectsPage(){
   const { theme: mode } = useAppTheme();
   const { currentUser } = useAuth();
-  const role = currentUser?.access || "member";
+  const role = (currentUser?.access).toLowerCase();
   const t=T[mode];
   const{
     people,
@@ -443,12 +443,12 @@ export default function ProjectsPage(){
   const filtered=useMemo(()=>{const isArch=viewTab==="archived";return projects.filter(p=>{if(p.archived!==isArch)return false;
 
       /** Check permissions */
-      if (can(role, 'projects', 'viewAll')) {
+      if (role === "admin") {
         // Admin can see all projects
       } else if (role === "manager") {
         // Managers see projects they're part of the team OR projects they own
         const isTeamMember = p.teamIds && p.teamIds.includes(currentUser?.id);
-        const isOwner = p.owner === currentUser?.id;
+        const isOwner = String(p.owner) === String(currentUser?.id);
         if (!isTeamMember && !isOwner) return false;
       } else {
         // Members see only projects they're part of the team
@@ -457,8 +457,8 @@ export default function ProjectsPage(){
       }
 
       if(!search)return true;const s=search.toLowerCase();return p.name.toLowerCase().includes(s)||p.client.toLowerCase().includes(s)||p.code.toLowerCase().includes(s)||p.tags.some(tg=>tg.toLowerCase().includes(s));});},[projects,search,viewTab,role,currentUser?.id]);
-  const activeCount=filtered.filter(p=>!p.archived).length;
-  const archivedCount=filtered.filter(p=>p.archived).length;
+  const activeCount=projects.filter(p=>!p.archived).length;
+  const archivedCount=projects.filter(p=>p.archived).length;
   const toggleSel=id=>setSelected(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
   const toggleAll=()=>setSelected(selected.size===filtered.length?new Set():new Set(filtered.map(p=>p.id)));
   const doDelete=async()=>{const c=selected.size;const ids=[...selected];const prev=projects;setProjects(projects.filter(p=>!selected.has(p.id)));setSelected(new Set());setConfirmDel(false);try{if(isSupabaseConfigured) await syncProjectsDelete(ids);toast.error(`${c} project${c===1?"":"s"} removed`);}catch(e){setProjects(prev);toast.error("Delete failed",{description:e?.message||String(e)});} };
