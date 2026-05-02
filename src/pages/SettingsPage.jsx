@@ -12,6 +12,7 @@ import {
   Wand2,
   Rows3,
   Send,
+  LayoutGrid,
 } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
@@ -21,8 +22,13 @@ import { useSlapAnimation } from "../context/SlapAnimationContext.jsx";
 import { useAppDialog } from "../context/AppDialogContext.jsx";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
 import {
+  ALLOCATION_BOX_STYLE_CHANGED_EVENT,
+  ALLOCATION_BOX_STYLE_IDS,
+  ALLOCATION_BOX_STYLE_LABELS,
   PEAK_LOAD_LABELS_CHANGED_EVENT,
+  readAllocationBoxStyle,
   readPeakLoadLabelsVisible,
+  writeAllocationBoxStyle,
   writePeakLoadLabelsVisible,
 } from "../config/scheduleUiPrefs.js";
 import { SettingsItem } from "../components/ui/SettingsItem.jsx";
@@ -30,6 +36,7 @@ import { ThemePreferenceControl } from "../components/ui/ThemePreferenceControl.
 import { PalettePreferenceControl } from "../components/ui/PalettePreferenceControl.jsx";
 import { CanvasTintPreferenceControl } from "../components/ui/CanvasTintPreferenceControl.jsx";
 import { InviteMemberDialog } from "../components/InviteMemberDialog.jsx";
+import { SettingsSchedulePreview } from "../components/settings/SettingsSchedulePreview.jsx";
 import "./SettingsPage.css";
 
 const APPEARANCE_ICONS = [
@@ -57,6 +64,7 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const profileRef = useRef(null);
   const [peakLoadLabels, setPeakLoadLabels] = useState(() => readPeakLoadLabelsVisible());
+  const [allocationBoxStyle, setAllocationBoxStyle] = useState(() => readAllocationBoxStyle());
   const [inviteOpen, setInviteOpen] = useState(false);
 
   const setPeakLoadLabelsPreference = useCallback((next) => {
@@ -64,10 +72,21 @@ export default function SettingsPage() {
     writePeakLoadLabelsVisible(next);
   }, []);
 
+  const setAllocationBoxStylePreference = useCallback((next) => {
+    setAllocationBoxStyle(next);
+    writeAllocationBoxStyle(next);
+  }, []);
+
   useEffect(() => {
     const sync = () => setPeakLoadLabels(readPeakLoadLabelsVisible());
     window.addEventListener(PEAK_LOAD_LABELS_CHANGED_EVENT, sync);
     return () => window.removeEventListener(PEAK_LOAD_LABELS_CHANGED_EVENT, sync);
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setAllocationBoxStyle(readAllocationBoxStyle());
+    window.addEventListener(ALLOCATION_BOX_STYLE_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(ALLOCATION_BOX_STYLE_CHANGED_EVENT, sync);
   }, []);
 
   useEffect(() => {
@@ -115,6 +134,7 @@ export default function SettingsPage() {
     <div className="settings-root" data-theme={theme === "light" ? "light" : "dark"}>
       <AppSideNav />
 
+      <div className="settings-body">
       <main className="settings-main">
         <motion.header
           className="settings-hero"
@@ -191,10 +211,44 @@ export default function SettingsPage() {
             Schedule
           </h2>
           <p className="settings-section-desc">
-            Saved in this browser only. Turn off to hide Underallocated, On target, and Overallocated on each
-            person row.
+            Saved in this browser only. Controls how project hours appear on the timeline and whether peak-load
+            bands show under each person.
           </p>
           <div className="settings-card settings-card--glow">
+            <SettingsItem
+              icon={LayoutGrid}
+              label="Allocation blocks"
+              trailFullWidth
+              subtext={
+                <>
+                  Choose how colored project tiles look on the schedule. Eight presets: borders, shadows,
+                  corners, and one layout (Center hrs) with large centered hours.
+                  <span className="settings-subtext-detail">
+                    Center hrs scales the hours type with tile height and keeps project name and code above
+                    and below.
+                  </span>
+                </>
+              }
+              showChevron={false}
+            >
+              <div className="settings-alloc-box-toggle" role="radiogroup" aria-label="Allocation block style">
+                {ALLOCATION_BOX_STYLE_IDS.map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={allocationBoxStyle === id}
+                    className={
+                      "settings-alloc-box-btn" +
+                      (allocationBoxStyle === id ? " settings-alloc-box-btn--active" : "")
+                    }
+                    onClick={() => setAllocationBoxStylePreference(id)}
+                  >
+                    {ALLOCATION_BOX_STYLE_LABELS[id] ?? id}
+                  </button>
+                ))}
+              </div>
+            </SettingsItem>
             <SettingsItem
               icon={Rows3}
               label="Peak load labels"
@@ -288,6 +342,15 @@ export default function SettingsPage() {
           </div>
         </section>
       </main>
+
+      <aside className="settings-preview-aside" aria-label="Schedule preview">
+        <SettingsSchedulePreview
+          allocationBoxStyle={allocationBoxStyle}
+          peakLoadLabels={peakLoadLabels}
+          onAllocationBoxStyleChange={setAllocationBoxStylePreference}
+        />
+      </aside>
+      </div>
 
       <InviteMemberDialog layout="full" open={inviteOpen} onOpenChange={setInviteOpen} />
     </div>

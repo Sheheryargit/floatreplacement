@@ -2592,6 +2592,85 @@ button.lp-block.lp-block-alloc.lp-block-alloc-project {
     inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
+/* Schedule allocation tile presets (`data-alloc-box-style` on `.lp-root`) */
+.lp-root[data-alloc-box-style="minimal"] .lp-block-alloc.lp-block-alloc-project:hover,
+.lp-root[data-alloc-box-style="outline"] .lp-block-alloc.lp-block-alloc-project:hover {
+  transform: translate3d(0, -1px, 0);
+}
+
+.lp-root[data-alloc-box-style="minimal"] .lp-block-alloc.lp-block-alloc-project:hover {
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.lp-root[data-theme="light"][data-alloc-box-style="minimal"] .lp-block-alloc.lp-block-alloc-project:hover {
+  box-shadow:
+    0 4px 14px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.lp-root[data-alloc-box-style="outline"] .lp-block-alloc.lp-block-alloc-project:hover {
+  box-shadow: none;
+  filter: brightness(1.08);
+}
+
+.lp-root[data-theme="light"][data-alloc-box-style="outline"] .lp-block-alloc.lp-block-alloc-project:hover {
+  filter: brightness(0.96);
+}
+
+.lp-root[data-alloc-box-style="pill"] .lp-block-alloc.lp-block-alloc-project:hover {
+  transform: translate3d(0, -1px, 0) scale(1.006);
+}
+
+.lp-root[data-alloc-box-style="center"] .lp-block-alloc.lp-block-alloc-project:hover {
+  transform: translate3d(0, -1px, 0) scale(1.008);
+}
+
+.lp-root[data-alloc-box-style="neon"] .lp-block-alloc.lp-block-alloc-project:hover {
+  transform: translate3d(0, -1px, 0);
+  filter: brightness(1.06);
+}
+
+.lp-root[data-theme="light"][data-alloc-box-style="neon"] .lp-block-alloc.lp-block-alloc-project:hover {
+  filter: brightness(1.03);
+}
+
+.lp-root[data-alloc-box-style="glass"] .lp-block-alloc.lp-block-alloc-project:hover {
+  transform: translate3d(0, -1px, 0);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.22),
+    0 6px 20px rgba(0, 0, 0, 0.42) !important;
+}
+
+.lp-root[data-theme="light"][data-alloc-box-style="glass"] .lp-block-alloc.lp-block-alloc-project:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.05),
+    0 6px 18px rgba(15, 23, 42, 0.11) !important;
+}
+
+.lp-root[data-alloc-box-style="rail"] .lp-block-alloc.lp-block-alloc-project:hover {
+  transform: translate3d(-1px, -2px, 0);
+}
+
+.lp-root[data-theme="light"][data-alloc-box-style="rail"] .lp-block-alloc.lp-block-alloc-project:hover {
+  transform: translate3d(-1px, -2px, 0);
+}
+
+.lp-root[data-alloc-box-style="minimal"] .lp-block-alloc-project .lp-alloc-bar__line--name,
+.lp-root[data-alloc-box-style="outline"] .lp-block-alloc-project .lp-alloc-bar__line--name {
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.22);
+}
+
+.lp-root[data-theme="light"][data-alloc-box-style="minimal"] .lp-block-alloc-project .lp-alloc-bar__line--name,
+.lp-root[data-theme="light"][data-alloc-box-style="outline"] .lp-block-alloc-project .lp-alloc-bar__line--name {
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.4),
+    0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
 .lp-block-alloc:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -2653,6 +2732,60 @@ button.lp-block.lp-block-alloc.lp-alloc-bar {
   font-size: 11px;
   line-height: 1.15;
   letter-spacing: 0.01em;
+}
+
+/* “Center hrs” preset — hero hours scale with tile height (inline font-size). */
+.lp-alloc-bar__body--center-hours {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 2px 6px;
+  gap: 0;
+}
+
+.lp-alloc-bar__line--center-subtitle {
+  flex: 0 0 auto;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.1;
+  max-width: 100%;
+  opacity: 0.9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lp-alloc-bar__hours-hero {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin: 1px 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.lp-root[data-theme="light"] .lp-alloc-bar__hours-hero {
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.lp-alloc-bar__line--center-meta {
+  flex: 0 0 auto;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: 100%;
+  overflow: hidden;
+}
+
+.lp-alloc-bar__line--center-meta .lp-alloc-bar__icons {
+  margin-left: 0;
 }
 
 /* All schedule tiles share one compact layout; no variable-height special cases. */

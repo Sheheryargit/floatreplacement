@@ -76,6 +76,14 @@ import {
   splitLayoutByOffDays,
 } from "../schedule/renderModel/index.js";
 import {
+  allocationBarBorderRadiusPx,
+  allocationBarChromeStyles,
+  allocationBarInnerWash,
+  allocationCenterHoursHeroPx,
+  allocationLoadFillTopAlpha,
+  hexToRgba,
+} from "../schedule/allocationBarVisuals.js";
+import {
   avatarGradientFromName as avGrad,
   colorForAllocationBar,
   contrastingTextColor,
@@ -109,8 +117,11 @@ import {
   isAvailabilityDayOffAlloc,
 } from "../utils/leaveVisuals.js";
 import {
+  ALLOCATION_BOX_STYLE_CHANGED_EVENT,
+  ALLOCATION_BOX_STYLE_LS_KEY,
   PEAK_LOAD_LABELS_CHANGED_EVENT,
   PEAK_LOAD_LABELS_LS_KEY,
+  readAllocationBoxStyle,
   readPeakLoadLabelsVisible,
 } from "../config/scheduleUiPrefs.js";
 import "./LandingPage.css";
@@ -753,74 +764,17 @@ const timelineRowEqual = (prev, next) => {
   if (prev.viewMode !== next.viewMode) return false;
   if (prev.anchorDate?.getTime?.() !== next.anchorDate?.getTime?.()) return false;
   if (prev.utilizationMode !== next.utilizationMode) return false;
+  if (prev.density !== next.density) return false;
   if (prev.gridTemplate !== next.gridTemplate) return false;
   if (prev.scheduleModel !== next.scheduleModel) return false;
   if (prev.projects !== next.projects) return false;
   if (prev.personAllocations !== next.personAllocations) return false;
   if (prev.dismissedAvailOffKeys !== next.dismissedAvailOffKeys) return false;
+  if (prev.showPeakLoadStatus !== next.showPeakLoadStatus) return false;
+  if (prev.allocationBoxStyle !== next.allocationBoxStyle) return false;
 
   return true;
 };
-
-function hexToRgba(hex, alpha) {
-  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || "");
-  if (!m) return `rgba(108, 140, 255, ${alpha})`;
-  return `rgba(${parseInt(m[1], 16)}, ${parseInt(m[2], 16)}, ${parseInt(m[3], 16)}, ${alpha})`;
-}
-
-function hexToRgbTriplet(hex) {
-  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || "");
-  if (!m) return { r: 108, g: 140, b: 255 };
-  return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
-}
-
-function clampByte(n) {
-  return Math.max(0, Math.min(255, Math.round(n)));
-}
-
-/** Linear mix toward `target` (0–255 per channel). `amount` 0–1. */
-function mixRgbHex(hex, target, amount) {
-  const { r, g, b } = hexToRgbTriplet(hex);
-  const t = Math.max(0, Math.min(1, amount));
-  const R = r + (target - r) * t;
-  const G = g + (target - g) * t;
-  const B = b + (target - b) * t;
-  return `#${clampByte(R).toString(16).padStart(2, "0")}${clampByte(G).toString(16).padStart(2, "0")}${clampByte(B).toString(16).padStart(2, "0")}`;
-}
-
-function allocationBarChromeStyles(barColor, hours, theme, { thin = false } = {}) {
-  const light = theme === "light";
-  const hnorm = Math.min(1, Math.max(0, hours) / BAR_H_NORM);
-  const sheen = light
-    ? "inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -1px 0 rgba(0,0,0,0.05)"
-    : "inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.35)";
-  const drop = light
-    ? `0 2px 10px ${hexToRgba(barColor, 0.2 + hnorm * 0.08)}`
-    : `0 2px 12px rgba(0,0,0,0.42)`;
-  // Thin bars can be as short as ~14px; a 3px border would swallow most of the fill,
-  // so scale the border down to keep the hours label legible.
-  const borderPx = thin ? 1 : 3;
-  return {
-    boxShadow: `${sheen}, ${drop}`,
-    border: `${borderPx}px solid ${barColor}`,
-  };
-}
-
-/** Softer interior wash behind text — slightly lifted toward white / mid-tones for calmer UI. */
-function allocationBarInnerWash(barColor, theme) {
-  const light = theme === "light";
-  const hi = mixRgbHex(barColor, 255, light ? 0.72 : 0.46);
-  const mid = mixRgbHex(barColor, light ? 255 : 0, light ? 0.36 : 0.28);
-  const lo = mixRgbHex(barColor, 0, light ? 0.1 : 0.34);
-  return `linear-gradient(168deg, ${hi} 0%, ${mid} 42%, ${lo} 100%)`;
-}
-
-function allocationBarBorderRadiusPx(widthPct) {
-  if (widthPct < 4) return 6;
-  if (widthPct < 9) return 8;
-  if (widthPct < 16) return 10;
-  return 12;
-}
 
 function buildWorkAllocationTitle(alloc, projectName, hoursLabel) {
   const bits = [alloc.project || projectName, hoursLabel ? `${hoursLabel}/day` : ""];
@@ -850,6 +804,7 @@ const TimelineRow = memo(function TimelineRow({
   todayDateKey,
   dismissedAvailOffKeys,
   showPeakLoadStatus,
+  allocationBoxStyle,
 }) {
   const { theme } = useAppTheme();
   const t = T[theme];
@@ -1238,7 +1193,10 @@ const TimelineRow = memo(function TimelineRow({
                 {leaveSegments.map((seg, segIdx) => {
                   const colStart = Math.max(1, Math.round(seg.lay.start) + 1);
                   const colSpan = Math.max(1, Math.round(seg.lay.span));
-                  const leaveBrPx = allocationBarBorderRadiusPx((colSpan / Math.max(1, nCols)) * 100);
+                  const leaveBrPx = allocationBarBorderRadiusPx(
+                    (colSpan / Math.max(1, nCols)) * 100,
+                    allocationBoxStyle
+                  );
                   const isDayOff = isAvailabilityDayOffAlloc(seg.a);
                   const occStart = seg?.lay?.occStart ?? seg.a.startDate;
                   const occEnd = seg?.lay?.occEnd ?? seg.a.endDate;
@@ -1363,13 +1321,16 @@ const TimelineRow = memo(function TimelineRow({
                       const { projectName, projectCode, hoursLabel } = allocationDisplay(seg.a);
                       const barColor = colorForAllocationBar(seg.a, projects);
                       const fg = contrastingTextColor(barColor);
-                      const innerWash = allocationBarInnerWash(barColor, theme);
+                      const innerWash = allocationBarInnerWash(barColor, theme, allocationBoxStyle);
 
-                      const brPx = allocationBarBorderRadiusPx(geo.widthPct);
+                      const brPx = allocationBarBorderRadiusPx(geo.widthPct, allocationBoxStyle);
                       // Every bar uses the same compact two-line layout with a
                       // consistent text style — short bars clip via overflow: hidden.
                       const compactBorder = calculatedHeight < 40;
-                      const chrome = allocationBarChromeStyles(barColor, h, theme, { thin: compactBorder });
+                      const chrome = allocationBarChromeStyles(barColor, h, theme, {
+                        thin: compactBorder,
+                        boxStyle: allocationBoxStyle,
+                      });
 
                       const repeatOn = (seg.a.repeatId ?? "none") !== "none";
                       const hasNotes = Boolean((seg.a.notes || "").trim());
@@ -1412,7 +1373,8 @@ const TimelineRow = memo(function TimelineRow({
                           type="button"
                           className={
                             "lp-block lp-block-alloc lp-block-alloc-project lp-alloc-bar" +
-                            (compactBorder ? " lp-alloc-bar--compact" : "")
+                            (compactBorder ? " lp-alloc-bar--compact" : "") +
+                            (allocationBoxStyle === "center" ? " lp-alloc-bar--layout-center" : "")
                           }
                           data-hours={h}
                           data-bar-h={calculatedHeight}
@@ -1428,41 +1390,79 @@ const TimelineRow = memo(function TimelineRow({
                           <span
                             className="lp-alloc-bar__load"
                             style={{
-                              background: `linear-gradient(to top, ${hexToRgba(barColor, theme === "light" ? 0.34 : 0.42)}, ${hexToRgba(barColor, 0)})`,
+                              background: `linear-gradient(to top, ${hexToRgba(barColor, allocationLoadFillTopAlpha(theme, allocationBoxStyle))}, ${hexToRgba(barColor, 0)})`,
                               height: `${hnorm * 100}%`,
                             }}
                             aria-hidden
                           />
-                          <span className="lp-alloc-bar__body">
-                            {/* Consistent compact layout for EVERY bar, regardless of hours.
-                                Line 1: project name (truncated). Line 2: code chip + hours + icons.
-                                Short bars (e.g. 0.5h) clip via overflow: hidden; tall bars
-                                display the full two-line block. */}
-                            <span className="lp-alloc-bar__line lp-alloc-bar__line--name">
-                              {projectName || hoursLabel}
-                            </span>
-                            <span className="lp-alloc-bar__line lp-alloc-bar__line--meta">
-                              {projectCode ? (
-                                <span
-                                  className="lp-alloc-code-chip"
-                                  style={projectCodeChipStyles(barColor, theme)}
-                                >
-                                  {projectCode}
+                          {allocationBoxStyle === "center" ? (
+                            <span className="lp-alloc-bar__body lp-alloc-bar__body--center-hours">
+                              {projectName || projectCode ? (
+                                <span className="lp-alloc-bar__line lp-alloc-bar__line--name lp-alloc-bar__line--center-subtitle">
+                                  {projectName || projectCode}
                                 </span>
                               ) : null}
-                              <span className="lp-alloc-hours">{hoursLabel}</span>
-                              {(repeatOn || hasNotes) ? (
-                                <span className="lp-alloc-bar__icons">
-                                  {repeatOn ? (
-                                    <Repeat2 size={10} strokeWidth={2.25} className="lp-alloc-bar__ic" aria-hidden />
-                                  ) : null}
-                                  {hasNotes ? (
-                                    <StickyNote size={10} strokeWidth={2.25} className="lp-alloc-bar__ic" aria-hidden />
-                                  ) : null}
-                                </span>
-                              ) : null}
+                              <span
+                                className="lp-alloc-bar__hours-hero"
+                                style={{
+                                  fontSize: `${allocationCenterHoursHeroPx(calculatedHeight)}px`,
+                                }}
+                              >
+                                {hoursLabel}
+                              </span>
+                              <span className="lp-alloc-bar__line lp-alloc-bar__line--meta lp-alloc-bar__line--center-meta">
+                                {projectName && projectCode ? (
+                                  <span
+                                    className="lp-alloc-code-chip"
+                                    style={projectCodeChipStyles(barColor, theme)}
+                                  >
+                                    {projectCode}
+                                  </span>
+                                ) : null}
+                                {repeatOn || hasNotes ? (
+                                  <span className="lp-alloc-bar__icons">
+                                    {repeatOn ? (
+                                      <Repeat2 size={10} strokeWidth={2.25} className="lp-alloc-bar__ic" aria-hidden />
+                                    ) : null}
+                                    {hasNotes ? (
+                                      <StickyNote size={10} strokeWidth={2.25} className="lp-alloc-bar__ic" aria-hidden />
+                                    ) : null}
+                                  </span>
+                                ) : null}
+                              </span>
                             </span>
-                          </span>
+                          ) : (
+                            <span className="lp-alloc-bar__body">
+                              {/* Consistent compact layout for EVERY bar, regardless of hours.
+                                  Line 1: project name (truncated). Line 2: code chip + hours + icons.
+                                  Short bars (e.g. 0.5h) clip via overflow: hidden; tall bars
+                                  display the full two-line block. */}
+                              <span className="lp-alloc-bar__line lp-alloc-bar__line--name">
+                                {projectName || hoursLabel}
+                              </span>
+                              <span className="lp-alloc-bar__line lp-alloc-bar__line--meta">
+                                {projectCode ? (
+                                  <span
+                                    className="lp-alloc-code-chip"
+                                    style={projectCodeChipStyles(barColor, theme)}
+                                  >
+                                    {projectCode}
+                                  </span>
+                                ) : null}
+                                <span className="lp-alloc-hours">{hoursLabel}</span>
+                                {repeatOn || hasNotes ? (
+                                  <span className="lp-alloc-bar__icons">
+                                    {repeatOn ? (
+                                      <Repeat2 size={10} strokeWidth={2.25} className="lp-alloc-bar__ic" aria-hidden />
+                                    ) : null}
+                                    {hasNotes ? (
+                                      <StickyNote size={10} strokeWidth={2.25} className="lp-alloc-bar__ic" aria-hidden />
+                                    ) : null}
+                                  </span>
+                                ) : null}
+                              </span>
+                            </span>
+                          )}
                         </button>
                       );
                     })}
@@ -1491,7 +1491,7 @@ const TimelineRow = memo(function TimelineRow({
               >
                 {publicHolidaySegments.map((seg) => {
                   const geo = clampedSegmentGeometry(seg.lay, nCols);
-                  const phBrPx = allocationBarBorderRadiusPx(geo.widthPct);
+                  const phBrPx = allocationBarBorderRadiusPx(geo.widthPct, allocationBoxStyle);
                   const phBarH = allocationBarHeightPx(seg.a);
                   const holidayLabel = seg.a.notes || "Public holiday";
                   const holidayHours = Math.max(0, parseFloat(seg.a.hoursPerDay) || 0);
@@ -1621,6 +1621,7 @@ export default function LandingPage() {
   const [density, setDensity] = useState("comfortable");
   const [utilizationMode, setUtilizationMode] = useState("hours");
   const [showPeakLoadStatus, setShowPeakLoadStatus] = useState(() => readPeakLoadLabelsVisible());
+  const [allocationBoxStyle, setAllocationBoxStyle] = useState(() => readAllocationBoxStyle());
 
   useEffect(() => {
     const sync = () => setShowPeakLoadStatus(readPeakLoadLabelsVisible());
@@ -1631,6 +1632,19 @@ export default function LandingPage() {
     window.addEventListener("storage", onStorage);
     return () => {
       window.removeEventListener(PEAK_LOAD_LABELS_CHANGED_EVENT, sync);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setAllocationBoxStyle(readAllocationBoxStyle());
+    window.addEventListener(ALLOCATION_BOX_STYLE_CHANGED_EVENT, sync);
+    const onStorage = (e) => {
+      if (e.key === ALLOCATION_BOX_STYLE_LS_KEY || e.key == null) sync();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(ALLOCATION_BOX_STYLE_CHANGED_EVENT, sync);
       window.removeEventListener("storage", onStorage);
     };
   }, []);
@@ -2369,6 +2383,7 @@ export default function LandingPage() {
       data-theme={theme === "light" ? "light" : "dark"}
       data-density={density}
       data-view={viewMode}
+      data-alloc-box-style={allocationBoxStyle}
     >
       <AppSideNav />
 
@@ -3035,6 +3050,7 @@ export default function LandingPage() {
                         todayDateKey={todayDateKey}
                         dismissedAvailOffKeys={dismissedAvailOffKeys}
                         showPeakLoadStatus={showPeakLoadStatus}
+                        allocationBoxStyle={allocationBoxStyle}
                       />
                     </div>
                   );

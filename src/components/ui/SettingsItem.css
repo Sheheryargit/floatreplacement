@@ -81,6 +81,19 @@
   flex-shrink: 0;
 }
 
+/* Control below label row — fills card width (e.g. multi-option pickers). */
+.float-settings-item--trail-full {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.float-settings-item--trail-full .float-settings-item-trail {
+  flex: 1 1 100%;
+  width: 100%;
+  margin-top: var(--space-3);
+  align-items: stretch;
+}
+
 .float-settings-item-chevron {
   color: var(--float-si-muted, #64748b);
   flex-shrink: 0;

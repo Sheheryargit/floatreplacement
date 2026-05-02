@@ -27,3 +27,63 @@ export function writePeakLoadLabelsVisible(visible) {
     // ignore
   }
 }
+
+/** Work allocation tiles on the schedule timeline (border, shadow, radius, wash). */
+export const ALLOCATION_BOX_STYLE_LS_KEY = "float.allocBoxStyle.v1";
+
+export const ALLOCATION_BOX_STYLE_CHANGED_EVENT = "float-alloc-box-style-change";
+
+/** @typedef {typeof ALLOCATION_BOX_STYLE_IDS[number]} AllocationBoxStyleId */
+
+export const ALLOCATION_BOX_STYLE_IDS = /** @type {const} */ ([
+  "classic",
+  "minimal",
+  "pill",
+  "outline",
+  "center",
+  "neon",
+  "glass",
+  "rail",
+]);
+
+/** Short labels for Settings (radiogroup buttons). */
+export const ALLOCATION_BOX_STYLE_LABELS = {
+  classic: "Classic",
+  minimal: "Minimal",
+  pill: "Pill",
+  outline: "Outline",
+  center: "Center hrs",
+  neon: "Neon",
+  glass: "Glass",
+  rail: "Rail",
+};
+
+/** @returns {AllocationBoxStyleId} */
+export function readAllocationBoxStyle() {
+  try {
+    if (typeof window === "undefined") return "classic";
+    const v = window.localStorage.getItem(ALLOCATION_BOX_STYLE_LS_KEY);
+    if (v == null || v === "") return "classic";
+    return ALLOCATION_BOX_STYLE_IDS.includes(/** @type {any} */ (v)) ? /** @type {AllocationBoxStyleId} */ (v) : "classic";
+  } catch {
+    return "classic";
+  }
+}
+
+/** @param {AllocationBoxStyleId | string} styleId */
+export function writeAllocationBoxStyle(styleId) {
+  const id = ALLOCATION_BOX_STYLE_IDS.includes(/** @type {any} */ (styleId))
+    ? /** @type {AllocationBoxStyleId} */ (styleId)
+    : "classic";
+  try {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(ALLOCATION_BOX_STYLE_LS_KEY, id);
+  } catch {
+    // ignore
+  }
+  try {
+    window.dispatchEvent(new CustomEvent(ALLOCATION_BOX_STYLE_CHANGED_EVENT));
+  } catch {
+    // ignore
+  }
+}
