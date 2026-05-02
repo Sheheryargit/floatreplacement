@@ -1,0 +1,78 @@
+/**
+ * Motion & surface polish — performance-first.
+ * - prefers-reduced-motion: soften / remove decorative motion
+ * - data-low-gpu="1": set via localStorage alloc8-low-gpu=1 (see index.html)
+ */
+
+/* ── Route / global (complements index.css) ───────────────── */
+@keyframes alloc8-route-shell-in {
+  from {
+    opacity: 0.88;
+    transform: translate3d(0, 5px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.alloc8-route-shell {
+  animation: alloc8-route-shell-in 0.32s var(--ease-out-ui, cubic-bezier(0.22, 1, 0.36, 1)) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alloc8-route-shell {
+    animation: none;
+  }
+}
+
+/* static-ui mode zeroes durations globally; keep explicit override for clarity */
+:root[data-static-ui="1"] .alloc8-route-shell {
+  animation: none !important;
+}
+
+/* ── Low-GPU: trim continuous / filter-heavy effects (schedule + chrome) ── */
+html[data-low-gpu="1"] .lp-person-tags .float-tag-chroma.lp-schedule-tag,
+html[data-low-gpu="1"] .lp-person-tags .lp-tag-more-pill {
+  animation: none !important;
+}
+
+html[data-low-gpu="1"] .lp-person-tags .float-tag-chroma.lp-schedule-tag::after {
+  animation: none !important;
+  opacity: 0.12;
+}
+
+html[data-low-gpu="1"] .lp-today-grid-dot::after {
+  animation: none !important;
+  opacity: 0.25;
+}
+
+html[data-low-gpu="1"] .lp-sched-row {
+  animation: none !important;
+  opacity: 1;
+}
+
+html[data-low-gpu="1"] button.lp-block.lp-block-alloc {
+  animation: none !important;
+}
+
+html[data-low-gpu="1"] .lp-leave-block--today:not(:hover) {
+  animation: none !important;
+}
+
+html[data-low-gpu="1"] .lp-person-hours-overloaded {
+  animation: none !important;
+}
+
+html[data-low-gpu="1"] .lp-overload-dot {
+  animation: none !important;
+}
+
+html[data-low-gpu="1"] .lp-sched-row-overloaded .lp-sched-person {
+  animation: none !important;
+}
+
+html[data-low-gpu="1"] .lp-sched-row-overloaded .lp-sched-timeline::before {
+  animation: none !important;
+  opacity: 0.85;
+}

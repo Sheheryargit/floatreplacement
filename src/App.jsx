@@ -84,7 +84,7 @@ function AnimatedRoutes() {
     <Suspense fallback={<RouteSkeleton />}>
       <div
         key={location.pathname}
-        className="app-route-shell"
+        className="app-route-shell alloc8-route-shell"
         style={{
           flex: 1,
           minHeight: 0,

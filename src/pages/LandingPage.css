@@ -1184,6 +1184,36 @@
     animation: none;
   }
 
+  .lp-sched-row {
+    animation: none !important;
+    opacity: 1;
+  }
+
+  .lp-today-grid-dot::after {
+    animation: none !important;
+  }
+
+  button.lp-block.lp-block-alloc {
+    animation: none !important;
+  }
+
+  .lp-person-tags .float-tag-chroma.lp-schedule-tag,
+  .lp-person-tags .lp-tag-more-pill {
+    animation: none !important;
+  }
+
+  .lp-person-tags .float-tag-chroma.lp-schedule-tag::after {
+    animation: none !important;
+    opacity: 0.16;
+  }
+
+  .lp-person-hours-overloaded,
+  .lp-overload-dot,
+  .lp-sched-row-overloaded .lp-sched-person,
+  .lp-sched-row-overloaded .lp-sched-timeline::before {
+    animation: none !important;
+  }
+
   .lp-person-row,
   .lp-grid-row,
   .lp-avatar,
@@ -2100,8 +2130,12 @@ button.lp-person-identity-hit {
     0 2px 6px rgba(0, 0, 0, 0.2),
     0 1px 2px rgba(0, 0, 0, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  transition: font-size 0.28s cubic-bezier(0.22, 1, 0.36, 1), padding 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.2s ease, transform 0.15s ease;
+  transition:
+    font-size 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    padding 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow var(--duration-emphasis, 0.28s) var(--ease-premium, cubic-bezier(0.2, 0.85, 0.15, 1)),
+    transform var(--duration-fast, 0.15s) var(--ease-premium, cubic-bezier(0.2, 0.85, 0.15, 1)),
+    filter var(--duration-normal, 0.2s) var(--ease-ui-in-out, ease-in-out);
 }
 
 .lp-block-orange {
@@ -2193,12 +2227,11 @@ button.lp-block.lp-block-alloc {
 }
 
 .lp-block-alloc:hover {
-  filter: brightness(1.06);
   box-shadow:
-    0 6px 20px rgba(0, 0, 0, 0.3),
-    0 2px 6px rgba(0, 0, 0, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  transform: translateY(-1px);
+    0 8px 24px rgba(0, 0, 0, 0.32),
+    0 2px 8px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transform: translate3d(0, -1px, 0);
 }
 
 .lp-root[data-theme="light"] .lp-block-alloc:hover {
@@ -2235,12 +2268,18 @@ button.lp-block.lp-block-alloc.lp-block-alloc-project {
 }
 
 .lp-block-alloc.lp-block-alloc-project:hover {
-  filter: saturate(1.1) brightness(1.05);
-  transform: translateY(-2px) translateZ(0);
+  transform: translate3d(0, -2px, 0) scale(1.01);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.28),
+    0 2px 8px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .lp-root[data-theme="light"] .lp-block-alloc.lp-block-alloc-project:hover {
-  filter: saturate(1.08) brightness(1.03);
+  box-shadow:
+    0 10px 28px rgba(15, 23, 42, 0.12),
+    0 2px 8px rgba(15, 23, 42, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .lp-block-alloc:focus-visible {
@@ -2395,11 +2434,10 @@ button.lp-block.lp-block-alloc.lp-alloc-bar {
 
 button.lp-block.lp-block-alloc.lp-block-alloc-project.lp-alloc-bar:hover {
   z-index: 126 !important;
-  filter: saturate(1.1) brightness(1.05);
 }
 
 .lp-root[data-theme="light"] button.lp-block.lp-block-alloc.lp-block-alloc-project.lp-alloc-bar:hover {
-  filter: saturate(1.08) brightness(1.03);
+  transform: translate3d(0, -2px, 0) scale(1.01);
 }
 
 .lp-alloc-bar.lp-block-alloc:focus-visible {

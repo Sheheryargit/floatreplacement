@@ -1,18 +1,226 @@
 /* Alloc8 — mission-grade sign-in: precision UI, interactive depth, reduced-motion safe */
 
 .login-page {
-  --mx: 50%;
-  --my: 42%;
+  --login-deloitte-green: #86bc25;
+  --login-deloitte-glow: rgba(134, 188, 37, 0.45);
   position: fixed;
   inset: 0;
   z-index: 300;
   display: flex;
   align-items: stretch;
   justify-content: center;
-  padding: clamp(16px, 4vw, 48px);
-  padding-bottom: clamp(48px, 8vh, 72px);
+  /* Clear fixed Deloitte plate + EaaS strip (taller logo needs more top air) */
+  padding: clamp(92px, 11vw, 118px) clamp(16px, 4vw, 48px) clamp(48px, 8vh, 72px);
   overflow: auto;
   font-family: var(--font-body);
+}
+
+/* Successful password: hide full login chrome quickly — avoids odd mid-button “authenticating” state */
+.login-page--auth-exit {
+  opacity: 0;
+  transform: scale(0.988);
+  filter: blur(12px);
+  pointer-events: none;
+  transition:
+    opacity 0.42s cubic-bezier(0.25, 0.1, 0.25, 1),
+    transform 0.42s cubic-bezier(0.25, 0.1, 0.25, 1),
+    filter 0.38s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-page--auth-exit {
+    filter: none;
+    transform: none;
+    transition: opacity 0.28s ease;
+  }
+}
+
+.login-page-atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.login-page-orb--deloitte {
+  width: min(320px, 48vw);
+  height: min(320px, 48vw);
+  bottom: 10%;
+  left: 4%;
+  background: radial-gradient(
+    circle at 40% 40%,
+    color-mix(in srgb, var(--login-deloitte-green) 42%, transparent) 0%,
+    transparent 68%
+  );
+  opacity: 0.32;
+  filter: blur(88px);
+}
+
+/* Deloitte — larger wordmark plate; top/shell padding keeps hero from overlapping */
+.login-page-corner-deloitte {
+  position: fixed;
+  top: max(22px, calc(env(safe-area-inset-top, 0px) + 14px));
+  left: max(22px, calc(env(safe-area-inset-left, 0px) + 14px));
+  z-index: 4;
+  pointer-events: none;
+}
+
+.login-page-corner-deloitte-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  padding: 11px 22px 12px;
+  width: fit-content;
+  max-width: min(300px, 58vw);
+  border-radius: 13px;
+  background: #ffffff;
+  border: 1px solid color-mix(in srgb, var(--login-deloitte-green) 45%, #e2e8f0);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.88) inset,
+    0 12px 40px rgba(0, 0, 0, 0.32),
+    0 0 40px color-mix(in srgb, var(--login-deloitte-green) 14%, transparent);
+}
+
+.login-page[data-theme="dark"] .login-page-corner-deloitte-inner {
+  background: #fafafa;
+  border-color: color-mix(in srgb, var(--login-deloitte-green) 38%, #cbd5e1);
+}
+
+.login-page-corner-deloitte-logo {
+  display: block;
+  height: clamp(30px, 5.2vw, 44px);
+  width: auto;
+  max-width: min(260px, 54vw);
+  object-fit: contain;
+}
+
+.login-page[data-theme="light"] .login-page-corner-deloitte-inner {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.95) inset,
+    0 12px 32px rgba(15, 23, 42, 0.1),
+    0 0 36px color-mix(in srgb, var(--login-deloitte-green) 12%, transparent);
+}
+
+/* EaaS engineering credit — top-right, subtle live blink */
+.login-page-corner-eaas {
+  position: fixed;
+  top: max(22px, calc(env(safe-area-inset-top, 0px) + 14px));
+  right: max(22px, calc(env(safe-area-inset-right, 0px) + 14px));
+  z-index: 4;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: min(340px, 42vw);
+  padding: 10px 14px 12px;
+  border-radius: 12px;
+  pointer-events: none;
+  text-align: right;
+  background: color-mix(in srgb, var(--color-surface) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 65%, transparent);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+}
+
+.login-page[data-theme="light"] .login-page-corner-eaas {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: color-mix(in srgb, var(--color-border) 80%, #fff);
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08);
+}
+
+.login-page-corner-eaas-pulse {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--color-brand-light);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--color-brand) 70%, transparent);
+  animation: loginEaasPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes loginEaasPulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+}
+
+.login-page-corner-eaas-text {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-muted) 75%, var(--color-text));
+  animation: loginEaasTextSoft 2.4s ease-in-out infinite;
+}
+
+@keyframes loginEaasTextSoft {
+  0%,
+  100% {
+    opacity: 0.88;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.login-page-hero-badge--futurist {
+  border-color: color-mix(in srgb, var(--login-deloitte-green) 42%, var(--color-brand) 40%);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-brand) 16%, transparent),
+    color-mix(in srgb, var(--login-deloitte-green) 14%, transparent)
+  );
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 0 36px color-mix(in srgb, var(--login-deloitte-green) 18%, transparent),
+    0 0 48px color-mix(in srgb, var(--color-brand) 12%, transparent);
+}
+
+.login-page-hero-badge--futurist .login-page-hero-badge-pulse {
+  background: var(--login-deloitte-green);
+  box-shadow: 0 0 14px var(--login-deloitte-glow);
+}
+
+.login-page-hero-title-line--grad {
+  margin-top: 0.06em;
+  background: linear-gradient(
+    105deg,
+    var(--color-text) 0%,
+    var(--login-deloitte-green) 26%,
+    var(--color-brand-light) 52%,
+    color-mix(in srgb, var(--color-accent) 70%, var(--color-brand-light)) 78%,
+    var(--color-text) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: loginShimmerText 10s ease-in-out infinite;
+}
+
+.login-page-hero-trust-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--login-deloitte-green), var(--color-brand-light));
+  box-shadow:
+    0 0 10px var(--login-deloitte-glow),
+    0 0 18px color-mix(in srgb, var(--color-brand) 45%, transparent);
+}
+
+.login-page-hud-seg--ai {
+  color: var(--login-deloitte-green);
+  text-shadow: 0 0 18px var(--login-deloitte-glow);
 }
 
 .login-page-aurora {
@@ -82,25 +290,12 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 120% 80% at var(--mx) var(--my), rgba(0, 136, 255, 0.14) 0%, transparent 42%),
+    radial-gradient(ellipse 120% 80% at 50% 38%, rgba(0, 136, 255, 0.14) 0%, transparent 42%),
     radial-gradient(ellipse 90% 60% at 8% 12%, rgba(0, 136, 255, 0.1) 0%, transparent 45%),
     radial-gradient(ellipse 70% 50% at 92% 18%, rgba(91, 141, 239, 0.09) 0%, transparent 48%),
     radial-gradient(ellipse 60% 45% at 40% 100%, rgba(124, 106, 247, 0.07) 0%, transparent 42%),
     linear-gradient(168deg, #050608 0%, #0c0e14 38%, #080a0f 100%);
   transition: background 0.2s ease;
-}
-
-.login-page-spotlight {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(
-    circle 55vmin at var(--mx) var(--my),
-    rgba(0, 229, 255, 0.09) 0%,
-    rgba(124, 106, 247, 0.03) 35%,
-    transparent 62%
-  );
-  mix-blend-mode: screen;
 }
 
 .login-page-vignette {
@@ -203,6 +398,182 @@
   max-width: 540px;
 }
 
+.login-page-feature-loop-wrap {
+  margin-bottom: 28px;
+}
+
+.login-page-feature-loop-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-muted) 78%, var(--color-brand-light));
+}
+
+.login-page-feature-loop-label-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  margin-right: 2px;
+  background: linear-gradient(180deg, var(--color-brand-light), var(--login-deloitte-green));
+  border-radius: 1px;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--color-brand) 50%, transparent);
+  animation: loginCursorBlink 1.1s step-end infinite;
+}
+
+@keyframes loginCursorBlink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0.2;
+  }
+}
+
+.login-page-feature-loop {
+  position: relative;
+}
+
+.login-page-feature-loop-frame {
+  position: relative;
+  min-height: 124px;
+  padding: 18px 20px 20px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--color-brand) 22%, transparent);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--color-brand) 8%, transparent),
+    color-mix(in srgb, #0a0c14 92%, transparent) 55%
+  );
+  box-shadow:
+    0 0 0 1px rgba(0, 229, 255, 0.06) inset,
+    0 20px 48px rgba(0, 0, 0, 0.35),
+    0 0 40px color-mix(in srgb, var(--color-brand) 6%, transparent);
+  overflow: hidden;
+}
+
+.login-page-feature-loop-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    color-mix(in srgb, var(--color-brand-light) 12%, transparent) 48%,
+    transparent 62%
+  );
+  opacity: 0.35;
+}
+
+.login-page-feature-loop-slide {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.login-page-feature-loop-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  color: var(--color-brand-light);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--color-brand) 22%, transparent),
+    color-mix(in srgb, var(--login-deloitte-green) 10%, transparent)
+  );
+  border: 1px solid color-mix(in srgb, var(--color-brand) 32%, transparent);
+  box-shadow: 0 0 28px color-mix(in srgb, var(--color-brand) 14%, transparent);
+}
+
+.login-page-feature-loop-title {
+  margin: 4px 0 0;
+  font-size: clamp(0.92rem, 2.8vw, 1.02rem);
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.login-page-feature-loop-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.login-page-feature-loop-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-muted) 55%, transparent);
+  transition:
+    background 0.35s ease,
+    transform 0.35s ease,
+    box-shadow 0.35s ease;
+}
+
+.login-page-feature-loop-dot.is-active {
+  background: var(--color-brand-light);
+  transform: scale(1.15);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--color-brand) 55%, transparent);
+}
+
+.login-page-feature-loop--static {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.login-page-feature-loop-static-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  background: color-mix(in srgb, var(--color-brand) 4%, transparent);
+}
+
+.login-page-feature-loop-static-item .login-page-feature-loop-title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 550;
+}
+
+.login-page[data-theme="light"] .login-page-feature-loop-frame {
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--color-brand) 6%, transparent),
+    rgba(255, 255, 255, 0.75) 50%
+  );
+  border-color: color-mix(in srgb, var(--color-brand) 18%, var(--color-border));
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.9) inset,
+    0 16px 40px rgba(15, 23, 42, 0.08);
+}
+
+.login-page[data-theme="light"] .login-page-feature-loop-label {
+  color: color-mix(in srgb, var(--color-muted) 85%, var(--color-text));
+}
+
 .login-page-hero-badge-wrap {
   margin-bottom: 22px;
 }
@@ -272,22 +643,6 @@
   display: block;
 }
 
-.login-page-hero-title-line--grad {
-  margin-top: 0.06em;
-  background: linear-gradient(
-    105deg,
-    var(--color-text) 0%,
-    var(--color-brand-light) 38%,
-    color-mix(in srgb, var(--color-accent) 75%, var(--color-brand-light)) 72%,
-    var(--color-text) 100%
-  );
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: loginShimmerText 10s ease-in-out infinite;
-}
-
 @keyframes loginShimmerText {
   0%,
   100% {
@@ -337,92 +692,101 @@
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
 }
 
+.login-page-submit-wrap {
+  width: 100%;
+  position: relative;
+  overflow: visible;
+}
+
 .login-page-submit {
   position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
   width: 100%;
-  height: 48px;
+  min-height: 54px;
+  padding: 10px 18px;
+  touch-action: manipulation;
   font-size: 14px;
   font-weight: 700;
-  line-height: 1;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
   color: #fff;
-  background: linear-gradient(170deg, color-mix(in srgb, var(--color-brand) 92%, #fff), var(--color-brand));
-  border: 1px solid color-mix(in srgb, var(--color-brand-light) 40%, transparent);
-  border-radius: var(--radius-input);
+  background: linear-gradient(
+    168deg,
+    color-mix(in srgb, var(--color-brand-light) 22%, var(--color-brand)) 0%,
+    var(--color-brand) 48%,
+    color-mix(in srgb, var(--color-brand) 88%, #020617) 100%
+  );
+  border: 1px solid color-mix(in srgb, var(--color-brand-light) 48%, transparent);
+  border-radius: 12px;
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.2),
-    0 0 0 1px rgba(255, 255, 255, 0.12) inset,
-    0 4px 16px color-mix(in srgb, var(--color-brand) 30%, transparent);
+    0 1px 2px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.14) inset,
+    0 6px 22px color-mix(in srgb, var(--color-brand) 38%, transparent);
   cursor: pointer;
   overflow: hidden;
   transition:
     box-shadow 0.35s ease,
     border-color 0.2s ease,
-    background 0.2s ease;
+    background 0.2s ease,
+    transform 0.2s ease;
 }
 
-.login-page-submit--busy {
-  background: linear-gradient(135deg, rgba(0, 136, 255, 0.1), rgba(0, 229, 255, 0.25));
-  border-color: rgba(0, 229, 255, 0.5);
-  box-shadow: 0 0 30px rgba(0, 229, 255, 0.35);
-  cursor: default;
-}
-
-.login-page-submit-busy-scan {
-  font-family: var(--font-mono);
-  letter-spacing: 0.18em;
-  font-size: 13px;
-  font-weight: 800;
-  color: #4dadff;
-  text-shadow: 0 0 12px rgba(0, 229, 255, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  width: 100%;
+.login-page-submit-hold-track {
   position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 0 0 11px 11px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.22);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.login-page-submit-hold-track::after {
+  content: "";
+  position: absolute;
+  left: 0;
   top: 0;
-  left: 0;
-  opacity: 0;
-  animation: 
-    scanFadeIn 0.5s ease forwards 0.4s, 
-    textPulseScan 1s infinite alternate 0.9s;
-}
-
-.login-page-scanner-line {
-  position: absolute;
-  top: -10px;
-  left: 0;
+  bottom: 0;
   width: 100%;
-  height: 2px;
-  background: #ffffff;
-  box-shadow: 0 0 12px 3px #4dadff;
-  animation: laserScan 1.6s ease-in-out infinite;
-  z-index: 10;
+  transform-origin: left center;
+  transform: scaleX(var(--hold-p, 0));
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-brand-light) 70%, #fff),
+    var(--color-brand-light)
+  );
+  transition: transform 0.05s linear;
 }
 
-@keyframes laserScan {
-  0% { transform: translateY(0); opacity: 0; }
-  15% { opacity: 1; }
-  85% { opacity: 1; }
-  100% { transform: translateY(60px); opacity: 0; }
+.login-page-submit--holding {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.14) inset,
+    0 6px 22px color-mix(in srgb, var(--color-brand) 38%, transparent),
+    0 0 24px color-mix(in srgb, var(--color-brand) 25%, transparent);
 }
 
-@keyframes textPulseScan {
-  from { filter: brightness(1); }
-  to { filter: brightness(1.3); }
+.login-page-submit:hover:not(:disabled) {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.18) inset,
+    0 8px 28px color-mix(in srgb, var(--color-brand) 48%, transparent);
 }
 
-@keyframes scanFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.login-page-button-text {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
 }
 
 .login-page-submit-inner {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -438,21 +802,6 @@
 
 .login-page-submit:hover:not(:disabled) .login-page-arrow {
   transform: translateX(6px);
-}
-
-.login-page-submit-inner.is-exiting .login-page-button-text {
-  color: transparent;
-  transition: color 0.4s ease;
-}
-
-.login-page-submit-inner.is-exiting .login-page-arrow {
-  animation: flyArrow 1.5s cubic-bezier(0.32, 0, 0.67, 0) forwards;
-}
-
-@keyframes flyArrow {
-  0% { transform: translateX(6px); opacity: 1; color: #fff; filter: drop-shadow(0 0 0 transparent); }
-  80% { transform: translateX(200px); opacity: 1; color: #4dadff; filter: drop-shadow(0 0 12px #4dadff); }
-  100% { transform: translateX(300px); opacity: 0; color: #4dadff; filter: drop-shadow(0 0 20px #4dadff); }
 }
 
 .login-page-hero-item-icon {
@@ -514,15 +863,6 @@
 .login-page-hero-trust-text {
   font-weight: 500;
   letter-spacing: 0.06em;
-}
-
-.login-page-hero-trust-dot {
-  flex-shrink: 0;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color-success);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--color-success) 60%, transparent);
 }
 
 /* Card stack (2D only — 3D tilt removed to avoid GPU compositor crashes in Brave/Chromium). */
@@ -615,96 +955,335 @@
 .login-page-card {
   position: relative;
   width: 100%;
-  border-radius: 16px;
+  border-radius: 14px;
   /* Solid panel avoids backdrop-filter + preserve-3d compositing (GPU crashes in some Chromium/Brave builds). */
-  background: rgba(18, 21, 31, 0.94);
-  border: 1px solid color-mix(in srgb, var(--color-border) 70%, rgba(255, 255, 255, 0.06));
+  background: rgba(12, 14, 22, 0.96);
+  border: 1px solid color-mix(in srgb, var(--color-brand) 28%, var(--color-border));
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
-    0 48px 120px rgba(0, 0, 0, 0.55),
-    0 0 100px color-mix(in srgb, var(--color-brand) 6%, transparent);
+    0 0 0 1px rgba(0, 229, 255, 0.08) inset,
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 48px 120px rgba(0, 0, 0, 0.58),
+    0 0 80px color-mix(in srgb, var(--color-brand) 10%, transparent),
+    0 0 1px rgba(0, 229, 255, 0.25);
   overflow: hidden;
 }
 
 .login-page-card-inner {
   position: relative;
   z-index: 3;
-  padding: 42px 38px 34px;
+  padding: 44px 40px 36px;
   pointer-events: auto !important;
 }
 
+.login-page-card-header-accent {
+  position: absolute;
+  top: 0;
+  left: 40px;
+  right: 40px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--color-brand) 55%, transparent) 20%,
+    color-mix(in srgb, var(--login-deloitte-green) 45%, transparent) 50%,
+    color-mix(in srgb, var(--color-brand-light) 50%, transparent) 80%,
+    transparent
+  );
+  opacity: 0.9;
+}
+
 .login-page-card-kicker {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--color-muted) 95%, var(--color-text));
+  color: color-mix(in srgb, var(--color-brand-light) 42%, var(--color-muted));
 }
 
 .login-page-card-title {
-  margin: 0 0 10px;
+  margin: 0 0 12px;
   font-family: var(--font-display);
-  font-size: 1.55rem;
+  font-size: clamp(1.5rem, 4vw, 1.72rem);
   font-weight: 700;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.038em;
+  line-height: 1.12;
   color: var(--color-text);
 }
 
 .login-page-card-sub {
-  margin: 0 0 26px;
-  font-size: 0.9rem;
-  line-height: 1.55;
-  color: color-mix(in srgb, var(--color-muted) 96%, var(--color-text));
+  margin: 0 0 28px;
+  font-size: 0.91rem;
+  line-height: 1.58;
+  letter-spacing: -0.012em;
+  color: color-mix(in srgb, var(--color-muted) 94%, var(--color-text));
 }
 
 .login-page-sso {
   margin-bottom: 20px;
 }
 
-.login-google-mark {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
+.login-page-sso-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
 }
 
-.login-page-google {
+.login-page-sso-btn {
+  position: relative;
   display: flex;
-  width: 100%;
+  flex: 1 1 0;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 13px 20px;
-  border-radius: 11px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 0.93rem;
-  font-weight: 600;
+  gap: 0;
+  min-width: 0;
+  min-height: 48px;
+  max-height: 52px;
+  padding: 10px 8px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  color: #fff;
   font-family: var(--font-body);
-  letter-spacing: 0.01em;
-  cursor: not-allowed;
-  color: #1a1a1a;
-  background: linear-gradient(180deg, #ffffff 0%, #f2f2f2 100%);
+  overflow: hidden;
+  isolation: isolate;
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.08),
-    0 0 0 1px rgba(255, 255, 255, 0.5) inset;
-  opacity: 0.78;
+    0 0 0 1px rgba(255, 255, 255, 0.12) inset,
+    0 10px 28px rgba(0, 0, 0, 0.35);
   transition:
-    opacity 0.25s ease,
-    transform 0.25s ease;
+    box-shadow 0.3s ease,
+    filter 0.25s ease;
 }
 
-.login-page-google:disabled {
+.login-page-sso-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.35);
+}
+
+.login-page-sso-btn-glow {
+  position: absolute;
+  inset: -40%;
+  border-radius: 50%;
+  opacity: 0.35;
+  filter: blur(28px);
   pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.5), transparent 55%);
 }
 
-.login-page-sso-note {
-  margin: 12px 0 0;
-  font-size: 11px;
-  line-height: 1.45;
-  text-align: center;
-  letter-spacing: 0.02em;
-  color: color-mix(in srgb, var(--color-muted) 96%, var(--color-text));
+.login-page-sso-btn .login-page-sso-brand-svg {
+  position: relative;
+  z-index: 1;
+  width: min(26px, 5.5vw);
+  height: min(26px, 5.5vw);
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.35));
+}
+
+.login-page-sso-btn .login-page-sso-brand-svg--slack-official,
+.login-page-sso-btn .login-page-sso-brand-svg--on-brand {
+  filter: none;
+}
+
+.login-page-sso-btn--google {
+  background: linear-gradient(145deg, #4a5568 0%, #1a1d24 55%, #0f1118 100%);
+}
+
+/* Atlassian Jira — brand blue #0052CC (atlassian.design), white glyph */
+.login-page-sso-btn--jira {
+  background: linear-gradient(155deg, #003d99 0%, #0052cc 48%, #0747a6 100%);
+}
+
+/* Microsoft Outlook — product blue #0078D4 (Microsoft 365 / Fluent), white glyph */
+.login-page-sso-btn--outlook {
+  background: linear-gradient(155deg, #004578 0%, #0078d4 50%, #005a9e 100%);
+}
+
+/* Slack — full-color mark on white/neutral (Slack brand guidelines: color logo on white) */
+.login-page-sso-btn--slack {
+  background: linear-gradient(180deg, #ffffff 0%, #ececf1 100%);
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.1) inset,
+    0 0 0 1px rgba(255, 255, 255, 0.55) inset,
+    0 8px 22px rgba(0, 0, 0, 0.28);
+}
+
+.login-page-sso-btn--slack .login-page-sso-btn-glow {
+  opacity: 0.18;
+}
+
+/* Full-screen welcome after triple-click SSO (above login chrome) */
+.login-page--welcome .login-page-shell,
+.login-page--welcome .login-page-corner-deloitte,
+.login-page--welcome .login-page-corner-eaas,
+.login-page--welcome .login-page-attribution,
+.login-page--welcome .login-page-hud {
+  pointer-events: none;
+  filter: saturate(0.65) brightness(0.55);
+}
+
+.login-welcome-root {
+  position: fixed;
+  inset: 0;
+  z-index: 360;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  pointer-events: auto;
+  background: rgba(2, 4, 12, 0.72);
+}
+
+.login-page[data-theme="light"] .login-welcome-root {
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.login-welcome-aurora {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 30%, color-mix(in srgb, var(--color-brand) 35%, transparent), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 85% 20%, color-mix(in srgb, var(--login-deloitte-green) 28%, transparent), transparent 50%),
+    radial-gradient(ellipse 60% 45% at 50% 100%, rgba(124, 106, 247, 0.2), transparent 45%);
+  opacity: 0.85;
+  animation: loginWelcomeAurora 4s ease-in-out infinite;
+}
+
+@keyframes loginWelcomeAurora {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.03);
+  }
+}
+
+.login-welcome-floaties {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.login-welcome-floaty {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  user-select: none;
+  line-height: 1;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+}
+
+.login-welcome-card {
+  position: relative;
+  z-index: 2;
+  width: min(440px, 100%);
+  padding: 36px 32px 34px;
+  border-radius: 20px;
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--color-surface) 92%, #0a0c12) 0%,
+    rgba(12, 14, 22, 0.94) 100%
+  );
+  border: 1.5px solid color-mix(in srgb, var(--color-brand) 42%, var(--color-border));
+  box-shadow:
+    0 0 0 1px rgba(0, 229, 255, 0.1) inset,
+    0 32px 80px rgba(0, 0, 0, 0.55),
+    0 0 60px color-mix(in srgb, var(--color-brand) 18%, transparent);
+}
+
+.login-page[data-theme="light"] .login-welcome-card {
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+  border-color: color-mix(in srgb, var(--color-brand) 35%, #cbd5e1);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 1) inset,
+    0 28px 64px rgba(15, 23, 42, 0.16),
+    0 0 48px color-mix(in srgb, var(--color-brand) 14%, transparent);
+}
+
+.login-welcome-kicker {
+  margin: 0 0 10px;
   font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-brand-light) 55%, var(--color-muted));
+}
+
+.login-welcome-title {
+  margin: 0 0 12px;
+  font-family: var(--font-display);
+  font-size: clamp(1.65rem, 4.5vw, 2.1rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  color: var(--color-text);
+}
+
+.login-welcome-sub {
+  margin: 0 0 16px;
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--login-deloitte-green) 75%, var(--color-text));
+}
+
+.login-welcome-lede {
+  margin: 0 0 22px;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--color-muted) 90%, var(--color-text));
+}
+
+.login-welcome-em {
+  font-style: italic;
+  color: color-mix(in srgb, var(--color-brand-light) 70%, var(--color-text));
+}
+
+.login-welcome-pulse-row {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.login-welcome-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-brand-light);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--color-brand) 60%, transparent);
+  animation: loginWelcomePulse 0.9s ease-in-out infinite;
+}
+
+.login-welcome-pulse--delay {
+  animation-delay: 0.15s;
+}
+
+.login-welcome-pulse--delay2 {
+  animation-delay: 0.3s;
+}
+
+@keyframes loginWelcomePulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
 }
 
 .login-page-divider {
@@ -758,12 +1337,12 @@
 
 .login-page-pwd-label {
   display: block;
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   font-size: 11px;
-  font-weight: 650;
-  letter-spacing: 0.08em;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--color-muted) 92%, var(--color-text));
+  color: color-mix(in srgb, var(--color-muted) 88%, var(--color-text));
 }
 
 .login-page-field-wrapper {
@@ -1094,7 +1673,7 @@
 /* Light theme */
 .login-page[data-theme="light"] .login-page-bg {
   background:
-    radial-gradient(ellipse 120% 80% at var(--mx) var(--my), rgba(0, 136, 255, 0.1) 0%, transparent 42%),
+    radial-gradient(ellipse 120% 80% at 50% 36%, rgba(0, 136, 255, 0.1) 0%, transparent 42%),
     radial-gradient(ellipse 90% 55% at 100% 12%, rgba(124, 106, 247, 0.06) 0%, transparent 48%),
     linear-gradient(168deg, #eef2f8 0%, #f7f9fc 45%, #f0f3f9 100%);
 }
@@ -1102,6 +1681,10 @@
 .login-page[data-theme="light"] .login-page-aurora {
   opacity: 0.45;
   mix-blend-mode: multiply;
+}
+
+.login-page[data-theme="light"] .login-page-orb--deloitte {
+  opacity: 0.18;
 }
 
 .login-page[data-theme="light"] .login-page-vignette {
@@ -1116,21 +1699,29 @@
 }
 
 .login-page[data-theme="light"] .login-page-card {
-  background: rgba(255, 255, 255, 0.82);
-  border-color: color-mix(in srgb, var(--color-border) 85%, #fff);
+  background: rgba(255, 255, 255, 0.9);
+  border-color: color-mix(in srgb, var(--color-brand) 22%, var(--color-border));
   box-shadow:
+    0 0 0 1px rgba(0, 136, 255, 0.06) inset,
     0 0 0 1px rgba(255, 255, 255, 0.95) inset,
     0 36px 72px rgba(15, 23, 42, 0.1),
-    0 0 80px rgba(0, 136, 255, 0.05);
+    0 0 80px rgba(0, 136, 255, 0.06);
 }
 
 .login-page[data-theme="light"] .login-page-card-ring {
   opacity: 0.35;
 }
 
-.login-page[data-theme="light"] .login-page-google {
-  border-color: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+.login-page[data-theme="light"] .login-page-sso-btn {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.2) inset,
+    0 10px 28px rgba(15, 23, 42, 0.12);
+}
+
+.login-page[data-theme="light"] .login-page-sso-btn--slack {
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.1) inset,
+    0 8px 22px rgba(15, 23, 42, 0.1);
 }
 
 .login-page[data-theme="light"] .login-page-input {
@@ -1152,15 +1743,73 @@
   color: color-mix(in srgb, var(--color-muted) 90%, var(--color-text));
 }
 
+/* Optional: localStorage alloc8-low-gpu=1 — trims ambient motion (see index.html) */
+html[data-low-gpu="1"] .login-page-aurora,
+html[data-low-gpu="1"] .login-page-scanline,
+html[data-low-gpu="1"] .login-page-particle,
+html[data-low-gpu="1"] .login-page-card-ring,
+html[data-low-gpu="1"] .login-page-corner-eaas-pulse,
+html[data-low-gpu="1"] .login-page-corner-eaas-text {
+  animation: none !important;
+}
+
+html[data-low-gpu="1"] .login-welcome-aurora,
+html[data-low-gpu="1"] .login-welcome-pulse {
+  animation: none !important;
+}
+
+html[data-low-gpu="1"] .login-page-submit-hold-track::after {
+  transition: none !important;
+}
+
+html[data-low-gpu="1"] .login-page-aurora {
+  opacity: 0.55;
+  transform: none;
+}
+
+html[data-low-gpu="1"] .login-page-particle {
+  opacity: 0.12 !important;
+  transform: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .login-page-scanline,
   .login-page-aurora,
+  .login-page-particle,
   .login-page-card-sheen,
   .login-page-card-ring,
   .login-page-hero-badge-pulse,
   .login-page-hero-title-line--grad,
   .login-page-hud-blink,
-  .login-page-submit-dots {
+  .login-page-submit-dots,
+  .login-page-feature-loop-label-cursor {
+    animation: none !important;
+  }
+
+  .login-page-feature-loop-label-cursor {
+    opacity: 1;
+  }
+
+  .login-page-corner-eaas-pulse,
+  .login-page-corner-eaas-text {
+    animation: none !important;
+  }
+
+  .login-page-corner-eaas-text {
+    opacity: 1;
+  }
+
+  .login-page-corner-eaas-pulse {
+    opacity: 1;
+    transform: none;
+  }
+
+  .login-page-submit-hold-track {
+    display: none;
+  }
+
+  .login-welcome-aurora,
+  .login-welcome-pulse {
     animation: none !important;
   }
 
@@ -1209,11 +1858,8 @@
     margin-right: auto;
   }
 
-  .login-page-hero-list {
-    text-align: left;
-    max-width: 420px;
-    margin-left: auto;
-    margin-right: auto;
+  .login-page-feature-loop-label {
+    justify-content: center;
   }
 
   .login-page-hero-trust {
@@ -1234,5 +1880,31 @@
 
   .login-page-hero-title {
     font-size: 1.75rem;
+  }
+
+  .login-page-corner-deloitte-inner {
+    padding: 9px 16px 10px;
+    max-width: min(72vw, 280px);
+  }
+
+  .login-page-corner-deloitte-logo {
+    height: clamp(26px, 10vw, 38px);
+    max-width: 100%;
+  }
+
+  .login-page-corner-eaas {
+    max-width: min(calc(100% - 20px), 280px);
+    padding: 8px 10px 10px;
+  }
+
+  .login-page-corner-eaas-text {
+    font-size: 8px;
+    letter-spacing: 0.08em;
+  }
+}
+
+@media (max-width: 640px) {
+  .login-page-corner-eaas {
+    max-width: min(300px, calc(100vw - 120px));
   }
 }

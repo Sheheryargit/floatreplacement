@@ -9,6 +9,7 @@
       } catch (e) {
         /* ignore */
       }
+      /* Softer motion / fewer layers: localStorage.setItem('alloc8-low-gpu','1'); location.reload() */
       /* Default: static lightweight UI. Re-enable motion: localStorage.setItem('alloc8-static-ui','0'); location.reload() */
       try {
         if (localStorage.getItem("alloc8-static-ui") === "0") {

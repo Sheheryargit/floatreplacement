@@ -9,6 +9,7 @@ import {
 } from "react";
 
 const STORAGE_KEY = "float-replacement-theme";
+const PALETTE_STORAGE_KEY = "alloc8-palette";
 
 const ThemeContext = createContext(null);
 
@@ -33,19 +34,38 @@ function resolveTheme(preference) {
   return preference;
 }
 
-function syncThemeDom(resolved) {
+/** @returns {"default" | "studio"} */
+function readStoredPalette() {
+  try {
+    const s = localStorage.getItem(PALETTE_STORAGE_KEY);
+    if (s === "studio") return "studio";
+  } catch {
+    /* ignore */
+  }
+  return "default";
+}
+
+function syncAppearanceDom(resolvedTheme, palette) {
   if (typeof document === "undefined") return;
-  document.documentElement.dataset.theme = resolved;
-  document.documentElement.removeAttribute("data-palette");
-  document.documentElement.style.colorScheme = resolved === "dark" ? "dark" : "light";
+  const el = document.documentElement;
+  el.dataset.theme = resolvedTheme;
+  if (palette === "studio") {
+    el.dataset.palette = "studio";
+  } else {
+    el.removeAttribute("data-palette");
+  }
+  el.style.colorScheme = resolvedTheme === "dark" ? "dark" : "light";
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {
-    meta.setAttribute("content", resolved === "dark" ? "#0F1117" : "#F4F6FA");
+    const darkBg = palette === "studio" ? "#07080c" : "#0F1117";
+    const lightBg = palette === "studio" ? "#fafafa" : "#F4F6FA";
+    meta.setAttribute("content", resolvedTheme === "dark" ? darkBg : lightBg);
   }
 }
 
 export function ThemeProvider({ children }) {
   const [themePreference, setThemePreferenceState] = useState(() => readStoredPreference());
+  const [palettePreference, setPalettePreferenceState] = useState(() => readStoredPalette());
 
   const resolvedTheme = useMemo(
     () => resolveTheme(themePreference),
@@ -53,8 +73,8 @@ export function ThemeProvider({ children }) {
   );
 
   useLayoutEffect(() => {
-    syncThemeDom(resolvedTheme);
-  }, [resolvedTheme]);
+    syncAppearanceDom(resolvedTheme, palettePreference);
+  }, [resolvedTheme, palettePreference]);
 
   useEffect(() => {
     try {
@@ -65,15 +85,26 @@ export function ThemeProvider({ children }) {
   }, [themePreference]);
 
   useEffect(() => {
+    try {
+      localStorage.setItem(
+        PALETTE_STORAGE_KEY,
+        palettePreference === "studio" ? "studio" : "default"
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [palettePreference]);
+
+  useEffect(() => {
     if (themePreference !== "system") return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
-      syncThemeDom(getSystemTheme());
+      syncAppearanceDom(getSystemTheme(), palettePreference);
     };
     mq.addEventListener("change", onChange);
-    syncThemeDom(resolveTheme("system"));
+    syncAppearanceDom(resolveTheme("system"), palettePreference);
     return () => mq.removeEventListener("change", onChange);
-  }, [themePreference]);
+  }, [themePreference, palettePreference]);
 
   const setThemePreference = useCallback((next) => {
     setThemePreferenceState((prev) =>
@@ -89,6 +120,13 @@ export function ThemeProvider({ children }) {
     });
   }, []);
 
+  const setPalettePreference = useCallback((next) => {
+    setPalettePreferenceState((prev) => {
+      const resolved = typeof next === "function" ? next(prev) : next;
+      return resolved === "studio" ? "studio" : "default";
+    });
+  }, []);
+
   const value = useMemo(
     () => ({
       /** Resolved appearance: "dark" | "light" */
@@ -96,8 +134,18 @@ export function ThemeProvider({ children }) {
       themePreference,
       setThemePreference,
       toggleTheme,
+      /** Visual preset: "default" | "studio" (typography + neutrals) */
+      palette: palettePreference,
+      setPalettePreference,
     }),
-    [resolvedTheme, themePreference, setThemePreference, toggleTheme]
+    [
+      resolvedTheme,
+      themePreference,
+      setThemePreference,
+      toggleTheme,
+      palettePreference,
+      setPalettePreference,
+    ]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

@@ -64,7 +64,10 @@
   --duration-fast: 0.15s;
   --duration-normal: 0.2s;
   --duration-slow: 0.22s;
+  --duration-emphasis: 0.28s;
   --duration-theme: 0.2s;
+  /** Product-wide micro-motion (transform / opacity only in hot paths) */
+  --ease-premium: cubic-bezier(0.2, 0.85, 0.15, 1);
 
   --ds-focus: var(--color-brand);
 

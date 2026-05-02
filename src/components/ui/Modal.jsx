@@ -1,11 +1,15 @@
 import { useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import { Button } from "./Button.jsx";
 import "./Modal.css";
 
 export function Modal({ title, message, onClose }) {
+  const reduceMotion = useReducedMotion();
+  const panelSpring = reduceMotion
+    ? { duration: 0.18, ease: [0.16, 1, 0.3, 1] }
+    : { type: "spring", stiffness: 340, damping: 28, mass: 0.82 };
   const handleKey = useCallback(
     (e) => {
       if (e.key === "Escape") onClose();
@@ -30,7 +34,7 @@ export function Modal({ title, message, onClose }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
     >
       <motion.button
         type="button"
@@ -48,10 +52,14 @@ export function Modal({ title, message, onClose }) {
           role="dialog"
           aria-modal="true"
           aria-labelledby="float-modal-title"
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.98 }}
-          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.9, y: 28 }}
+          animate={reduceMotion ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
+          exit={
+            reduceMotion
+              ? { opacity: 0 }
+              : { opacity: 0, scale: 0.96, y: 16, filter: "blur(4px)" }
+          }
+          transition={panelSpring}
         >
           <button
             type="button"
