@@ -9,7 +9,7 @@ import {
   syncAllocationDelete,
   refreshWorkspaceFromSupabase,
 } from "../context/AppDataContext.jsx";
-import { projectToAllocationLabel } from "../utils/projectColors.js";
+import { buildAllocationProjectOptionStrings } from "../utils/projectColors.js";
 
 /**
  * Schedule (Landing) page store bindings: one useAppStore selector per field so the page
@@ -44,13 +44,7 @@ export function useSchedulePageData() {
   const setScheduleFilterRules = useAppStore((s) => s.setScheduleFilterRules);
 
   const allocationProjectOptions = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          ...projects.map(projectToAllocationLabel),
-          ...extraAllocationLabels,
-        ])
-      ).sort((a, b) => a.localeCompare(b)),
+    () => buildAllocationProjectOptionStrings(projects, extraAllocationLabels),
     [projects, extraAllocationLabels]
   );
 

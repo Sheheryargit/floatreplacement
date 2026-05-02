@@ -1,8 +1,14 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from "framer-motion";
 import { X, ChevronDown, ArrowLeftRight, Zap, Trash2, Palmtree } from "lucide-react";
-import { resolveColorForProjectLabel } from "../utils/projectColors.js";
+import {
+  resolveColorForProjectLabel,
+  projectToAllocationLabel,
+  matchProjectFromAllocationPickerLabel,
+  registryProjectIdForPickerLabel,
+} from "../utils/projectColors.js";
 import { normalizeLeaveTypeId, leaveAccentTheme, leavePanelStyleVars } from "../utils/leaveVisuals.js";
 import "./AllocationModals.css";
 import { ALLOCATION_PROJECT_SEED } from "../data/workspaceSeedConstants.js";
@@ -61,6 +67,82 @@ function formatAllocDate(d) {
   return dt.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
 }
 
+function resolveProjectIdForCanonicalLabel(label, registry) {
+  const t = String(label || "").trim();
+  if (!t || !registry?.length) return "";
+  const matches = registry.filter((p) => p && !p.archived && projectToAllocationLabel(p) === t);
+  if (matches.length === 1) return String(matches[0].id);
+  return "";
+}
+
+/** Group registry projects by code; non-registry option strings go under "Other projects". */
+function buildProjectPickerCodeGroups(projectRegistry, optionStrings) {
+  const active = (projectRegistry || []).filter((p) => p && !p.archived);
+  const byCode = new Map();
+  for (const row of active) {
+    const code = String(row.code || "").trim() || "__nocode__";
+    if (!byCode.has(code)) byCode.set(code, []);
+    byCode.get(code).push(row);
+  }
+  for (const rows of byCode.values()) {
+    rows.sort((a, b) =>
+      String(a.name || "").localeCompare(String(b.name || ""), undefined, { sensitivity: "base" })
+    );
+  }
+  const sortedCodes = [...byCode.keys()].sort((a, b) => {
+    if (a === "__nocode__") return 1;
+    if (b === "__nocode__") return -1;
+    return a.localeCompare(b, undefined, { sensitivity: "base" });
+  });
+  const groups = [];
+  for (const code of sortedCodes) {
+    const rows = byCode.get(code);
+    const heading = code === "__nocode__" ? "Other codes" : code;
+    groups.push({ key: `code:${code}`, heading, kind: "registry", rows });
+  }
+  const registryLabels = new Set(active.map((r) => projectToAllocationLabel(r)));
+  const extras = (optionStrings || [])
+    .map(String)
+    .filter((s) => s && !registryLabels.has(s))
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  if (extras.length) {
+    groups.push({
+      key: "__extra__",
+      heading: groups.length === 0 ? "Projects" : "Other projects",
+      kind: "extras",
+      labels: extras,
+    });
+  }
+  return groups;
+}
+
+function filterProjectPickerCodeGroups(groups, query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return groups;
+  const out = [];
+  for (const g of groups) {
+    if (g.kind === "extras") {
+      const labels = g.labels.filter((lbl) => lbl.toLowerCase().includes(q));
+      if (labels.length) out.push({ ...g, labels });
+      continue;
+    }
+    const headingHit = g.heading.toLowerCase().includes(q);
+    const rows = headingHit
+      ? g.rows
+      : g.rows.filter((row) => {
+          const lbl = projectToAllocationLabel(row).toLowerCase();
+          const name = String(row.name || "").toLowerCase();
+          const client = String(row.client || "").toLowerCase();
+          const code = String(row.code || "").toLowerCase();
+          return (
+            lbl.includes(q) || name.includes(q) || client.includes(q) || code.includes(q)
+          );
+        });
+    if (rows.length) out.push({ ...g, rows });
+  }
+  return out;
+}
+
 export function CreateAllocationModal({
   open,
   onClose,
@@ -95,6 +177,8 @@ export function CreateAllocationModal({
   const [assignOpen, setAssignOpen] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
   const [projectQuery, setProjectQuery] = useState("");
+  /** Registry project id when chosen from picker (disambiguates duplicate labels). */
+  const [allocationProjectId, setAllocationProjectId] = useState("");
 
   // Leave-specific state
   const [leaveType, setLeaveType] = useState("annual");
@@ -105,7 +189,13 @@ export function CreateAllocationModal({
   const repeatWrapRef = useRef(null);
   const assignWrapRef = useRef(null);
   const projectWrapRef = useRef(null);
+  const projectTriggerRef = useRef(null);
+  const projectMenuRef = useRef(null);
+  /** Portal mount inside Dialog.Content so Radix FocusScope includes the search input. */
+  const projectMenuPortalRef = useRef(null);
+  const [projectMenuHostEl, setProjectMenuHostEl] = useState(null);
   const leaveTypeWrapRef = useRef(null);
+  const [projectMenuBox, setProjectMenuBox] = useState(null);
 
   useEffect(() => {
     if (!open) return;
@@ -114,6 +204,11 @@ export function CreateAllocationModal({
       setEndDate(editAllocation.endDate || "");
       setHoursPerDay(editAllocation.hoursPerDay ? String(editAllocation.hoursPerDay) : "7.5");
       setProject(editAllocation.project || "");
+      setAllocationProjectId(
+        editAllocation.projectId != null && String(editAllocation.projectId).trim() !== ""
+          ? String(editAllocation.projectId)
+          : resolveProjectIdForCanonicalLabel(editAllocation.project || "", projectRegistry)
+      );
       setNotes(editAllocation.notes || "");
       setRepeatId(editAllocation.repeatId || "none");
       setActiveTab(editAllocation.isLeave ? "leave" : "allocation");
@@ -143,8 +238,10 @@ export function CreateAllocationModal({
     setHoursPerDay("7.5");
     const list = projects.length ? projects : ALLOCATION_PROJECT_SEED;
     const pre = preselectProject != null ? String(preselectProject).trim() : "";
+    const nextProj = pre || list[0] || "";
     if (pre) setProject(pre);
     else setProject(list[0] ?? "");
+    setAllocationProjectId(resolveProjectIdForCanonicalLabel(nextProj, projectRegistry));
     setNotes("");
     setRepeatId("none");
     setRepeatOpen(false);
@@ -160,13 +257,25 @@ export function CreateAllocationModal({
     if (preselectPerson) setAssignedIds([preselectPerson.id]);
     else if (people[0]) setAssignedIds([people[0].id]);
     else setAssignedIds([]);
-  }, [open, preselectPerson, preselectDate, preselectProject, people, projects, editAllocation, defaultTab]);
+  }, [
+    open,
+    preselectPerson,
+    preselectDate,
+    preselectProject,
+    people,
+    projects,
+    projectRegistry,
+    editAllocation,
+    defaultTab,
+  ]);
 
   useEffect(() => {
     function onDoc(e) {
       if (repeatWrapRef.current && !repeatWrapRef.current.contains(e.target)) setRepeatOpen(false);
       if (assignWrapRef.current && !assignWrapRef.current.contains(e.target)) setAssignOpen(false);
-      if (projectWrapRef.current && !projectWrapRef.current.contains(e.target)) {
+      const inProjectTrigger = projectWrapRef.current?.contains(e.target);
+      const inProjectMenu = projectMenuRef.current?.contains(e.target);
+      if (!inProjectTrigger && !inProjectMenu) {
         setProjectOpen(false);
         setProjectQuery("");
       }
@@ -280,11 +389,68 @@ export function CreateAllocationModal({
     [projects]
   );
 
-  const filteredProjects = useMemo(() => {
-    const q = projectQuery.trim().toLowerCase();
-    if (!q) return projectOptions;
-    return projectOptions.filter((p) => String(p).toLowerCase().includes(q));
-  }, [projectOptions, projectQuery]);
+  const projectOptionGroups = useMemo(
+    () => buildProjectPickerCodeGroups(projectRegistry, projectOptions),
+    [projectRegistry, projectOptions]
+  );
+
+  const filteredProjectGroups = useMemo(
+    () => filterProjectPickerCodeGroups(projectOptionGroups, projectQuery),
+    [projectOptionGroups, projectQuery]
+  );
+
+  const projectSelectionKey = allocationProjectId || resolveProjectIdForCanonicalLabel(project, projectRegistry);
+
+  const triggerRegistryRow = useMemo(() => {
+    const id = allocationProjectId.trim();
+    if (!id) return null;
+    return projectRegistry.find((r) => String(r.id) === id) ?? null;
+  }, [allocationProjectId, projectRegistry]);
+
+  const triggerSwatchColor = useMemo(() => {
+    const hex = triggerRegistryRow?.color;
+    if (hex && typeof hex === "string" && /^#([0-9A-Fa-f]{6})$/i.test(hex.trim())) {
+      return hex.trim();
+    }
+    return resolveColorForProjectLabel(project, projectRegistry);
+  }, [triggerRegistryRow, project, projectRegistry]);
+
+  useLayoutEffect(() => {
+    if (!open || !projectOpen) {
+      setProjectMenuBox(null);
+      return;
+    }
+    const el = projectTriggerRef.current;
+    if (!el) {
+      setProjectMenuBox(null);
+      return;
+    }
+    const measure = () => {
+      const host = projectMenuPortalRef.current;
+      if (!host) return;
+      const r = el.getBoundingClientRect();
+      const h = host.getBoundingClientRect();
+      const gap = 6;
+      const spaceBelow = h.bottom - r.bottom - gap - 12;
+      const maxH = Math.min(360, Math.max(120, spaceBelow));
+      setProjectMenuBox({
+        top: r.bottom - h.top + gap,
+        left: r.left - h.left,
+        width: Math.max(r.width, 260),
+        maxHeight: maxH,
+      });
+    };
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [open, projectOpen]);
 
   const assignedPeople = useMemo(
     () => assignedIds.map((id) => people.find((p) => p.id === id)).filter(Boolean),
@@ -350,6 +516,10 @@ export function CreateAllocationModal({
         totalHours,
         workingDays,
         project,
+        projectId:
+          allocationProjectId.trim() !== ""
+            ? allocationProjectId.trim()
+            : registryProjectIdForPickerLabel(project, projectRegistry),
         notes: notes.trim(),
         repeatId,
       };
@@ -368,6 +538,7 @@ export function CreateAllocationModal({
         totalHours: leaveTotalHours,
         workingDays,
         project: leaveLabel(leaveType),
+        projectId: undefined,
         notes: leaveNotes.trim(),
         repeatId: "none",
         isLeave: true,
@@ -390,11 +561,14 @@ export function CreateAllocationModal({
     <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="lpam-overlay-radix" />
-        <Dialog.Content 
-          className="lpam-modal lpam-create float-premium-modal" 
-          style={{ 
-            background: t.surface, 
-            color: t.text 
+        <Dialog.Content
+          className={
+            "lpam-modal lpam-create float-premium-modal" +
+            (projectOpen ? " lpam-modal--project-picker-open" : "")
+          }
+          style={{
+            background: t.surface,
+            color: t.text,
           }}
         >
           <Dialog.Description className="lpam-sr-only">
@@ -607,17 +781,28 @@ export function CreateAllocationModal({
           </div>
           <div className="lpam-dropdown-wrap lpam-dropdown-full" ref={projectWrapRef}>
             <button
+              ref={projectTriggerRef}
               type="button"
-              className="lpam-input lpam-project-trigger"
-              style={{ borderColor: t.borderIn || t.border, background: t.surface, color: t.text, boxShadow: "0 1px 3px rgba(0,0,0,0.02)" }}
+              className={
+                "lpam-input lpam-project-trigger" + (projectOpen ? " lpam-project-trigger--open" : "")
+              }
+              style={{
+                borderColor: projectOpen ? t.accent : t.borderIn || t.border,
+                background: t.surface,
+                color: t.text,
+                boxShadow: projectOpen
+                  ? `0 0 0 1px color-mix(in srgb, ${t.accent} 45%, transparent), 0 4px 14px rgba(0,0,0,0.08)`
+                  : "0 1px 3px rgba(0,0,0,0.02)",
+              }}
               aria-expanded={projectOpen}
+              aria-haspopup="listbox"
               onClick={() => setProjectOpen((o) => !o)}
             >
               <span className="lpam-project-trigger-inner">
                 {project ? (
                   <span
-                    className="lpam-project-swatch"
-                    style={{ background: resolveColorForProjectLabel(project, projectRegistry) }}
+                    className="lpam-project-swatch lpam-project-swatch--trigger"
+                    style={{ background: triggerSwatchColor }}
                     aria-hidden
                   />
                 ) : null}
@@ -625,65 +810,143 @@ export function CreateAllocationModal({
               </span>
               <ChevronDown size={16} style={{ color: t.textMuted }} />
             </button>
-            {projectOpen && (
-              <div
-                className="lpam-menu lpam-menu-project"
-                style={{ background: t.surface, borderColor: t.border }}
-              >
-                <>
-                    <div
-                      className="lpam-menu-search"
-                      onMouseDown={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="text"
-                        className="lpam-input lpam-menu-search-input"
-                        style={{ borderColor: t.border, background: t.bg, color: t.text }}
-                        placeholder="Search projects…"
-                        value={projectQuery}
-                        onChange={(e) => setProjectQuery(e.target.value)}
-                        autoFocus
-                      />
-                    </div>
-                    <div className="lpam-menu-scroll">
-                      {filteredProjects.length === 0 ? (
-                        <div
-                          className="lpam-menu-empty"
-                          style={{ color: t.textMuted }}
-                        >
-                          No projects match “{projectQuery}”
+            {projectOpen &&
+              projectMenuBox &&
+              projectMenuHostEl &&
+              createPortal(
+                <div
+                  ref={projectMenuRef}
+                  className="lpam-menu lpam-menu-project lpam-menu-project-float"
+                  style={{
+                    position: "absolute",
+                    top: projectMenuBox.top,
+                    left: projectMenuBox.left,
+                    width: projectMenuBox.width,
+                    maxHeight: projectMenuBox.maxHeight,
+                    minHeight: 0,
+                    background: t.surface,
+                    borderColor: t.border,
+                  }}
+                  role="listbox"
+                  aria-label="Projects"
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  <div className="lpam-menu-search">
+                    <input
+                      type="text"
+                      className="lpam-input lpam-menu-search-input"
+                      style={{ borderColor: t.border, background: t.bg, color: t.text }}
+                      placeholder="Search projects…"
+                      value={projectQuery}
+                      onChange={(e) => setProjectQuery(e.target.value)}
+                      autoFocus
+                    />
+                  </div>
+                  <div
+                    className="lpam-menu-scroll lpam-menu-scroll--grouped"
+                    onWheel={(e) => e.stopPropagation()}
+                  >
+                    {filteredProjectGroups.length === 0 ? (
+                      <div className="lpam-menu-empty" style={{ color: t.textMuted }}>
+                        No projects match “{projectQuery}”
+                      </div>
+                    ) : (
+                      filteredProjectGroups.map((g) => (
+                        <div key={g.key} className="lpam-menu-client-block">
+                          <div
+                            className="lpam-menu-client-heading"
+                            style={{ color: t.textSoft }}
+                          >
+                            {g.heading}
+                          </div>
+                          {g.kind === "extras"
+                            ? g.labels.map((lbl) => {
+                                const swatch = resolveColorForProjectLabel(lbl, projectRegistry);
+                                return (
+                                  <button
+                                    key={g.key + ":" + lbl}
+                                    type="button"
+                                    role="option"
+                                    aria-selected={project === lbl}
+                                    className={
+                                      "lpam-menu-item lpam-menu-item--project-row" +
+                                      (project === lbl ? " lpam-menu-item-active" : "")
+                                    }
+                                    style={{ color: t.text }}
+                                    onPointerDown={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setProject(lbl);
+                                      setAllocationProjectId("");
+                                      setProjectOpen(false);
+                                      setProjectQuery("");
+                                    }}
+                                  >
+                                    <span className="lpam-menu-item-inner">
+                                      <span
+                                        className="lpam-project-swatch lpam-project-swatch--menu"
+                                        style={{ background: swatch }}
+                                        aria-hidden
+                                      />
+                                      <span className="lpam-menu-item-label">{lbl}</span>
+                                    </span>
+                                  </button>
+                                );
+                              })
+                            : g.rows.map((row) => {
+                                const canonical = projectToAllocationLabel(row);
+                                const swatch = resolveColorForProjectLabel(canonical, projectRegistry);
+                                const selected = String(row.id) === projectSelectionKey;
+                                return (
+                                  <button
+                                    key={String(row.id)}
+                                    type="button"
+                                    role="option"
+                                    aria-selected={selected}
+                                    className={
+                                      "lpam-menu-item lpam-menu-item--project-row" +
+                                      (selected ? " lpam-menu-item-active" : "")
+                                    }
+                                    style={{ color: t.text }}
+                                    onPointerDown={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setProject(canonical);
+                                      setAllocationProjectId(String(row.id));
+                                      setProjectOpen(false);
+                                      setProjectQuery("");
+                                    }}
+                                  >
+                                    <span className="lpam-menu-item-inner">
+                                      <span
+                                        className="lpam-project-swatch lpam-project-swatch--menu"
+                                        style={{ background: swatch }}
+                                        aria-hidden
+                                      />
+                                      <span className="lpam-menu-item-label lpam-menu-item-label--stacked">
+                                        <span className="lpam-menu-item-title">
+                                          {String(row.name || "").trim() || canonical}
+                                        </span>
+                                        {(row.client || "").trim() ? (
+                                          <span
+                                            className="lpam-menu-item-sub"
+                                            style={{ color: t.textMuted }}
+                                          >
+                                            {String(row.client).trim()}
+                                          </span>
+                                        ) : null}
+                                      </span>
+                                    </span>
+                                  </button>
+                                );
+                              })}
                         </div>
-                      ) : (
-                        filteredProjects.map((p) => {
-                          const swatch = resolveColorForProjectLabel(p, projectRegistry);
-                          return (
-                            <button
-                              key={p}
-                              type="button"
-                              className={"lpam-menu-item" + (project === p ? " lpam-menu-item-active" : "")}
-                              style={{ color: t.text }}
-                              onClick={() => {
-                                setProject(p);
-                                setProjectOpen(false);
-                                setProjectQuery("");
-                              }}
-                            >
-                              <span className="lpam-menu-item-inner">
-                                <span
-                                  className="lpam-project-swatch"
-                                  style={{ background: swatch }}
-                                  aria-hidden
-                                />
-                                <span className="lpam-menu-item-label">{p}</span>
-                              </span>
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
-                </>
-              </div>
-            )}
+                      ))
+                    )}
+                  </div>
+                </div>,
+                projectMenuHostEl
+              )}
           </div>
         </div>
 
@@ -961,6 +1224,14 @@ export function CreateAllocationModal({
             </Dialog.Close>
           </div>
         </div>
+        <div
+          ref={(el) => {
+            projectMenuPortalRef.current = el;
+            setProjectMenuHostEl(el);
+          }}
+          className="lpam-project-menu-portal-host"
+          aria-hidden={!projectOpen}
+        />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

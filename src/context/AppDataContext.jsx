@@ -12,9 +12,7 @@ import {
   SEED_CLIENTS,
   SEED_PROJECT_TAGS,
 } from "../data/projectsSeed.js";
-import {
-  projectToAllocationLabel,
-} from "../utils/projectColors.js";
+import { buildAllocationProjectOptionStrings } from "../utils/projectColors.js";
 import { loadWorkspaceFromSupabase } from "../lib/api/loadWorkspace.js";
 import {
   defaultWorkspaceAllocationWindow,
@@ -381,13 +379,7 @@ export function useAppData() {
   );
 
   const allocationProjectOptions = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          ...state.projects.map(projectToAllocationLabel),
-          ...state.extraAllocationLabels,
-        ])
-      ).sort((a, b) => a.localeCompare(b)),
+    () => buildAllocationProjectOptionStrings(state.projects, state.extraAllocationLabels),
     [state.projects, state.extraAllocationLabels]
   );
 

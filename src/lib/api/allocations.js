@@ -6,6 +6,12 @@ function allocationToRow(a) {
     : a.personId != null
       ? [String(a.personId)]
       : [];
+  const rawProjectId = a.projectId;
+  const projectId =
+    rawProjectId != null && String(rawProjectId).trim() !== ""
+      ? String(rawProjectId).trim()
+      : null;
+
   return {
     person_ids: personIds,
     start_date: a.startDate,
@@ -14,6 +20,7 @@ function allocationToRow(a) {
     total_hours: Number(a.totalHours) || 0,
     working_days: a.workingDays != null ? Number(a.workingDays) : null,
     project_label: a.project ?? "",
+    project_id: projectId,
     notes: a.notes ?? "",
     repeat_id: a.repeatId ?? "none",
     is_leave: !!a.isLeave,
@@ -22,6 +29,38 @@ function allocationToRow(a) {
     project_color: a.projectColor ?? null,
     availability_slot_key: a.availabilitySlotKey ?? null,
   };
+}
+
+/** Only send `p_project_id` when set (migration 021 RPC signature). */
+function applyProjectIdRpcArg(payload, row) {
+  const id = row.project_id;
+  if (id != null && String(id).trim() !== "") {
+    payload.p_project_id = id;
+  }
+  return payload;
+}
+
+/** PostgREST / DB has not picked up `save_allocation(..., p_project_id)` yet. */
+function saveAllocationRpcSchemaMismatch(err) {
+  const m = String(err?.message || err || "");
+  return (
+    m.includes("Could not find the function") ||
+    /schema cache/i.test(m)
+  );
+}
+
+/** Call `save_allocation`; if the server has no `p_project_id` arg yet, retry without it. */
+async function rpcSaveAllocation(payload) {
+  let res = await supabase.rpc("save_allocation", payload);
+  if (
+    res.error &&
+    Object.prototype.hasOwnProperty.call(payload, "p_project_id") &&
+    saveAllocationRpcSchemaMismatch(res.error)
+  ) {
+    const { p_project_id: _drop, ...rest } = payload;
+    res = await supabase.rpc("save_allocation", rest);
+  }
+  return res;
 }
 
 function rowToAllocation(row) {
@@ -40,6 +79,7 @@ function rowToAllocation(row) {
     totalHours: Number(row.total_hours) || 0,
     workingDays: row.working_days != null ? Number(row.working_days) : undefined,
     project: row.project_label ?? "",
+    projectId: row.project_id != null ? String(row.project_id) : undefined,
     notes: row.notes ?? "",
     repeatId: row.repeat_id ?? "none",
     isLeave: !!row.is_leave,
@@ -110,23 +150,28 @@ export async function fetchAllocations({ startDate, endDate } = {}) {
 export async function createAllocation(allocation) {
   if (!isSupabaseConfigured) return;
   const row = allocationToRow(allocation);
-  const { data, error } = await supabase.rpc("save_allocation", {
-    p_id: null,
-    p_expected_version: null,
-    p_person_ids: row.person_ids,
-    p_start_date: row.start_date,
-    p_end_date: row.end_date,
-    p_hours_per_day: row.hours_per_day,
-    p_total_hours: row.total_hours,
-    p_working_days: row.working_days,
-    p_project_label: row.project_label,
-    p_notes: row.notes,
-    p_repeat_id: row.repeat_id,
-    p_is_leave: row.is_leave,
-    p_leave_type: row.leave_type,
-    p_updated_by: row.updated_by,
-    p_project_color: row.project_color,
-  });
+  const { data, error } = await rpcSaveAllocation(
+    applyProjectIdRpcArg(
+      {
+        p_id: null,
+        p_expected_version: null,
+        p_person_ids: row.person_ids,
+        p_start_date: row.start_date,
+        p_end_date: row.end_date,
+        p_hours_per_day: row.hours_per_day,
+        p_total_hours: row.total_hours,
+        p_working_days: row.working_days,
+        p_project_label: row.project_label,
+        p_notes: row.notes,
+        p_repeat_id: row.repeat_id,
+        p_is_leave: row.is_leave,
+        p_leave_type: row.leave_type,
+        p_updated_by: row.updated_by,
+        p_project_color: row.project_color,
+      },
+      row
+    )
+  );
   if (error) throw error;
   const created = rowToAllocation(data);
 
@@ -147,23 +192,28 @@ export async function updateAllocation(allocation) {
   }
 
   const row = allocationToRow(allocation);
-  const { data, error } = await supabase.rpc("save_allocation", {
-    p_id: String(allocation.id),
-    p_expected_version: prevVersion,
-    p_person_ids: row.person_ids,
-    p_start_date: row.start_date,
-    p_end_date: row.end_date,
-    p_hours_per_day: row.hours_per_day,
-    p_total_hours: row.total_hours,
-    p_working_days: row.working_days,
-    p_project_label: row.project_label,
-    p_notes: row.notes,
-    p_repeat_id: row.repeat_id,
-    p_is_leave: row.is_leave,
-    p_leave_type: row.leave_type,
-    p_updated_by: row.updated_by,
-    p_project_color: row.project_color,
-  });
+  const { data, error } = await rpcSaveAllocation(
+    applyProjectIdRpcArg(
+      {
+        p_id: String(allocation.id),
+        p_expected_version: prevVersion,
+        p_person_ids: row.person_ids,
+        p_start_date: row.start_date,
+        p_end_date: row.end_date,
+        p_hours_per_day: row.hours_per_day,
+        p_total_hours: row.total_hours,
+        p_working_days: row.working_days,
+        p_project_label: row.project_label,
+        p_notes: row.notes,
+        p_repeat_id: row.repeat_id,
+        p_is_leave: row.is_leave,
+        p_leave_type: row.leave_type,
+        p_updated_by: row.updated_by,
+        p_project_color: row.project_color,
+      },
+      row
+    )
+  );
   if (error) {
     const msg = String(error.message || error);
     if (msg.includes("optimistic_lock")) {

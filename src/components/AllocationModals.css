@@ -74,6 +74,24 @@
   border: 1px solid;
   padding: 24px 28px 20px;
   box-shadow: var(--shadow-lg, 0 24px 80px rgba(0, 0, 0, 0.45));
+  position: relative;
+}
+
+/* Let the portaled project picker extend past inner scroll clipping while open */
+.lpam-modal.lpam-modal--project-picker-open {
+  overflow: visible;
+}
+
+.lpam-modal.lpam-modal--project-picker-open .lpam-modal-body {
+  overflow: visible;
+}
+
+.lpam-project-menu-portal-host {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6000;
+  isolation: isolate;
 }
 
 .lpam-modal > .lpam-head,
@@ -321,6 +339,62 @@
   padding: 8px;
 }
 
+/* Portaled inside Dialog.Content; position absolute + coords from trigger (FocusScope-safe) */
+.lpam-menu-project-float {
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid;
+  box-shadow:
+    0 22px 56px rgba(0, 0, 0, 0.32),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  pointer-events: auto;
+  min-height: 0;
+  z-index: 1;
+}
+
+.lpam-menu-project-float .lpam-menu-scroll {
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.lpam-menu-scroll--grouped {
+  padding-top: 2px;
+}
+
+.lpam-menu-client-block {
+  margin-bottom: 6px;
+}
+
+.lpam-menu-client-block:last-child {
+  margin-bottom: 0;
+}
+
+.lpam-menu-client-heading {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 8px 10px 4px 10px;
+  margin: 0;
+}
+
+.lpam-menu-item--project-row {
+  padding-left: 12px;
+}
+
+.lpam-project-swatch--menu {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.lpam-project-swatch--trigger {
+  border-radius: 50%;
+}
+
 .lpam-menu-search {
   flex: 0 0 auto;
   padding: 2px 2px 6px;
@@ -453,6 +527,28 @@
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: left;
+}
+
+.lpam-menu-item-label--stacked {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+}
+
+.lpam-menu-item-title {
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.lpam-menu-item-sub {
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.2;
 }
 
 .lpam-project-create {
