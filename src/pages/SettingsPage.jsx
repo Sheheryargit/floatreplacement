@@ -28,6 +28,7 @@ import {
 import { SettingsItem } from "../components/ui/SettingsItem.jsx";
 import { ThemePreferenceControl } from "../components/ui/ThemePreferenceControl.jsx";
 import { PalettePreferenceControl } from "../components/ui/PalettePreferenceControl.jsx";
+import { CanvasTintPreferenceControl } from "../components/ui/CanvasTintPreferenceControl.jsx";
 import { InviteMemberDialog } from "../components/InviteMemberDialog.jsx";
 import "./SettingsPage.css";
 
@@ -41,7 +42,15 @@ const APPEARANCE_ICONS = [
 
 export default function SettingsPage() {
   const reduceMotion = useReducedMotion();
-  const { theme, themePreference, setThemePreference, palette, setPalettePreference } = useAppTheme();
+  const {
+    theme,
+    themePreference,
+    setThemePreference,
+    palette,
+    setPalettePreference,
+    canvasTintHex,
+    setCanvasTintHex,
+  } = useAppTheme();
   const { lock } = useAuth();
   const { triggerSlap } = useSlapAnimation();
   const { openDialog } = useAppDialog();
@@ -162,6 +171,17 @@ export default function SettingsPage() {
               showChevron={false}
             >
               <PalettePreferenceControl value={palette} onChange={setPalettePreference} />
+            </SettingsItem>
+            <SettingsItem
+              label="Canvas tint"
+              subtext="Blends into the slide nav, schedule calendar, grids, reporting shell, and page backgrounds. Saved on this browser only."
+              showChevron={false}
+            >
+              <CanvasTintPreferenceControl
+                value={canvasTintHex}
+                onChange={setCanvasTintHex}
+                theme={theme}
+              />
             </SettingsItem>
           </div>
         </section>

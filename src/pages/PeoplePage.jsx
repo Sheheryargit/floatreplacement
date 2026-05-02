@@ -82,7 +82,7 @@ function toggleArr(list, v) {
    APP
    ═══════════════════════════════════════════════════════════ */
 export default function PeoplePage() {
-  const { theme: mode } = useAppTheme();
+  const { theme: mode, shellBackground } = useAppTheme();
   const t = T[mode];
   const setAlloc8FeedbackDock = useAlloc8ActionFeedbackMount();
 
@@ -571,7 +571,7 @@ export default function PeoplePage() {
       className="people-page-root"
       data-theme={mode === "light" ? "light" : "dark"}
       style={{
-        background: t.bg,
+        background: shellBackground ?? t.bg,
         color: t.text,
         fontFamily: "var(--font-body, 'DM Sans', system-ui, sans-serif)",
         fontSize: 14,

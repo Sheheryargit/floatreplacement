@@ -4,6 +4,7 @@
 @import "./styles/global-bg.css";
 @import "./styles/motion-surface.css";
 @import "./styles/static-ui.css";
+@import "./styles/custom-canvas.css";
 
 *,
 *::before,

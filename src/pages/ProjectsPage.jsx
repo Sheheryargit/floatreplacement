@@ -415,7 +415,7 @@ export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,c
    APP
    ═══════════════════════════════════════════════════════════ */
 export default function ProjectsPage(){
-  const { theme: mode } = useAppTheme();
+  const { theme: mode, shellBackground } = useAppTheme();
   const t=T[mode];
   const{
     people,
@@ -527,7 +527,7 @@ export default function ProjectsPage(){
   const handleModalArchive=()=>{if(editingProject){archiveProject(editingProject.id);setModalOpen(false);setEditingProject(null);}};
 
   return(
-    <div style={{display:"flex",minHeight:"100vh",background:t.bg,color:t.text,fontFamily:"var(--font-body, 'DM Sans', system-ui, sans-serif)",fontSize:14,transition:"background 0.35s ease,color 0.35s ease"}}>
+    <div style={{display:"flex",minHeight:"100vh",background:shellBackground ?? t.bg,color:t.text,fontFamily:"var(--font-body, 'DM Sans', system-ui, sans-serif)",fontSize:14,transition:"background 0.35s ease,color 0.35s ease"}}>
       <AppSideNav />
 
       <main style={{flex:1,minWidth:0,padding:"24px 36px"}}>
@@ -557,8 +557,19 @@ export default function ProjectsPage(){
           )}
         </div>
 
-        {/* Table */}
-        <div style={{background:t.surface,borderRadius:12,border:`1px solid ${t.border}`,overflow:"hidden",transition:"background 0.35s",boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
+        {/* Table — class hooks custom-canvas tint over inline surface/border */}
+        <div
+          className="projects-page-table-card"
+          data-theme={mode === "light" ? "light" : "dark"}
+          style={{
+            background: t.surface,
+            borderRadius: 12,
+            border: `1px solid ${t.border}`,
+            overflow: "hidden",
+            transition: "background 0.35s",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+          }}
+        >
           <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",minWidth:900}}>
             <thead><tr style={{borderBottom:`2px solid ${t.border}`}}>
