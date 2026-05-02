@@ -60,7 +60,7 @@ import { syncPersonAvailabilityFromForm } from "../lib/api/personAvailability.js
 import { previewAvailabilityHours } from "../utils/availabilityPreview.js";
 import { advanceRepeatWindow } from "../utils/allocationRepeatWindow.js";
 import {
-  assignAllocationStackLevels,
+  assignAllocationStackLevelsByWorkWeek,
   BAR_H_BASE_PX,
   BAR_H_NORM,
   PX_PER_HOUR,
@@ -102,6 +102,11 @@ import {
   buildLeaveHoverTitle,
   isAvailabilityDayOffAlloc,
 } from "../utils/leaveVisuals.js";
+import {
+  PEAK_LOAD_LABELS_CHANGED_EVENT,
+  PEAK_LOAD_LABELS_LS_KEY,
+  readPeakLoadLabelsVisible,
+} from "../config/scheduleUiPrefs.js";
 import "./LandingPage.css";
 
 const LEAVE_LUCIDE = {
@@ -119,7 +124,11 @@ const LEAVE_LUCIDE = {
 function LeaveTimelineGlyph({ leaveTypeId, className }) {
   const key = leaveTimelineIconKey(leaveTypeId);
   const Ic = LEAVE_LUCIDE[key] || Palmtree;
-  return <Ic className={className} size={15} strokeWidth={2.25} aria-hidden />;
+  return (
+    <span className="lp-leave-block__icon-pill" aria-hidden>
+      <Ic className={className} size={14} strokeWidth={2.35} />
+    </span>
+  );
 }
 
 const VIEW_OPTIONS = [
@@ -680,13 +689,28 @@ function computePersonHoursInViewFromList(personAllocations, scheduleModel) {
   return t;
 }
 
-function personHasOverloadInViewFromList(personAllocations, scheduleModel) {
-  const keys = visibleDateKeysForHours(scheduleModel);
-  for (const dk of keys) {
-    const maxH = maxWorkHoursOnDayForPersonList(personAllocations, dk, STANDARD_DAY_HOURS);
-    if (sumWorkHoursOnDayForPersonList(personAllocations, dk) > maxH + 1e-6) return true;
-  }
-  return false;
+/** Peak booked work hours / day vs a full 7.5h target (fixed bar, not per-person capacity). */
+const PEAK_LOAD_EPS = 0.02;
+
+function classifyPeakDailyLoad(peakHours) {
+  const T = STANDARD_DAY_HOURS;
+  if (!Number.isFinite(peakHours) || peakHours < 0) return "none";
+  if (peakHours > T + PEAK_LOAD_EPS) return "over";
+  if (Math.abs(peakHours - T) <= PEAK_LOAD_EPS) return "onTarget";
+  return "under";
+}
+
+function formatPeakHoursForCopy(peak) {
+  if (!Number.isFinite(peak)) return "0";
+  return peak.toFixed(peak % 1 ? 1 : 0);
+}
+
+function peakLoadSummaryLine(loadBand, peakHours, target = STANDARD_DAY_HOURS) {
+  const pf = formatPeakHoursForCopy(peakHours);
+  if (loadBand === "over") return `Overallocated — peak ${pf}h/day vs ${target}h/day target.`;
+  if (loadBand === "under") return `Underallocated — peak ${pf}h/day vs ${target}h/day target.`;
+  if (loadBand === "onTarget") return `On target — peak ${pf}h/day (${target}h/day target).`;
+  return "";
 }
 
 /**
@@ -708,6 +732,8 @@ const LEAVE_PX_PER_HOUR = (WEEK_CELL_FULL_DAY_PX - BAR_H_BASE_PX) / LEAVE_H_NORM
 // still click empty space below to create allocations.
 const LEAVE_FIXED_HEIGHT_PX = 86;
 const LEAVE_CLICK_GAP_PX = 56;
+/** Matches `.lp-grid-row` vertical padding — in-flow work bars start below this; abspos overlays must inset the same. */
+const SCHED_GRID_ROW_PAD_Y = 12;
 
 function leaveBarHeightPx(alloc) {
   // Legacy: leave tiles used variable heights. Schedule now uses consistent tile sizing
@@ -817,6 +843,7 @@ const TimelineRow = memo(function TimelineRow({
   handleTimelineClick,
   todayDateKey,
   dismissedAvailOffKeys,
+  showPeakLoadStatus,
 }) {
   const { theme } = useAppTheme();
   const t = T[theme];
@@ -846,8 +873,32 @@ const TimelineRow = memo(function TimelineRow({
     utilizationMode === "hours"
       ? `${maxDailyBookedHours.toFixed(maxDailyBookedHours % 1 ? 1 : 0)}h/d`
       : `${pct}%`;
-  const overloaded = personHasOverloadInViewFromList(personAllocations, scheduleModel);
   const noWorkingDaysInView = hoursKeys.length > 0 && rawCap < 1e-6;
+
+  const peakLoadBand = useMemo(() => {
+    if (noWorkingDaysInView || !hoursKeys.length) return "none";
+    return classifyPeakDailyLoad(maxDailyBookedHours);
+  }, [noWorkingDaysInView, hoursKeys.length, maxDailyBookedHours]);
+
+  const peakLoadSummary = useMemo(() => {
+    if (peakLoadBand === "none") return "";
+    return peakLoadSummaryLine(peakLoadBand, maxDailyBookedHours);
+  }, [peakLoadBand, maxDailyBookedHours]);
+
+  const hoursToneClass =
+    peakLoadBand !== "none" ? ` lp-person-hours--load-${peakLoadBand === "onTarget" ? "on" : peakLoadBand}` : "";
+
+  const hoursHitTitle = useMemo(() => {
+    const base =
+      utilizationMode === "hours"
+        ? `${hours.toFixed(hours % 1 ? 1 : 0)}h total in view · peak ${maxDailyBookedHours.toFixed(
+            maxDailyBookedHours % 1 ? 1 : 0
+          )}h/day`
+        : `${pct}% utilization in view (peak ${maxDailyBookedHours.toFixed(maxDailyBookedHours % 1 ? 1 : 0)}h/day)`;
+    return peakLoadSummary ? `${base}. ${peakLoadSummary}` : base;
+  }, [utilizationMode, hours, maxDailyBookedHours, pct, peakLoadSummary]);
+
+  const overAllocated = peakLoadBand === "over";
 
   // Build leave + public holiday segments first (they render as-is and define off-day gaps).
   const baseLeaveAndHolidaySegments = personAllocations.flatMap((a) => {
@@ -937,7 +988,7 @@ const TimelineRow = memo(function TimelineRow({
     }));
   });
 
-  assignAllocationStackLevels(workEnvelopeSegments);
+  assignAllocationStackLevelsByWorkWeek(workEnvelopeSegments, scheduleModel);
 
   const workSegments = workEnvelopeSegments.flatMap((env) => {
     const pieces = splitLayoutByOffDays(env.lay, scheduleModel, offDayColSet);
@@ -1027,9 +1078,7 @@ const TimelineRow = memo(function TimelineRow({
   return (
     <div
       key={p.id}
-      className={
-        "lp-sched-row" + (overloaded ? " lp-sched-row-overloaded" : "")
-      }
+      className={"lp-sched-row" + (overAllocated ? " lp-sched-row-overloaded" : "")}
       style={{ ["--animation-order"]: Math.min(i, TABLE_ROW_ENTER_ANIM_MAX) }}
     >
       <div className="lp-sched-person">
@@ -1051,29 +1100,60 @@ const TimelineRow = memo(function TimelineRow({
                     openEdit(p);
                   }}
                 >
-                  <div className="lp-avatar" style={{ background: avGrad(p.name) }}>
-                    {ini(p.name)}
-                  </div>
-                  <div className="lp-person-meta">
-                    <div className="lp-person-name">{p.name}</div>
-                    <div className="lp-person-sub">
-                      {p.role !== "—" ? `${p.role} · ` : ""}
-                      {p.department || "—"}
-                    </div>
-                    {p.tags.length > 0 && (
-                      <div className="lp-person-tags">
-                        {p.tags.slice(0, 2).map((tag) => {
-                          const tp = tagChromaProps(tag, theme === "dark", "lp-schedule-tag");
-                          return (
-                            <span key={tag} className={tp.className} style={tp.style}>
-                              {tag}
+                  <span className="lp-person-identity-hit-inner">
+                    <span className="lp-person-identity-top">
+                      <span className="lp-avatar" style={{ background: avGrad(p.name) }}>
+                        {ini(p.name)}
+                      </span>
+                      <span className="lp-person-meta">
+                        <span className="lp-person-identity-stack">
+                          <span className="lp-person-name-line">
+                            <span className="lp-person-name">{p.name}</span>
+                            {showPeakLoadStatus && peakLoadBand !== "none" && (
+                              <span className="lp-person-load-wrap" aria-hidden>
+                                <span
+                                  className={`lp-person-load-pip lp-person-load-pip--${peakLoadBand}`}
+                                  aria-hidden
+                                />
+                              </span>
+                            )}
+                          </span>
+                          <span className="lp-person-sub">
+                            {p.role !== "—" ? `${p.role} · ` : ""}
+                            {p.department || "—"}
+                          </span>
+                          {p.tags.length > 0 && (
+                            <span className="lp-person-tags">
+                              {p.tags.slice(0, 2).map((tag) => {
+                                const tp = tagChromaProps(tag, theme === "dark", "lp-schedule-tag");
+                                return (
+                                  <span key={tag} className={tp.className} style={tp.style}>
+                                    {tag}
+                                  </span>
+                                );
+                              })}
+                              {p.tags.length > 2 && <span className="lp-tag-more-pill">+{p.tags.length - 2}</span>}
                             </span>
-                          );
-                        })}
-                        {p.tags.length > 2 && <span className="lp-tag-more-pill">+{p.tags.length - 2}</span>}
-                      </div>
+                          )}
+                        </span>
+                      </span>
+                    </span>
+                    {showPeakLoadStatus && peakLoadBand !== "none" && (
+                      <span className="lp-person-load-status-row">
+                        <span
+                          className={`lp-person-load-pop lp-person-load-pop--${peakLoadBand}`}
+                          role="status"
+                          aria-label={peakLoadSummary}
+                        >
+                          {peakLoadBand === "over"
+                            ? "Overallocated"
+                            : peakLoadBand === "under"
+                              ? "Underallocated"
+                              : "On target"}
+                        </span>
+                      </span>
                     )}
-                  </div>
+                  </span>
                 </button>
                 <div className="lp-person-add-banner">
                   <button
@@ -1102,20 +1182,9 @@ const TimelineRow = memo(function TimelineRow({
             type="button"
             className="lp-person-row lp-person-hours-hit"
             onClick={() => openEdit(p)}
-            title={
-              utilizationMode === "hours"
-                ? `${hours.toFixed(hours % 1 ? 1 : 0)}h total in view · peak ${maxDailyBookedHours.toFixed(
-                    maxDailyBookedHours % 1 ? 1 : 0
-                  )}h/day`
-                : `${pct}% utilization in view`
-            }
+            title={hoursHitTitle}
           >
-            <span className={"lp-person-hours" + (overloaded ? " lp-person-hours-overloaded" : "")}>
-              {right}
-            </span>
-            {overloaded && (
-              <span className="lp-overload-dot" title="Over 7.5h booked on at least one day in view" aria-hidden />
-            )}
+            <span className={"lp-person-hours" + hoursToneClass}>{right}</span>
           </button>
         </div>
       </div>
@@ -1155,14 +1224,15 @@ const TimelineRow = memo(function TimelineRow({
                 alignSelf: "stretch",
                 pointerEvents: "none",
                 zIndex: 1,
-                // Match the work + holiday layers so tiles align on the same baseline.
-                padding: 0,
+                // Match `.lp-grid-row` vertical padding so leave bars line up with work bars.
+                padding: `${SCHED_GRID_ROW_PAD_Y}px 0`,
               }}
             >
               <AnimatePresence initial={false}>
                 {leaveSegments.map((seg, segIdx) => {
                   const colStart = Math.max(1, Math.round(seg.lay.start) + 1);
                   const colSpan = Math.max(1, Math.round(seg.lay.span));
+                  const leaveBrPx = allocationBarBorderRadiusPx((colSpan / Math.max(1, nCols)) * 100);
                   const isDayOff = isAvailabilityDayOffAlloc(seg.a);
                   const occStart = seg?.lay?.occStart ?? seg.a.startDate;
                   const occEnd = seg?.lay?.occEnd ?? seg.a.endDate;
@@ -1170,16 +1240,10 @@ const TimelineRow = memo(function TimelineRow({
                   const dismissKey = isDayOff ? `${allocUi.personIds?.[0] ?? ""}|${allocUi.startDate}` : "";
                   if (isDayOff && dismissedAvailOffKeys && dismissedAvailOffKeys.has(dismissKey)) return null;
 
-                  const lbl = isDayOff ? "Off" : allocUi.leaveType ? leaveLabel(allocUi.leaveType) : "Leave";
                   const typeId = isDayOff ? "day_off" : normalizeLeaveTypeId(allocUi.leaveType);
                   const onToday = leaveSpansToday(allocUi, todayDateKey);
-                  const dateLine =
-                    allocUi.startDate === allocUi.endDate
-                      ? allocUi.startDate
-                      : `${allocUi.startDate} → ${allocUi.endDate}`;
-                  const leaveH = Math.max(0, parseFloat(allocUi.hoursPerDay) || 0);
-                  const leaveHoursLabel = !isDayOff && leaveH > 0 ? `${leaveH}h` : "";
                   const hoverTitle = buildLeaveHoverTitle(allocUi, leaveLabel);
+                  const leaveBarH = allocationBarHeightPx(allocUi);
 
                   return (
                     <motion.button
@@ -1189,17 +1253,19 @@ const TimelineRow = memo(function TimelineRow({
                       className={
                         "lp-leave-block lp-leave-block--" +
                         typeId +
-                        (onToday ? " lp-leave-block--today" : "")
+                        (onToday ? " lp-leave-block--today" : "") +
+                        (!isDayOff ? " lp-leave-block--icon-only" : "")
                       }
                       style={{
                         gridColumn: `${colStart} / span ${colSpan}`,
                         gridRow: 1,
-                        alignSelf: "stretch",
-                        height: "auto",
-                        minHeight: 0,
-                        maxHeight: "none",
+                        alignSelf: "start",
+                        height: `${leaveBarH}px`,
+                        minHeight: `${leaveBarH}px`,
+                        maxHeight: `${leaveBarH}px`,
                         margin: 0,
-                        borderRadius: 0,
+                        borderRadius: `${leaveBrPx}px`,
+                        overflow: "hidden",
                         pointerEvents: "auto",
                       }}
                       aria-label={allocationAriaLabel(allocUi)}
@@ -1233,15 +1299,13 @@ const TimelineRow = memo(function TimelineRow({
                         openAllocationDetail(allocUi);
                       }}
                     >
-                      {!isDayOff && (
+                      {isDayOff ? (
+                        <span className="lp-leave-block__label">
+                          <span>Off</span>
+                        </span>
+                      ) : (
                         <LeaveTimelineGlyph leaveTypeId={allocUi.leaveType} className="lp-leave-block__icon" />
                       )}
-                      <span className="lp-leave-block__label">
-                        <span>
-                          {lbl}
-                          {leaveHoursLabel ? <span className="lp-leave-block__hours">{leaveHoursLabel}</span> : null}
-                        </span>
-                      </span>
                     </motion.button>
                   );
                 })}
@@ -1253,7 +1317,7 @@ const TimelineRow = memo(function TimelineRow({
             className="lp-grid-row"
             style={{ 
               gridTemplateColumns: gridTemplate, 
-              padding: "12px 0", 
+              padding: `${SCHED_GRID_ROW_PAD_Y}px 0`, 
               alignContent: "start", 
               zIndex: 2,
               pointerEvents: "none" 
@@ -1409,8 +1473,8 @@ const TimelineRow = memo(function TimelineRow({
                   display: "grid",
                   gridTemplateColumns: gridTemplate,
                   position: "absolute",
-                  top: 0,
-                  bottom: 0,
+                  top: SCHED_GRID_ROW_PAD_Y,
+                  bottom: SCHED_GRID_ROW_PAD_Y,
                   left: 0,
                   right: 0,
                   width: "100%",
@@ -1421,42 +1485,39 @@ const TimelineRow = memo(function TimelineRow({
               >
                 {publicHolidaySegments.map((seg) => {
                   const geo = clampedSegmentGeometry(seg.lay, nCols);
+                  const phBrPx = allocationBarBorderRadiusPx(geo.widthPct);
+                  const phBarH = allocationBarHeightPx(seg.a);
                   const holidayLabel = seg.a.notes || "Public holiday";
                   const holidayHours = Math.max(0, parseFloat(seg.a.hoursPerDay) || 0);
-                  const holidayHoursLabel = holidayHours > 0 ? `${holidayHours}h` : "";
+                  const phDetailTitle = `${holidayLabel}${holidayHours > 0 ? ` · ${holidayHours}h` : ""} · Click for details`;
 
                   return (
                     <button
                       key={seg.segKey}
                       type="button"
-                      className="lp-leave-block lp-leave-block--public_holiday"
+                      className="lp-leave-block lp-leave-block--public_holiday lp-leave-block--icon-only"
                       style={{
                         position: "absolute",
                         left: `${geo.leftPct}%`,
                         width: `${geo.widthPct}%`,
                         top: 0,
-                        bottom: 0,
-                        height: "auto",
-                        minHeight: 0,
-                        maxHeight: "none",
+                        height: `${phBarH}px`,
+                        minHeight: `${phBarH}px`,
+                        maxHeight: `${phBarH}px`,
                         pointerEvents: "auto",
                         zIndex: 999,
                         margin: 0,
-                        borderRadius: 0,
+                        borderRadius: `${phBrPx}px`,
+                        overflow: "hidden",
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
                         openAllocationDetail(seg.a);
                       }}
-                      title={`${holidayLabel} · Click for details`}
+                      title={phDetailTitle}
+                      aria-label={phDetailTitle}
                     >
                       <LeaveTimelineGlyph leaveTypeId="public_holiday" className="lp-leave-block__icon" />
-                      <span className="lp-leave-block__label">
-                        <span>
-                          Public Holiday
-                          {holidayHoursLabel ? <span className="lp-leave-block__hours">{holidayHoursLabel}</span> : null}
-                        </span>
-                      </span>
                     </button>
                   );
                 })}
@@ -1552,6 +1613,20 @@ export default function LandingPage() {
   const [anchorDate, setAnchorDate] = useState(() => new Date());
   const [density, setDensity] = useState("comfortable");
   const [utilizationMode, setUtilizationMode] = useState("hours");
+  const [showPeakLoadStatus, setShowPeakLoadStatus] = useState(() => readPeakLoadLabelsVisible());
+
+  useEffect(() => {
+    const sync = () => setShowPeakLoadStatus(readPeakLoadLabelsVisible());
+    window.addEventListener(PEAK_LOAD_LABELS_CHANGED_EVENT, sync);
+    const onStorage = (e) => {
+      if (e.key === PEAK_LOAD_LABELS_LS_KEY || e.key == null) sync();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(PEAK_LOAD_LABELS_CHANGED_EVENT, sync);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
 
   const [timelineOffsets, setTimelineOffsets] = useState({ prev: 1, next: 2 });
   const [timeRangePreset, setTimeRangePreset] = useState(null);
@@ -2576,9 +2651,16 @@ export default function LandingPage() {
 
           <div className="lp-subbar">
             <div className="lp-subbar-people">
-              <button type="button" className="lp-icon-btn" aria-label="Add person" onClick={openAdd}>
-                <UserPlus size={18} />
-              </button>
+              <div className="lp-subbar-people-icons">
+                <button
+                  type="button"
+                  className="lp-icon-btn lp-subbar-core-icon"
+                  aria-label="Add person"
+                  onClick={openAdd}
+                >
+                  <UserPlus size={20} strokeWidth={2} />
+                </button>
+              </div>
               <div className="lp-dropdown-wrap" ref={sortWrapRef}>
                 <button
                   type="button"
@@ -2780,7 +2862,7 @@ export default function LandingPage() {
               transition={{ type: "spring", stiffness: 420, damping: 32, mass: 0.88 }}
             >
               <div className="lp-sched-row lp-sched-row-head">
-                <div className="lp-sched-corner" aria-hidden />
+                <div className="lp-sched-corner lp-sched-corner--empty" aria-hidden />
                 <div className="lp-sched-timeline lp-sched-sticky-top">
                   <div className="lp-cal-head">
                     <div
@@ -2887,6 +2969,7 @@ export default function LandingPage() {
                         handleTimelineClick={handleTimelineClick}
                         todayDateKey={todayDateKey}
                         dismissedAvailOffKeys={dismissedAvailOffKeys}
+                        showPeakLoadStatus={showPeakLoadStatus}
                       />
                     </div>
                   );

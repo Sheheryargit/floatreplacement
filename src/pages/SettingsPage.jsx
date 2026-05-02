@@ -1,6 +1,17 @@
-import { useCallback, useRef, useEffect } from "react";
+import { useCallback, useRef, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { HelpCircle, Bell, LogOut, Sparkles, Eclipse, SunMedium, MoonStar, Hexagon, Wand2 } from "lucide-react";
+import {
+  HelpCircle,
+  Bell,
+  LogOut,
+  Sparkles,
+  Eclipse,
+  SunMedium,
+  MoonStar,
+  Hexagon,
+  Wand2,
+  Rows3,
+} from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
 import { useAppTheme } from "../context/ThemeContext.jsx";
@@ -8,6 +19,11 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useSlapAnimation } from "../context/SlapAnimationContext.jsx";
 import { useAppDialog } from "../context/AppDialogContext.jsx";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
+import {
+  PEAK_LOAD_LABELS_CHANGED_EVENT,
+  readPeakLoadLabelsVisible,
+  writePeakLoadLabelsVisible,
+} from "../config/scheduleUiPrefs.js";
 import { SettingsItem } from "../components/ui/SettingsItem.jsx";
 import { ThemePreferenceControl } from "../components/ui/ThemePreferenceControl.jsx";
 import { PalettePreferenceControl } from "../components/ui/PalettePreferenceControl.jsx";
@@ -29,6 +45,18 @@ export default function SettingsPage() {
   const { openDialog } = useAppDialog();
   const navigate = useNavigate();
   const profileRef = useRef(null);
+  const [peakLoadLabels, setPeakLoadLabels] = useState(() => readPeakLoadLabelsVisible());
+
+  const setPeakLoadLabelsPreference = useCallback((next) => {
+    setPeakLoadLabels(next);
+    writePeakLoadLabelsVisible(next);
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setPeakLoadLabels(readPeakLoadLabelsVisible());
+    window.addEventListener(PEAK_LOAD_LABELS_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(PEAK_LOAD_LABELS_CHANGED_EVENT, sync);
+  }, []);
 
   useEffect(() => {
     if (window.location.hash === "#profile" && profileRef.current) {
@@ -131,6 +159,47 @@ export default function SettingsPage() {
               showChevron={false}
             >
               <PalettePreferenceControl value={palette} onChange={setPalettePreference} />
+            </SettingsItem>
+          </div>
+        </section>
+
+        <section className="settings-section" aria-labelledby="settings-schedule">
+          <h2 id="settings-schedule" className="settings-h2">
+            Schedule
+          </h2>
+          <p className="settings-section-desc">
+            Saved in this browser only. Turn off to hide Underallocated, On target, and Overallocated on each
+            person row.
+          </p>
+          <div className="settings-card settings-card--glow">
+            <SettingsItem
+              icon={Rows3}
+              label="Peak load labels"
+              subtext="Underallocated, On target, and Overallocated under each person when daily load is not on target."
+              showChevron={false}
+            >
+              <div className="settings-peak-labels-toggle" role="group" aria-label="Peak load labels">
+                <button
+                  type="button"
+                  className={
+                    "settings-peak-labels-btn" + (!peakLoadLabels ? " settings-peak-labels-btn--active" : "")
+                  }
+                  aria-pressed={!peakLoadLabels}
+                  onClick={() => setPeakLoadLabelsPreference(false)}
+                >
+                  Off
+                </button>
+                <button
+                  type="button"
+                  className={
+                    "settings-peak-labels-btn" + (peakLoadLabels ? " settings-peak-labels-btn--active" : "")
+                  }
+                  aria-pressed={peakLoadLabels}
+                  onClick={() => setPeakLoadLabelsPreference(true)}
+                >
+                  On
+                </button>
+              </div>
             </SettingsItem>
           </div>
         </section>

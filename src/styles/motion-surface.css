@@ -60,7 +60,8 @@ html[data-low-gpu="1"] .lp-leave-block--today:not(:hover) {
   animation: none !important;
 }
 
-html[data-low-gpu="1"] .lp-person-hours-overloaded {
+html[data-low-gpu="1"] .lp-person-hours-overloaded,
+html[data-low-gpu="1"] .lp-person-hours--load-over {
   animation: none !important;
 }
 

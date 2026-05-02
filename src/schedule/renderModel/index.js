@@ -5,7 +5,7 @@
  * test and less fragile when UI structure changes.
  */
 
-export { assignAllocationStackLevels } from "./stacking.js";
+export { assignAllocationStackLevels, assignAllocationStackLevelsByWorkWeek } from "./stacking.js";
 export {
   BAR_H_NORM,
   BAR_H_STEP,

@@ -176,6 +176,60 @@
   margin-left: auto;
 }
 
+.settings-peak-labels-toggle {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: 11px;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+:root[data-theme="light"] .settings-peak-labels-toggle {
+  background: #eef2f7;
+  border-color: #cbd5e1;
+}
+
+.settings-peak-labels-btn {
+  margin: 0;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  color: #94a3b8;
+  background: transparent;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+:root[data-theme="light"] .settings-peak-labels-btn {
+  color: #64748b;
+}
+
+.settings-peak-labels-btn:hover {
+  color: #e2e8f0;
+}
+
+:root[data-theme="light"] .settings-peak-labels-btn:hover {
+  color: #334155;
+}
+
+.settings-peak-labels-btn--active {
+  color: #f8fafc !important;
+  background: rgba(99, 102, 241, 0.45) !important;
+  box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.35);
+}
+
+:root[data-theme="light"] .settings-peak-labels-btn--active {
+  color: #fff !important;
+  background: linear-gradient(165deg, #4f46e5 0%, #4338ca 100%) !important;
+  box-shadow: 0 1px 4px rgba(67, 56, 202, 0.25);
+}
+
 @media (max-width: 640px) {
   .settings-main {
     padding: var(--space-6) var(--space-4) var(--space-8);
