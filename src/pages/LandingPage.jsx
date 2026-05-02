@@ -2307,12 +2307,18 @@ export default function LandingPage() {
   const scheduleFirefox =
     typeof navigator !== "undefined" && /firefox/i.test(navigator.userAgent || "");
 
+  const scheduleRowEstimatePx = useMemo(() => {
+    if (density === "compact") return 100;
+    if (density === "spacious") return 162;
+    return 124;
+  }, [density]);
+
   // scrollMargin must stay 0: the calendar header is a sibling above .lp-sched-virtual-rows in the
   // scroll flow. Non-zero scrollMargin would add the same offset again as empty space above row 0.
   const scheduleRowVirtualizer = useVirtualizer({
     count: schedulePeople.length,
     getScrollElement: () => scheduleViewportRef.current,
-    estimateSize: () => 148,
+    estimateSize: () => scheduleRowEstimatePx,
     overscan: 4,
     measureElement: scheduleFirefox ? undefined : virtualMeasureElement,
   });
@@ -2321,7 +2327,7 @@ export default function LandingPage() {
   scheduleRowVirtualizerRef.current = scheduleRowVirtualizer;
   useLayoutEffect(() => {
     scheduleRowVirtualizerRef.current.measure();
-  }, [scheduleModel, viewMode, customRange, colMinPx, schedulePeople.length]);
+  }, [scheduleModel, viewMode, customRange, colMinPx, schedulePeople.length, density, scheduleRowEstimatePx]);
 
   return (
     <div
