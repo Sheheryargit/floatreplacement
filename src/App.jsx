@@ -2,6 +2,7 @@ import React, { lazy, Suspense } from "react";
 import { BrowserRouter, useLocation, useRoutes, Navigate } from "react-router-dom";
 import { MotionConfig } from "framer-motion";
 import { ThemeProvider, useAppTheme } from "./context/ThemeContext.jsx";
+import { CenterActionFeedbackProvider } from "./context/CenterActionFeedbackContext.jsx";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { AppDialogProvider } from "./context/AppDialogContext.jsx";
 import { SlapAnimationProvider } from "./context/SlapAnimationContext.jsx";
@@ -165,7 +166,9 @@ export default function App() {
             <AppDataProvider>
               <GlobalBackground />
               <BrowserRouter>
-                <AuthGate />
+                <CenterActionFeedbackProvider>
+                  <AuthGate />
+                </CenterActionFeedbackProvider>
               </BrowserRouter>
             </AppDataProvider>
           </AppDialogProvider>

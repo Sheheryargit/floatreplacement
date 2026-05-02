@@ -3,7 +3,6 @@ import {
   Users,
   User,
   Plus,
-  Download,
   Trash2,
   Search,
   X,
@@ -37,6 +36,10 @@ import PersonModal, {
   avGrad,
 } from "../components/PersonModal.jsx";
 import { toast } from "sonner";
+import {
+  showCenterActionFeedback,
+  useAlloc8ActionFeedbackMount,
+} from "../context/CenterActionFeedbackContext.jsx";
 import { tagChromaProps } from "../utils/tagChroma.js";
 import {
   SCHEDULE_SORT_OPTIONS,
@@ -81,6 +84,7 @@ function toggleArr(list, v) {
 export default function PeoplePage() {
   const { theme: mode } = useAppTheme();
   const t = T[mode];
+  const setAlloc8FeedbackDock = useAlloc8ActionFeedbackMount();
 
   const {
     people,
@@ -223,11 +227,12 @@ export default function PeoplePage() {
       try {
         const saved = isSupabaseConfigured ? await syncAllocationCreate(createdDraft) : createdDraft;
         setAllocations((prev) => [...prev, saved]);
-        toast.success(payload.isLeave ? "Leave saved" : "Allocation saved", {
-          description: payload.isLeave
+        showCenterActionFeedback({
+          action: "add",
+          title: payload.isLeave ? "Leave saved" : "Saved",
+          subtitle: payload.isLeave
             ? `${payload.startDate} → ${payload.endDate}`
             : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
-          duration: 2800,
         });
       } catch (e) {
         toast.error("Save failed", { description: e?.message || String(e) });
@@ -460,8 +465,44 @@ export default function PeoplePage() {
   const toggleSel=(id)=>setSelected((p)=>{ const n=new Set(p); n.has(id)?n.delete(id):n.add(id); return n; });
   const toggleAll=()=>setSelected(selected.size===filteredSorted.length?new Set():new Set(filteredSorted.map((p)=>p.id)));
 
-  const doDelete=async()=>{ const c=selected.size; const ids=[...selected]; const prev=people; setPeople(people.filter((p)=>!selected.has(p.id))); setSelected(new Set()); setConfirmDel(false); try{ if(isSupabaseConfigured) await syncPeopleDelete(ids); toast.error(`${c} ${c===1?"person":"people"} removed`);} catch(e){ setPeople(prev); toast.error("Delete failed",{description:e?.message||String(e)});} };
-  const archivePerson=async(id)=>{ const p=people.find((x)=>x.id===id); const next={...p,archived:!p.archived}; const prev=people; setPeople(people.map((x)=>x.id===id?next:x)); setSelected(new Set()); try{ if(isSupabaseConfigured) await syncPersonUpdate(next); toast.warning(`${p.name} ${p.archived?"restored":"archived"}`);} catch(e){ setPeople(prev); toast.error("Update failed",{description:e?.message||String(e)});} };
+  const doDelete = async () => {
+    const c = selected.size;
+    const ids = [...selected];
+    const prev = people;
+    setPeople(people.filter((p) => !selected.has(p.id)));
+    setSelected(new Set());
+    setConfirmDel(false);
+    try {
+      if (isSupabaseConfigured) await syncPeopleDelete(ids);
+      showCenterActionFeedback({
+        action: "remove",
+        title: "Removed",
+        subtitle: `${c} ${c === 1 ? "person" : "people"} removed from the directory.`,
+      });
+    } catch (e) {
+      setPeople(prev);
+      toast.error("Delete failed", { description: e?.message || String(e) });
+    }
+  };
+
+  const archivePerson = async (id) => {
+    const p = people.find((x) => x.id === id);
+    const next = { ...p, archived: !p.archived };
+    const prev = people;
+    setPeople(people.map((x) => (x.id === id ? next : x)));
+    setSelected(new Set());
+    try {
+      if (isSupabaseConfigured) await syncPersonUpdate(next);
+      showCenterActionFeedback({
+        action: "update",
+        title: next.archived ? "Archived" : "Restored",
+        subtitle: p.name,
+      });
+    } catch (e) {
+      setPeople(prev);
+      toast.error("Update failed", { description: e?.message || String(e) });
+    }
+  };
 
   const openAdd=()=>{ setEditingPerson(null); setModalOpen(true); };
   const openEdit=(person)=>{ setEditingPerson(person); setModalOpen(true); };
@@ -493,7 +534,11 @@ export default function PeoplePage() {
       try{
         const saved = isSupabaseConfigured ? await syncPersonUpdate(draft) : draft;
         setPeople(people.map((p)=>p.id===editingPerson.id?saved:p).sort((a,b)=>a.name.localeCompare(b.name)));
-        toast.success(`${form.name} updated`);
+        showCenterActionFeedback({
+          action: "update",
+          title: "Updated",
+          subtitle: (form.name || editingPerson.name || "").trim() || "Person",
+        });
         await syncAvailAfterSave(saved);
         setModalOpen(false); setEditingPerson(null);
       } catch(e){
@@ -505,7 +550,11 @@ export default function PeoplePage() {
       try{
         const saved = isSupabaseConfigured ? await syncPersonCreate(draft) : draft;
         setPeople([...people,saved].sort((a,b)=>a.name.localeCompare(b.name)));
-        toast.success(`${form.name} added to directory`);
+        showCenterActionFeedback({
+          action: "add",
+          title: "Saved",
+          subtitle: (form.name || "").trim() || "New person",
+        });
         await syncAvailAfterSave(saved);
         setModalOpen(false); setEditingPerson(null);
       } catch(e){
@@ -799,14 +848,17 @@ export default function PeoplePage() {
                 </div>
               )}
             </div>
-            <Button type="button" variant="secondary" size="md" style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <Download size={14} /> Import
-            </Button>
             <Button type="button" variant="primary" size="md" onClick={openAdd} style={{ display: "flex", alignItems: "center", gap: 7 }}>
               <UserPlus size={14} /> Add person
             </Button>
           </div>
         </header>
+
+        <div
+          ref={setAlloc8FeedbackDock}
+          data-alloc8-action-feedback-mount
+          className="people-action-feedback-mount"
+        />
 
         {/* Active / Archived Tabs + Bulk Delete */}
         <div className="people-page-toolbar" style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,marginTop:8,flexWrap:"wrap",gap:10 }}>

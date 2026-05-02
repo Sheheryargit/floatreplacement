@@ -9,12 +9,15 @@ import { FloatSelect, FloatPersonPicker } from "../components/ui/FloatSelect.jsx
 import { PROJECT_COLOR_PALETTE, avatarGradientFromName } from "../utils/projectColors.js";
 import { tagChromaProps } from "../utils/tagChroma.js";
 import { toast } from "sonner";
+import {
+  showCenterActionFeedback,
+  useAlloc8ActionFeedbackMount,
+} from "../context/CenterActionFeedbackContext.jsx";
 import { useFixedAnchorDropdown } from "../hooks/useFixedAnchorDropdown.js";
 import {
   Users,
   FolderOpen,
   Plus,
-  Download,
   Trash2,
   Search,
   X,
@@ -433,6 +436,7 @@ export default function ProjectsPage(){
   const[editingProject,setEditingProject]=useState(null);
   const[confirmDel,setConfirmDel]=useState(false);
   const[mounted,setMounted]=useState(false);
+  const setAlloc8FeedbackDock = useAlloc8ActionFeedbackMount();
 
   useEffect(()=>{setMounted(true);},[]);
 
@@ -441,28 +445,83 @@ export default function ProjectsPage(){
   const archivedCount=projects.filter(p=>p.archived).length;
   const toggleSel=id=>setSelected(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
   const toggleAll=()=>setSelected(selected.size===filtered.length?new Set():new Set(filtered.map(p=>p.id)));
-  const doDelete=async()=>{const c=selected.size;const ids=[...selected];const prev=projects;setProjects(projects.filter(p=>!selected.has(p.id)));setSelected(new Set());setConfirmDel(false);try{if(isSupabaseConfigured) await syncProjectsDelete(ids);toast.error(`${c} project${c===1?"":"s"} removed`);}catch(e){setProjects(prev);toast.error("Delete failed",{description:e?.message||String(e)});} };
-  const archiveProject=async(id)=>{const p=projects.find(x=>x.id===id);const next={...p,archived:!p.archived};const prev=projects;setProjects(projects.map(x=>x.id===id?next:x));setSelected(new Set());try{if(isSupabaseConfigured) await syncProjectUpdate(next);toast.warning(`${p.name} ${p.archived?"restored":"archived"}`);}catch(e){setProjects(prev);toast.error("Update failed",{description:e?.message||String(e)});} };
+  const doDelete = async () => {
+    const c = selected.size;
+    const ids = [...selected];
+    const prev = projects;
+    setProjects(projects.filter((p) => !selected.has(p.id)));
+    setSelected(new Set());
+    setConfirmDel(false);
+    try {
+      if (isSupabaseConfigured) await syncProjectsDelete(ids);
+      showCenterActionFeedback({
+        action: "remove",
+        title: "Removed",
+        subtitle: `${c} project${c === 1 ? "" : "s"} removed from the registry.`,
+      });
+    } catch (e) {
+      setProjects(prev);
+      toast.error("Delete failed", { description: e?.message || String(e) });
+    }
+  };
+
+  const archiveProject = async (id) => {
+    const p = projects.find((x) => x.id === id);
+    const next = { ...p, archived: !p.archived };
+    const prev = projects;
+    setProjects(projects.map((x) => (x.id === id ? next : x)));
+    setSelected(new Set());
+    try {
+      if (isSupabaseConfigured) await syncProjectUpdate(next);
+      showCenterActionFeedback({
+        action: "update",
+        title: next.archived ? "Archived" : "Restored",
+        subtitle: p.name,
+      });
+    } catch (e) {
+      setProjects(prev);
+      toast.error("Update failed", { description: e?.message || String(e) });
+    }
+  };
   const openAdd=()=>{setEditingProject(null);setModalOpen(true);};
   const openEdit=p=>{setEditingProject(p);setModalOpen(true);};
-  const handleSave=async(form)=>{const clean={...form};delete clean._colorOpen;
-    if(editingProject){
-      const draft={...clean,id:editingProject.id,archived:editingProject.archived};
-      try{
-        const saved=isSupabaseConfigured? await syncProjectUpdate(draft):draft;
-        setProjects(projects.map(p=>p.id===editingProject.id?saved:p).sort((a,b)=>a.name.localeCompare(b.name)));
-        toast.success(`${form.name} updated`);
-        setModalOpen(false);setEditingProject(null);
-      }catch(e){toast.error("Update failed",{description:e?.message||String(e)});}
+  const handleSave = async (form) => {
+    const clean = { ...form };
+    delete clean._colorOpen;
+    if (editingProject) {
+      const draft = { ...clean, id: editingProject.id, archived: editingProject.archived };
+      try {
+        const saved = isSupabaseConfigured ? await syncProjectUpdate(draft) : draft;
+        setProjects(projects.map((p) => (p.id === editingProject.id ? saved : p)).sort((a, b) => a.name.localeCompare(b.name)));
+        showCenterActionFeedback({
+          action: "update",
+          title: "Updated",
+          subtitle: (form.name || "").trim() || editingProject.name || "Project",
+        });
+        setModalOpen(false);
+        setEditingProject(null);
+      } catch (e) {
+        toast.error("Update failed", { description: e?.message || String(e) });
+      }
     } else {
-      const tempId=typeof crypto!=="undefined"&&typeof crypto.randomUUID==="function"?crypto.randomUUID():`tmp_${Date.now()}`;
-      const draft={...clean,id:tempId,archived:false};
-      try{
-        const saved=isSupabaseConfigured? await syncProjectCreate(draft):draft;
-        setProjects([...projects,saved].sort((a,b)=>a.name.localeCompare(b.name)));
-        toast.success(`${form.name} created`);
-        setModalOpen(false);setEditingProject(null);
-      }catch(e){toast.error("Save failed",{description:e?.message||String(e)});}
+      const tempId =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `tmp_${Date.now()}`;
+      const draft = { ...clean, id: tempId, archived: false };
+      try {
+        const saved = isSupabaseConfigured ? await syncProjectCreate(draft) : draft;
+        setProjects([...projects, saved].sort((a, b) => a.name.localeCompare(b.name)));
+        showCenterActionFeedback({
+          action: "add",
+          title: "Saved",
+          subtitle: (form.name || "").trim() || "New project",
+        });
+        setModalOpen(false);
+        setEditingProject(null);
+      } catch (e) {
+        toast.error("Save failed", { description: e?.message || String(e) });
+      }
     }
   };
   const handleModalArchive=()=>{if(editingProject){archiveProject(editingProject.id);setModalOpen(false);setEditingProject(null);}};
@@ -476,10 +535,15 @@ export default function ProjectsPage(){
           <h1 style={{fontSize:26,fontWeight:700,margin:0,letterSpacing:-0.5}}>Projects</h1>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
             <div style={{position:"relative"}}><Search size={15} style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:t.textMuted}}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search projects…" style={{width:search?240:180,background:t.surface,border:`1.5px solid ${t.borderIn}`,borderRadius:8,padding:"8px 12px 8px 34px",color:t.text,fontSize:13,outline:"none",transition:"all 0.25s"}} onFocus={e=>{e.target.style.width="240px";e.target.style.borderColor=t.focus;e.target.style.boxShadow=`0 0 0 3px ${t.accentGlow}`;}} onBlur={e=>{if(!search)e.target.style.width="180px";e.target.style.borderColor=t.borderIn;e.target.style.boxShadow="none";}}/>{search&&<X size={14} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",color:t.textMuted,cursor:"pointer"}} onClick={()=>setSearch("")}/>}</div>
-            <Button type="button" variant="secondary" size="md" style={{ display: "flex", alignItems: "center", gap: 7 }}><Download size={14}/> Import</Button>
             <Button type="button" variant="primary" size="md" onClick={openAdd} style={{ display: "flex", alignItems: "center", gap: 7 }}><Plus size={14}/> Add project</Button>
           </div>
         </header>
+
+        <div
+          ref={setAlloc8FeedbackDock}
+          data-alloc8-action-feedback-mount
+          className="projects-action-feedback-mount"
+        />
 
         {/* Tabs + Bulk */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,marginTop:8}}>
@@ -538,6 +602,7 @@ export default function ProjectsPage(){
         @keyframes rowIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
         @keyframes toastIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
         @keyframes toastOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(30px)}}
+        .projects-action-feedback-mount{width:100%;height:0;flex-shrink:0;min-height:0;position:relative;overflow:visible;z-index:60}
         *{box-sizing:border-box}
         ::-webkit-scrollbar{width:7px}
         ::-webkit-scrollbar-track{background:transparent}

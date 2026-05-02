@@ -33,6 +33,7 @@ import {
   Plus,
   Repeat2,
   Rows3,
+  Send,
   Share,
   SlidersHorizontal,
   Star,
@@ -54,6 +55,11 @@ import {
 import { ScheduleAllocationFilterMenu } from "../components/ScheduleAllocationFilterMenu.jsx";
 import { useSchedulePageData } from "../hooks/useSchedulePageData.js";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
+import { InviteMemberDialog } from "../components/InviteMemberDialog.jsx";
+import {
+  showCenterActionFeedback,
+  useAlloc8ActionFeedbackMount,
+} from "../context/CenterActionFeedbackContext.jsx";
 import { useTimelineScrollController } from "../schedule/useTimelineScrollController.js";
 import { ProjectModal } from "./ProjectsPage.jsx";
 import { syncPersonAvailabilityFromForm } from "../lib/api/personAvailability.js";
@@ -1536,6 +1542,7 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const { theme } = useAppTheme();
   const t = T[theme];
+  const setAlloc8FeedbackDock = useAlloc8ActionFeedbackMount();
 
   const {
     people,
@@ -1664,6 +1671,7 @@ export default function LandingPage() {
 
   const [scheduleFilterOpen, setScheduleFilterOpen] = useState(false);
   const [starredPopoverOpen, setStarredPopoverOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   useEffect(() => {
     function onDoc(e) {
@@ -2030,12 +2038,12 @@ export default function LandingPage() {
       try {
         const saved = isSupabaseConfigured ? await syncAllocationCreate(createdDraft) : createdDraft;
         setAllocations((prev) => [...prev, saved]);
-        toast.success(payload.isLeave ? "Leave saved" : "Allocation saved", {
-          description: payload.isLeave
+        showCenterActionFeedback({
+          action: "add",
+          title: payload.isLeave ? "Leave saved" : "Saved",
+          subtitle: payload.isLeave
             ? `${payload.startDate} → ${payload.endDate}`
             : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
-          duration: 2800,
-          className: "float-schedule-view-toast",
         });
       } catch (e) {
         toast.error("Save failed", { description: e?.message || String(e) });
@@ -2094,12 +2102,12 @@ export default function LandingPage() {
       try {
         const saved = isSupabaseConfigured ? await syncAllocationUpdate(merged) : merged;
         setAllocations((prev) => prev.map((a) => (a.id === id ? saved : a)));
-        toast.success(payload.isLeave ? "Leave updated" : "Allocation updated", {
-          description: payload.isLeave
+        showCenterActionFeedback({
+          action: "update",
+          title: payload.isLeave ? "Leave updated" : "Updated",
+          subtitle: payload.isLeave
             ? `${payload.startDate} → ${payload.endDate}`
             : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
-          duration: 2600,
-          className: "float-schedule-view-toast",
         });
       } catch (e) {
         if (e?.name === "OptimisticLockError") {
@@ -2127,8 +2135,10 @@ export default function LandingPage() {
             next.add(key);
             return next;
           });
-          toast.success("Off block removed", {
-            description: "This hides just that day. Weekly availability stays unchanged.",
+          showCenterActionFeedback({
+            action: "remove",
+            title: "Removed",
+            subtitle: "That day is hidden. Weekly availability stays unchanged.",
           });
         } else {
           toast.error("Couldn't remove this block");
@@ -2144,7 +2154,11 @@ export default function LandingPage() {
           return cur.filter((a) => a.id !== alloc.id);
         });
         if (!isSupabaseConfigured) {
-          toast.success("Public holiday removed from schedule");
+          showCenterActionFeedback({
+            action: "remove",
+            title: "Removed",
+            subtitle: "Public holiday removed from this schedule.",
+          });
           return;
         }
         try {
@@ -2154,7 +2168,11 @@ export default function LandingPage() {
             name: alloc.notes,
           });
           await refreshWorkspaceFromSupabase();
-          toast.success("Public holiday removed from schedule");
+          showCenterActionFeedback({
+            action: "remove",
+            title: "Removed",
+            subtitle: "Public holiday removed from this schedule.",
+          });
         } catch (e) {
           if (removedHoliday) {
             setPublicHolidayAllocations((cur) => {
@@ -2170,7 +2188,11 @@ export default function LandingPage() {
       setAllocations((cur) => cur.filter((a) => a.id !== alloc.id));
       try {
         if (isSupabaseConfigured) await syncAllocationDelete(alloc.id);
-        toast.success("Allocation deleted");
+        showCenterActionFeedback({
+          action: "remove",
+          title: "Removed",
+          subtitle: "Allocation removed from the schedule.",
+        });
       } catch (e) {
         setAllocations((cur) => [...cur, prev]);
         toast.error("Delete failed", { description: e?.message || String(e) });
@@ -2241,7 +2263,11 @@ export default function LandingPage() {
       try {
         const saved = isSupabaseConfigured ? await syncPersonUpdate(draft) : draft;
         setPeople(people.map((p) => (p.id === editingPerson.id ? saved : p)).sort((a, b) => a.name.localeCompare(b.name)));
-        toast.success(`${form.name} updated`);
+        showCenterActionFeedback({
+          action: "update",
+          title: "Updated",
+          subtitle: (form.name || editingPerson.name || "").trim() || "Person",
+        });
         await syncAvailAfterSave(saved);
         setModalOpen(false);
         setEditingPerson(null);
@@ -2257,7 +2283,11 @@ export default function LandingPage() {
       try {
         const saved = isSupabaseConfigured ? await syncPersonCreate(draft) : draft;
         setPeople([...people, saved].sort((a, b) => a.name.localeCompare(b.name)));
-        toast.success(`${form.name} added to directory`);
+        showCenterActionFeedback({
+          action: "add",
+          title: "Saved",
+          subtitle: (form.name || "").trim() || "New person",
+        });
         await syncAvailAfterSave(saved);
         setModalOpen(false);
         setEditingPerson(null);
@@ -2273,7 +2303,11 @@ export default function LandingPage() {
     setPeople(people.map((p) => (p.id === editingPerson.id ? next : p)));
     try {
       if (isSupabaseConfigured) await syncPersonUpdate(next);
-      toast.warning(`${editingPerson.name} ${editingPerson.archived ? "restored" : "archived"}`);
+      showCenterActionFeedback({
+        action: "update",
+        title: next.archived ? "Archived" : "Restored",
+        subtitle: editingPerson.name,
+      });
       setModalOpen(false);
       setEditingPerson(null);
     } catch (e) {
@@ -2590,6 +2624,25 @@ export default function LandingPage() {
                 )}
               </div>
 
+              <motion.button
+                type="button"
+                className="lp-icon-btn lp-invite-toolbar-btn"
+                aria-label="Invite team member"
+                onClick={() => {
+                  setInviteOpen(true);
+                  setViewMenuOpen(false);
+                  setDensityOpen(false);
+                  setAddMenuOpen(false);
+                  setScheduleFilterOpen(false);
+                  setStarredPopoverOpen(false);
+                }}
+                whileHover={{ scale: 1.07 }}
+                whileTap={{ scale: 0.93 }}
+                transition={{ type: "spring", stiffness: 520, damping: 28 }}
+              >
+                <Send size={18} strokeWidth={2.25} className="lp-invite-tray-ico" />
+              </motion.button>
+
               <button type="button" className="lp-icon-btn" aria-label="Share">
                 <Share size={18} />
               </button>
@@ -2654,6 +2707,12 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
+
+          <div
+            ref={setAlloc8FeedbackDock}
+            data-alloc8-action-feedback-mount
+            className="lp-schedule-feedback-mount"
+          />
 
           <div className="lp-subbar">
             <div className="lp-subbar-people">
@@ -3057,6 +3116,8 @@ export default function LandingPage() {
         t={t}
       />
 
+      <InviteMemberDialog open={inviteOpen} onOpenChange={setInviteOpen} />
+
       <ProjectModal
         open={projectCreateOpen}
         onClose={() => setProjectCreateOpen(false)}
@@ -3071,7 +3132,11 @@ export default function LandingPage() {
           try {
             const saved = isSupabaseConfigured ? await syncProjectCreate(draft) : draft;
             setProjects([...projects, saved].sort((a, b) => a.name.localeCompare(b.name)));
-            toast.success(`Project "${form.name}" created!`);
+            showCenterActionFeedback({
+              action: "add",
+              title: "Saved",
+              subtitle: (form.name || "").trim() || "New project",
+            });
             setProjectCreateOpen(false);
           } catch (e) {
             toast.error("Save failed", { description: e?.message || String(e) });

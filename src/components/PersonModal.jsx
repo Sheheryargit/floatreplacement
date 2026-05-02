@@ -6,12 +6,16 @@ import {
   Plus, Trash2, X, ChevronRight,
   AlertTriangle, UserPlus, Shield, Clock,
   Palmtree, Briefcase, Tag, DollarSign, Mail, Info, Calendar,
-  Archive, ArchiveRestore, Save, MoreHorizontal, Pencil,
+  Archive, ArchiveRestore, Save, MoreHorizontal, Pencil, Bell,
 } from "lucide-react";
 import { Button } from "./ui/Button.jsx";
+import { SettingsItem } from "./ui/SettingsItem.jsx";
+import { useAppDialog } from "../context/AppDialogContext.jsx";
+import { useSlapAnimation } from "../context/SlapAnimationContext.jsx";
 import { tagChromaProps } from "../utils/tagChroma.js";
 import { projectToAllocationLabel, avatarGradientFromName } from "../utils/projectColors.js";
 import { toast } from "sonner";
+import { showCenterActionFeedback } from "../context/CenterActionFeedbackContext.jsx";
 import { DepartmentSelector } from "./DepartmentSelector.jsx";
 import { FloatSelect } from "./ui/FloatSelect.jsx";
 import {
@@ -699,6 +703,7 @@ function ProjectsTab({
   syncAllocationUpdate,
   onOpenCreateAllocation,
   onRefreshWorkspace,
+  onProjectsLockedHint,
 }) {
   const [pickKey, setPickKey] = useState(0);
   const personId = editPerson?.id;
@@ -783,19 +788,24 @@ function ProjectsTab({
         }
       }
     }
-    toast.success("Schedule updated", { description: `Removed from ${pl}` });
+    showCenterActionFeedback({
+      action: "remove",
+      title: "Removed",
+      subtitle: `No longer assigned to ${pl}.`,
+    });
   };
 
   if (!editPerson) {
     return (
-      <div style={{ textAlign:"center",padding:"40px 20px",color:t.textMuted }}>
-        <div style={{ width:52,height:52,borderRadius:14,background:t.accentGlow,display:"inline-flex",alignItems:"center",justifyContent:"center",marginBottom:14 }}>
-          <FolderOpen size={22} style={{ color:t.accent }} />
-        </div>
-        <div style={{ fontSize:15,fontWeight:600,color:t.textSoft,marginBottom:6 }}>Save the person first</div>
-        <div style={{ fontSize:13,color:t.textDim,lineHeight:1.55,maxWidth:360,margin:"0 auto" }}>
-          Once they are in the directory, you can link them to projects here or from the Schedule.
-        </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <SettingsItem
+          icon={Bell}
+          label="Project assignments"
+          subtext="Save this person first — then link projects from here or the Schedule."
+          dim
+          showChevron
+          onClick={onProjectsLockedHint}
+        />
       </div>
     );
   }
@@ -919,11 +929,21 @@ function PersonModal({
   tagTheme = "dark",
 }) {
   const tagIsDark = tagTheme === "dark";
+  const { openDialog } = useAppDialog();
+  const { triggerSlap } = useSlapAnimation();
   const [tab, setTab] = useState(0);
   const [form, setForm] = useState(null);
   const [dirty, setDirty] = useState(false);
   const ref = useRef(null);
   const isEdit = !!editPerson;
+
+  const onProjectsLockedHint = useCallback(async () => {
+    await triggerSlap();
+    openDialog({
+      title: "Save this person first",
+      message: "Once they're in the directory, you can assign projects from this tab or from the Schedule.",
+    });
+  }, [triggerSlap, openDialog]);
 
   useEffect(() => {
     if (open) {
@@ -1082,6 +1102,7 @@ function PersonModal({
               syncAllocationUpdate={syncAllocationUpdate}
               onOpenCreateAllocation={onOpenCreateAllocation}
               onRefreshWorkspace={onRefreshWorkspace}
+              onProjectsLockedHint={onProjectsLockedHint}
             />
           )}
         </div>

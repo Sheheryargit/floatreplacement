@@ -377,6 +377,17 @@
   flex-wrap: wrap;
 }
 
+/* Portal target: zero height so the pill overlays the gap without shifting the schedule. */
+.lp-schedule-feedback-mount {
+  width: 100%;
+  height: 0;
+  flex-shrink: 0;
+  min-height: 0;
+  position: relative;
+  overflow: visible;
+  z-index: 60;
+}
+
 .lp-btn-secondary {
   position: relative;
   display: inline-flex;
@@ -794,6 +805,27 @@
 .lp-icon-btn-active {
   color: var(--accent) !important;
   background: var(--accent-glow) !important;
+}
+
+.lp-icon-btn.lp-invite-toolbar-btn {
+  color: color-mix(in srgb, var(--accent) 88%, var(--text-muted));
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent),
+    0 0 20px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.lp-icon-btn.lp-invite-toolbar-btn:hover {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 42%, transparent),
+    0 0 28px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.lp-invite-tray-ico {
+  transform: rotate(-16deg);
+  display: block;
 }
 
 /* Schedule “+” — same control in header and next to each name (high contrast, black on light). */

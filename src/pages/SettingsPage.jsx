@@ -11,6 +11,7 @@ import {
   Hexagon,
   Wand2,
   Rows3,
+  Send,
 } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
@@ -27,6 +28,7 @@ import {
 import { SettingsItem } from "../components/ui/SettingsItem.jsx";
 import { ThemePreferenceControl } from "../components/ui/ThemePreferenceControl.jsx";
 import { PalettePreferenceControl } from "../components/ui/PalettePreferenceControl.jsx";
+import { InviteMemberDialog } from "../components/InviteMemberDialog.jsx";
 import "./SettingsPage.css";
 
 const APPEARANCE_ICONS = [
@@ -46,6 +48,7 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const profileRef = useRef(null);
   const [peakLoadLabels, setPeakLoadLabels] = useState(() => readPeakLoadLabelsVisible());
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   const setPeakLoadLabelsPreference = useCallback((next) => {
     setPeakLoadLabels(next);
@@ -204,6 +207,25 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        <section className="settings-section" aria-labelledby="settings-team">
+          <h2 id="settings-team" className="settings-h2">
+            Team
+          </h2>
+          <p className="settings-section-desc">
+            Super-admin only. Add people by email and set their role before they sign in. Delivery is still a
+            placeholder.
+          </p>
+          <div className="settings-card settings-card--glow">
+            <SettingsItem
+              icon={Send}
+              label="Invite team members"
+              subtext="Opens a centered invite dialog — email, role, then send."
+              showChevron
+              onClick={() => setInviteOpen(true)}
+            />
+          </div>
+        </section>
+
         <section className="settings-section" aria-labelledby="settings-support">
           <h2 id="settings-support" className="settings-h2">
             Support
@@ -246,6 +268,8 @@ export default function SettingsPage() {
           </div>
         </section>
       </main>
+
+      <InviteMemberDialog layout="full" open={inviteOpen} onOpenChange={setInviteOpen} />
     </div>
   );
 }
