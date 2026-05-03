@@ -95,7 +95,8 @@
 }
 
 .lpam-modal > .lpam-head,
-.lpam-modal > .lpam-tabs--motion {
+.lpam-modal > .lpam-tabs--motion,
+.lpam-modal > .lpam-create-tabs-premium {
   flex-shrink: 0;
 }
 
@@ -795,8 +796,9 @@
   font-size: 12px;
 }
 
-/* Allocation detail shell — prod-style close pill, discreet extend drawer, footer CTAs */
-.lpam-modal.lpam-detail .lpam-icon-close {
+/* Shared allocation modals — circular close matches production */
+.lpam-modal.lpam-detail .lpam-icon-close,
+.lpam-modal.lpam-create .lpam-icon-close {
   display: inline-flex;
   width: 40px;
   height: 40px;
@@ -810,13 +812,137 @@
     transform 0.18s ease;
 }
 
-:root[data-theme="light"] .lpam-modal.lpam-detail .lpam-icon-close {
+:root[data-theme="light"] .lpam-modal.lpam-detail .lpam-icon-close,
+:root[data-theme="light"] .lpam-modal.lpam-create .lpam-icon-close {
   border-color: rgba(15, 23, 42, 0.12);
 }
 
-.lpam-modal.lpam-detail .lpam-icon-close:hover {
+.lpam-modal.lpam-detail .lpam-icon-close:hover,
+.lpam-modal.lpam-create .lpam-icon-close:hover {
   border-radius: 999px !important;
   background: color-mix(in srgb, var(--color-brand, #0088ff) 14%, transparent) !important;
+}
+
+/* Create / edit — segmented Allocation | Leave chrome */
+.lpam-create-tabs-premium {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 5px;
+  margin: 2px 0 18px;
+  border-radius: 14px;
+  box-sizing: border-box;
+}
+
+:root[data-theme="dark"] .lpam-create-tabs-premium {
+  background: color-mix(in srgb, #fff 5%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.045),
+    0 6px 24px rgba(0, 0, 0, 0.22);
+}
+
+:root[data-theme="light"] .lpam-create-tabs-premium {
+  background: color-mix(in srgb, #0f172a 4%, #f8fafc);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 0 0 1px rgba(15, 23, 42, 0.07),
+    0 4px 18px rgba(15, 23, 42, 0.05);
+}
+
+.lpam-create-tab-chip {
+  border: none;
+  border-radius: 11px;
+  padding: 11px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  transition:
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.18s ease,
+    opacity 0.18s ease;
+  background: transparent;
+}
+
+.lpam-create-tab-chip:focus-visible {
+  outline: 2px solid var(--color-brand, #0088ff);
+  outline-offset: 2px;
+}
+
+.lpam-create-tab-chip:active:not(:disabled) {
+  transform: scale(0.982);
+}
+
+.lpam-create-tab-chip--disabled {
+  pointer-events: none;
+}
+
+:root[data-theme="dark"] .lpam-create-tab-chip:not(.lpam-create-tab-chip--active):hover:not(:disabled) {
+  background: color-mix(in srgb, #fff 6%, transparent);
+}
+
+:root[data-theme="light"] .lpam-create-tab-chip:not(.lpam-create-tab-chip--active):hover {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+/* Stage card inside create modal — cohesive inset surface */
+:root[data-theme="dark"] .lpam-modal.lpam-create .lpam-create-stage {
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, #ffffff 6%, transparent) 0%,
+    color-mix(in srgb, #fff 3%, transparent) 100%
+  ) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 10px 32px rgba(0, 0, 0, 0.2) !important;
+}
+
+:root[data-theme="light"] .lpam-modal.lpam-create .lpam-create-stage {
+  background: #fff !important;
+  border-color: color-mix(in srgb, var(--color-border, #e0e4ef) 92%, transparent) !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.95) inset,
+    0 10px 28px rgba(15, 23, 42, 0.05) !important;
+}
+
+.lpam-modal.lpam-create .lpam-create-actions {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: stretch;
+  gap: 10px;
+}
+
+@media (min-width: 480px) {
+  .lpam-modal.lpam-create .lpam-create-actions {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}
+
+.lpam-modal.lpam-create .lpam-create-actions .lpam-btn-primary:not(.lpam-btn-leave) {
+  background-image: linear-gradient(180deg, #1aa3ff 0%, var(--color-brand, #0088ff) 100%);
+  box-shadow:
+    0 8px 28px rgba(0, 136, 255, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.lpam-modal.lpam-create .lpam-create-actions .lpam-btn-primary:not(.lpam-btn-leave):hover:not(:disabled) {
+  filter: brightness(1.045);
+}
+
+.lpam-modal.lpam-create .lpam-create-actions .lpam-btn-secondary {
+  font-weight: 700;
+  border-radius: 10px;
 }
 
 .lpam-detail-extend-drawer {
@@ -1225,4 +1351,35 @@
   .lpam-extend-chip:active {
     transform: none;
   }
+}
+
+/* Schedule v2: template row + PH chips */
+.lpam-template-field {
+  margin-top: 10px;
+}
+
+.lpam-ph-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lpam-ph-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11.5px;
+  font-weight: 620;
+  line-height: 1.25;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(180, 120, 0, 0.35);
+}
+
+:root[data-theme="light"] .lpam-ph-chip {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.lpam-ph-overlap-box--v2 {
+  border-radius: 8px !important;
 }

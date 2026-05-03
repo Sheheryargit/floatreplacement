@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } fr
 import { createPortal } from "react-dom";
 import * as Dialog from "@radix-ui/react-dialog";
 import { toast } from "sonner";
-import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { X, ChevronDown, ArrowLeftRight, Zap, Trash2, Palmtree, ArrowRight } from "lucide-react";
 import {
   resolveColorForProjectLabel,
@@ -21,6 +21,7 @@ import {
   addCalendarWeeksToIsoLocal,
   allocationTotalHoursRounded,
 } from "../utils/allocationWorkMetrics.js";
+import { suggestHoursPerDayFromAllocations } from "../lib/suggestHoursPremiumV2.js";
 
 const REPEAT_OPTIONS = [
   { id: "none", label: "Doesn't repeat" },
@@ -154,11 +155,15 @@ export function CreateAllocationModal({
   defaultTab = "allocation",
   publicHolidayAllocations = [],
   t,
+  premiumV2Enabled = false,
+  premiumV2Templates,
 }) {
+  const tplList = premiumV2Templates ?? [];
   /** Static UI clamps CSS animations globally — pair with `.lpam-modal` static-ui overrides to avoid invisible panels. */
   const clampMotion = useReducedMotion() || isStaticUi();
   const hoursMode = "Hours";
   const [activeTab, setActiveTab] = useState("allocation");
+  const [templatePresetId, setTemplatePresetId] = useState("");
   const [hoursPerDay, setHoursPerDay] = useState("7.5");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -194,6 +199,7 @@ export function CreateAllocationModal({
   useEffect(() => {
     if (!open) return;
     if (editAllocation) {
+      setTemplatePresetId("");
       setStartDate(editAllocation.startDate || "");
       setEndDate(editAllocation.endDate || "");
       setHoursPerDay(editAllocation.hoursPerDay ? String(editAllocation.hoursPerDay) : "7.5");
@@ -229,13 +235,27 @@ export function CreateAllocationModal({
     }
     setStartDate(iso);
     setEndDate(iso);
-    setHoursPerDay("7.5");
     const list = projects.length ? projects : ALLOCATION_PROJECT_SEED;
     const pre = preselectProject != null ? String(preselectProject).trim() : "";
     const nextProj = pre || list[0] || "";
     if (pre) setProject(pre);
     else setProject(list[0] ?? "");
     setAllocationProjectId(resolveProjectIdForCanonicalLabel(nextProj, projectRegistry));
+    const nextAssigned =
+      preselectPerson != null ? [preselectPerson.id] : people[0] != null ? [people[0].id] : [];
+    let hoursDefault = "7.5";
+    if (
+      premiumV2Enabled &&
+      defaultTab !== "leave" &&
+      nextAssigned.length > 0
+    ) {
+      const sug = suggestHoursPerDayFromAllocations(allocations, nextAssigned, nextProj);
+      if (sug != null && Number.isFinite(sug) && sug > 0) {
+        const rounded = Math.round(sug * 100) / 100;
+        hoursDefault = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+      }
+    }
+    setHoursPerDay(hoursDefault);
     setNotes("");
     setRepeatId("none");
     setRepeatOpen(false);
@@ -248,9 +268,8 @@ export function CreateAllocationModal({
     setLeaveTypeOpen(false);
     setLeaveNotes("");
     setLeaveHoursPerDay("7.5");
-    if (preselectPerson) setAssignedIds([preselectPerson.id]);
-    else if (people[0]) setAssignedIds([people[0].id]);
-    else setAssignedIds([]);
+    setAssignedIds(nextAssigned);
+    setTemplatePresetId("");
   }, [
     open,
     preselectPerson,
@@ -261,6 +280,8 @@ export function CreateAllocationModal({
     projectRegistry,
     editAllocation,
     defaultTab,
+    allocations,
+    premiumV2Enabled,
   ]);
 
   useEffect(() => {
@@ -517,14 +538,17 @@ export function CreateAllocationModal({
   return (
     <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="lpam-overlay-radix" />
+        <Dialog.Overlay
+          className={
+            "lpam-overlay-radix" + (!editAllocation ? " lpam-overlay-radix--create-new" : "")
+          }
+        />
         <Dialog.Content
           className={
             "lpam-modal lpam-create float-premium-modal" +
             (projectOpen ? " lpam-modal--project-picker-open" : "")
           }
           style={{
-            background: t.surface,
             color: t.text,
           }}
         >
@@ -544,21 +568,28 @@ export function CreateAllocationModal({
           </Dialog.Close>
         </div>
 
-        <LayoutGroup id="lpam-create-tabs">
-          <div className="lpam-tabs lpam-tabs--motion" style={{ borderColor: t.border }}>
+        <div className="lpam-create-tabs-premium" role="tablist" aria-label="Allocation or leave">
             <button
               type="button"
+              role="tab"
+              aria-selected={activeTab === "allocation"}
               className={
-                "lpam-tab" +
-                (activeTab === "allocation" ? " lpam-tab-active" : "") +
-                (editingLeave ? " lpam-tab-disabled" : "")
+                "lpam-create-tab-chip" +
+                (activeTab === "allocation" ? " lpam-create-tab-chip--active" : "") +
+                (editingLeave ? " lpam-create-tab-chip--disabled" : "")
               }
               style={{
-                color: activeTab === "allocation" ? t.accent : t.textSoft,
-                borderBottomColor: "transparent",
-                position: "relative",
+                color:
+                  activeTab === "allocation" ? "#fff" : editingLeave ? t.textMuted : t.textSoft,
                 opacity: editingLeave ? 0.45 : 1,
                 cursor: editingLeave ? "not-allowed" : "pointer",
+                ...(activeTab === "allocation"
+                  ? {
+                      background: `linear-gradient(155deg, color-mix(in srgb, ${t.accent} 88%, #0f172a), ${t.accent})`,
+                      boxShadow:
+                        `0 0 0 1px color-mix(in srgb, ${t.accent} 45%, transparent), 0 8px 24px ${t.accentGlow || "rgba(0,136,255,0.25)"}`,
+                    }
+                  : {}),
               }}
               disabled={editingLeave}
               onClick={() => {
@@ -567,38 +598,31 @@ export function CreateAllocationModal({
               }}
             >
               Allocation
-              {activeTab === "allocation" ? (
-                <motion.span
-                  layoutId="lpam-create-tab-line"
-                  className="lpam-tab-line"
-                  style={{ background: t.accent }}
-                  transition={{ type: "spring", stiffness: 400, damping: 34 }}
-                />
-              ) : null}
             </button>
             <button
               type="button"
-              className={"lpam-tab" + (activeTab === "leave" ? " lpam-tab-active" : "")}
+              role="tab"
+              aria-selected={activeTab === "leave"}
+              className={
+                "lpam-create-tab-chip" + (activeTab === "leave" ? " lpam-create-tab-chip--active" : "")
+              }
               style={{
-                color: activeTab === "leave" ? leaveAccent.solid : t.textSoft,
-                borderBottomColor: "transparent",
-                position: "relative",
+                color: activeTab === "leave" ? "#fff" : t.textSoft,
+                ...(activeTab === "leave"
+                  ? {
+                      background: `linear-gradient(155deg,
+                        color-mix(in srgb, ${leaveAccent.solid} 82%, #0f172a),
+                        ${leaveAccent.solid})`,
+                      boxShadow: `0 0 0 1px color-mix(in srgb, ${leaveAccent.solid} 42%, transparent), 0 8px 24px ${leaveAccent.glow}`,
+                    }
+                  : {}),
               }}
               onClick={() => setActiveTab("leave")}
             >
-              <Palmtree size={14} style={{ marginRight: 5 }} />
+              <Palmtree size={15} strokeWidth={2} style={{ marginRight: 6, flexShrink: 0 }} aria-hidden />
               Leave
-              {activeTab === "leave" ? (
-                <motion.span
-                  layoutId="lpam-create-tab-line"
-                  className="lpam-tab-line"
-                  style={{ background: leaveAccent.solid }}
-                  transition={{ type: "spring", stiffness: 400, damping: 34 }}
-                />
-              ) : null}
             </button>
           </div>
-        </LayoutGroup>
 
         <div className="lpam-modal-body">
         <AnimatePresence mode="wait">
@@ -609,7 +633,7 @@ export function CreateAllocationModal({
             animate={{ opacity: 1, y: 0, transition: { duration: 0.26, ease: [0.45, 0, 0.55, 1] } }}
             exit={clampMotion ? undefined : { opacity: 0, y: -8, transition: { duration: 0.18 } }}
           >
-        <div className="lpam-panel" style={{ background: t.surface, borderColor: t.borderIn || t.border, boxShadow: "0 2px 6px rgba(0,0,0,0.02)" }}>
+        <div className="lpam-panel lpam-create-stage">
           <div className="lpam-row lpam-row-split">
             <div className="lpam-field">
               <label className="lpam-label">Type</label>
@@ -649,23 +673,70 @@ export function CreateAllocationModal({
           <p className="lpam-duration" style={{ color: t.textSoft, marginTop: "8px" }}>
             Duration: {workingDays === 1 ? "1 working day" : `${workingDays} working days`}
           </p>
+          {premiumV2Enabled && tplList.length > 0 && (
+            <div className="lpam-field lpam-template-field">
+              <label className="lpam-label" htmlFor="lpam-v2-template-presets">
+                Template
+              </label>
+              <select
+                id="lpam-v2-template-presets"
+                className="lpam-select"
+                aria-label="Apply hours and repeat preset"
+                value={templatePresetId}
+                style={{ borderColor: t.border, background: t.bg, color: t.text, width: "100%" }}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setTemplatePresetId(id);
+                  if (!id || activeTab !== "allocation") return;
+                  const tpl = tplList.find((row) => row.id === id);
+                  if (!tpl) return;
+                  setHoursPerDay(String(tpl.hoursPerDay));
+                  setRepeatId(tpl.repeatId || "none");
+                }}
+              >
+                <option value="">Custom · no preset</option>
+                {tplList.map((tplOpt) => (
+                  <option key={tplOpt.id} value={tplOpt.id}>
+                    {tplOpt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           {publicHolidayOverlaps.length > 0 && (
-            <div style={{ 
-              marginTop: "12px", 
-              padding: "10px 12px", 
-              background: "rgba(245, 158, 11, 0.08)", 
-              borderLeft: "3px solid rgb(245, 158, 11)", 
-              borderRadius: "4px",
-              color: "rgb(180, 120, 0)"
-            }}>
-              <p style={{ margin: "0 0 6px 0", fontSize: "13px", fontWeight: "500" }}>
-                ⚠ Public holiday overlap
+            <div
+              className={"lpam-ph-overlap-box" + (premiumV2Enabled ? " lpam-ph-overlap-box--v2" : "")}
+              style={{
+                marginTop: "12px",
+                padding: premiumV2Enabled ? "12px 12px 10px" : "10px 12px",
+                background: "rgba(245, 158, 11, 0.08)",
+                borderLeft: "3px solid rgb(245, 158, 11)",
+                borderRadius: "6px",
+                color: "rgb(140, 100, 0)",
+              }}
+            >
+              <p style={{ margin: "0 0 8px 0", fontSize: "13px", fontWeight: "500" }}>
+                Public holiday overlap
               </p>
-              <p style={{ margin: 0, fontSize: "12px", lineHeight: "1.4" }}>
-                {publicHolidayOverlaps.length === 1
-                  ? `This allocation overlaps with: ${publicHolidayOverlaps[0].notes || "Public holiday"}`
-                  : `This allocation overlaps with ${publicHolidayOverlaps.length} public holidays`}
-              </p>
+              {premiumV2Enabled ? (
+                <div className="lpam-ph-chip-row" role="list" aria-label="Overlapping holidays">
+                  {publicHolidayOverlaps.map((ph, hi) => {
+                    const nid = `${String(ph?.id ?? "ph")}-${String(ph?.startDate ?? hi)}-${hi}`;
+                    const label = String(ph?.notes ?? "Public holiday").trim() || "Public holiday";
+                    return (
+                      <span key={nid} className="lpam-ph-chip" role="listitem">
+                        {label}
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p style={{ margin: 0, fontSize: "12px", lineHeight: "1.45" }}>
+                  {publicHolidayOverlaps.length === 1
+                    ? `This allocation overlaps with: ${publicHolidayOverlaps[0].notes || "Public holiday"}`
+                    : `This allocation overlaps with ${publicHolidayOverlaps.length} public holidays`}
+                </p>
+              )}
             </div>
           )}
           <div className="lpam-dates">
@@ -1146,18 +1217,16 @@ export function CreateAllocationModal({
               className={"lpam-btn lpam-btn-primary" + (activeTab === "leave" ? " lpam-btn-leave" : "")}
               onClick={handleSave}
               disabled={primarySaveDisabled}
-              style={{
-                background:
-                  activeTab === "leave"
-                    ? `linear-gradient(145deg, ${leaveAccent.solid}, color-mix(in srgb, ${leaveAccent.solid} 75%, #0f172a))`
-                    : t.accent,
-                borderColor: "transparent",
-                color: "#fff",
-                boxShadow:
-                  activeTab === "leave"
-                    ? `0 6px 28px ${leaveAccent.glow}`
-                    : undefined,
-              }}
+              style={
+                activeTab === "leave"
+                  ? {
+                      background: `linear-gradient(145deg, ${leaveAccent.solid}, color-mix(in srgb, ${leaveAccent.solid} 75%, #0f172a))`,
+                      borderColor: "transparent",
+                      color: "#fff",
+                      boxShadow: `0 6px 28px ${leaveAccent.glow}`,
+                    }
+                  : { borderColor: "transparent", color: "#fff" }
+              }
               whileTap={clampMotion || primarySaveDisabled ? undefined : { scale: 0.98 }}
             >
               {editAllocation && !isSyntheticPhEdit

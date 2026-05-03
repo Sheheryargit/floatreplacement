@@ -4007,3 +4007,50 @@ button.lp-block.lp-block-leave:hover {
 .lp-alloc-bar-covered-by-holiday .lp-alloc-hours {
   display: none;
 }
+
+/* Schedule v2 */
+.lp-person-v2-peak-micro {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--text-soft) 88%, transparent);
+}
+
+.lp-v2-started-banner {
+  margin: 0 auto 12px;
+  max-width: min(1180px, calc(100% - 32px));
+  padding: 14px 16px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 136, 255, 0.22);
+  background: rgba(0, 136, 255, 0.07);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+.lp-root[data-theme="light"] .lp-v2-started-banner {
+  background: rgba(0, 136, 255, 0.08);
+  border-color: rgba(0, 86, 200, 0.18);
+}
+
+.lp-v2-started-banner__title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.lp-v2-started-banner__list {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 12.75px;
+  line-height: 1.55;
+  color: var(--text-soft);
+}
+
+.lp-v2-started-banner__list li + li {
+  margin-top: 4px;
+}

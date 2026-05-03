@@ -6,6 +6,7 @@ import { ThemeProvider, useAppTheme } from "./context/ThemeContext.jsx";
 import { CenterActionFeedbackProvider } from "./context/CenterActionFeedbackContext.jsx";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { AppDialogProvider } from "./context/AppDialogContext.jsx";
+import { PremiumV2Provider } from "./context/PremiumV2Context.jsx";
 import { SlapAnimationProvider } from "./context/SlapAnimationContext.jsx";
 import { AppDataProvider, useAppStore } from "./context/AppDataContext.jsx";
 import AnimatedAppLoader from "./components/ui/AnimatedAppLoader.jsx";
@@ -117,14 +118,16 @@ function AuthGate() {
       <SkipToMainLink />
       <AppErrorBoundary>
         <WorkspaceReady>
-          <SlapAnimationProvider>
-            <Suspense fallback={null}>
-              <CommandPalette />
-            </Suspense>
-            <div className="app-viewport">
-              <AnimatedRoutes />
-            </div>
-          </SlapAnimationProvider>
+          <PremiumV2Provider>
+            <SlapAnimationProvider>
+              <Suspense fallback={null}>
+                <CommandPalette />
+              </Suspense>
+              <div className="app-viewport">
+                <AnimatedRoutes />
+              </div>
+            </SlapAnimationProvider>
+          </PremiumV2Provider>
         </WorkspaceReady>
       </AppErrorBoundary>
       <ThemedToaster />

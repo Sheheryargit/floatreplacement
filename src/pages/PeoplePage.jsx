@@ -51,6 +51,7 @@ import { CreateAllocationModal, leaveLabel } from "../components/AllocationModal
 import { resolveColorForProjectLabel } from "../utils/projectColors.js";
 import { findLeaveOverlapWithWorkRange } from "../utils/allocationLeaveConflict.js";
 import { mergeScheduleAllocations } from "../utils/scheduleAllocationsMerge.js";
+import { usePremiumV2 } from "../context/PremiumV2Context.jsx";
 import "./PeoplePage.css";
 
 /** Cap staggered row enter animations — large tables stay responsive */
@@ -116,6 +117,8 @@ export default function PeoplePage() {
     () => mergeScheduleAllocations(allocations, publicHolidayAllocations),
     [allocations, publicHolidayAllocations]
   );
+
+  const { premiumV2Enabled, premiumV2Templates } = usePremiumV2();
 
   const [selected,setSelected]=useState(new Set());
   const [search,setSearch]=useState("");
@@ -228,18 +231,60 @@ export default function PeoplePage() {
       try {
         const saved = isSupabaseConfigured ? await syncAllocationCreate(createdDraft) : createdDraft;
         setAllocations((prev) => [...prev, saved]);
-        showCenterActionFeedback({
-          action: "add",
-          title: payload.isLeave ? "Leave saved" : "Saved",
-          subtitle: payload.isLeave
-            ? `${payload.startDate} → ${payload.endDate}`
-            : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
-        });
+
+        if (premiumV2Enabled && saved?.id) {
+          const savedSnap = saved;
+          toast.success(payload.isLeave ? "Leave saved" : "Saved", {
+            description: payload.isLeave
+              ? `${payload.startDate} → ${payload.endDate}`
+              : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
+            duration: 9000,
+            action: {
+              label: "Undo",
+              onClick: () => {
+                void (async () => {
+                  const uid = savedSnap.id;
+                  setAllocations((cur) => cur.filter((a) => a.id !== uid));
+                  try {
+                    if (isSupabaseConfigured) await syncAllocationDelete(uid);
+                    showCenterActionFeedback({
+                      action: "remove",
+                      title: "Undone",
+                      subtitle: "Removed what you had just saved.",
+                    });
+                  } catch (err) {
+                    setAllocations((cur) =>
+                      cur.some((a) => a.id === uid) ? cur : [...cur, savedSnap]
+                    );
+                    toast.error("Undo failed", { description: err?.message || String(err) });
+                  }
+                })();
+              },
+            },
+          });
+        } else {
+          showCenterActionFeedback({
+            action: "add",
+            title: payload.isLeave ? "Leave saved" : "Saved",
+            subtitle: payload.isLeave
+              ? `${payload.startDate} → ${payload.endDate}`
+              : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
+          });
+        }
       } catch (e) {
         toast.error("Save failed", { description: e?.message || String(e) });
       }
     },
-    [setAllocations, projects, scheduleAllocations, people, syncAllocationCreate]
+    [
+      setAllocations,
+      projects,
+      scheduleAllocations,
+      people,
+      syncAllocationCreate,
+      premiumV2Enabled,
+      isSupabaseConfigured,
+      syncAllocationDelete,
+    ]
   );
 
   useEffect(()=>{ setMounted(true); },[]);
@@ -1068,6 +1113,10 @@ export default function PeoplePage() {
         projects={allocationProjectOptions}
         projectRegistry={projects}
         onAddProject={addAllocationProjectLabel}
+        allocations={scheduleAllocations}
+        publicHolidayAllocations={publicHolidayAllocations}
+        premiumV2Enabled={premiumV2Enabled}
+        premiumV2Templates={premiumV2Templates}
         t={t}
       />
 

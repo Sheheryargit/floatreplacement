@@ -133,6 +133,9 @@ import {
   readAllocationEnterAnimation,
   readPeakLoadLabelsVisible,
 } from "../config/scheduleUiPrefs.js";
+import { ALLOC8_OPEN_COMMAND_PALETTE_EVENT } from "../config/appKeyboardEvents.js";
+import { usePremiumV2 } from "../context/PremiumV2Context.jsx";
+import { useAppDialog } from "../context/AppDialogContext.jsx";
 import "./LandingPage.css";
 import "../styles/premium-schedule.css";
 
@@ -627,6 +630,16 @@ function formatPeakHoursForCopy(peak) {
   return peak.toFixed(peak % 1 ? 1 : 0);
 }
 
+function landingPageShortcutsConsumesKeydown(el) {
+  const tag = el && el.tagName;
+  return Boolean(
+    el?.isContentEditable ||
+      tag === "INPUT" ||
+      tag === "TEXTAREA" ||
+      tag === "SELECT"
+  );
+}
+
 function peakLoadSummaryLine(loadBand, peakHours, target = STANDARD_DAY_HOURS) {
   const pf = formatPeakHoursForCopy(peakHours);
   if (loadBand === "over") return `Overallocated — peak ${pf}h/day vs ${target}h/day target.`;
@@ -679,6 +692,7 @@ const timelineRowEqual = (prev, next) => {
   if (prev.allocationBoxStyle !== next.allocationBoxStyle) return false;
   if (prev.allocationEnterAnim !== next.allocationEnterAnim) return false;
   if (prev.freshEnteredAllocationKey !== next.freshEnteredAllocationKey) return false;
+  if (prev.premiumV2Enabled !== next.premiumV2Enabled) return false;
 
   return true;
 };
@@ -714,6 +728,7 @@ const TimelineRow = memo(function TimelineRow({
   allocationBoxStyle,
   allocationEnterAnim,
   freshEnteredAllocationKey,
+  premiumV2Enabled,
 }) {
   const { theme } = useAppTheme();
   const t = T[theme];
@@ -1009,6 +1024,16 @@ const TimelineRow = memo(function TimelineRow({
                                 );
                               })}
                               {p.tags.length > 2 && <span className="lp-tag-more-pill">+{p.tags.length - 2}</span>}
+                            </span>
+                          )}
+                          {premiumV2Enabled && !showPeakLoadStatus && peakLoadBand !== "none" && (
+                            <span className="lp-person-v2-peak-micro" title={peakLoadSummary}>
+                              Peak {formatPeakHoursForCopy(maxDailyBookedHours)}h/d ·{" "}
+                              {peakLoadBand === "over"
+                                ? "over typical"
+                                : peakLoadBand === "under"
+                                  ? "under typical"
+                                  : "on target"}
                             </span>
                           )}
                         </span>
@@ -1502,6 +1527,9 @@ export default function LandingPage() {
     setPublicHolidayAllocations,
   } = useSchedulePageData();
 
+  const { premiumV2Enabled, premiumV2Templates } = usePremiumV2();
+  const { openDialog } = useAppDialog();
+
   const scheduleAllocations = useMemo(
     () => mergeScheduleAllocations(allocations, publicHolidayAllocations),
     [allocations, publicHolidayAllocations]
@@ -1750,6 +1778,15 @@ export default function LandingPage() {
     [totalHours, teamCapacityHours]
   );
 
+  const showV2GettingStartedBanner = useMemo(
+    () =>
+      premiumV2Enabled &&
+      schedulePeople.length > 0 &&
+      visibleCapacityDays > 0 &&
+      totalHours <= 1e-6,
+    [premiumV2Enabled, schedulePeople.length, visibleCapacityDays, totalHours]
+  );
+
   const scheduleMotionKey = useMemo(() => {
     if (customRange?.start && customRange?.end) {
       return `cr-${customRange.start}-${customRange.end}`;
@@ -1757,6 +1794,34 @@ export default function LandingPage() {
     if (viewMode === "week") return `w-${weekMondayKey(anchorDate)}`;
     return `m-${anchorDate.getFullYear()}-${anchorDate.getMonth() + 1}`;
   }, [viewMode, anchorDate, customRange]);
+
+  useEffect(() => {
+    if (!premiumV2Enabled) return undefined;
+    const onKeyDown = (e) => {
+      if (landingPageShortcutsConsumesKeydown(document.activeElement)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "?") {
+        e.preventDefault();
+        openDialog({
+          title: "Schedule v2 shortcuts",
+          message: [
+            "? — Opens this shortcuts list.",
+            "/ — Opens the command palette (same as ⌘K or Ctrl+K).",
+            "After saving a new allocation or leave — use Undo on the toast to remove it.",
+            "Create modal — bundled templates plus suggested hours/day from recent work.",
+            "Holiday overlaps — labelled chips listing public holidays in the draft range.",
+          ].join("\n\n"),
+        });
+        return;
+      }
+      if (e.key === "/") {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent(ALLOC8_OPEN_COMMAND_PALETTE_EVENT));
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [premiumV2Enabled, openDialog]);
 
   const prevViewModeRef = useRef(viewMode);
   useEffect(() => {
@@ -2026,18 +2091,61 @@ export default function LandingPage() {
         const saved = isSupabaseConfigured ? await syncAllocationCreate(createdDraft) : createdDraft;
         setAllocations((prev) => [...prev, saved]);
         if (!payload.isLeave) pulseFreshAllocationTile(saved.id);
-        showCenterActionFeedback({
-          action: "add",
-          title: payload.isLeave ? "Leave saved" : "Saved",
-          subtitle: payload.isLeave
-            ? `${payload.startDate} → ${payload.endDate}`
-            : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
-        });
+
+        if (premiumV2Enabled && saved?.id) {
+          const savedSnap = saved;
+          toast.success(payload.isLeave ? "Leave saved" : "Saved", {
+            description: payload.isLeave
+              ? `${payload.startDate} → ${payload.endDate}`
+              : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
+            duration: 9000,
+            action: {
+              label: "Undo",
+              onClick: () => {
+                void (async () => {
+                  const uid = savedSnap.id;
+                  setAllocations((cur) => cur.filter((a) => a.id !== uid));
+                  try {
+                    if (isSupabaseConfigured) await syncAllocationDelete(uid);
+                    showCenterActionFeedback({
+                      action: "remove",
+                      title: "Undone",
+                      subtitle: "Removed what you had just saved.",
+                    });
+                  } catch (err) {
+                    setAllocations((cur) =>
+                      cur.some((a) => a.id === uid) ? cur : [...cur, savedSnap]
+                    );
+                    toast.error("Undo failed", { description: err?.message || String(err) });
+                  }
+                })();
+              },
+            },
+          });
+        } else {
+          showCenterActionFeedback({
+            action: "add",
+            title: payload.isLeave ? "Leave saved" : "Saved",
+            subtitle: payload.isLeave
+              ? `${payload.startDate} → ${payload.endDate}`
+              : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
+          });
+        }
       } catch (e) {
         toast.error("Save failed", { description: e?.message || String(e) });
       }
     },
-    [setAllocations, projects, allocationsByPerson, people, syncAllocationCreate, pulseFreshAllocationTile]
+    [
+      setAllocations,
+      projects,
+      allocationsByPerson,
+      people,
+      syncAllocationCreate,
+      pulseFreshAllocationTile,
+      premiumV2Enabled,
+      isSupabaseConfigured,
+      syncAllocationDelete,
+    ]
   );
 
   const handleEditAllocation = useCallback(
@@ -2954,6 +3062,17 @@ export default function LandingPage() {
           </div>
         </div>
 
+        {showV2GettingStartedBanner ? (
+          <div className="lp-v2-started-banner" role="status">
+            <span className="lp-v2-started-banner__title">Getting started · Schedule v2</span>
+            <ul className="lp-v2-started-banner__list">
+              <li>Click empty space on a row or use the plus to add project hours.</li>
+              <li>Press the slash key to open quick navigation (same idea as ⌘K).</li>
+              <li>Expand Filter if you expected people here but rows are blank.</li>
+            </ul>
+          </div>
+        ) : null}
+
         <div className="lp-schedule">
           <div
             className="lp-schedule-viewport"
@@ -3084,6 +3203,7 @@ export default function LandingPage() {
                         allocationBoxStyle={allocationBoxStyle}
                         allocationEnterAnim={allocationEnterAnim}
                         freshEnteredAllocationKey={freshEnteredAllocationKey}
+                        premiumV2Enabled={premiumV2Enabled}
                       />
                     </div>
                   );
@@ -3145,6 +3265,8 @@ export default function LandingPage() {
         onAddProject={addAllocationProjectLabel}
         publicHolidayAllocations={publicHolidayAllocations}
         t={t}
+        premiumV2Enabled={premiumV2Enabled}
+        premiumV2Templates={premiumV2Templates}
       />
 
       <AllocationDetailModal

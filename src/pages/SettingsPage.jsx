@@ -14,6 +14,7 @@ import {
   Send,
   LayoutGrid,
   Spline,
+  Keyboard,
 } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
@@ -37,6 +38,12 @@ import {
   writeAllocationEnterAnimation,
   writePeakLoadLabelsVisible,
 } from "../config/scheduleUiPrefs.js";
+import {
+  PREMIUM_V2_CHANGED_EVENT,
+  readPremiumV2Enabled,
+  writePremiumV2Enabled,
+} from "../config/premiumV2Prefs.js";
+import { resetPremiumV2Templates } from "../config/premiumV2Templates.js";
 import { SettingsItem } from "../components/ui/SettingsItem.jsx";
 import { ThemePreferenceControl } from "../components/ui/ThemePreferenceControl.jsx";
 import { PalettePreferenceControl } from "../components/ui/PalettePreferenceControl.jsx";
@@ -73,6 +80,12 @@ export default function SettingsPage() {
   const [allocationBoxStyle, setAllocationBoxStyle] = useState(() => readAllocationBoxStyle());
   const [allocationEnterAnim, setAllocationEnterAnim] = useState(() => readAllocationEnterAnimation());
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [premiumV2, setPremiumV2] = useState(() => readPremiumV2Enabled());
+
+  const setPremiumV2Preference = useCallback((next) => {
+    setPremiumV2(next);
+    writePremiumV2Enabled(next);
+  }, []);
 
   const setPeakLoadLabelsPreference = useCallback((next) => {
     setPeakLoadLabels(next);
@@ -105,6 +118,12 @@ export default function SettingsPage() {
     const sync = () => setAllocationEnterAnim(readAllocationEnterAnimation());
     window.addEventListener(ALLOCATION_ENTER_ANIM_CHANGED_EVENT, sync);
     return () => window.removeEventListener(ALLOCATION_ENTER_ANIM_CHANGED_EVENT, sync);
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setPremiumV2(readPremiumV2Enabled());
+    window.addEventListener(PREMIUM_V2_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(PREMIUM_V2_CHANGED_EVENT, sync);
   }, []);
 
   useEffect(() => {
@@ -332,6 +351,62 @@ export default function SettingsPage() {
                   On
                 </button>
               </div>
+            </SettingsItem>
+            <SettingsItem
+              icon={Keyboard}
+              label="Schedule v2 (experimental)"
+              trailFullWidth
+              subtext={
+                <>
+                  Shortcut help on ?, command palette focus on /. Undo chip after saving new allocations / leave.
+                  Suggested hours from recent allocations, template presets in create, richer public-holiday hints,
+                  a compact peak-day hint under names when peak labels are off, and a checklist banner when filtered
+                  people have no project blocks yet.
+                  <span className="settings-subtext-detail">Saved only in this browser.</span>
+                </>
+              }
+              showChevron={false}
+            >
+              <div className="settings-peak-labels-toggle" role="group" aria-label="Schedule v2 experimental mode">
+                <button
+                  type="button"
+                  className={
+                    "settings-peak-labels-btn" + (!premiumV2 ? " settings-peak-labels-btn--active" : "")
+                  }
+                  aria-pressed={!premiumV2}
+                  onClick={() => setPremiumV2Preference(false)}
+                >
+                  Off
+                </button>
+                <button
+                  type="button"
+                  className={
+                    "settings-peak-labels-btn" + (premiumV2 ? " settings-peak-labels-btn--active" : "")
+                  }
+                  aria-pressed={premiumV2}
+                  onClick={() => setPremiumV2Preference(true)}
+                >
+                  On
+                </button>
+              </div>
+            </SettingsItem>
+            <SettingsItem
+              label="V2 allocation templates"
+              trailFullWidth
+              subtext="Resets bundled hour and repeat presets (Standard 7.5h, weekly, etc.)."
+              showChevron={false}
+            >
+              <button
+                type="button"
+                className="settings-alloc-box-btn settings-alloc-box-btn--active"
+                style={{ justifySelf: "start" }}
+                onClick={() => {
+                  resetPremiumV2Templates();
+                  toast.success("Templates reset", { description: "Create-allocation quick picks restored." });
+                }}
+              >
+                Reset bundled templates
+              </button>
             </SettingsItem>
           </div>
         </section>

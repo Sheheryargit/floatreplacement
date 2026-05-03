@@ -58,6 +58,19 @@
   background: rgba(3, 5, 11, 0.58) !important;
 }
 
+/* Creating a new allocation/leave — lighter wash so the grid stays readable */
+:root[data-theme="dark"] .lpam-overlay-radix.lpam-overlay-radix--create-new {
+  background:
+    radial-gradient(105% 75% at 50% -20%, rgba(0, 136, 255, 0.11), transparent 50%),
+    rgba(14, 18, 32, 0.38) !important;
+}
+
+:root[data-theme="light"] .lpam-overlay-radix.lpam-overlay-radix--create-new {
+  background:
+    radial-gradient(100% 55% at 50% -18%, color-mix(in srgb, var(--color-brand) 14%, transparent), transparent 52%),
+    rgba(15, 18, 28, 0.26) !important;
+}
+
 .lpam-modal {
   padding: 28px 32px 22px !important;
   border: 1px solid color-mix(in srgb, var(--color-brand) 32%, transparent) !important;
@@ -73,7 +86,8 @@
   ) !important;
 }
 
-:root[data-theme="dark"] .lpam-modal.lpam-detail {
+:root[data-theme="dark"] .lpam-modal.lpam-detail,
+:root[data-theme="dark"] .lpam-modal.lpam-create {
   background:
     linear-gradient(180deg, #1f2330 0%, #171a24 50%, #13161e 100%) !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
@@ -82,7 +96,8 @@
     0 28px 72px rgba(0, 0, 0, 0.55) !important;
 }
 
-:root[data-theme="light"] .lpam-modal.lpam-detail {
+:root[data-theme="light"] .lpam-modal.lpam-detail,
+:root[data-theme="light"] .lpam-modal.lpam-create {
   background: linear-gradient(180deg, #ffffff 0%, #f6f8fc 100%) !important;
   border: 1px solid color-mix(in srgb, var(--color-brand) 32%, var(--color-border)) !important;
   box-shadow:

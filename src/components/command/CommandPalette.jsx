@@ -14,6 +14,7 @@ import { useAppData } from "../../context/AppDataContext.jsx";
 import { useAppTheme } from "../../context/ThemeContext.jsx";
 import "./CommandPalette.css";
 import "../../styles/premium-overlays.css";
+import { ALLOC8_OPEN_COMMAND_PALETTE_EVENT } from "../../config/appKeyboardEvents.js";
 
 const ACTIONS = [
   {
@@ -158,6 +159,12 @@ export default function CommandPalette() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    const onOpenEvt = () => setOpen(true);
+    window.addEventListener(ALLOC8_OPEN_COMMAND_PALETTE_EVENT, onOpenEvt);
+    return () => window.removeEventListener(ALLOC8_OPEN_COMMAND_PALETTE_EVENT, onOpenEvt);
   }, []);
 
   useEffect(() => {
