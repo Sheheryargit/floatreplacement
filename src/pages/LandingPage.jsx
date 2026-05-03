@@ -65,6 +65,7 @@ import { ProjectModal } from "./ProjectsPage.jsx";
 import { syncPersonAvailabilityFromForm } from "../lib/api/personAvailability.js";
 import { previewAvailabilityHours } from "../utils/availabilityPreview.js";
 import { advanceRepeatWindow } from "../utils/allocationRepeatWindow.js";
+import { WORKSPACE_THEME as T } from "../theme/workspacePalette.js";
 import {
   assignAllocationStackLevelsByWorkWeek,
   BAR_H_BASE_PX,
@@ -90,7 +91,12 @@ import {
   projectCodeChipStyles,
   resolveColorForProjectLabel,
   projectToAllocationLabel,
+  registryProjectIdForPickerLabel,
 } from "../utils/projectColors.js";
+import {
+  countAllocationWorkingDaysExcludingOffDays,
+  allocationTotalHoursRounded,
+} from "../utils/allocationWorkMetrics.js";
 import { tagChromaProps } from "../utils/tagChroma.js";
 import {
   SCHEDULE_SORT_OPTIONS,
@@ -119,12 +125,16 @@ import {
 import {
   ALLOCATION_BOX_STYLE_CHANGED_EVENT,
   ALLOCATION_BOX_STYLE_LS_KEY,
+  ALLOCATION_ENTER_ANIM_CHANGED_EVENT,
+  ALLOCATION_ENTER_ANIM_LS_KEY,
   PEAK_LOAD_LABELS_CHANGED_EVENT,
   PEAK_LOAD_LABELS_LS_KEY,
   readAllocationBoxStyle,
+  readAllocationEnterAnimation,
   readPeakLoadLabelsVisible,
 } from "../config/scheduleUiPrefs.js";
 import "./LandingPage.css";
+import "../styles/premium-schedule.css";
 
 const LEAVE_LUCIDE = {
   palmtree: Palmtree,
@@ -152,111 +162,6 @@ const VIEW_OPTIONS = [
   { id: "week", label: "Weeks" },
   { id: "month", label: "Months" },
 ];
-
-const T = {
-  dark: {
-    bg: "#0f1117",
-    surface: "#181c26",
-    surfRaised: "#1e2235",
-    surfAlt: "#1a1e2e",
-    border: "#2a2f45",
-    borderSub: "#323852",
-    borderIn: "#3a4060",
-    text: "#f0f2f8",
-    textSoft: "#9ba4b8",
-    textMuted: "#7b82a0",
-    textDim: "#4a5168",
-    accent: "#0088ff",
-    accentHov: "#1a9bff",
-    accentTxt: "#ffffff",
-    accentGlow: "rgba(0,136,255,0.15)",
-    sidebar: "#0f1117",
-    sidebarAct: "rgba(0,136,255,0.08)",
-    rowHov: "#151a24",
-    tagBg: "rgba(124,106,247,0.12)",
-    tagTxt: "#a599fc",
-    btnSec: "#1e2235",
-    btnSecHov: "#252a3d",
-    btnSecTxt: "#c4c9d8",
-    danger: "#ef4444",
-    dangerHov: "#dc2626",
-    dangerSoft: "rgba(239,68,68,0.16)",
-    dangerTxt: "#fff",
-    dangerGlow: "0 4px 24px rgba(239,68,68,0.25)",
-    success: "#22c55e",
-    successHov: "#16a34a",
-    successSoft: "rgba(34,197,94,0.14)",
-    successGlow: "0 4px 20px rgba(34,197,94,0.22)",
-    warn: "#f59e0b",
-    warnHov: "#d97706",
-    warnTxt: "#0f172a",
-    warnSoft: "rgba(245,158,11,0.16)",
-    warnGlow: "0 4px 20px rgba(245,158,11,0.2)",
-    info: "#38bdf8",
-    infoSoft: "rgba(56,189,248,0.14)",
-    overlay: "rgba(0,0,0,0.6)",
-    shadow: "0 32px 100px rgba(0,0,0,0.55)",
-    chk: "#0088ff",
-    scroll: "#2a2f45",
-    selRow: "rgba(0,136,255,0.06)",
-    focus: "#0088ff",
-    toastBg: "#181c26",
-    toastBdr: "#2a2f45",
-    tabActiveBg: "rgba(0,136,255,0.12)",
-    tabHovBg: "rgba(0,136,255,0.06)",
-  },
-  light: {
-    bg: "#f4f6fa",
-    surface: "#ffffff",
-    surfRaised: "#ffffff",
-    surfAlt: "#e8ebf4",
-    border: "#e0e4ef",
-    borderSub: "#e4e8f0",
-    borderIn: "#d4d8e4",
-    text: "#12151f",
-    textSoft: "#4a5168",
-    textMuted: "#5c6478",
-    textDim: "#9ca3b8",
-    accent: "#0077e6",
-    accentHov: "#0088ff",
-    accentTxt: "#ffffff",
-    accentGlow: "rgba(0,136,255,0.12)",
-    sidebar: "#ffffff",
-    sidebarAct: "rgba(0,136,255,0.08)",
-    rowHov: "#f4f6fa",
-    tagBg: "rgba(124,106,247,0.1)",
-    tagTxt: "#5b4fcf",
-    btnSec: "#e8ebf4",
-    btnSecHov: "#dde1ec",
-    btnSecTxt: "#3e4560",
-    danger: "#ef4444",
-    dangerHov: "#dc2626",
-    dangerSoft: "rgba(239,68,68,0.1)",
-    dangerTxt: "#fff",
-    dangerGlow: "0 4px 18px rgba(239,68,68,0.2)",
-    success: "#16a34a",
-    successHov: "#15803d",
-    successSoft: "rgba(22,163,74,0.1)",
-    successGlow: "0 4px 16px rgba(22,163,74,0.18)",
-    warn: "#d97706",
-    warnHov: "#b45309",
-    warnTxt: "#fff",
-    warnSoft: "rgba(217,119,6,0.1)",
-    warnGlow: "0 4px 16px rgba(217,119,6,0.16)",
-    info: "#0284c7",
-    infoSoft: "rgba(2,132,199,0.1)",
-    overlay: "rgba(15,18,28,0.35)",
-    shadow: "0 32px 100px rgba(0,0,0,0.12)",
-    chk: "#0077e6",
-    scroll: "#d4d8e0",
-    selRow: "rgba(0,136,255,0.08)",
-    focus: "#0088ff",
-    toastBg: "#ffffff",
-    toastBdr: "#e0e4ef",
-    tabActiveBg: "rgba(0,136,255,0.1)",
-    tabHovBg: "rgba(0,136,255,0.05)",
-  },
-};
 
 const ini = (n) => {
   if (!n) return "";
@@ -772,6 +677,8 @@ const timelineRowEqual = (prev, next) => {
   if (prev.dismissedAvailOffKeys !== next.dismissedAvailOffKeys) return false;
   if (prev.showPeakLoadStatus !== next.showPeakLoadStatus) return false;
   if (prev.allocationBoxStyle !== next.allocationBoxStyle) return false;
+  if (prev.allocationEnterAnim !== next.allocationEnterAnim) return false;
+  if (prev.freshEnteredAllocationKey !== next.freshEnteredAllocationKey) return false;
 
   return true;
 };
@@ -805,10 +712,18 @@ const TimelineRow = memo(function TimelineRow({
   dismissedAvailOffKeys,
   showPeakLoadStatus,
   allocationBoxStyle,
+  allocationEnterAnim,
+  freshEnteredAllocationKey,
 }) {
   const { theme } = useAppTheme();
   const t = T[theme];
   const reduceMotion = useReducedMotion();
+
+  const enteredFreshSet = useMemo(
+    () => new Set((freshEnteredAllocationKey || "").split("|").filter(Boolean)),
+    [freshEnteredAllocationKey]
+  );
+  const wantsAllocEnterFx = !reduceMotion && allocationEnterAnim !== "instant";
 
   const hoursKeys = visibleDateKeysForHours(scheduleModel);
   const hours = computePersonHoursInViewFromList(personAllocations, scheduleModel);
@@ -1336,7 +1251,10 @@ const TimelineRow = memo(function TimelineRow({
                       const hasNotes = Boolean((seg.a.notes || "").trim());
                       const tip = buildWorkAllocationTitle(seg.a, projectName, hoursLabel);
 
-                      const enterDelayMs = reduceMotion ? 0 : stackIdx * 8 + segJ * 15;
+                      const allocId = String(seg.a?.id ?? "");
+                      const showFreshEnterAlloc = wantsAllocEnterFx && enteredFreshSet.has(allocId);
+                      const enterDelayMs =
+                        showFreshEnterAlloc && !reduceMotion ? stackIdx * 10 + segJ * 20 : undefined;
 
                       const baseStyle = {
                         position: "absolute",
@@ -1364,7 +1282,8 @@ const TimelineRow = memo(function TimelineRow({
                         color: fg,
                         transition:
                           "height 0.35s cubic-bezier(0.22, 1, 0.36, 1), left 0.35s cubic-bezier(0.22, 1, 0.36, 1), width 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease, transform 0.2s ease, filter 0.2s ease",
-                        animationDelay: enterDelayMs ? `${enterDelayMs}ms` : undefined,
+                        animationDelay:
+                          enterDelayMs != null ? `${enterDelayMs}ms` : undefined,
                       };
 
                       return (
@@ -1374,7 +1293,10 @@ const TimelineRow = memo(function TimelineRow({
                           className={
                             "lp-block lp-block-alloc lp-block-alloc-project lp-alloc-bar" +
                             (compactBorder ? " lp-alloc-bar--compact" : "") +
-                            (allocationBoxStyle === "center" ? " lp-alloc-bar--layout-center" : "")
+                            (allocationBoxStyle === "center" ? " lp-alloc-bar--layout-center" : "") +
+                            (showFreshEnterAlloc
+                              ? ` lp-alloc-enter lp-alloc-enter--${allocationEnterAnim}`
+                              : "")
                           }
                           data-hours={h}
                           data-bar-h={calculatedHeight}
@@ -1622,6 +1544,9 @@ export default function LandingPage() {
   const [utilizationMode, setUtilizationMode] = useState("hours");
   const [showPeakLoadStatus, setShowPeakLoadStatus] = useState(() => readPeakLoadLabelsVisible());
   const [allocationBoxStyle, setAllocationBoxStyle] = useState(() => readAllocationBoxStyle());
+  const [allocationEnterAnim, setAllocationEnterAnim] = useState(() => readAllocationEnterAnimation());
+  const [freshEnteredAllocationKey, setFreshEnteredAllocationKey] = useState("");
+  const allocationEnterTimersRef = useRef(new Map());
 
   useEffect(() => {
     const sync = () => setShowPeakLoadStatus(readPeakLoadLabelsVisible());
@@ -1646,6 +1571,26 @@ export default function LandingPage() {
     return () => {
       window.removeEventListener(ALLOCATION_BOX_STYLE_CHANGED_EVENT, sync);
       window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setAllocationEnterAnim(readAllocationEnterAnimation());
+    window.addEventListener(ALLOCATION_ENTER_ANIM_CHANGED_EVENT, sync);
+    const onStorage = (e) => {
+      if (e.key === ALLOCATION_ENTER_ANIM_LS_KEY || e.key == null) sync();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(ALLOCATION_ENTER_ANIM_CHANGED_EVENT, sync);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      for (const tmt of allocationEnterTimersRef.current.values()) window.clearTimeout(tmt);
+      allocationEnterTimersRef.current.clear();
     };
   }, []);
 
@@ -1985,6 +1930,34 @@ export default function LandingPage() {
     setAllocDefaultTab("allocation");
   }, []);
 
+  const pulseFreshAllocationTile = useCallback(
+    (allocId) => {
+      const id = String(allocId || "");
+      if (!id || allocationEnterAnim === "instant") return;
+
+      const existing = allocationEnterTimersRef.current.get(id);
+      if (existing != null) window.clearTimeout(existing);
+
+      setFreshEnteredAllocationKey((k) => {
+        const s = new Set((k || "").split("|").filter(Boolean));
+        s.add(id);
+        return [...s].sort().join("|");
+      });
+
+      const tmt = window.setTimeout(() => {
+        allocationEnterTimersRef.current.delete(id);
+        setFreshEnteredAllocationKey((k) => {
+          const s = new Set((k || "").split("|").filter(Boolean));
+          s.delete(id);
+          return [...s].sort().join("|");
+        });
+      }, 920);
+
+      allocationEnterTimersRef.current.set(id, tmt);
+    },
+    [allocationEnterAnim]
+  );
+
   /** Click on empty timeline space → open allocation modal with person + date */
   const handleTimelineClick = useCallback(
     (e, person, nCols) => {
@@ -2052,6 +2025,7 @@ export default function LandingPage() {
       try {
         const saved = isSupabaseConfigured ? await syncAllocationCreate(createdDraft) : createdDraft;
         setAllocations((prev) => [...prev, saved]);
+        if (!payload.isLeave) pulseFreshAllocationTile(saved.id);
         showCenterActionFeedback({
           action: "add",
           title: payload.isLeave ? "Leave saved" : "Saved",
@@ -2063,7 +2037,7 @@ export default function LandingPage() {
         toast.error("Save failed", { description: e?.message || String(e) });
       }
     },
-    [setAllocations, projects, allocationsByPerson, people, syncAllocationCreate]
+    [setAllocations, projects, allocationsByPerson, people, syncAllocationCreate, pulseFreshAllocationTile]
   );
 
   const handleEditAllocation = useCallback(
@@ -2116,6 +2090,7 @@ export default function LandingPage() {
       try {
         const saved = isSupabaseConfigured ? await syncAllocationUpdate(merged) : merged;
         setAllocations((prev) => prev.map((a) => (a.id === id ? saved : a)));
+        setSelectedAllocation((prev) => (prev && prev.id === id ? saved : prev));
         showCenterActionFeedback({
           action: "update",
           title: payload.isLeave ? "Leave updated" : "Updated",
@@ -2123,6 +2098,7 @@ export default function LandingPage() {
             ? `${payload.startDate} → ${payload.endDate}`
             : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
         });
+        return true;
       } catch (e) {
         if (e?.name === "OptimisticLockError") {
           toast.error("Someone else edited this allocation", {
@@ -2132,9 +2108,60 @@ export default function LandingPage() {
         } else {
           toast.error("Update failed", { description: e?.message || String(e) });
         }
+        return false;
       }
     },
-    [setAllocations, projects, allocationsByPerson, people, syncAllocationUpdate, refreshWorkspaceFromSupabase, scheduleAllocations]
+    [
+      setAllocations,
+      setSelectedAllocation,
+      projects,
+      allocationsByPerson,
+      people,
+      syncAllocationUpdate,
+      refreshWorkspaceFromSupabase,
+      scheduleAllocations,
+    ]
+  );
+
+  const handleExtendAllocation = useCallback(
+    async (alloc, newEndDateKey) => {
+      const isoEnd = String(newEndDateKey || "").slice(0, 10);
+      if (!isoEnd) return false;
+      const personIds =
+        alloc.personIds?.length > 0
+          ? alloc.personIds.map(String)
+          : alloc.personId != null
+            ? [String(alloc.personId)]
+            : [];
+      const workingDays = countAllocationWorkingDaysExcludingOffDays(
+        alloc.startDate,
+        isoEnd,
+        personIds,
+        scheduleAllocations,
+        publicHolidayAllocations
+      );
+      const hoursPerDay = Number(alloc.hoursPerDay) || 0;
+      const totalHours = allocationTotalHoursRounded(workingDays, hoursPerDay);
+      const label = String(alloc.project || "").trim();
+      const projectIdRaw =
+        alloc.projectId != null && String(alloc.projectId).trim() !== ""
+          ? String(alloc.projectId).trim()
+          : registryProjectIdForPickerLabel(label, projects);
+      const payload = {
+        personIds,
+        startDate: alloc.startDate,
+        endDate: isoEnd,
+        hoursPerDay,
+        totalHours,
+        workingDays,
+        project: label,
+        projectId: projectIdRaw,
+        notes: String(alloc.notes ?? "").trim(),
+        repeatId: alloc.repeatId ?? "none",
+      };
+      return handleEditAllocation(payload, alloc.id);
+    },
+    [handleEditAllocation, projects, scheduleAllocations, publicHolidayAllocations]
   );
 
   const handleDeleteAllocation = useCallback(
@@ -2387,7 +2414,11 @@ export default function LandingPage() {
     >
       <AppSideNav />
 
-      <div className="lp-main">
+      <main
+        id="main-content"
+        className="lp-main"
+        aria-label="Schedule"
+      >
         <div className="lp-header-block">
           <div className="lp-page-title-row">
             <div className="lp-schedule-title-cluster">
@@ -3051,6 +3082,8 @@ export default function LandingPage() {
                         dismissedAvailOffKeys={dismissedAvailOffKeys}
                         showPeakLoadStatus={showPeakLoadStatus}
                         allocationBoxStyle={allocationBoxStyle}
+                        allocationEnterAnim={allocationEnterAnim}
+                        freshEnteredAllocationKey={freshEnteredAllocationKey}
                       />
                     </div>
                   );
@@ -3059,7 +3092,7 @@ export default function LandingPage() {
             </motion.div>
           </div>
         </div>
-      </div>
+      </main>
 
       <button type="button" className="lp-fab" aria-label="Pointer tool">
         <MousePointer2 size={16} />
@@ -3120,6 +3153,9 @@ export default function LandingPage() {
         assigneeNames={selectedAssigneeNames}
         onClose={closeAllocationDetail}
         onDelete={handleDeleteAllocation}
+        onExtendAllocation={handleExtendAllocation}
+        allocations={scheduleAllocations}
+        publicHolidayAllocations={publicHolidayAllocations}
         onEditClick={
           selectedAllocation
             ? () => {

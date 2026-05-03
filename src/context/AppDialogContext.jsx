@@ -5,7 +5,6 @@ import {
   useCallback,
   useMemo,
 } from "react";
-import { AnimatePresence } from "framer-motion";
 import { Modal } from "../components/ui/Modal.jsx";
 
 const AppDialogContext = createContext(null);
@@ -30,16 +29,14 @@ export function AppDialogProvider({ children }) {
   return (
     <AppDialogContext.Provider value={value}>
       {children}
-      <AnimatePresence>
-        {dialog ? (
-          <Modal
-            key="app-dialog"
-            title={dialog.title}
-            message={dialog.message}
-            onClose={closeDialog}
-          />
-        ) : null}
-      </AnimatePresence>
+      {dialog ? (
+        <Modal
+          key="app-dialog"
+          title={dialog.title}
+          message={dialog.message}
+          onClose={closeDialog}
+        />
+      ) : null}
     </AppDialogContext.Provider>
   );
 }

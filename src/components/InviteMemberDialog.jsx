@@ -5,6 +5,7 @@ import { Check, Send, Shield, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "./ui/Button.jsx";
 import "./InviteMemberDialog.css";
+import "../styles/premium-overlays.css";
 
 const ACCESS_LEVELS = [
   { id: "admin", label: "Admin" },

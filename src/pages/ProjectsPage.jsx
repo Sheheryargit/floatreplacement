@@ -14,6 +14,10 @@ import {
   useAlloc8ActionFeedbackMount,
 } from "../context/CenterActionFeedbackContext.jsx";
 import { useFixedAnchorDropdown } from "../hooks/useFixedAnchorDropdown.js";
+import { WORKSPACE_THEME as T } from "../theme/workspacePalette.js";
+import { EmptyState } from "../components/ui/EmptyState.jsx";
+import "./ProjectsPage.css";
+import "../styles/premium-person-modal.css";
 import {
   Users,
   FolderOpen,
@@ -65,10 +69,6 @@ const fmtDate = (d) => { if(!d)return"—"; const dt=new Date(d); return dt.toLo
 /** Cap staggered row enter animations — large tables stay responsive */
 const TABLE_ROW_ENTER_ANIM_MAX = 32;
 
-const T = {
-  dark: { bg:"#0f1117",surface:"#181c26",surfRaised:"#1e2235",surfAlt:"#1a1e2e",border:"#2a2f45",borderSub:"#323852",borderIn:"#3a4060",text:"#f0f2f8",textSoft:"#9ba4b8",textMuted:"#7b82a0",textDim:"#4a5168",accent:"#0088ff",accentHov:"#1a9bff",accentTxt:"#ffffff",accentGlow:"rgba(0,136,255,0.15)",sidebar:"#0f1117",sidebarAct:"rgba(0,136,255,0.08)",rowHov:"#151a24",tagBg:"rgba(124,106,247,0.12)",tagTxt:"#a599fc",btnSec:"#1e2235",btnSecHov:"#252a3d",btnSecTxt:"#c4c9d8",danger:"#ef4444",dangerHov:"#dc2626",dangerSoft:"rgba(239,68,68,0.16)",dangerTxt:"#fff",dangerGlow:"0 4px 24px rgba(239,68,68,0.25)",success:"#22c55e",successHov:"#16a34a",successSoft:"rgba(34,197,94,0.14)",successGlow:"0 4px 20px rgba(34,197,94,0.22)",warn:"#f59e0b",warnHov:"#d97706",warnTxt:"#0f172a",warnSoft:"rgba(245,158,11,0.16)",warnGlow:"0 4px 20px rgba(245,158,11,0.2)",info:"#38bdf8",infoSoft:"rgba(56,189,248,0.14)",overlay:"rgba(0,0,0,0.6)",shadow:"0 32px 100px rgba(0,0,0,0.55)",chk:"#0088ff",scroll:"#2a2f45",selRow:"rgba(0,136,255,0.06)",focus:"#0088ff",toastBg:"#181c26",toastBdr:"#2a2f45",tabActiveBg:"rgba(0,136,255,0.12)",tabHovBg:"rgba(0,136,255,0.06)" },
-  light: { bg:"#f4f6fa",surface:"#ffffff",surfRaised:"#ffffff",surfAlt:"#e8ebf4",border:"#e0e4ef",borderSub:"#e4e8f0",borderIn:"#d4d8e4",text:"#12151f",textSoft:"#4a5168",textMuted:"#5c6478",textDim:"#9ca3b8",accent:"#0077e6",accentHov:"#0088ff",accentTxt:"#ffffff",accentGlow:"rgba(0,136,255,0.12)",sidebar:"#ffffff",sidebarAct:"rgba(0,136,255,0.08)",rowHov:"#f4f6fa",tagBg:"rgba(124,106,247,0.1)",tagTxt:"#5b4fcf",btnSec:"#e8ebf4",btnSecHov:"#dde1ec",btnSecTxt:"#3e4560",danger:"#ef4444",dangerHov:"#dc2626",dangerSoft:"rgba(239,68,68,0.1)",dangerTxt:"#fff",dangerGlow:"0 4px 18px rgba(239,68,68,0.2)",success:"#16a34a",successHov:"#15803d",successSoft:"rgba(22,163,74,0.1)",successGlow:"0 4px 16px rgba(22,163,74,0.18)",warn:"#d97706",warnHov:"#b45309",warnTxt:"#fff",warnSoft:"rgba(217,119,6,0.1)",warnGlow:"0 4px 16px rgba(217,119,6,0.16)",info:"#0284c7",infoSoft:"rgba(2,132,199,0.1)",overlay:"rgba(15,18,28,0.35)",shadow:"0 32px 100px rgba(0,0,0,0.12)",chk:"#0077e6",scroll:"#d4d8e0",selRow:"rgba(0,136,255,0.08)",focus:"#0088ff",toastBg:"#ffffff",toastBdr:"#e0e4ef",tabActiveBg:"rgba(0,136,255,0.1)",tabHovBg:"rgba(0,136,255,0.05)" },
-};
 
 
 /* ═══════════════════ CONFIRM ═══════════════════ */
@@ -526,14 +526,23 @@ export default function ProjectsPage(){
   };
   const handleModalArchive=()=>{if(editingProject){archiveProject(editingProject.id);setModalOpen(false);setEditingProject(null);}};
 
-  return(
-    <div style={{display:"flex",minHeight:"100vh",background:shellBackground ?? t.bg,color:t.text,fontFamily:"var(--font-body, 'DM Sans', system-ui, sans-serif)",fontSize:14,transition:"background 0.35s ease,color 0.35s ease"}}>
+  return (
+    <div
+      className="projects-page-root"
+      data-theme={mode === "light" ? "light" : "dark"}
+      style={{
+        background: shellBackground ?? t.bg,
+        color: t.text,
+        fontFamily: "var(--font-body, 'DM Sans', system-ui, sans-serif)",
+        fontSize: 14,
+      }}
+    >
       <AppSideNav />
 
-      <main style={{flex:1,minWidth:0,padding:"24px 36px"}}>
-        <header style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-          <h1 style={{fontSize:26,fontWeight:700,margin:0,letterSpacing:-0.5}}>Projects</h1>
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+      <main id="main-content" className="projects-page-main">
+        <header className="projects-page-header">
+          <h1 className="projects-page-title">Projects</h1>
+          <div className="projects-page-toolbar">
             <div style={{position:"relative"}}><Search size={15} style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:t.textMuted}}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search projects…" style={{width:search?240:180,background:t.surface,border:`1.5px solid ${t.borderIn}`,borderRadius:8,padding:"8px 12px 8px 34px",color:t.text,fontSize:13,outline:"none",transition:"all 0.25s"}} onFocus={e=>{e.target.style.width="240px";e.target.style.borderColor=t.focus;e.target.style.boxShadow=`0 0 0 3px ${t.accentGlow}`;}} onBlur={e=>{if(!search)e.target.style.width="180px";e.target.style.borderColor=t.borderIn;e.target.style.boxShadow="none";}}/>{search&&<X size={14} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",color:t.textMuted,cursor:"pointer"}} onClick={()=>setSearch("")}/>}</div>
             <Button type="button" variant="primary" size="md" onClick={openAdd} style={{ display: "flex", alignItems: "center", gap: 7 }}><Plus size={14}/> Add project</Button>
           </div>
@@ -546,7 +555,7 @@ export default function ProjectsPage(){
         />
 
         {/* Tabs + Bulk */}
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,marginTop:8}}>
+        <div className="projects-page-tabs-row">
           <div style={{display:"flex",gap:2,background:t.surfAlt,borderRadius:10,padding:3,border:`1px solid ${t.border}`}}>
             {[{key:"active",label:"Active",count:activeCount,icon:FolderOpen},{key:"archived",label:"Archived",count:archivedCount,icon:Archive}].map(vt=>{const Icon=vt.icon;const active=viewTab===vt.key;return(<button key={vt.key} onClick={()=>{setViewTab(vt.key);setSelected(new Set());}} style={{padding:"8px 18px",fontSize:13,fontWeight:active?700:500,cursor:"pointer",background:active?t.surface:"transparent",border:active?`1px solid ${t.border}`:"1px solid transparent",color:active?t.text:t.textMuted,borderRadius:8,display:"flex",alignItems:"center",gap:7,transition:"all 0.2s",boxShadow:active?"0 1px 3px rgba(0,0,0,0.06)":"none"}} onMouseEnter={e=>{if(!active)e.currentTarget.style.color=t.textSoft;}} onMouseLeave={e=>{if(!active)e.currentTarget.style.color=t.textMuted;}}><Icon size={14}/> {vt.label}<span style={{background:active?t.accentGlow:t.surfAlt,color:active?t.accent:t.textDim,borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700,marginLeft:2}}>{vt.count}</span></button>);})}
           </div>
@@ -570,7 +579,7 @@ export default function ProjectsPage(){
             boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
           }}
         >
-          <div style={{overflowX:"auto"}}>
+          <div className="projects-page-table-scroll">
           <table style={{width:"100%",borderCollapse:"collapse",minWidth:900}}>
             <thead><tr style={{borderBottom:`2px solid ${t.border}`}}>
               <th style={{width:48,padding:"14px 14px"}}><input type="checkbox" checked={selected.size===filtered.length&&filtered.length>0} onChange={toggleAll} style={{accentColor:t.chk,cursor:"pointer",width:16,height:16}}/></th>
@@ -591,7 +600,29 @@ export default function ProjectsPage(){
                   <td style={{padding:"12px 12px"}}>{owner&&<div style={{width:28,height:28,borderRadius:8,background:avGrad(owner.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff"}} title={owner.name}>{ini(owner.name)}</div>}</td>
                   <td style={{padding:"12px 8px"}} onClick={e=>e.stopPropagation()}><RowActions project={p} t={t} onEdit={()=>openEdit(p)} onArchive={()=>archiveProject(p.id)} onDelete={()=>{setSelected(new Set([p.id]));setConfirmDel(true);}}/></td>
                 </tr>);})}
-              {filtered.length===0&&(<tr><td colSpan={11} style={{textAlign:"center",padding:"56px 20px"}}>{viewTab==="archived"?<><Archive size={32} style={{color:t.textDim,marginBottom:12}}/><div style={{color:t.textMuted,fontSize:15,fontWeight:600}}>No archived projects</div><div style={{color:t.textDim,fontSize:13,marginTop:4}}>Archived projects will appear here</div></>:<><Search size={32} style={{color:t.textDim,marginBottom:12}}/><div style={{color:t.textMuted,fontSize:15,fontWeight:600}}>{search?"No projects match your search":"No projects yet"}</div><div style={{color:t.textDim,fontSize:13,marginTop:4}}>{search?"Try a different search term":"Click \"Add project\" to get started"}</div></>}</td></tr>)}
+              {filtered.length===0&&(
+                <tr>
+                  <td colSpan={11} style={{ padding: 0, borderBottom: "none" }}>
+                    <div style={{ padding: "56px 20px" }}>
+                      {viewTab==="archived" ? (
+                        <EmptyState
+                          icon={Archive}
+                          title="No archived projects"
+                          description="Archived projects will appear here."
+                        />
+                      ) : (
+                        <EmptyState
+                          icon={Search}
+                          title={search ? "No projects match your search" : "No projects yet"}
+                          description={
+                            search ? "Try a different search term." : "Click “Add project” to get started."
+                          }
+                        />
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
           </div>
@@ -613,7 +644,6 @@ export default function ProjectsPage(){
         @keyframes rowIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
         @keyframes toastIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
         @keyframes toastOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(30px)}}
-        .projects-action-feedback-mount{width:100%;height:0;flex-shrink:0;min-height:0;position:relative;overflow:visible;z-index:60}
         *{box-sizing:border-box}
         ::-webkit-scrollbar{width:7px}
         ::-webkit-scrollbar-track{background:transparent}

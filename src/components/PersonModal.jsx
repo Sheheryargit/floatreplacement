@@ -36,6 +36,8 @@ import {
   employmentToWorkType,
   workTypeToEmployment,
 } from "../utils/availabilityPreview.js";
+import { WORKSPACE_THEME as T } from "../theme/workspacePalette.js";
+import "../styles/premium-person-modal.css";
 
 /* ═══════════════════ DATA ═══════════════════ */
 const TYPES = ["Employee","Contractor","Placeholder"];
@@ -97,45 +99,6 @@ const formToPerson = (form, id, archived) => {
   };
 };
 
-/* ═══════════════════ THEMES ═══════════════════ */
-const T = {
-  dark: {
-    bg:"#0f1117",surface:"#181c26",surfRaised:"#1e2235",surfAlt:"#1a1e2e",
-    border:"#2a2f45",borderSub:"#323852",borderIn:"#3a4060",
-    text:"#f0f2f8",textSoft:"#9ba4b8",textMuted:"#7b82a0",textDim:"#4a5168",
-    accent:"#0088ff",accentSoft:"#006edc",accentHov:"#1a9bff",accentTxt:"#ffffff",accentGlow:"rgba(0,136,255,0.15)",
-    sidebar:"#0f1117",sidebarAct:"rgba(0,136,255,0.08)",rowHov:"#151a24",
-    tagBg:"rgba(124,106,247,0.12)",tagTxt:"#a599fc",
-    btnSec:"#1e2235",btnSecHov:"#252a3d",btnSecTxt:"#c4c9d8",
-    danger:"#ef4444",dangerHov:"#dc2626",dangerSoft:"rgba(239,68,68,0.16)",dangerTxt:"#fff",
-    dangerGlow:"0 4px 24px rgba(239,68,68,0.25)",
-    success:"#22c55e",successHov:"#16a34a",successSoft:"rgba(34,197,94,0.14)",successGlow:"0 4px 20px rgba(34,197,94,0.22)",
-    warn:"#f59e0b",warnHov:"#d97706",warnTxt:"#0f172a",warnSoft:"rgba(245,158,11,0.16)",warnGlow:"0 4px 20px rgba(245,158,11,0.2)",
-    info:"#38bdf8",infoSoft:"rgba(56,189,248,0.14)",infoGlow:"0 4px 22px rgba(56,189,248,0.22)",
-    overlay:"rgba(0,0,0,0.6)",shadow:"0 32px 100px rgba(0,0,0,0.55)",
-    chk:"#0088ff",scroll:"#2a2f45",selRow:"rgba(0,136,255,0.06)",focus:"#0088ff",
-    tabActiveBg:"rgba(0,136,255,0.12)",tabHovBg:"rgba(0,136,255,0.06)",
-  },
-  light: {
-    bg:"#f4f6fa",surface:"#ffffff",surfRaised:"#ffffff",surfAlt:"#e8ebf4",
-    border:"#e0e4ef",borderSub:"#e4e8f0",borderIn:"#d4d8e4",
-    text:"#12151f",textSoft:"#4a5168",textMuted:"#5c6478",textDim:"#9ca3b8",
-    accent:"#0077e6",accentSoft:"#0066cc",accentHov:"#0088ff",accentTxt:"#ffffff",accentGlow:"rgba(0,136,255,0.12)",
-    sidebar:"#ffffff",sidebarAct:"rgba(0,136,255,0.08)",rowHov:"#f4f6fa",
-    tagBg:"rgba(124,106,247,0.1)",tagTxt:"#5b4fcf",
-    btnSec:"#e8ebf4",btnSecHov:"#dde1ec",btnSecTxt:"#3e4560",
-    danger:"#ef4444",dangerHov:"#dc2626",dangerSoft:"rgba(239,68,68,0.1)",dangerTxt:"#fff",
-    dangerGlow:"0 4px 18px rgba(239,68,68,0.2)",
-    success:"#16a34a",successHov:"#15803d",successSoft:"rgba(22,163,74,0.1)",successGlow:"0 4px 16px rgba(22,163,74,0.18)",
-    warn:"#d97706",warnHov:"#b45309",warnTxt:"#fff",warnSoft:"rgba(217,119,6,0.1)",warnGlow:"0 4px 16px rgba(217,119,6,0.16)",
-    info:"#0284c7",infoSoft:"rgba(2,132,199,0.1)",infoGlow:"0 4px 18px rgba(2,132,199,0.15)",
-    overlay:"rgba(15,18,28,0.35)",shadow:"0 32px 100px rgba(0,0,0,0.12)",
-    chk:"#0077e6",scroll:"#d4d8e0",selRow:"rgba(0,136,255,0.08)",focus:"#0088ff",
-    tabActiveBg:"rgba(0,136,255,0.1)",tabHovBg:"rgba(0,136,255,0.05)",
-  },
-};
-
-/* ═══════════════════ CONFIRM DIALOG ═══════════════════ */
 function Confirm({ open, onYes, onNo, title, desc, yesLabel, yesIcon:YI, yesDanger, t }) {
   if(!open) return null;
   return (

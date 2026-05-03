@@ -27,6 +27,7 @@ import { syncPersonAvailabilityFromForm } from "../lib/api/personAvailability.js
 import { previewAvailabilityHours } from "../utils/availabilityPreview.js";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
 import { Button } from "../components/ui/Button.jsx";
+import { EmptyState } from "../components/ui/EmptyState.jsx";
 import PersonModal, {
   T,
   Confirm,
@@ -580,7 +581,7 @@ export default function PeoplePage() {
     >
       <AppSideNav />
 
-      <main className="people-page-main">
+      <main id="main-content" className="people-page-main">
         {/* Header */}
         <header className="people-page-header" style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8 }}>
           <h1 style={{ fontSize:26,fontWeight:700,margin:0,letterSpacing:-0.5 }}>People</h1>
@@ -1003,12 +1004,33 @@ export default function PeoplePage() {
                 );
               })}
               {filteredSorted.length===0 && (
-                <tr><td colSpan={8} style={{ textAlign:"center",padding:"56px 20px" }}>
-                  {viewTab==="archived"
-                    ? <><Archive size={32} style={{ color:t.textDim,marginBottom:12 }}/><div style={{ color:t.textMuted,fontSize:15,fontWeight:600 }}>No archived people</div><div style={{ color:t.textDim,fontSize:13,marginTop:4 }}>Archived team members will appear here</div></>
-                    : <><Search size={32} style={{ color:t.textDim,marginBottom:12 }}/><div style={{ color:t.textMuted,fontSize:15,fontWeight:600 }}>{search||advActiveCount?"No people match filters":"No people yet"}</div><div style={{ color:t.textDim,fontSize:13,marginTop:4 }}>{search||advActiveCount?"Try adjusting search or open Filters to clear criteria":"Click \"Add person\" to get started"}</div></>
-                  }
-                </td></tr>
+                <tr>
+                  <td colSpan={8} style={{ padding: 0, borderBottom: "none" }}>
+                    <div style={{ padding: "56px 20px" }}>
+                      {viewTab === "archived" ? (
+                        <EmptyState
+                          icon={Archive}
+                          title="No archived people"
+                          description="Archived team members will appear here."
+                        />
+                      ) : (
+                        <EmptyState
+                          icon={Search}
+                          title={
+                            search || advActiveCount
+                              ? "No people match filters"
+                              : "No people yet"
+                          }
+                          description={
+                            search || advActiveCount
+                              ? "Try adjusting search or open Filters to clear criteria."
+                              : 'Click “Add person” to get started.'
+                          }
+                        />
+                      )}
+                    </div>
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>

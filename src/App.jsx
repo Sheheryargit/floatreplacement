@@ -1,4 +1,5 @@
 import React, { lazy, Suspense } from "react";
+import { AppErrorFallback } from "./components/AppErrorFallback.jsx";
 import { BrowserRouter, useLocation, useRoutes, Navigate } from "react-router-dom";
 import { MotionConfig } from "framer-motion";
 import { ThemeProvider, useAppTheme } from "./context/ThemeContext.jsx";
@@ -13,6 +14,7 @@ import LoginPage from "./pages/LoginPage.jsx";
 import GlobalBackground from "./components/ui/GlobalBackground.jsx";
 import { Toaster } from "sonner";
 import { isStaticUi } from "./config/uiMode.js";
+import "./styles/premium-overlays.css";
 
 /** Opaque toast shell — detailed fills live in index.css (.alloc8-toast). */
 const toastShellStyle = {
@@ -47,6 +49,10 @@ function WorkspaceReady({ children }) {
   return children;
 }
 
+function AppErrorBoundaryShell({ error }) {
+  return <AppErrorFallback error={error} />;
+}
+
 class AppErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -61,20 +67,7 @@ class AppErrorBoundary extends React.Component {
   }
   render() {
     if (!this.state.error) return this.props.children;
-    const msg = this.state.error?.message || String(this.state.error);
-    return (
-      <div style={{ padding: 24, color: "var(--color-text, #fff)" }}>
-        <h2 style={{ margin: 0, fontSize: 18 }}>App error</h2>
-        <p style={{ opacity: 0.85, marginTop: 8, marginBottom: 0 }}>
-          {msg}
-        </p>
-        {import.meta.env.DEV ? (
-          <pre style={{ marginTop: 12, whiteSpace: "pre-wrap", opacity: 0.75 }}>
-            {this.state.error?.stack || ""}
-          </pre>
-        ) : null}
-      </div>
-    );
+    return <AppErrorBoundaryShell error={this.state.error} />;
   }
 }
 
@@ -100,11 +93,20 @@ function AnimatedRoutes() {
   );
 }
 
+function SkipToMainLink() {
+  return (
+    <a href="#main-content" className="skip-to-main">
+      Skip to main content
+    </a>
+  );
+}
+
 function AuthGate() {
   const { isAuthenticated } = useAuth();
   if (!isAuthenticated) {
     return (
       <>
+        <SkipToMainLink />
         <LoginPage />
         <ThemedToaster />
       </>
@@ -112,6 +114,7 @@ function AuthGate() {
   }
   return (
     <>
+      <SkipToMainLink />
       <AppErrorBoundary>
         <WorkspaceReady>
           <SlapAnimationProvider>

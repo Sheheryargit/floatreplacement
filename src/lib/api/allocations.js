@@ -148,7 +148,7 @@ export async function fetchAllocations({ startDate, endDate } = {}) {
 }
 
 export async function createAllocation(allocation) {
-  if (!isSupabaseConfigured) return;
+  if (!isSupabaseConfigured) return allocation;
   const row = allocationToRow(allocation);
   const { data, error } = await rpcSaveAllocation(
     applyProjectIdRpcArg(
@@ -185,7 +185,7 @@ export async function createAllocation(allocation) {
 }
 
 export async function updateAllocation(allocation) {
-  if (!isSupabaseConfigured) return;
+  if (!isSupabaseConfigured) return allocation;
   const prevVersion = Number(allocation.version);
   if (!Number.isFinite(prevVersion)) {
     throw new Error("Allocation version missing (optimistic locking)");

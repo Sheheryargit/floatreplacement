@@ -1,0 +1,147 @@
+/**
+ * Dialogs & command palette — import from lazy chunks AFTER their base CSS.
+ */
+
+/* ── Global app toast-style modal (Radial) ─────────────── */
+.float-modal-backdrop {
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(0, 136, 255, 0.16), transparent 48%),
+    rgba(5, 8, 16, 0.62);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+}
+
+:root[data-theme="light"] .float-modal-backdrop {
+  background:
+    radial-gradient(100% 60% at 50% -20%, color-mix(in srgb, var(--color-brand) 18%, transparent), transparent 50%),
+    rgba(15, 18, 28, 0.38);
+}
+
+.float-modal-panel {
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--color-surface) 94%, transparent) 0%,
+      color-mix(in srgb, var(--color-surface) 100%, transparent) 100%
+    ) !important;
+  border-radius: calc(var(--radius-modal) + 4px);
+  border: 1px solid color-mix(in srgb, var(--color-brand) 38%, var(--color-border)) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 32px 80px rgba(0, 0, 0, 0.42),
+    0 2px 0 color-mix(in srgb, var(--color-accent) 22%, transparent) inset,
+    0 0 100px color-mix(in srgb, var(--color-brand) 15%, transparent) !important;
+}
+
+:root[data-theme="light"] .float-modal-panel {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 1) inset,
+    0 28px 72px rgba(15, 23, 42, 0.12),
+    inset 0 2px 0 color-mix(in srgb, var(--color-brand) 15%, transparent) !important;
+}
+
+.float-modal-title {
+  font-family: var(--font-display);
+  letter-spacing: -0.03em;
+}
+
+/* ── Allocation modal (Radix lpam-) ─────────────────────── */
+.lpam-overlay-radix {
+  background:
+    radial-gradient(100% 70% at 50% -15%, rgba(0, 136, 255, 0.14), transparent 45%),
+    rgba(6, 8, 14, 0.66) !important;
+  backdrop-filter: blur(18px) saturate(1.15);
+}
+
+/* Schedule allocation detail dialog — softer dim + charcoal panel like production dark */
+:root[data-theme="dark"] .lpam-overlay-radix {
+  background: rgba(3, 5, 11, 0.58) !important;
+}
+
+.lpam-modal {
+  padding: 28px 32px 22px !important;
+  border: 1px solid color-mix(in srgb, var(--color-brand) 32%, transparent) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 36px 100px rgba(0, 0, 0, 0.52),
+    0 2px 0 color-mix(in srgb, var(--color-accent) 25%, transparent) inset,
+    0 0 120px color-mix(in srgb, var(--color-brand) 12%, transparent) !important;
+  background: linear-gradient(
+    170deg,
+    color-mix(in srgb, var(--color-surface) 94%, transparent) 0%,
+    color-mix(in srgb, var(--color-surface-2, #101830) 88%, transparent) 100%
+  ) !important;
+}
+
+:root[data-theme="dark"] .lpam-modal.lpam-detail {
+  background:
+    linear-gradient(180deg, #1f2330 0%, #171a24 50%, #13161e 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 28px 72px rgba(0, 0, 0, 0.55) !important;
+}
+
+:root[data-theme="light"] .lpam-modal.lpam-detail {
+  background: linear-gradient(180deg, #ffffff 0%, #f6f8fc 100%) !important;
+  border: 1px solid color-mix(in srgb, var(--color-brand) 32%, var(--color-border)) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 1) inset,
+    0 24px 60px rgba(15, 23, 42, 0.1) !important;
+}
+
+:root[data-theme="light"] .lpam-modal {
+  background: linear-gradient(180deg, #ffffff 0%, #f6f8fc 100%) !important;
+  border: 1px solid color-mix(in srgb, var(--color-brand) 38%, var(--color-border)) !important;
+}
+
+.lpam-title {
+  font-family: var(--font-display);
+  letter-spacing: -0.035em;
+  font-size: 1.28rem !important;
+}
+
+.lpam-modal .lpam-icon-close:hover {
+  background: color-mix(in srgb, var(--color-brand) 14%, transparent);
+  border-radius: 10px;
+}
+
+/* ── Command palette ───────────────────────────────────────── */
+.alloc8-cmd-overlay {
+  background:
+    radial-gradient(80% 50% at 50% -10%, rgba(0, 136, 255, 0.12), transparent 50%),
+    rgba(0, 0, 0, 0.54);
+  backdrop-filter: blur(22px) saturate(1.18);
+}
+
+.alloc8-cmd {
+  border: 1px solid color-mix(in srgb, var(--color-brand) 42%, var(--color-border));
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 32px 100px rgba(0, 0, 0, 0.5),
+    0 0 80px color-mix(in srgb, var(--color-brand) 10%, transparent) !important;
+}
+
+/* ── Invite dialog ───────────────────────────────────────── */
+.lp-invite-overlay {
+  background:
+    radial-gradient(110% 80% at 50% -20%, rgba(0, 136, 255, 0.18), transparent 52%),
+    rgba(4, 8, 18, 0.68);
+  backdrop-filter: blur(22px) saturate(1.15);
+}
+
+.lp-invite-content {
+  border: 1px solid color-mix(in srgb, var(--color-brand) 42%, transparent) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+    0 40px 100px rgba(0, 0, 0, 0.55),
+    0 0 100px color-mix(in srgb, var(--color-brand) 14%, transparent) !important;
+}
+
+:root[data-static-ui="1"] .float-modal-backdrop,
+:root[data-static-ui="1"] .lpam-overlay-radix,
+:root[data-static-ui="1"] .alloc8-cmd-overlay,
+:root[data-static-ui="1"] .lp-invite-overlay {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}

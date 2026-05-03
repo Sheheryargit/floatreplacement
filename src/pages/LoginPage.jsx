@@ -30,6 +30,9 @@ const ACCESS_PASSWORD =
   String(import.meta.env.VITE_APP_ACCESS_PASSWORD ?? "").trim() ||
   "Engineering1";
 
+const SESSION_DEFAULT_NAME =
+  String(import.meta.env.VITE_SESSION_DISPLAY_NAME ?? "").trim() || "Workspace session";
+
 const SIGN_IN_HOLD_MS = 5000;
 const SSO_TRIPLE_WINDOW_MS = 720;
 const SSO_WELCOME_MS = 3000;
@@ -354,6 +357,12 @@ const heroStagger = {
   },
 };
 
+/** Reduced / static-ui: avoids `opacity: 0` initial state when CSS kills motion timing (hero must not stay blank). */
+const heroStaggerVisible = {
+  hidden: { opacity: 1 },
+  show: { opacity: 1 },
+};
+
 const heroItem = {
   hidden: { opacity: 0, y: 16 },
   show: {
@@ -361,6 +370,11 @@ const heroItem = {
     y: 0,
     transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] },
   },
+};
+
+const heroItemVisible = {
+  hidden: { opacity: 1, y: 0 },
+  show: { opacity: 1, y: 0 },
 };
 
 export default function LoginPage() {
@@ -529,7 +543,7 @@ export default function LoginPage() {
     setEmptyPulse(false);
     setAuthExit(true);
     window.setTimeout(() => {
-      unlock();
+      unlock({ displayName: SESSION_DEFAULT_NAME });
     }, 440);
   }, [password, unlock, openDialog]);
 
@@ -614,8 +628,9 @@ export default function LoginPage() {
 
   const completeSsoWelcome = useCallback(() => {
     flushSsoTriple();
-    unlock();
-  }, [unlock, flushSsoTriple]);
+    const label = SSO_PROVIDERS.find((p) => p.id === welcomeProvider)?.label ?? "Signed in";
+    unlock({ displayName: label });
+  }, [unlock, flushSsoTriple, welcomeProvider]);
 
   const handleSsoActivate = useCallback(
     (id) => {
@@ -693,43 +708,58 @@ export default function LoginPage() {
         <span className="login-page-corner-eaas-text">Built by EaaS Engineers for EaaS</span>
       </aside>
 
-      <div className="login-page-shell">
+      <main id="main-content" className="login-page-shell">
         <section className="login-page-hero" aria-label="Alloc8 overview">
           <motion.div
             className="login-page-hero-inner"
-            variants={heroStagger}
+            variants={reduceMotion ? heroStaggerVisible : heroStagger}
             initial="hidden"
             animate="show"
           >
-            <motion.div variants={heroItem} className="login-page-hero-badge-wrap">
+            <motion.div
+              variants={reduceMotion ? heroItemVisible : heroItem}
+              className="login-page-hero-badge-wrap"
+            >
               <div className="login-page-hero-badge login-page-hero-badge--futurist">
                 <span className="login-page-hero-badge-pulse" aria-hidden />
                 AI-operated workforce intelligence
               </div>
             </motion.div>
-            <motion.div variants={heroItem}>
+            <motion.div variants={reduceMotion ? heroItemVisible : heroItem}>
               <span className="alloc8-wordmark login-page-hero-wordmark" aria-label="Alloc8">
                 Alloc<span className="alloc8-wordmark-eight">8</span>
               </span>
             </motion.div>
-            <motion.h1 className="login-page-hero-title" variants={heroItem}>
+            <motion.h1
+              className="login-page-hero-title"
+              variants={reduceMotion ? heroItemVisible : heroItem}
+            >
               <span className="login-page-hero-title-line">Operate the future of work.</span>
               <span className="login-page-hero-title-line login-page-hero-title-line--grad">
                 Agents, people, one command surface.
               </span>
             </motion.h1>
-            <motion.p className="login-page-hero-lead" variants={heroItem}>
+            <motion.p
+              className="login-page-hero-lead"
+              variants={reduceMotion ? heroItemVisible : heroItem}
+            >
               Enterprise-grade workforce intelligence — AI agents amplify planners while
               governance, audit trails, and role-aware controls stay in command.
             </motion.p>
-            <motion.div variants={heroItem} className="login-page-feature-loop-wrap">
+            <motion.div
+              variants={reduceMotion ? heroItemVisible : heroItem}
+              className="login-page-feature-loop-wrap"
+            >
               <p className="login-page-feature-loop-label">
                 <span className="login-page-feature-loop-label-cursor" aria-hidden />
                 Live capability stream
               </p>
               <FeatureRotator reduceMotion={reduceMotion} />
             </motion.div>
-            <motion.p className="login-page-hero-trust" variants={heroItem}>
+            <motion.p
+              className="login-page-hero-trust"
+              variants={reduceMotion ? heroItemVisible : heroItem}
+            >
               <span className="login-page-hero-trust-dot" aria-hidden />
               <span className="login-page-hero-trust-text">
                 Models nominal · human-in-the-loop · audit-ready telemetry
@@ -740,7 +770,7 @@ export default function LoginPage() {
 
         <motion.div
           className="login-page-card-tilt"
-          initial={{ opacity: 0, y: 36 }}
+          initial={reduceMotion ? false : { opacity: 0, y: 36 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={cardSpring}
         >
@@ -910,7 +940,7 @@ export default function LoginPage() {
             </div>
           </div>
         </motion.div>
-      </div>
+      </main>
 
       <div className="login-page-attribution" aria-label="Credit">
         <motion.div

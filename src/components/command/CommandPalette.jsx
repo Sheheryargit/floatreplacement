@@ -13,6 +13,7 @@ import {
 import { useAppData } from "../../context/AppDataContext.jsx";
 import { useAppTheme } from "../../context/ThemeContext.jsx";
 import "./CommandPalette.css";
+import "../../styles/premium-overlays.css";
 
 const ACTIONS = [
   {

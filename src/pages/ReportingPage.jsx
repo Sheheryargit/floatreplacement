@@ -1957,7 +1957,7 @@ export default function ReportingPage() {
     <div className="reporting-root" data-theme={theme === "light" ? "light" : "dark"}>
       <AppSideNav />
  
-      <main className="reporting-main rp-full-main">
+      <main id="main-content" className="reporting-main rp-full-main">
  
         {/* ── Top View Mode Selector ── */}
         <motion.div className="rp-view-mode-selector-container" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>

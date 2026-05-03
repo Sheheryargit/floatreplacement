@@ -41,6 +41,9 @@ const LEGACY_STORAGE_KEY = "float-workspace-v1";
 /** Debounce window for postgres_changes → full reload (coalesces bursts from many editors). */
 const WORKSPACE_REALTIME_DEBOUNCE_MS = 900;
 
+/** If Supabase hangs, still leave the animated loader instead of trapping the user indefinitely. */
+const WORKSPACE_READY_FALLBACK_MS = 25_000;
+
 function dbSync(fn) {
   if (!isSupabaseConfigured) return;
   Promise.resolve()
@@ -411,6 +414,7 @@ export function AppDataProvider({ children }) {
 
     let cancelled = false;
     let timer = null;
+    let readyFallbackTimer = null;
     /** Tables touched since last flush; coalesced into one debounced partial refresh. */
     const dirtyRealtime = new Set();
 
@@ -500,6 +504,10 @@ export function AppDataProvider({ children }) {
       )
       .subscribe();
 
+    readyFallbackTimer = window.setTimeout(() => {
+      if (!cancelled) useAppStore.setState({ workspaceReady: true });
+    }, WORKSPACE_READY_FALLBACK_MS);
+
     loadWorkspaceFromSupabase()
       .then((data) => {
         if (cancelled || !data) return;
@@ -507,11 +515,18 @@ export function AppDataProvider({ children }) {
       })
       .catch((e) => console.warn("[float] Supabase load:", e?.message || e))
       .finally(() => {
+        if (readyFallbackTimer != null) {
+          window.clearTimeout(readyFallbackTimer);
+          readyFallbackTimer = null;
+        }
         if (!cancelled) useAppStore.setState({ workspaceReady: true });
       });
 
     return () => {
       cancelled = true;
+      if (readyFallbackTimer != null) {
+        window.clearTimeout(readyFallbackTimer);
+      }
       document.removeEventListener("visibilitychange", onVisibilityChange);
       if (timer) clearTimeout(timer);
       dirtyRealtime.clear();

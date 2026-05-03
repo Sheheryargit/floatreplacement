@@ -13,6 +13,7 @@ import {
   Rows3,
   Send,
   LayoutGrid,
+  Spline,
 } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
@@ -25,10 +26,15 @@ import {
   ALLOCATION_BOX_STYLE_CHANGED_EVENT,
   ALLOCATION_BOX_STYLE_IDS,
   ALLOCATION_BOX_STYLE_LABELS,
+  ALLOCATION_ENTER_ANIM_CHANGED_EVENT,
+  ALLOCATION_ENTER_ANIM_IDS,
+  ALLOCATION_ENTER_ANIM_LABELS,
   PEAK_LOAD_LABELS_CHANGED_EVENT,
   readAllocationBoxStyle,
+  readAllocationEnterAnimation,
   readPeakLoadLabelsVisible,
   writeAllocationBoxStyle,
+  writeAllocationEnterAnimation,
   writePeakLoadLabelsVisible,
 } from "../config/scheduleUiPrefs.js";
 import { SettingsItem } from "../components/ui/SettingsItem.jsx";
@@ -65,6 +71,7 @@ export default function SettingsPage() {
   const profileRef = useRef(null);
   const [peakLoadLabels, setPeakLoadLabels] = useState(() => readPeakLoadLabelsVisible());
   const [allocationBoxStyle, setAllocationBoxStyle] = useState(() => readAllocationBoxStyle());
+  const [allocationEnterAnim, setAllocationEnterAnim] = useState(() => readAllocationEnterAnimation());
   const [inviteOpen, setInviteOpen] = useState(false);
 
   const setPeakLoadLabelsPreference = useCallback((next) => {
@@ -77,6 +84,11 @@ export default function SettingsPage() {
     writeAllocationBoxStyle(next);
   }, []);
 
+  const setAllocationEnterAnimPreference = useCallback((next) => {
+    setAllocationEnterAnim(next);
+    writeAllocationEnterAnimation(next);
+  }, []);
+
   useEffect(() => {
     const sync = () => setPeakLoadLabels(readPeakLoadLabelsVisible());
     window.addEventListener(PEAK_LOAD_LABELS_CHANGED_EVENT, sync);
@@ -87,6 +99,12 @@ export default function SettingsPage() {
     const sync = () => setAllocationBoxStyle(readAllocationBoxStyle());
     window.addEventListener(ALLOCATION_BOX_STYLE_CHANGED_EVENT, sync);
     return () => window.removeEventListener(ALLOCATION_BOX_STYLE_CHANGED_EVENT, sync);
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setAllocationEnterAnim(readAllocationEnterAnimation());
+    window.addEventListener(ALLOCATION_ENTER_ANIM_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(ALLOCATION_ENTER_ANIM_CHANGED_EVENT, sync);
   }, []);
 
   useEffect(() => {
@@ -135,7 +153,7 @@ export default function SettingsPage() {
       <AppSideNav />
 
       <div className="settings-body">
-      <main className="settings-main">
+      <main id="main-content" className="settings-main">
         <motion.header
           className="settings-hero"
           initial={{ opacity: 0, y: 10 }}
@@ -245,6 +263,43 @@ export default function SettingsPage() {
                     onClick={() => setAllocationBoxStylePreference(id)}
                   >
                     {ALLOCATION_BOX_STYLE_LABELS[id] ?? id}
+                  </button>
+                ))}
+              </div>
+            </SettingsItem>
+            <SettingsItem
+              icon={Spline}
+              label="New allocation arrival"
+              trailFullWidth
+              subtext={
+                <>
+                  Plays once when you save a new project block—not on reload.{" "}
+                  <em>Slow drift</em> floats in like availability chips; Ribbon reel grows from the left edge.
+                  <span className="settings-subtext-detail">
+                    Respects reduced motion & low‑GPU overrides in your browser/OS.
+                  </span>
+                </>
+              }
+              showChevron={false}
+            >
+              <div
+                className="settings-alloc-enter-toggle settings-alloc-box-toggle"
+                role="radiogroup"
+                aria-label="New allocation animation"
+              >
+                {ALLOCATION_ENTER_ANIM_IDS.map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={allocationEnterAnim === id}
+                    className={
+                      "settings-alloc-box-btn settings-alloc-enter-btn" +
+                      (allocationEnterAnim === id ? " settings-alloc-box-btn--active" : "")
+                    }
+                    onClick={() => setAllocationEnterAnimPreference(id)}
+                  >
+                    {ALLOCATION_ENTER_ANIM_LABELS[id] ?? id}
                   </button>
                 ))}
               </div>

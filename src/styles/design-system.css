@@ -155,3 +155,5 @@ a:focus:not(:focus-visible) {
     background-position: -200% 0;
   }
 }
+
+/* Full workspace chrome map (People / Schedule / Projects modals): src/theme/workspacePalette.js */

@@ -52,8 +52,16 @@ html[data-low-gpu="1"] .lp-sched-row {
   opacity: 1;
 }
 
-html[data-low-gpu="1"] button.lp-block.lp-block-alloc {
+html[data-low-gpu="1"] button.lp-block.lp-block-alloc,
+html[data-low-gpu="1"] button.lp-block.lp-block-alloc.lp-alloc-enter {
   animation: none !important;
+  animation-delay: 0ms !important;
+}
+
+:root[data-static-ui="1"] button.lp-block.lp-block-alloc.lp-alloc-enter {
+  animation: none !important;
+  animation-delay: 0ms !important;
+  filter: none !important;
 }
 
 html[data-low-gpu="1"] .lp-leave-block--today:not(:hover) {

@@ -87,3 +87,62 @@ export function writeAllocationBoxStyle(styleId) {
     // ignore
   }
 }
+
+/** One-shot entrance animation when a new work allocation lands on the schedule (not shown on reload). */
+export const ALLOCATION_ENTER_ANIM_LS_KEY = "float.allocEnterAnim.v1";
+
+export const ALLOCATION_ENTER_ANIM_CHANGED_EVENT = "float-alloc-enter-anim-change";
+
+/** @type {readonly AllocationEnterAnimId[]} */
+export const ALLOCATION_ENTER_ANIM_IDS = /** @type {const} */ ([
+  "spring",
+  "drift",
+  "draw",
+  "rise",
+  "bloom",
+  "instant",
+]);
+
+/** @typedef {typeof ALLOCATION_ENTER_ANIM_IDS[number]} AllocationEnterAnimId */
+
+/** @type {Record<AllocationEnterAnimId, string>} */
+export const ALLOCATION_ENTER_ANIM_LABELS = {
+  spring: "Snap & settle",
+  drift: "Slow drift",
+  draw: "Ribbon reel",
+  rise: "Gentle rise",
+  bloom: "Luminous bloom",
+  instant: "Instant",
+};
+
+/** @returns {AllocationEnterAnimId} */
+export function readAllocationEnterAnimation() {
+  try {
+    if (typeof window === "undefined") return "spring";
+    const v = window.localStorage.getItem(ALLOCATION_ENTER_ANIM_LS_KEY);
+    if (v == null || v === "") return "spring";
+    return ALLOCATION_ENTER_ANIM_IDS.includes(/** @type {any} */ (v))
+      ? /** @type {AllocationEnterAnimId} */ (v)
+      : "spring";
+  } catch {
+    return "spring";
+  }
+}
+
+/** @param {AllocationEnterAnimId | string} id */
+export function writeAllocationEnterAnimation(id) {
+  const next = ALLOCATION_ENTER_ANIM_IDS.includes(/** @type {any} */ (id))
+    ? /** @type {AllocationEnterAnimId} */ (id)
+    : "spring";
+  try {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(ALLOCATION_ENTER_ANIM_LS_KEY, next);
+  } catch {
+    // ignore
+  }
+  try {
+    window.dispatchEvent(new CustomEvent(ALLOCATION_ENTER_ANIM_CHANGED_EVENT));
+  } catch {
+    // ignore
+  }
+}

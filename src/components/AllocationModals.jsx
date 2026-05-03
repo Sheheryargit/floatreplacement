@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import * as Dialog from "@radix-ui/react-dialog";
+import { toast } from "sonner";
 import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from "framer-motion";
-import { X, ChevronDown, ArrowLeftRight, Zap, Trash2, Palmtree } from "lucide-react";
+import { X, ChevronDown, ArrowLeftRight, Zap, Trash2, Palmtree, ArrowRight } from "lucide-react";
 import {
   resolveColorForProjectLabel,
   projectToAllocationLabel,
@@ -10,8 +11,16 @@ import {
   registryProjectIdForPickerLabel,
 } from "../utils/projectColors.js";
 import { normalizeLeaveTypeId, leaveAccentTheme, leavePanelStyleVars } from "../utils/leaveVisuals.js";
+import { isStaticUi } from "../config/uiMode.js";
 import "./AllocationModals.css";
+import "../styles/premium-overlays.css";
 import { ALLOCATION_PROJECT_SEED } from "../data/workspaceSeedConstants.js";
+import {
+  countWorkingDaysBetween,
+  countAllocationWorkingDaysExcludingOffDays,
+  addCalendarWeeksToIsoLocal,
+  allocationTotalHoursRounded,
+} from "../utils/allocationWorkMetrics.js";
 
 const REPEAT_OPTIONS = [
   { id: "none", label: "Doesn't repeat" },
@@ -43,22 +52,6 @@ export function leaveLabel(id) {
 
 function repeatLabel(id) {
   return REPEAT_OPTIONS.find((o) => o.id === id)?.label ?? "Doesn't repeat";
-}
-
-function countWorkingDaysBetween(start, end) {
-  const a = new Date(start);
-  a.setHours(0, 0, 0, 0);
-  const b = new Date(end);
-  b.setHours(0, 0, 0, 0);
-  if (b < a) return 0;
-  let n = 0;
-  const x = new Date(a);
-  while (x <= b) {
-    const d = x.getDay();
-    if (d !== 0 && d !== 6) n++;
-    x.setDate(x.getDate() + 1);
-  }
-  return n;
 }
 
 function formatAllocDate(d) {
@@ -162,7 +155,8 @@ export function CreateAllocationModal({
   publicHolidayAllocations = [],
   t,
 }) {
-  const reduceMotion = useReducedMotion();
+  /** Static UI clamps CSS animations globally — pair with `.lpam-modal` static-ui overrides to avoid invisible panels. */
+  const clampMotion = useReducedMotion() || isStaticUi();
   const hoursMode = "Hours";
   const [activeTab, setActiveTab] = useState("allocation");
   const [hoursPerDay, setHoursPerDay] = useState("7.5");
@@ -287,80 +281,17 @@ export function CreateAllocationModal({
     }
   }, [open]);
 
-  function dateKeyLocal(dt) {
-    const x = new Date(dt);
-    const y = x.getFullYear();
-    const mo = String(x.getMonth() + 1).padStart(2, "0");
-    const day = String(x.getDate()).padStart(2, "0");
-    return `${y}-${mo}-${day}`;
-  }
-
-  function allocationHasPerson(a, personId) {
-    const pid = String(personId ?? "");
-    if (!pid) return false;
-    if (Array.isArray(a?.personIds) && a.personIds.map(String).includes(pid)) return true;
-    if (a?.personId != null && String(a.personId) === pid) return true;
-    return false;
-  }
-
-  function countWorkingDaysExcludingOffDays(start, end) {
-    if (!start || !end) return 0;
-    const assignees = (assignedIds || []).map((id) => String(id)).filter(Boolean);
-    // Multi-assignee allocations store one shared record; time-off is per-person.
-    // Apply off-day skipping only when there is exactly one assignee.
-    if (assignees.length !== 1) return countWorkingDaysBetween(start, end);
-    const pid = assignees[0];
-
-    const offDayKeys = new Set();
-
-    for (const ph of publicHolidayAllocations || []) {
-      if (!allocationHasPerson(ph, pid)) continue;
-      const dk = String(ph.startDate || "").slice(0, 10);
-      if (dk) offDayKeys.add(dk);
-    }
-
-    for (const a of allocations || []) {
-      if (!a?.isLeave) continue;
-      if (!allocationHasPerson(a, pid)) continue;
-      const s = String(a.startDate || "").slice(0, 10);
-      const e = String(a.endDate || "").slice(0, 10);
-      if (!s || !e) continue;
-      const ds = new Date(s);
-      ds.setHours(0, 0, 0, 0);
-      const de = new Date(e);
-      de.setHours(0, 0, 0, 0);
-      if (de < ds) continue;
-      const x = new Date(ds);
-      while (x <= de) {
-        offDayKeys.add(dateKeyLocal(x));
-        x.setDate(x.getDate() + 1);
-      }
-    }
-
-    const a = new Date(start);
-    a.setHours(0, 0, 0, 0);
-    const b = new Date(end);
-    b.setHours(0, 0, 0, 0);
-    if (b < a) return 0;
-
-    let n = 0;
-    const x = new Date(a);
-    while (x <= b) {
-      const d = x.getDay();
-      if (d !== 0 && d !== 6) {
-        const dk = dateKeyLocal(x);
-        if (!offDayKeys.has(dk)) n++;
-      }
-      x.setDate(x.getDate() + 1);
-    }
-    return n;
-  }
-
   const workingDays = useMemo(
     () => {
       if (!startDate || !endDate) return 0;
       if (activeTab === "leave") return countWorkingDaysBetween(startDate, endDate);
-      return countWorkingDaysExcludingOffDays(startDate, endDate);
+      return countAllocationWorkingDaysExcludingOffDays(
+        startDate,
+        endDate,
+        assignedIds,
+        allocations,
+        publicHolidayAllocations
+      );
     },
     [startDate, endDate, activeTab, assignedIds, allocations, publicHolidayAllocations]
   );
@@ -500,14 +431,41 @@ export function CreateAllocationModal({
 
   const leaveAccent = useMemo(() => leaveAccentTheme(leaveType), [leaveType]);
 
+  /** Do not tie commit to `workingDays` — it can be 0 after excluding leave/off-days (single assignee) or for odd ranges; that used to permanently disable Save with no explanation. */
+  const primarySaveDisabled = useMemo(() => {
+    const dateOk =
+      Boolean(startDate && endDate) && new Date(`${startDate}T12:00:00`) <= new Date(`${endDate}T12:00:00`);
+    if (!dateOk || assignedIds.length === 0) return true;
+    if (activeTab === "allocation") {
+      return !String(project || "").trim() || !(parseFloat(hoursPerDay) > 0);
+    }
+    return !(parseFloat(leaveHoursPerDay) > 0);
+  }, [startDate, endDate, assignedIds, activeTab, project, hoursPerDay, leaveHoursPerDay]);
+
   if (!open) return null;
 
   const isSyntheticPhEdit = editAllocation?.syntheticPublicHoliday === true;
   const editingLeave = !!editAllocation && !!editAllocation.isLeave;
 
   const handleSave = () => {
+    if (!(startDate && endDate)) {
+      toast.error("Pick dates", { description: "Start and end date are required." });
+      return;
+    }
+    if (new Date(`${startDate}T12:00:00`) > new Date(`${endDate}T12:00:00`)) {
+      toast.error("Invalid range", { description: "End date must be on or after the start date." });
+      return;
+    }
+    if (assignedIds.length === 0) {
+      toast.error("Assign people", { description: "Choose at least one person." });
+      return;
+    }
+
     if (activeTab === "allocation") {
-      if (assignedIds.length === 0 || !startDate || !endDate || !project) return;
+      if (!String(project || "").trim()) {
+        toast.error("Choose a project", { description: "Select a project (or extra label) before saving." });
+        return;
+      }
       const payload = {
         personIds: assignedIds,
         startDate,
@@ -529,7 +487,6 @@ export function CreateAllocationModal({
         onCreate(payload);
       }
     } else {
-      if (assignedIds.length === 0 || !startDate || !endDate) return;
       const payload = {
         personIds: assignedIds,
         startDate,
@@ -648,9 +605,9 @@ export function CreateAllocationModal({
         {activeTab === "allocation" ? (
           <motion.div
             key="lpam-body-alloc"
-            initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+            initial={clampMotion ? false : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0, transition: { duration: 0.26, ease: [0.45, 0, 0.55, 1] } }}
-            exit={reduceMotion ? undefined : { opacity: 0, y: -8, transition: { duration: 0.18 } }}
+            exit={clampMotion ? undefined : { opacity: 0, y: -8, transition: { duration: 0.18 } }}
           >
         <div className="lpam-panel" style={{ background: t.surface, borderColor: t.borderIn || t.border, boxShadow: "0 2px 6px rgba(0,0,0,0.02)" }}>
           <div className="lpam-row lpam-row-split">
@@ -967,9 +924,9 @@ export function CreateAllocationModal({
         ) : (
           <motion.div
             key="lpam-body-leave"
-            initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+            initial={clampMotion ? false : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0, transition: { duration: 0.26, ease: [0.45, 0, 0.55, 1] } }}
-            exit={reduceMotion ? undefined : { opacity: 0, y: -8, transition: { duration: 0.18 } }}
+            exit={clampMotion ? undefined : { opacity: 0, y: -8, transition: { duration: 0.18 } }}
           >
             <div
               className={"lpam-panel lpam-panel-leave lpam-panel-leave--" + leaveTypeNorm}
@@ -984,7 +941,7 @@ export function CreateAllocationModal({
                 <motion.div
                   className="lpam-leave-icon-circle"
                   style={{ background: leaveAccent.soft }}
-                  animate={reduceMotion ? undefined : { scale: [1, 1.04, 1] }}
+                  animate={clampMotion ? undefined : { scale: [1, 1.04, 1] }}
                   transition={{ duration: 0.45, ease: [0.45, 0, 0.55, 1] }}
                   key={leaveTypeNorm}
                 >
@@ -1022,9 +979,9 @@ export function CreateAllocationModal({
                         className="lpam-menu lpam-menu-project lpam-menu-leave-types"
                         style={{ background: t.surface, borderColor: t.border }}
                         role="listbox"
-                        initial={reduceMotion ? false : { opacity: 0, y: -6, scale: 0.98 }}
+                        initial={clampMotion ? false : { opacity: 0, y: -6, scale: 0.98 }}
                         animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.22, ease: [0.45, 0, 0.55, 1] } }}
-                        exit={reduceMotion ? undefined : { opacity: 0, y: -4, scale: 0.99, transition: { duration: 0.15 } }}
+                        exit={clampMotion ? undefined : { opacity: 0, y: -4, scale: 0.99, transition: { duration: 0.15 } }}
                       >
                         {LEAVE_TYPES.map((lt, li) => {
                           const n = normalizeLeaveTypeId(lt.id);
@@ -1035,11 +992,11 @@ export function CreateAllocationModal({
                               role="option"
                               className={"lpam-menu-item" + (leaveType === lt.id ? " lpam-menu-item-active" : "")}
                               style={{ color: t.text }}
-                              initial={reduceMotion ? false : { opacity: 0, x: -8 }}
+                              initial={clampMotion ? false : { opacity: 0, x: -8 }}
                               animate={{
                                 opacity: 1,
                                 x: 0,
-                                transition: { delay: reduceMotion ? 0 : li * 0.035, duration: 0.2 },
+                                transition: { delay: clampMotion ? 0 : li * 0.035, duration: 0.2 },
                               }}
                               onClick={() => {
                                 setLeaveType(lt.id);
@@ -1188,11 +1145,7 @@ export function CreateAllocationModal({
               type="button"
               className={"lpam-btn lpam-btn-primary" + (activeTab === "leave" ? " lpam-btn-leave" : "")}
               onClick={handleSave}
-              disabled={
-                workingDays <= 0 ||
-                (activeTab === "allocation" && parseFloat(hoursPerDay) <= 0) ||
-                (activeTab === "leave" && parseFloat(leaveHoursPerDay) <= 0)
-              }
+              disabled={primarySaveDisabled}
               style={{
                 background:
                   activeTab === "leave"
@@ -1205,7 +1158,7 @@ export function CreateAllocationModal({
                     ? `0 6px 28px ${leaveAccent.glow}`
                     : undefined,
               }}
-              whileTap={reduceMotion || workingDays <= 0 ? undefined : { scale: 0.98 }}
+              whileTap={clampMotion || primarySaveDisabled ? undefined : { scale: 0.98 }}
             >
               {editAllocation && !isSyntheticPhEdit
                 ? "Save changes"
@@ -1238,13 +1191,127 @@ export function CreateAllocationModal({
   );
 }
 
-export function AllocationDetailModal({ open, allocation, assigneeNames, onClose, onDelete, onEditClick, t }) {
+export function AllocationDetailModal({
+  open,
+  allocation,
+  assigneeNames,
+  onClose,
+  onDelete,
+  onEditClick,
+  onExtendAllocation,
+  allocations = [],
+  publicHolidayAllocations = [],
+  t,
+}) {
+  const allocationPersonIds = useMemo(() => {
+    if (!allocation) return [];
+    if (allocation.personIds?.length) return allocation.personIds.map(String);
+    if (allocation.personId != null) return [String(allocation.personId)];
+    return [];
+  }, [allocation]);
+
+  const showExtendPanel =
+    !!onExtendAllocation &&
+    !!allocation &&
+    !allocation.isLeave &&
+    !allocation.syntheticPublicHoliday;
+
+  const [extendPresetWeeks, setExtendPresetWeeks] = useState(2);
+  const [extendChipMode, setExtendChipMode] = useState("preset");
+  const [extendCustomWeeksStr, setExtendCustomWeeksStr] = useState("2");
+  const [extendBusy, setExtendBusy] = useState(false);
+
+  useEffect(() => {
+    if (open && allocation) {
+      setExtendPresetWeeks(2);
+      setExtendChipMode("preset");
+      setExtendCustomWeeksStr("2");
+      setExtendBusy(false);
+    }
+  }, [open, allocation?.id]);
+
+  const currentEndKey = allocation ? String(allocation.endDate || "").slice(0, 10) : "";
+
+  const activeExtendWeeks = useMemo(() => {
+    if (extendChipMode === "custom") {
+      const raw = extendCustomWeeksStr.replace(/\D/g, "");
+      const n = Number.parseInt(raw || "1", 10);
+      const v = Number.isFinite(n) ? n : 1;
+      return Math.min(52, Math.max(1, v));
+    }
+    return Math.min(52, Math.max(1, extendPresetWeeks));
+  }, [extendChipMode, extendCustomWeeksStr, extendPresetWeeks]);
+
+  const previewEndKey = allocation
+    ? addCalendarWeeksToIsoLocal(String(allocation.endDate || "").slice(0, 10), activeExtendWeeks)
+    : "";
+
+  const extendValid =
+    !!allocation &&
+    !!previewEndKey &&
+    previewEndKey.length >= 10 &&
+    previewEndKey.slice(0, 10) > currentEndKey;
+
+  const previewExtendWorkingDays = useMemo(() => {
+    if (!allocation || !previewEndKey || !extendValid) return 0;
+    return countAllocationWorkingDaysExcludingOffDays(
+      allocation.startDate,
+      previewEndKey.slice(0, 10),
+      allocationPersonIds,
+      allocations,
+      publicHolidayAllocations
+    );
+  }, [
+    allocation,
+    previewEndKey,
+    extendValid,
+    allocationPersonIds,
+    allocations,
+    publicHolidayAllocations,
+  ]);
+
+  const previewExtendTotalHours = useMemo(
+    () => allocationTotalHoursRounded(previewExtendWorkingDays, allocation?.hoursPerDay),
+    [previewExtendWorkingDays, allocation?.hoursPerDay]
+  );
+
   if (!open || !allocation) return null;
 
   const isLeave = !!allocation.isLeave;
   const detailLeaveAccent = isLeave ? leaveAccentTheme(allocation.leaveType) : null;
-  const wd = allocation.workingDays ?? countWorkingDaysBetween(allocation.startDate, allocation.endDate);
-  const repeatText = allocation.repeatId && allocation.repeatId !== "none" ? repeatLabel(allocation.repeatId) : null;
+  const wd =
+    allocation.workingDays ??
+    countWorkingDaysBetween(
+      allocation.startDate,
+      allocation.endDate
+    );
+  const repeatText =
+    allocation.repeatId && allocation.repeatId !== "none" ? repeatLabel(allocation.repeatId) : null;
+  const currentTotalH = Number(allocation.totalHours) || 0;
+  const deltaWd = extendValid ? previewExtendWorkingDays - wd : 0;
+  const deltaH =
+    extendValid ? Math.round((previewExtendTotalHours - currentTotalH) * 100) / 100 : 0;
+
+  const bumpCustomWeeks = (delta) => {
+    setExtendChipMode("custom");
+    setExtendCustomWeeksStr((prev) => {
+      const raw = prev.replace(/\D/g, "") || String(activeExtendWeeks);
+      const n = Number.parseInt(raw, 10) || 1;
+      const next = Math.min(52, Math.max(1, n + delta));
+      return String(next);
+    });
+  };
+
+  const handleApplyExtend = async () => {
+    if (!onExtendAllocation || !extendValid || extendBusy) return;
+    const nextKey = previewEndKey.slice(0, 10);
+    setExtendBusy(true);
+    try {
+      await onExtendAllocation(allocation, nextKey);
+    } finally {
+      setExtendBusy(false);
+    }
+  };
 
   const handleDelete = () => {
     if (!onDelete) return;
@@ -1270,7 +1337,9 @@ export function AllocationDetailModal({ open, allocation, assigneeNames, onClose
           <Dialog.Description className="lpam-sr-only">
             {isLeave
               ? "Leave type, dates, and assignment details for this leave entry."
-              : "Hours, project, assignments, and notes for this allocation."}
+              : showExtendPanel
+                ? "Hours, project, assignments, notes, assigned people, and an optional Extend end date section."
+                : "Hours, project, assignments, and notes for this allocation."}
           </Dialog.Description>
         <div className="lpam-head">
           <Dialog.Title asChild>
@@ -1324,9 +1393,8 @@ export function AllocationDetailModal({ open, allocation, assigneeNames, onClose
             </div>
           </>
         ) : (
-          /* ── Allocation detail layout ───── */
           <>
-            <div className="lpam-detail-metrics">
+                <div className="lpam-detail-metrics">
               <div>
                 <div className="lpam-detail-label" style={{ color: t.textMuted }}>
                   Hours
@@ -1350,26 +1418,252 @@ export function AllocationDetailModal({ open, allocation, assigneeNames, onClose
               </div>
             </div>
 
-            {repeatText ? (
-              <div className="lpam-detail-section">
-                <div className="lpam-detail-label" style={{ color: t.textMuted }}>
-                  Repeats
-                </div>
-                <div className="lpam-detail-value lpam-detail-value-sm">{repeatText}</div>
-              </div>
-            ) : null}
+                {repeatText ? (
+                  <div className="lpam-detail-section">
+                    <div className="lpam-detail-label" style={{ color: t.textMuted }}>
+                      Repeats
+                    </div>
+                    <div className="lpam-detail-value lpam-detail-value-sm">{repeatText}</div>
+                  </div>
+                ) : null}
 
-            <div className="lpam-detail-section">
-              <div className="lpam-detail-label" style={{ color: t.textMuted }}>
-                Project
+                <div className="lpam-detail-section">
+                  <div className="lpam-detail-label" style={{ color: t.textMuted }}>
+                    Project
+                  </div>
+                  <div className="lpam-detail-project" style={{ color: t.text }}>
+                    {allocation.project}
+                  </div>
+                  <button type="button" className="lpam-link" style={{ color: t.accent }}>
+                    View project
+                  </button>
+                </div>
+
+            {showExtendPanel ? (
+              <details className="lpam-detail-extend-drawer">
+                <summary
+                  className="lpam-detail-extend-drawer-sum"
+                  style={{
+                    color: t.text,
+                    borderColor: `color-mix(in srgb, ${t.borderSub} 88%, transparent)`,
+                    background: `color-mix(in srgb, ${t.surfRaised || t.surface} 55%, transparent)`,
+                  }}
+                >
+                  <ArrowRight aria-hidden strokeWidth={2.25} className="lpam-detail-extend-drawer-ico" size={17} />
+                  <span className="lpam-detail-extend-drawer-label">Extend end date</span>
+                  <span className="lpam-detail-extend-drawer-hint" style={{ color: t.textMuted }}>
+                    calendar weeks · optional
+                  </span>
+                </summary>
+                <div className="lpam-extend-card-wrap lpam-extend-card-wrap--drawer">
+                <div
+                  className="lpam-extend-card"
+                  style={{
+                    borderColor: `color-mix(in srgb, ${t.borderSub} 72%, transparent)`,
+                    boxShadow: `inset 0 1px 0 color-mix(in srgb, ${t.surface} 40%, transparent), 0 10px 32px ${t.accentGlow || "rgba(0,136,255,0.06)"}`,
+                    background: `linear-gradient(
+                      148deg,
+                      color-mix(in srgb, ${t.surface} 92%, ${t.accent} 8%) 0%,
+                      color-mix(in srgb, ${t.surfRaised || t.surface} 97%, ${t.border} 3%) 100%
+                    )`,
+                  }}
+                >
+                  <div className="lpam-extend-chip-row" role="group" aria-label="Extension length presets">
+                    {[
+                      { w: 1, label: "+1 week" },
+                      { w: 2, label: "+2 weeks" },
+                      { w: 4, label: "+4 weeks" },
+                    ].map(({ w, label }) => (
+                      <button
+                        key={w}
+                        type="button"
+                        className={`lpam-extend-chip${extendChipMode === "preset" && extendPresetWeeks === w ? " lpam-extend-chip--active" : ""}`}
+                        style={{
+                          borderColor:
+                            extendChipMode === "preset" && extendPresetWeeks === w
+                              ? t.accent
+                              : `color-mix(in srgb, ${t.border} 82%, transparent)`,
+                          background:
+                            extendChipMode === "preset" && extendPresetWeeks === w
+                              ? `linear-gradient(180deg,
+                                  color-mix(in srgb, ${t.surface} 40%, transparent),
+                                  color-mix(in srgb, ${t.accent} 12%, transparent))`
+                              : t.btnSec || t.surface,
+                          color:
+                            extendChipMode === "preset" && extendPresetWeeks === w ? t.accent : t.textSoft,
+                        }}
+                        onClick={() => {
+                          setExtendChipMode("preset");
+                          setExtendPresetWeeks(w);
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className={`lpam-extend-chip lpam-extend-chip--narrow${extendChipMode === "custom" ? " lpam-extend-chip--active" : ""}`}
+                      style={{
+                        borderColor:
+                          extendChipMode === "custom"
+                            ? t.accent
+                            : `color-mix(in srgb, ${t.border} 82%, transparent)`,
+                        background:
+                          extendChipMode === "custom"
+                            ? `linear-gradient(180deg,
+                                color-mix(in srgb, ${t.surface} 40%, transparent),
+                                color-mix(in srgb, ${t.accent} 12%, transparent))`
+                            : t.btnSec || t.surface,
+                        color: extendChipMode === "custom" ? t.accent : t.textSoft,
+                      }}
+                      onClick={() => {
+                        setExtendChipMode("custom");
+                        setExtendCustomWeeksStr(
+                          String(extendChipMode === "preset" ? extendPresetWeeks : activeExtendWeeks)
+                        );
+                      }}
+                    >
+                      Custom
+                    </button>
+                  </div>
+
+                  {extendChipMode === "custom" ? (
+                    <div className="lpam-extend-custom">
+                      <span className="lpam-detail-label" style={{ color: t.textMuted }}>
+                        Weeks
+                      </span>
+                      <div
+                        className="lpam-extend-stepper"
+                        style={{
+                          border: `1px solid ${t.border}`,
+                          borderRadius: 12,
+                          overflow: "hidden",
+                          display: "flex",
+                          alignItems: "stretch",
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="lpam-extend-step"
+                          aria-label="Fewer weeks"
+                          style={{
+                            borderColor: t.border,
+                            background: t.btnSec || t.surface,
+                            color: t.text,
+                          }}
+                          onClick={() => bumpCustomWeeks(-1)}
+                        >
+                          −
+                        </button>
+                        <input
+                          aria-label="Number of calendar weeks to extend"
+                          className="lpam-extend-input"
+                          type="text"
+                          inputMode="numeric"
+                          value={extendCustomWeeksStr}
+                          onChange={(e) => {
+                            setExtendChipMode("custom");
+                            const next = e.target.value.replace(/\D/g, "").slice(0, 2);
+                            setExtendCustomWeeksStr(next === "" ? "" : next);
+                          }}
+                          onBlur={() =>
+                            setExtendCustomWeeksStr((s) =>
+                              String(
+                                Math.min(52, Math.max(1, Number.parseInt(s.replace(/\D/g, "") || "1", 10)))
+                              )
+                            )
+                          }
+                          style={{
+                            borderColor: t.border,
+                            background: t.surface,
+                            color: t.text,
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="lpam-extend-step"
+                          aria-label="More weeks"
+                          style={{
+                            borderColor: t.border,
+                            background: t.btnSec || t.surface,
+                            color: t.text,
+                          }}
+                          onClick={() => bumpCustomWeeks(1)}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div
+                    className={
+                      extendValid
+                        ? "lpam-extend-preview lpam-extend-preview--ok"
+                        : "lpam-extend-preview lpam-extend-preview--warn"
+                    }
+                    style={{
+                      borderColor: extendValid
+                        ? `color-mix(in srgb, ${t.accent} 35%, transparent)`
+                        : `color-mix(in srgb, ${t.warn ?? "#f59e0b"} 40%, transparent)`,
+                      background: extendValid
+                        ? `color-mix(in srgb, ${t.accentGlow || "rgba(0,136,255,0.12)"} 28%, transparent)`
+                        : String(t.warnSoft || "rgba(245,158,11,0.12)"),
+                    }}
+                  >
+                    <div className="lpam-extend-preview-top" style={{ color: extendValid ? t.text : t.warn ?? "#f59e0b" }}>
+                      <ArrowRight
+                        size={17}
+                        aria-hidden
+                        strokeWidth={2.25}
+                        style={{
+                          flexShrink: 0,
+                          color: extendValid ? t.accent : (t.warn ?? "#f59e0b"),
+                        }}
+                      />
+                      <span>
+                        {extendValid
+                          ? `New end · ${formatAllocDate(previewEndKey)}`
+                          : "Choose at least one more week"}
+                      </span>
+                    </div>
+                    {extendValid ? (
+                      <div className="lpam-extend-preview-metrics" style={{ color: t.textSoft }}>
+                        <span>
+                          {previewExtendWorkingDays} working days · {previewExtendTotalHours} h total
+                        </span>
+                        {deltaWd !== 0 || deltaH !== 0 ? (
+                          <span className="lpam-extend-delta" style={{ color: t.accent }}>
+                            +{deltaWd} days · +{deltaH} h vs current
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <button
+                    type="button"
+                    className="lpam-btn lpam-extend-apply"
+                    disabled={!extendValid || extendBusy}
+                    style={{
+                      width: "100%",
+                      justifyContent: "center",
+                      background: extendValid
+                        ? `linear-gradient(145deg, ${t.accent}, ${t.accentSoft || t.accent})`
+                        : t.btnSec || "#1e2235",
+                      borderColor: "transparent",
+                      color: extendValid ? "#fff" : t.textMuted,
+                      opacity: extendBusy ? 0.75 : 1,
+                      boxShadow: extendValid ? `0 12px 32px ${t.accentGlow || "rgba(0,136,255,0.2)"}` : undefined,
+                    }}
+                    onClick={handleApplyExtend}
+                  >
+                    {extendBusy ? "Applying…" : extendValid ? "Apply extension" : "Pick a duration"}
+                  </button>
+                </div>
               </div>
-              <div className="lpam-detail-project" style={{ color: t.text }}>
-                {allocation.project}
-              </div>
-              <button type="button" className="lpam-link" style={{ color: t.accent }}>
-                View project
-              </button>
-            </div>
+              </details>
+            ) : null}
           </>
         )}
 
@@ -1390,9 +1684,16 @@ export function AllocationDetailModal({ open, allocation, assigneeNames, onClose
           </div>
           <div className="lpam-detail-value lpam-detail-value-sm">{assigneeNames || "—"}</div>
         </div>
+
         </div>
 
-        <div className="lpam-detail-foot">
+        <div
+          className="lpam-detail-foot"
+          style={{
+            borderTop: `1px solid ${t.borderSub || t.border}`,
+            flexShrink: 0,
+          }}
+        >
           <div className="lpam-meta" style={{ color: t.textMuted }}>
             <Zap size={14} />
             <span>
@@ -1405,22 +1706,7 @@ export function AllocationDetailModal({ open, allocation, assigneeNames, onClose
             {onDelete ? (
               <button
                 type="button"
-                className="lpam-btn lpam-btn-secondary"
-                style={{
-                  background: t.dangerSoft,
-                  border: `1px solid color-mix(in srgb, ${t.danger} 35%, transparent)`,
-                  color: t.danger,
-                  boxShadow: t.dangerGlow || "0 2px 14px rgba(244,63,94,0.15)",
-                  transition: "box-shadow 0.22s cubic-bezier(0.22,1,0.36,1), filter 0.18s ease, transform 0.18s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.filter = "brightness(1.05)";
-                  e.currentTarget.style.transform = "translateY(-1px)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.filter = "";
-                  e.currentTarget.style.transform = "";
-                }}
+                className="lpam-btn lpam-btn-delete-solid"
                 onClick={handleDelete}
               >
                 Delete
@@ -1429,15 +1715,19 @@ export function AllocationDetailModal({ open, allocation, assigneeNames, onClose
             {onEditClick ? (
               <button
                 type="button"
-                className={"lpam-btn lpam-btn-primary" + (isLeave ? " lpam-btn-leave" : "")}
-                style={{
-                  background: isLeave && detailLeaveAccent
-                    ? `linear-gradient(145deg, ${detailLeaveAccent.solid}, color-mix(in srgb, ${detailLeaveAccent.solid} 72%, #0f172a))`
-                    : t.accent,
-                  borderColor: "transparent",
-                  color: "#fff",
-                  boxShadow: isLeave && detailLeaveAccent ? `0 6px 24px ${detailLeaveAccent.glow}` : undefined,
-                }}
+                className={
+                  "lpam-btn lpam-btn-primary lpam-btn-edit-solid" + (isLeave ? " lpam-btn-leave" : "")
+                }
+                style={
+                  isLeave && detailLeaveAccent
+                    ? {
+                        background: `linear-gradient(145deg, ${detailLeaveAccent.solid}, color-mix(in srgb, ${detailLeaveAccent.solid} 72%, #0f172a))`,
+                        borderColor: "transparent",
+                        color: "#fff",
+                        boxShadow: `0 6px 24px ${detailLeaveAccent.glow}`,
+                      }
+                    : { borderColor: "transparent", color: "#fff" }
+                }
                 onClick={onEditClick}
               >
                 Edit
