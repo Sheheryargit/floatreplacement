@@ -323,9 +323,9 @@ export default function PeoplePage() {
       if (p.archived !== isArch) return false;
 
       /** Check permissions */
-      if (role === 'admin') {
+      if (can(role, "peoplePage", "viewAll")) {
         // Admin sees everyone
-      } else if (role === 'manager') {
+      } else if (can(role, "peoplePage", "viewTeam")) {
         // Manager sees self and people on projects they own
         const isSelf = p.id === currentUser?.id;
         const isOnOwnedProject = projects.some(proj => 
@@ -825,7 +825,7 @@ export default function PeoplePage() {
             <Button type="button" variant="secondary" size="md" style={{ display: "flex", alignItems: "center", gap: 7 }}>
               <Download size={14} /> Import
             </Button>
-            {can(role, 'people', 'createPerson') && (
+            {can(role, 'peoplePage', 'createPerson') && (
               <Button type="button" variant="primary" size="md" onClick={openAdd} style={{ display: "flex", alignItems: "center", gap: 7 }}>
               <UserPlus size={14} /> Add person
               </Button>
@@ -891,7 +891,7 @@ export default function PeoplePage() {
                 </div>
               )}
             </div>
-          {selected.size>0 && can(role, 'people', 'deletePerson') && (
+          {selected.size>0 && can(role, 'peoplePage', 'deletePerson') && (
             <Button
               type="button"
               variant="destructive"
@@ -918,7 +918,7 @@ export default function PeoplePage() {
           <table>
             <thead>
               <tr style={{ borderBottom:`2px solid ${t.border}` }}>
-                {can(role, 'people', 'deletePerson') && (
+                {can(role, 'peoplePage', 'deletePerson') && (
                   <th style={{ width:48,padding:"14px 14px" }}><input type="checkbox" checked={selected.size===filteredSorted.length&&filteredSorted.length>0} onChange={toggleAll} style={{ accentColor:t.chk,cursor:"pointer",width:16,height:16 }}/></th>
                 )}
                 {["Name","Role","Department","Access","Tags","Type",""].map((h,i)=>(
@@ -945,7 +945,7 @@ export default function PeoplePage() {
                       if (!sel) e.currentTarget.style.background = sel ? t.selRow : "transparent";
                     }}
                   >
-                    {can(role, 'people', 'deletePerson') && (
+                    {can(role, 'peoplePage', 'deletePerson') && (
                       <td style={{ padding:"12px 14px" }} onClick={(e)=>e.stopPropagation()}>
                         <input type="checkbox" checked={sel} onChange={()=>toggleSel(p.id)} style={{ accentColor:t.chk,cursor:"pointer",width:16,height:16 }}/>
                       </td>

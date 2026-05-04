@@ -13,6 +13,7 @@ import { tagChromaProps } from "../utils/tagChroma.js";
 import { projectToAllocationLabel, avatarGradientFromName } from "../utils/projectColors.js";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext.jsx";
+import { can } from "../constants/permissions.js";
 import { DepartmentSelector } from "./DepartmentSelector.jsx";
 import { FloatSelect } from "./ui/FloatSelect.jsx";
 import {
@@ -931,19 +932,20 @@ function PersonModal({
 
   /** Check Permissions */
   const visibleTabs = useMemo(() => {
-    if (role === 'admin') {
+    const role = (currentUser?.access).toLowerCase();
+    if (can(role, 'personModal', 'editAll')) {
       // Admin can see all tabs
       return MODAL_TABS;
     } else if (isSelf) {
       // Member/Manager editing self: only "Time Off" tab
       return MODAL_TABS.filter(tab => tab.key === 'timeoff');
-    } else if (role === 'manager') {
+    } else if (can(role, 'personModal', 'editTeam')) {
       // Manager editing others
       return MODAL_TABS;
     } else {
       return [];
     }
-  }, [role, isSelf]);
+  }, [currentUser, isSelf]);
 
   useEffect(() => {
     const isTabVisible = visibleTabs.some(t => t.key === tabKey);
@@ -1026,17 +1028,17 @@ function PersonModal({
                   value={form.email} 
                   onChange={(e)=>updateForm({email:e.target.value})} 
                   placeholder="Email address"
-                  disabled={isSelf && role !== 'admin'}
+                  disabled={isSelf && !can(currentUser, 'personModal', 'editAll')}
                   style={{ 
                     background:"transparent",
                     border:"none",
                     outline:"none",
                     fontSize:14,
-                    color:isSelf && role !== 'admin' ? t.textDim : t.textMuted,
+                    color:isSelf && !can((currentUser?.access).toLowerCase(), 'personModal', 'editAll') ? t.textDim : t.textMuted,
                     width:"100%",
                     padding:0,
-                    cursor: isSelf && role !== 'admin' ? 'not-allowed' : 'text',
-                    opacity: isSelf && role !== 'admin' ? 0.6 : 1,
+                    cursor: isSelf && !can((currentUser?.access).toLowerCase(), 'personModal', 'editAll') ? 'not-allowed' : 'text',
+                    opacity: isSelf && !can((currentUser?.access).toLowerCase(), 'personModal', 'editAll') ? 0.6 : 1,
                   }}/>
               </div>
             </div>

@@ -32,7 +32,7 @@ const NAV = [
   { to: "/", end: true, icon: CalendarDays, label: "Schedule" },
   { to: "/people", icon: Users, label: "People" },
   { to: "/projects", icon: FolderOpen, label: "Projects" },
-  { to: "/report", icon: BarChart3, label: "Report", requiresPermission: { page: "reporting", action: "accessPage" } },
+  { to: "/report", icon: BarChart3, label: "Report", requiresPermission: { page: "reporting", action: "viewReporting" } },
 ];
 
 const V2_MODAL = {

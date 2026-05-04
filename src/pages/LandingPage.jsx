@@ -1623,9 +1623,9 @@ export default function LandingPage() {
     let list = people.filter((p) => !p.archived);
     
     /* Check Permissions */
-    if (role === 'admin') {
+    if (can(role, "schedule", "viewAll")) {
       // Admin sees everyone
-    } else if (role === 'manager') {
+    } else if (can(role, "schedule", "viewTeam")) {
       // Manager sees self and people on projects they own
       list = list.filter((p) => {
         const isSelf = p.id === currentUser?.id;
@@ -2538,7 +2538,7 @@ export default function LandingPage() {
                   {addMenuOpen && (
                   <div className="lp-popover lp-popover-add" style={{ right: 0, minWidth: "200px", zIndex: 100 }}>
                     <div className="lp-popover-title">Create New</div>
-                    {role === "admin" && (
+                    {can((currentUser?.access).toLowerCase(), 'schedule', 'createPerson') && (
                       <button
                         type="button"
                         className="lp-popover-item"

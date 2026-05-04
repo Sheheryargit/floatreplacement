@@ -49,7 +49,7 @@ const workspaceRoutes = [
   {
     path: "/report",
     element: (
-      <RequirePermission page="reporting" action="accessPage">
+      <RequirePermission page="reporting" action="viewReporting">
         <ReportingPage />
       </RequirePermission>
     ),

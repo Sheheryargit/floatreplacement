@@ -443,9 +443,9 @@ export default function ProjectsPage(){
   const filtered=useMemo(()=>{const isArch=viewTab==="archived";return projects.filter(p=>{if(p.archived!==isArch)return false;
 
       /** Check permissions */
-      if (role === "admin") {
+      if (can(role, "projectsPage", "viewAll")) {
         // Admin can see all projects
-      } else if (role === "manager") {
+      } else if (can(role, "projectsPage", "viewTeam")) {
         // Managers see projects they're part of the team OR projects they own
         const isTeamMember = p.teamIds && p.teamIds.includes(currentUser?.id);
         const isOwner = String(p.owner) === String(currentUser?.id);
@@ -497,7 +497,7 @@ export default function ProjectsPage(){
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
             <div style={{position:"relative"}}><Search size={15} style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:t.textMuted}}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search projects…" style={{width:search?240:180,background:t.surface,border:`1.5px solid ${t.borderIn}`,borderRadius:8,padding:"8px 12px 8px 34px",color:t.text,fontSize:13,outline:"none",transition:"all 0.25s"}} onFocus={e=>{e.target.style.width="240px";e.target.style.borderColor=t.focus;e.target.style.boxShadow=`0 0 0 3px ${t.accentGlow}`;}} onBlur={e=>{if(!search)e.target.style.width="180px";e.target.style.borderColor=t.borderIn;e.target.style.boxShadow="none";}}/>{search&&<X size={14} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",color:t.textMuted,cursor:"pointer"}} onClick={()=>setSearch("")}/>}</div>
             <Button type="button" variant="secondary" size="md" style={{ display: "flex", alignItems: "center", gap: 7 }}><Download size={14}/> Import</Button>
-            {can(role, 'projects', 'createProject') && (
+            {can(role, 'projectsPage', 'createProject') && (
               <Button type="button" variant="primary" size="md" onClick={openAdd} style={{ display: "flex", alignItems: "center", gap: 7 }}><Plus size={14}/> Add project</Button>
             )}
           </div>
@@ -520,7 +520,7 @@ export default function ProjectsPage(){
           <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",minWidth:900}}>
             <thead><tr style={{borderBottom:`2px solid ${t.border}`}}>
-              {can(role, 'projects', 'deleteProject') && (
+              {can(role, 'projectsPage', 'deleteProject') && (
                 <th style={{width:48,padding:"14px 14px"}}><input type="checkbox" checked={selected.size===filtered.length&&filtered.length>0} onChange={toggleAll} style={{accentColor:t.chk,cursor:"pointer",width:16,height:16}}/></th>
               )}
               {["Project","Code","Client","Tags","Stage","Team","Start","End","Owner",""].map((h,i)=>(<th key={i} style={{textAlign:"left",padding:"14px 12px",fontSize:11,fontWeight:700,color:t.textMuted,textTransform:"uppercase",letterSpacing:0.8,whiteSpace:"nowrap",width:i===9?48:undefined}}>{h}</th>))}
@@ -542,7 +542,7 @@ export default function ProjectsPage(){
                   <td style={{padding:"12px 12px"}}>{owner&&<div style={{width:28,height:28,borderRadius:8,background:avGrad(owner.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff"}} title={owner.name}>{ini(owner.name)}</div>}</td>
                   <td style={{padding:"12px 8px"}} onClick={e=>e.stopPropagation()}><RowActions project={p} t={t} onEdit={()=>openEdit(p)} onArchive={()=>archiveProject(p.id)} onDelete={()=>{setSelected(new Set([p.id]));setConfirmDel(true);}}/></td>
                 </tr>);})}
-              {filtered.length===0&&(<tr><td colSpan={can(role, 'projects', 'deleteProject') ? 11 : 10} style={{textAlign:"center",padding:"56px 20px"}}>{viewTab==="archived"?<><Archive size={32} style={{color:t.textDim,marginBottom:12}}/><div style={{color:t.textMuted,fontSize:15,fontWeight:600}}>No archived projects</div><div style={{color:t.textDim,fontSize:13,marginTop:4}}>Archived projects will appear here</div></>:<><Search size={32} style={{color:t.textDim,marginBottom:12}}/><div style={{color:t.textMuted,fontSize:15,fontWeight:600}}>{search?"No projects match your search":"No projects yet"}</div><div style={{color:t.textDim,fontSize:13,marginTop:4}}>{search?"Try a different search term":"Click \"Add project\" to get started"}</div></>}</td></tr>)}
+              {filtered.length===0&&(<tr><td colSpan={can(role, 'projectsPage', 'deleteProject') ? 11 : 10} style={{textAlign:"center",padding:"56px 20px"}}>{viewTab==="archived"?<><Archive size={32} style={{color:t.textDim,marginBottom:12}}/><div style={{color:t.textMuted,fontSize:15,fontWeight:600}}>No archived projects</div><div style={{color:t.textDim,fontSize:13,marginTop:4}}>Archived projects will appear here</div></>:<><Search size={32} style={{color:t.textDim,marginBottom:12}}/><div style={{color:t.textMuted,fontSize:15,fontWeight:600}}>{search?"No projects match your search":"No projects yet"}</div><div style={{color:t.textDim,fontSize:13,marginTop:4}}>{search?"Try a different search term":"Click \"Add project\" to get started"}</div></>}</td></tr>)}
             </tbody>
           </table>
           </div>

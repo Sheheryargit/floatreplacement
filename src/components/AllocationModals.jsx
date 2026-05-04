@@ -3,6 +3,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from "framer-motion";
 import { X, ChevronDown, ArrowLeftRight, Zap, Trash2, Palmtree } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
+import { can } from "../constants/permissions.js";
 import { resolveColorForProjectLabel } from "../utils/projectColors.js";
 import { normalizeLeaveTypeId, leaveAccentTheme, leavePanelStyleVars } from "../utils/leaveVisuals.js";
 import "./AllocationModals.css";
@@ -101,10 +102,11 @@ export function CreateAllocationModal({
 
   /** Check Permissions */
   const visibleAllocationTabs = useMemo(() => {
-    if (role === 'admin') {
+    const role = (currentUser?.access).toLowerCase();
+    if (can(role, 'allocationModal', 'editAll')) {
       // Admin can create both allocation and leave for anyone
       return ['allocation', 'leave'];
-    } else if (role === 'manager') {
+    } else if (can(role, 'allocationModal', 'editTeam')) {
       // Manager can only create allocation for people they own
       // If only assigning to self, restrict to leave only
       const assigningSelf = assignedIds.length === 1 && assignedIds[0] === currentUser?.id;
@@ -113,7 +115,7 @@ export function CreateAllocationModal({
       // Member can only create leave for themselves
       return ['leave'];
     }
-  }, [role, currentUser?.id, assignedIds]);
+  }, [currentUser, assignedIds]);
 
   useEffect(() => {
     if (!visibleAllocationTabs.includes(activeTab) && visibleAllocationTabs.length > 0) {
