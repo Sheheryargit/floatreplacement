@@ -951,19 +951,30 @@ const TimelineRow = memo(function TimelineRow({
     ? Math.max(...workSegments.map((s) => allocationBarHeightPx(s.a)))
     : leaveTileH;
 
-  // Row height scales with max tile height per lane.
-  const LANE_STACK_GAP = 2;
-  const BAR_VPAD = 0;
-  const ROW_ALLOC_PAD = 24;
-  let stackHeightsSum = 0;
-  for (let k = 0; k < allocLaneCount; k++) {
-    const segs = workSegments.filter((s) => s.stack === k);
-    if (segs.length === 0) continue;
-    const mh = Math.max(...segs.map((s) => allocationBarHeightPx(s.a))) + BAR_VPAD;
-    stackHeightsSum += mh;
-    if (k < allocLaneCount - 1) stackHeightsSum += LANE_STACK_GAP;
+  const LANE_STACK_GAP = 4;
+  const ROW_ALLOC_PAD = 8;
+
+  // Compute per-segment top offset based on which lower-stacked lanes actually
+  // have content overlapping the same columns. This eliminates phantom empty
+  // vertical space when a lane has no bars in the currently visible date range.
+  const segTopMap = new Map();
+  for (const seg of workSegments) {
+    const segStart = seg.lay.start;
+    const segEnd = seg.lay.start + seg.lay.span;
+    let top = ROW_ALLOC_PAD / 2;
+    for (let lane = 0; lane < seg.stack; lane++) {
+      const overlapping = workSegments.filter(
+        (o) => o.stack === lane && o.lay.start < segEnd && (o.lay.start + o.lay.span) > segStart
+      );
+      if (overlapping.length > 0) {
+        top += Math.max(...overlapping.map((o) => allocationBarHeightPx(o.a))) + LANE_STACK_GAP;
+      }
+    }
+    segTopMap.set(seg.segKey, top);
   }
-  const schedAllocContentH = ROW_ALLOC_PAD + stackHeightsSum;
+  const schedAllocContentH = workSegments.length > 0
+    ? Math.max(...workSegments.map((s) => (segTopMap.get(s.segKey) ?? 0) + allocationBarHeightPx(s.a))) + ROW_ALLOC_PAD / 2
+    : ROW_ALLOC_PAD;
 
 
   return (
@@ -1221,7 +1232,7 @@ const TimelineRow = memo(function TimelineRow({
             className="lp-grid-row"
             style={{ 
               gridTemplateColumns: gridTemplate, 
-              padding: `${SCHED_GRID_ROW_PAD_Y}px 0`, 
+              padding: 0, 
               alignContent: "start", 
               zIndex: 2,
               pointerEvents: "none" 
@@ -1229,29 +1240,12 @@ const TimelineRow = memo(function TimelineRow({
           >
             <div
               className="lp-alloc-lanes-root"
-              style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: `${LANE_STACK_GAP}px`, width: "100%", position: "relative" }}
+              style={{ gridColumn: "1 / -1", position: "relative", width: "100%", height: `${schedAllocContentH}px` }}
             >
-              {Array.from({ length: allocLaneCount }).map((_, stackIdx) => {
-                const laneSegs = workSegments
-                  .filter((s) => s.stack === stackIdx)
-                  .sort((a, b) => a.lay.start - b.lay.start);
-
-                if (laneSegs.length === 0) return null;
-
-                return (
-                  <div
-                    key={stackIdx}
-                    className={"lp-alloc-lane" + (stackIdx % 2 ? " lp-alloc-lane--stripe" : "")}
-                    style={{
-                      position: "relative",
-                      width: "100%",
-                      minHeight: `${Math.max(
-                        ...laneSegs.map((s) => allocationBarHeightPx(s.a))
-                      )}px`,
-                    }}
-                  >
-                    {laneSegs.map((seg, segJ) => {
-                      const geo = clampedSegmentGeometry(seg.lay, nCols);
+              {workSegments.map((seg, segJ) => {
+                    const stackIdx = seg.stack;
+                    const topPx = segTopMap.get(seg.segKey) ?? (ROW_ALLOC_PAD / 2);
+                    const geo = clampedSegmentGeometry(seg.lay, nCols);
                       const z = 20 + seg.stack * 20 + seg.occIdx + Math.floor(seg.lay.start);
 
                       const h = Math.max(0, parseFloat(seg.a.hoursPerDay) || 0);
@@ -1285,7 +1279,7 @@ const TimelineRow = memo(function TimelineRow({
                         position: "absolute",
                         left: `${geo.leftPct}%`,
                         width: `${geo.widthPct}%`,
-                        top: 0,
+                        top: `${topPx}px`,
                         zIndex: z,
                         // Pin a hard height so a 1h / 2h / 3h bar cannot grow to fit content —
                         // proportional scaling only reads clearly when the box is actually sized
@@ -1412,9 +1406,6 @@ const TimelineRow = memo(function TimelineRow({
                           )}
                         </button>
                       );
-                    })}
-                  </div>
-                );
               })}
             </div>
 

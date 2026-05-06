@@ -2594,6 +2594,12 @@ button.lp-block.lp-block-alloc.lp-alloc-enter.lp-alloc-enter--bloom {
   box-sizing: border-box;
 }
 
+.lp-alloc-lane {
+  margin: 0 !important;
+  padding: 0 !important;
+  flex-shrink: 0;
+}
+
 .lp-alloc-top {
   display: flex;
   flex-direction: column;

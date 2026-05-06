@@ -2,10 +2,13 @@
 export function assignAllocationStackLevels(segments) {
   const hoursOf = (seg) => Math.max(0, parseFloat(seg?.a?.hoursPerDay) || 0);
   const sorted = [...segments].sort((a, b) => {
+    // Sort by start time first so allocations in the same period occupy consecutive
+    // lanes from 0. Sorting by hours first caused empty lanes in earlier periods
+    // (later-date short allocations would claim lane 0, leaving gaps when scrolled left).
+    if (a.start !== b.start) return a.start - b.start;
     const ha = hoursOf(a);
     const hb = hoursOf(b);
     if (ha !== hb) return ha - hb;
-    if (a.start !== b.start) return a.start - b.start;
     return b.span - a.span;
   });
   const laneEnds = [];
