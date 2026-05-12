@@ -102,6 +102,9 @@ export function CreateAllocationModal({
 
   /** Check Permissions */
   const visibleAllocationTabs = useMemo(() => {
+    if (editAllocation) {
+      return [editAllocation.isLeave ? "leave" : "allocation"];
+    }
     const role = (currentUser?.access || "").toLowerCase();
     if (can(role, 'allocationModal', 'editAll')) {
       // Admin can create both allocation and leave for anyone

@@ -806,6 +806,7 @@ const TimelineRow = memo(function TimelineRow({
   p,
   i,
   canInteract,
+  canOpenPersonModal,
   personAllocations,
   projects,
   scheduleModel,
@@ -1031,17 +1032,17 @@ const TimelineRow = memo(function TimelineRow({
                 className="lp-person-main-col"
                 onClick={(e) => {
                   if (e.target.closest(".lp-person-add-banner")) return;
-                  if (!canInteract) return;
+                  if (!canOpenPersonModal) return;
                   openEdit(p);
                 }}
               >
                 <button
                   type="button"
                   className="lp-person-identity-hit"
-                  disabled={!canInteract}
+                  disabled={!canOpenPersonModal}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (!canInteract) return;
+                    if (!canOpenPersonModal) return;
                     openEdit(p);
                   }}
                 >
@@ -1097,9 +1098,9 @@ const TimelineRow = memo(function TimelineRow({
           <button
             type="button"
             className="lp-person-row lp-person-hours-hit"
-            disabled={!canInteract}
+            disabled={!canOpenPersonModal}
             onClick={() => {
-              if (!canInteract) return;
+              if (!canOpenPersonModal) return;
               openEdit(p);
             }}
             title={
@@ -1203,7 +1204,7 @@ const TimelineRow = memo(function TimelineRow({
                         maxHeight: "none",
                         margin: 0,
                         borderRadius: 0,
-                        pointerEvents: canInteract ? "auto" : "none",
+                        pointerEvents: "auto",
                       }}
                       aria-label={allocationAriaLabel(allocUi)}
                       title={hoverTitle}
@@ -1233,7 +1234,6 @@ const TimelineRow = memo(function TimelineRow({
                       whileTap={reduceMotion ? undefined : { scale: 0.99 }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (!canInteract) return;
                         openAllocationDetail(allocUi);
                       }}
                     >
@@ -1355,7 +1355,6 @@ const TimelineRow = memo(function TimelineRow({
                           title={tip}
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (!canInteract) return;
                             openAllocationDetail(seg.a);
                           }}
                         >
@@ -1451,6 +1450,7 @@ const TimelineRow = memo(function TimelineRow({
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
+                        openAllocationDetail(seg.a);
                       }}
                       aria-disabled="true"
                       title={`${holidayLabel} (Read-only)`}
@@ -2149,6 +2149,22 @@ export default function LandingPage() {
       .filter(Boolean)
       .join(", ");
   }, [selectedAllocation, people]);
+
+  const canManageSelectedAllocation = useMemo(() => {
+    if (!selectedAllocation || selectedAllocation.syntheticPublicHoliday) return false;
+    if (!currentUser?.id) return false;
+    const ids =
+      selectedAllocation.personIds?.length > 0
+        ? selectedAllocation.personIds
+        : selectedAllocation.personId != null
+          ? [selectedAllocation.personId]
+          : [];
+    if (ids.length === 0) return false;
+    return ids.every((id) => {
+      const person = people.find((p) => String(p.id) === String(id));
+      return person ? canInteractSchedulePerson(person) : false;
+    });
+  }, [selectedAllocation, currentUser?.id, people, canInteractSchedulePerson]);
 
   const openEdit = useCallback((person) => {
     setEditingPerson(person);
@@ -2895,6 +2911,7 @@ export default function LandingPage() {
                         p={p}
                         i={i}
                         canInteract={canInteractSchedulePerson(p)}
+                        canOpenPersonModal={can(role, "schedule", "interactAll")}
                         personAllocations={getPersonAllocations(allocationsByPerson, p.id)}
                         projects={projects}
                         scheduleModel={scheduleModel}
@@ -2978,9 +2995,9 @@ export default function LandingPage() {
         allocation={selectedAllocation}
         assigneeNames={selectedAssigneeNames}
         onClose={closeAllocationDetail}
-        onDelete={handleDeleteAllocation}
+        onDelete={canManageSelectedAllocation ? handleDeleteAllocation : undefined}
         onEditClick={
-          selectedAllocation
+          canManageSelectedAllocation && selectedAllocation
             ? () => {
                 setAllocEditing(selectedAllocation);
                 setAllocDetailOpen(false);

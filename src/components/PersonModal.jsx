@@ -903,6 +903,8 @@ function PersonModal({
   onSave,
   onArchive,
   editPerson,
+  readOnly = false,
+  visibleTabKeys = null,
   roles,
   setRoles,
   depts,
@@ -928,24 +930,17 @@ function PersonModal({
   const [dirty, setDirty] = useState(false);
   const ref = useRef(null);
   const isEdit = !!editPerson;
-  const isSelf = editPerson?.id === currentUser?.id;
 
-  /** Check Permissions */
   const visibleTabs = useMemo(() => {
-    const role = (currentUser?.access || "").toLowerCase();
-    if (can(role, 'personModal', 'editAll')) {
-      // Admin can see all tabs
-      return MODAL_TABS;
-    } else if (isSelf) {
-      // Member/Manager editing self: only "Time Off" tab
-      return MODAL_TABS.filter(tab => tab.key === 'timeoff');
-    } else if (can(role, 'personModal', 'editTeam')) {
-      // Manager editing others
-      return MODAL_TABS;
-    } else {
-      return [];
+    let tabs = MODAL_TABS;
+    if (Array.isArray(visibleTabKeys) && visibleTabKeys.length > 0) {
+      tabs = tabs.filter((tab) => visibleTabKeys.includes(tab.key));
     }
-  }, [currentUser, isSelf]);
+    if (readOnly) return tabs;
+    const accessRole = (currentUser?.access || "").toLowerCase();
+    if (can(accessRole, "personModal", "editAll")) return tabs;
+    return [];
+  }, [currentUser, readOnly, visibleTabKeys]);
 
   useEffect(() => {
     const isTabVisible = visibleTabs.some(t => t.key === tabKey);
@@ -992,8 +987,16 @@ function PersonModal({
 
   if (!open || !form) return null;
 
-  const updateForm = (patch) => { setForm({...form,...patch}); setDirty(true); };
-  const setFormWrap = (f) => { setForm(f); setDirty(true); };
+  const updateForm = (patch) => {
+    if (readOnly) return;
+    setForm({...form,...patch});
+    setDirty(true);
+  };
+  const setFormWrap = (f) => {
+    if (readOnly) return;
+    setForm(f);
+    setDirty(true);
+  };
 
   const handleSave = () => {
     if (!form.name.trim()) return;
@@ -1020,7 +1023,7 @@ function PersonModal({
         <div style={{ padding:"28px 32px 0",flexShrink:0 }}>
           <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start" }}>
             <div style={{ flex:1,minWidth:0 }}>
-              <input value={form.name} onChange={(e)=>updateForm({name:e.target.value})} placeholder="Name" autoFocus={!isEdit}
+              <input value={form.name} onChange={(e)=>updateForm({name:e.target.value})} placeholder="Name" autoFocus={!isEdit} disabled={readOnly}
                 style={{ background:"transparent",border:"none",outline:"none",fontSize:26,fontWeight:700,color:t.text,width:"100%",padding:0,marginBottom:6,letterSpacing:-0.3 }}/>
               <div style={{ display:"flex",alignItems:"center",gap:6 }}>
                 <Mail size={14} style={{ color:t.textDim,flexShrink:0 }}/>
@@ -1028,17 +1031,17 @@ function PersonModal({
                   value={form.email} 
                   onChange={(e)=>updateForm({email:e.target.value})} 
                   placeholder="Email address"
-                  disabled={isSelf && !can(currentUser, 'personModal', 'editAll')}
+                  disabled={readOnly}
                   style={{ 
                     background:"transparent",
                     border:"none",
                     outline:"none",
                     fontSize:14,
-                    color:isSelf && !can((currentUser?.access).toLowerCase(), 'personModal', 'editAll') ? t.textDim : t.textMuted,
+                    color:readOnly ? t.textDim : t.textMuted,
                     width:"100%",
                     padding:0,
-                    cursor: isSelf && !can((currentUser?.access).toLowerCase(), 'personModal', 'editAll') ? 'not-allowed' : 'text',
-                    opacity: isSelf && !can((currentUser?.access).toLowerCase(), 'personModal', 'editAll') ? 0.6 : 1,
+                    cursor: readOnly ? 'not-allowed' : 'text',
+                    opacity: readOnly ? 0.6 : 1,
                   }}/>
               </div>
             </div>
@@ -1131,20 +1134,22 @@ function PersonModal({
 
         {/* Footer */}
         <div style={{ padding:"16px 32px 24px",flexShrink:0,display:"flex",alignItems:"center",gap:10,borderTop:`1px solid ${t.border}`,flexWrap:"wrap" }}>
-          <Button
-            type="button"
-            variant="primary"
-            size="md"
-            onClick={handleSave}
-            disabled={!form.name.trim()}
-            style={{ display: "flex", alignItems: "center", gap: 8 }}
-          >
-            {isEdit ? <><Save size={15}/> Save changes</> : <><UserPlus size={15}/> Add person</>}
-          </Button>
+          {!readOnly && (
+            <Button
+              type="button"
+              variant="primary"
+              size="md"
+              onClick={handleSave}
+              disabled={!form.name.trim()}
+              style={{ display: "flex", alignItems: "center", gap: 8 }}
+            >
+              {isEdit ? <><Save size={15}/> Save changes</> : <><UserPlus size={15}/> Add person</>}
+            </Button>
+          )}
           <Button type="button" variant="secondary" size="md" onClick={onClose}>
-            Cancel
+            {readOnly ? "Close" : "Cancel"}
           </Button>
-          {isEdit && (
+          {isEdit && !readOnly && (
             <Button
               type="button"
               variant="warning"
