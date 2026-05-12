@@ -1,3 +1,5 @@
+import { view } from "framer-motion/client";
+
 /**
  * Role-Based Access Control (RBAC) Permissions System
  * Defines granular permissions for each role across different pages/features
@@ -41,6 +43,7 @@ export const PERMISSIONS = {
       interactAll: false,
       createPerson: false,
       deletePerson: false,
+      viewPeoplePage: false,
     },
 
     // Projects Page
@@ -49,11 +52,12 @@ export const PERMISSIONS = {
       interactAll: false,
       createProject: false,
       deleteProject: false,
+      viewProjectsPage: false,
     },
 
     // Reporting Page
     reporting: {
-      viewReporting: false,
+      viewReportingPage: false,
     },
   },
 
@@ -83,6 +87,7 @@ export const PERMISSIONS = {
       interactAll: false,
       createPerson: false,
       deletePerson: false,
+      viewPeoplePage: true,
     },
 
     // Projects Page
@@ -91,11 +96,12 @@ export const PERMISSIONS = {
       interactAll: false,
       createProject: true,
       deleteProject: true,
+      viewProjectsPage: true,
     },
 
     // Reporting Page
     reporting: {
-      viewReporting: true,
+      viewReportingPage: false,
     },
   },
 
@@ -125,6 +131,7 @@ export const PERMISSIONS = {
       interactAll: true,
       createPerson: true,
       deletePerson: true,
+      viewPeoplePage: true,
     },
 
     // Projects Page
@@ -133,11 +140,12 @@ export const PERMISSIONS = {
       interactAll: true,
       createProject: true,
       deleteProject: true,
+      viewProjectsPage: true,
     },
 
     // Reporting Page
     reporting: {
-      viewReporting: true,
+      viewReportingPage: true,
     },
   },
 };
