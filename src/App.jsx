@@ -44,12 +44,26 @@ function RequirePermission({ page, action, children }) {
 
 const workspaceRoutes = [
   { path: "/", element: <LandingPage /> },
-  { path: "/people", element: <PeoplePage /> },
-  { path: "/projects", element: <ProjectsPage /> },
+  {
+    path: "/people",
+    element: (
+      <RequirePermission page="peoplePage" action="viewPeoplePage">
+        <PeoplePage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: "/projects",
+    element: (
+      <RequirePermission page="projectsPage" action="viewProjectsPage">
+        <ProjectsPage />
+      </RequirePermission>
+    ),
+  },
   {
     path: "/report",
     element: (
-      <RequirePermission page="reporting" action="viewReporting">
+      <RequirePermission page="reporting" action="viewReportingPage">
         <ReportingPage />
       </RequirePermission>
     ),
