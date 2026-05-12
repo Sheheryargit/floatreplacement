@@ -59,7 +59,7 @@ function AppSideNav() {
 
   // Filter nav items based on permissions
   const visibleNav = NAV.filter(
-    (item) => !item.requiresPermission || can((currentUser?.access).toLowerCase(), item.requiresPermission.page, item.requiresPermission.action)
+    (item) => !item.requiresPermission || can((currentUser?.access || "").toLowerCase(), item.requiresPermission.page, item.requiresPermission.action)
   );
 
   const isDevMode = import.meta.env.VITE_LOGIN_SKIP_AUTH === "true";

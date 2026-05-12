@@ -84,7 +84,7 @@ export function CreateAllocationModal({
 }) {
   const reduceMotion = useReducedMotion();
   const { currentUser } = useAuth();
-  const role = (currentUser?.access).toLowerCase();
+  const role = (currentUser?.access || "").toLowerCase();
   const hoursMode = "Hours";
   const [activeTab, setActiveTab] = useState("allocation");
   const [hoursPerDay, setHoursPerDay] = useState("7.5");
@@ -102,7 +102,7 @@ export function CreateAllocationModal({
 
   /** Check Permissions */
   const visibleAllocationTabs = useMemo(() => {
-    const role = (currentUser?.access).toLowerCase();
+    const role = (currentUser?.access || "").toLowerCase();
     if (can(role, 'allocationModal', 'editAll')) {
       // Admin can create both allocation and leave for anyone
       return ['allocation', 'leave'];

@@ -922,7 +922,7 @@ function PersonModal({
 }) {
   const tagIsDark = tagTheme === "dark";
   const { currentUser } = useAuth();
-  const role = (currentUser?.access).toLowerCase();
+  const role = (currentUser?.access || "").toLowerCase();
   const [tabKey, setTabKey] = useState('info');
   const [form, setForm] = useState(null);
   const [dirty, setDirty] = useState(false);
@@ -932,7 +932,7 @@ function PersonModal({
 
   /** Check Permissions */
   const visibleTabs = useMemo(() => {
-    const role = (currentUser?.access).toLowerCase();
+    const role = (currentUser?.access || "").toLowerCase();
     if (can(role, 'personModal', 'editAll')) {
       // Admin can see all tabs
       return MODAL_TABS;
