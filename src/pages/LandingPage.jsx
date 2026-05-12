@@ -720,6 +720,7 @@ function leaveBarHeightPx(alloc) {
 const timelineRowEqual = (prev, next) => {
   if (prev.p !== next.p) return false;
   if (prev.i !== next.i) return false;
+  if (prev.canInteract !== next.canInteract) return false;
   if (prev.viewMode !== next.viewMode) return false;
   if (prev.anchorDate?.getTime?.() !== next.anchorDate?.getTime?.()) return false;
   if (prev.utilizationMode !== next.utilizationMode) return false;
@@ -804,6 +805,7 @@ function buildWorkAllocationTitle(alloc, projectName, hoursLabel) {
 const TimelineRow = memo(function TimelineRow({
   p,
   i,
+  canInteract,
   personAllocations,
   projects,
   scheduleModel,
@@ -1029,14 +1031,17 @@ const TimelineRow = memo(function TimelineRow({
                 className="lp-person-main-col"
                 onClick={(e) => {
                   if (e.target.closest(".lp-person-add-banner")) return;
+                  if (!canInteract) return;
                   openEdit(p);
                 }}
               >
                 <button
                   type="button"
                   className="lp-person-identity-hit"
+                  disabled={!canInteract}
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (!canInteract) return;
                     openEdit(p);
                   }}
                 >
@@ -1068,16 +1073,18 @@ const TimelineRow = memo(function TimelineRow({
                   <button
                     type="button"
                     className="lp-sched-add-btn lp-sched-add-btn--inline"
-                    disabled={noWorkingDaysInView}
+                    disabled={!canInteract || noWorkingDaysInView}
                     title={
-                      noWorkingDaysInView
+                      !canInteract
+                        ? "You cannot interact with this person"
+                        : noWorkingDaysInView
                         ? "No working days in this view (all days have leave or are unavailable)"
                         : "Add allocation (blocked on leave days when you save)"
                     }
                     aria-label={`Add allocation for ${p.name}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (noWorkingDaysInView) return;
+                      if (!canInteract || noWorkingDaysInView) return;
                       openCreateAllocation(p);
                     }}
                   >
@@ -1090,7 +1097,11 @@ const TimelineRow = memo(function TimelineRow({
           <button
             type="button"
             className="lp-person-row lp-person-hours-hit"
-            onClick={() => openEdit(p)}
+            disabled={!canInteract}
+            onClick={() => {
+              if (!canInteract) return;
+              openEdit(p);
+            }}
             title={
               utilizationMode === "hours"
                 ? `${hours.toFixed(hours % 1 ? 1 : 0)}h total in view · peak ${maxDailyBookedHours.toFixed(
@@ -1112,12 +1123,15 @@ const TimelineRow = memo(function TimelineRow({
         <div
           className="lp-grid-stack"
           style={{
-            cursor: "pointer",
+            cursor: canInteract ? "pointer" : "not-allowed",
             ["--lp-alloc-lane-count"]: allocLaneCount,
             ["--lp-sched-alloc-content-h"]: `${schedAllocContentH}px`,
             ["--lp-leave-min-h"]: leaveMinH > 0 ? `${leaveMinH}px` : undefined,
           }}
-          onClick={(e) => handleTimelineClick(e, p, nCols, offDayColSet)}
+          onClick={(e) => {
+            if (!canInteract) return;
+            handleTimelineClick(e, p, nCols, offDayColSet);
+          }}
         >
           <div className="lp-grid-week-lanes" style={{ gridTemplateColumns: gridTemplate }} aria-hidden>
             {scheduleModel.slots.map((slot, idx) => (
@@ -1189,7 +1203,7 @@ const TimelineRow = memo(function TimelineRow({
                         maxHeight: "none",
                         margin: 0,
                         borderRadius: 0,
-                        pointerEvents: "auto",
+                        pointerEvents: canInteract ? "auto" : "none",
                       }}
                       aria-label={allocationAriaLabel(allocUi)}
                       title={hoverTitle}
@@ -1219,6 +1233,7 @@ const TimelineRow = memo(function TimelineRow({
                       whileTap={reduceMotion ? undefined : { scale: 0.99 }}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (!canInteract) return;
                         openAllocationDetail(allocUi);
                       }}
                     >
@@ -1340,6 +1355,7 @@ const TimelineRow = memo(function TimelineRow({
                           title={tip}
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (!canInteract) return;
                             openAllocationDetail(seg.a);
                           }}
                         >
@@ -1464,7 +1480,7 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const { theme } = useAppTheme();
   const { currentUser } = useAuth();
-  const role = (currentUser?.access).toLowerCase();
+  const role = (currentUser?.access || "").toLowerCase();
   const t = T[theme];
 
   const {
@@ -1619,26 +1635,25 @@ export default function LandingPage() {
     [scheduleModel]
   );
 
+  const canInteractSchedulePerson = useCallback((p) => {
+    if (can(role, "schedule", "interactAll")) {
+      return true;
+    }
+    if (can(role, "schedule", "interactTeam")) {
+      const isSelf = p.id === currentUser?.id;
+      const isOnOwnedProject = projects.some(
+        (proj) =>
+          String(proj.owner) === String(currentUser?.id) &&
+          proj.teamIds &&
+          proj.teamIds.includes(p.id)
+      );
+      return isSelf || isOnOwnedProject;
+    }
+    return p.id === currentUser?.id;
+  }, [role, currentUser?.id, projects]);
+
   const { schedulePeople, schedulePeopleHoursInView } = useMemo(() => {
     let list = people.filter((p) => !p.archived);
-    
-    /* Check Permissions */
-    if (can(role, "schedule", "viewAll")) {
-      // Admin sees everyone
-    } else if (can(role, "schedule", "viewTeam")) {
-      // Manager sees self and people on projects they own
-      list = list.filter((p) => {
-        const isSelf = p.id === currentUser?.id;
-        const isOnOwnedProject = projects.some(proj => 
-          String(proj.owner) === String(currentUser?.id) &&
-          proj.teamIds && proj.teamIds.includes(p.id)
-        );
-        return isSelf || isOnOwnedProject;
-      });
-    } else {
-      // Member sees only self
-      list = list.filter((p) => p.id === currentUser?.id);
-    }
     
     list = list.filter((p) =>
       personMatchesScheduleFilter(p, scheduleFilterRules, {
@@ -1667,8 +1682,6 @@ export default function LandingPage() {
     allocationsByPerson,
     projects,
     scheduleModel,
-    role,
-    currentUser?.id,
   ]);
 
   const projectByLabel = useMemo(() => {
@@ -2538,7 +2551,7 @@ export default function LandingPage() {
                   {addMenuOpen && (
                   <div className="lp-popover lp-popover-add" style={{ right: 0, minWidth: "200px", zIndex: 100 }}>
                     <div className="lp-popover-title">Create New</div>
-                    {can((currentUser?.access).toLowerCase(), 'schedule', 'createPerson') && (
+                    {can((currentUser?.access || "").toLowerCase(), 'schedule', 'createPerson') && (
                       <button
                         type="button"
                         className="lp-popover-item"
@@ -2881,6 +2894,7 @@ export default function LandingPage() {
                       <TimelineRow
                         p={p}
                         i={i}
+                        canInteract={canInteractSchedulePerson(p)}
                         personAllocations={getPersonAllocations(allocationsByPerson, p.id)}
                         projects={projects}
                         scheduleModel={scheduleModel}

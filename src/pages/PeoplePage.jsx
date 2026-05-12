@@ -82,7 +82,7 @@ function toggleArr(list, v) {
    ═══════════════════════════════════════════════════════════ */
 export default function PeoplePage() {
   const { currentUser } = useAuth();
-  const role = (currentUser?.access).toLowerCase();
+  const role = (currentUser?.access || "").toLowerCase();
   const { theme: mode } = useAppTheme();
   const t = T[mode];
 
@@ -317,26 +317,27 @@ export default function PeoplePage() {
     );
   }, [peopleInTab, filterPersonSearch]);
 
+  const canInteractPerson = useCallback((p) => {
+    if (can(role, "peoplePage", "interactAll")) {
+      return true;
+    }
+    if (can(role, "peoplePage", "interactTeam")) {
+      const isSelf = p.id === currentUser?.id;
+      const isOnOwnedProject = projects.some(
+        (proj) =>
+          String(proj.owner) === String(currentUser?.id) &&
+          proj.teamIds &&
+          proj.teamIds.includes(p.id)
+      );
+      return isSelf || isOnOwnedProject;
+    }
+    return p.id === currentUser?.id;
+  }, [role, currentUser?.id, projects]);
+
   const filtered = useMemo(() => {
     const isArch = viewTab === "archived";
     return people.filter((p) => {
       if (p.archived !== isArch) return false;
-
-      /** Check permissions */
-      if (can(role, "peoplePage", "viewAll")) {
-        // Admin sees everyone
-      } else if (can(role, "peoplePage", "viewTeam")) {
-        // Manager sees self and people on projects they own
-        const isSelf = p.id === currentUser?.id;
-        const isOnOwnedProject = projects.some(proj => 
-          String(proj.owner) === String(currentUser?.id) &&
-          proj.teamIds && proj.teamIds.includes(p.id)
-        );
-        if (!isSelf && !isOnOwnedProject) return false;
-      } else {
-        // Member sees only self
-        if (p.id !== currentUser?.id) return false;
-      }
 
       if (search) {
         const s = search.toLowerCase();
@@ -929,17 +930,18 @@ export default function PeoplePage() {
             <tbody>
               {filteredSorted.map((p,idx)=>{
                 const sel=selected.has(p.id);
+                const canInteract = canInteractPerson(p);
                 return (
                   <tr
                     key={p.id}
-                    onClick={()=>openEdit(p)}
+                    onClick={()=>{ if (canInteract) openEdit(p); }}
                     style={{
                       borderBottom:`1px solid ${t.border}`,background:sel?t.selRow:"transparent",
-                      cursor:"pointer",transition:"background 0.12s",
+                      cursor:canInteract?"pointer":"not-allowed",transition:"background 0.12s",
                       animation:mounted&&idx<TABLE_ROW_ENTER_ANIM_MAX?`rowIn 0.35s ease-out ${idx*0.025}s both`:"none",
                     }}
                     onMouseEnter={(e) => {
-                      if (!sel) e.currentTarget.style.background = t.rowHov;
+                      if (canInteract && !sel) e.currentTarget.style.background = t.rowHov;
                     }}
                     onMouseLeave={(e) => {
                       if (!sel) e.currentTarget.style.background = sel ? t.selRow : "transparent";
@@ -970,11 +972,18 @@ export default function PeoplePage() {
                       </div>
                     </td>
                     <td style={{ padding:"12px 16px",color:t.textSoft,fontWeight:500 }}>{p.type}</td>
-                    <td style={{ padding:"12px 8px" }} onClick={(e)=>e.stopPropagation()}>
+                    <td
+                      style={{ padding:"12px 8px", opacity:canInteract?1:0.55, pointerEvents:canInteract?"auto":"none" }}
+                      onClick={(e)=>e.stopPropagation()}
+                    >
                       <RowActions person={p} t={t}
-                        onEdit={()=>openEdit(p)}
-                        onArchive={()=>archivePerson(p.id)}
-                        onDelete={() => { setSelected(new Set([p.id])); setConfirmDel(true); }}
+                        onEdit={()=>{ if (canInteract) openEdit(p); }}
+                        onArchive={()=>{ if (canInteract) archivePerson(p.id); }}
+                        onDelete={() => {
+                          if (!canInteract) return;
+                          setSelected(new Set([p.id]));
+                          setConfirmDel(true);
+                        }}
                         canDelete={can(role, 'people', 'deletePerson')} />
                     </td>
                   </tr>

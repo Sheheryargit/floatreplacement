@@ -2,10 +2,6 @@
  * Role-Based Access Control (RBAC) Permissions System
  * Defines granular permissions for each role across different pages/features
  */
-
-import { view } from "framer-motion/client";
-import { create } from "zustand";
-
 export const USER_ROLES = {
   MEMBER: "member",
   MANAGER: "manager",
@@ -22,8 +18,8 @@ export const PERMISSIONS = {
   member: {
     // Landing Page / Schedule View
     schedule: {
-      viewTeam: false,
-      viewAll: false,
+      interactTeam: false,
+      interactAll: false,
       createPerson: false,
     },
 
@@ -41,16 +37,16 @@ export const PERMISSIONS = {
 
     // People Page
     peoplePage: {
-      viewTeam: false,
-      viewAll: false,
+      interactTeam: false,
+      interactAll: false,
       createPerson: false,
       deletePerson: false,
     },
 
     // Projects Page
     projectsPage: {
-      viewTeam: false,
-      viewAll: false,
+      interactTeam: false,
+      interactAll: false,
       createProject: false,
       deleteProject: false,
     },
@@ -64,8 +60,8 @@ export const PERMISSIONS = {
   manager: {
     // Landing Page / Schedule View
     schedule: {
-      viewTeam: true,
-      viewAll: false,
+      interactTeam: true,
+      interactAll: false,
       createPerson: false,
     },
 
@@ -83,16 +79,16 @@ export const PERMISSIONS = {
 
     // People Page
     peoplePage: {
-      viewTeam: true,
-      viewAll: false,
+      interactTeam: true,
+      interactAll: false,
       createPerson: false,
       deletePerson: false,
     },
 
     // Projects Page
     projectsPage: {
-      viewTeam: true,
-      viewAll: false,
+      interactTeam: true,
+      interactAll: false,
       createProject: true,
       deleteProject: true,
     },
@@ -106,8 +102,8 @@ export const PERMISSIONS = {
   admin: {
     // Landing Page / Schedule View
     schedule: {
-      viewAll: true,
-      viewTeam: true,
+      interactAll: true,
+      interactTeam: true,
       createPerson: true,
     },
 
@@ -125,16 +121,16 @@ export const PERMISSIONS = {
 
     // People Page
     peoplePage: {
-      viewTeam: true,
-      viewAll: true,
+      interactTeam: true,
+      interactAll: true,
       createPerson: true,
       deletePerson: true,
     },
 
     // Projects Page
     projectsPage: {
-      viewTeam: true,
-      viewAll: true,
+      interactTeam: true,
+      interactAll: true,
       createProject: true,
       deleteProject: true,
     },
@@ -151,7 +147,7 @@ export const PERMISSIONS = {
  * Check if a role has permission to perform an action on a page
  * @param {*} role The access level of the user (e.g., "member", "manager", "admin")
  * @param {*} page The page or feature being accessed (e.g., "schedule", "personModal", "peoplePage", "projectsPage", "reporting", "settings")
- * @param {*} action The action being performed (e.g., "viewSelf", "editOthers", "createPerson")
+ * @param {*} action The action being performed (e.g., "interactAll", "interactTeam", "editAll", "createPerson")
  * @returns 
  */
 export function can(role, page, action) {

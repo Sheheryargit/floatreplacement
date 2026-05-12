@@ -416,7 +416,7 @@ export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,c
 export default function ProjectsPage(){
   const { theme: mode } = useAppTheme();
   const { currentUser } = useAuth();
-  const role = (currentUser?.access).toLowerCase();
+  const role = (currentUser?.access || "").toLowerCase();
   const t=T[mode];
   const{
     people,
@@ -440,21 +440,19 @@ export default function ProjectsPage(){
 
   useEffect(()=>{setMounted(true);},[]);
 
-  const filtered=useMemo(()=>{const isArch=viewTab==="archived";return projects.filter(p=>{if(p.archived!==isArch)return false;
+  const canInteractProject = useCallback((p) => {
+    if (can(role, "projectsPage", "interactAll")) {
+      return true;
+    }
+    if (can(role, "projectsPage", "interactTeam")) {
+      const isTeamMember = p.teamIds && p.teamIds.includes(currentUser?.id);
+      const isOwner = String(p.owner) === String(currentUser?.id);
+      return isTeamMember || isOwner;
+    }
+    return !!(p.teamIds && p.teamIds.includes(currentUser?.id));
+  }, [role, currentUser?.id]);
 
-      /** Check permissions */
-      if (can(role, "projectsPage", "viewAll")) {
-        // Admin can see all projects
-      } else if (can(role, "projectsPage", "viewTeam")) {
-        // Managers see projects they're part of the team OR projects they own
-        const isTeamMember = p.teamIds && p.teamIds.includes(currentUser?.id);
-        const isOwner = String(p.owner) === String(currentUser?.id);
-        if (!isTeamMember && !isOwner) return false;
-      } else {
-        // Members see only projects they're part of the team
-        const isTeamMember = p.teamIds && p.teamIds.includes(currentUser?.id);
-        if (!isTeamMember) return false;
-      }
+  const filtered=useMemo(()=>{const isArch=viewTab==="archived";return projects.filter(p=>{if(p.archived!==isArch)return false;
 
       if(!search)return true;const s=search.toLowerCase();return p.name.toLowerCase().includes(s)||p.client.toLowerCase().includes(s)||p.code.toLowerCase().includes(s)||p.tags.some(tg=>tg.toLowerCase().includes(s));});},[projects,search,viewTab,role,currentUser?.id]);
   const activeCount=projects.filter(p=>!p.archived).length;
@@ -526,8 +524,8 @@ export default function ProjectsPage(){
               {["Project","Code","Client","Tags","Stage","Team","Start","End","Owner",""].map((h,i)=>(<th key={i} style={{textAlign:"left",padding:"14px 12px",fontSize:11,fontWeight:700,color:t.textMuted,textTransform:"uppercase",letterSpacing:0.8,whiteSpace:"nowrap",width:i===9?48:undefined}}>{h}</th>))}
             </tr></thead>
             <tbody>
-              {filtered.map((p,idx)=>{const sel=selected.has(p.id);const stg=STAGES.find(s=>s.value===p.stage)||STAGES[0];const owner=people.find(o=>String(o.id)===String(p.owner));const teamPeople=p.teamIds.map(id=>people.find(x=>x.id===id)).filter(Boolean);return(
-                <tr key={p.id} onClick={()=>openEdit(p)} style={{borderBottom:`1px solid ${t.border}`,background:sel?t.selRow:"transparent",cursor:"pointer",transition:"background 0.12s",animation:mounted&&idx<TABLE_ROW_ENTER_ANIM_MAX?`rowIn 0.35s ease-out ${idx*0.025}s both`:"none"}} onMouseEnter={e=>{if(!sel)e.currentTarget.style.background=t.rowHov;}} onMouseLeave={e=>{if(!sel)e.currentTarget.style.background=sel?t.selRow:"transparent";}}>
+              {filtered.map((p,idx)=>{const sel=selected.has(p.id);const canInteract=canInteractProject(p);const stg=STAGES.find(s=>s.value===p.stage)||STAGES[0];const owner=people.find(o=>String(o.id)===String(p.owner));const teamPeople=p.teamIds.map(id=>people.find(x=>x.id===id)).filter(Boolean);return(
+                <tr key={p.id} onClick={()=>{ if (canInteract) openEdit(p); }} style={{borderBottom:`1px solid ${t.border}`,background:sel?t.selRow:"transparent",cursor:canInteract?"pointer":"not-allowed",transition:"background 0.12s",animation:mounted&&idx<TABLE_ROW_ENTER_ANIM_MAX?`rowIn 0.35s ease-out ${idx*0.025}s both`:"none"}} onMouseEnter={e=>{if(canInteract&&!sel)e.currentTarget.style.background=t.rowHov;}} onMouseLeave={e=>{if(!sel)e.currentTarget.style.background=sel?t.selRow:"transparent";}}>
                   {can(role, 'projects', 'deleteProject') && (
                     <td style={{padding:"12px 14px"}} onClick={e=>e.stopPropagation()}><input type="checkbox" checked={sel} onChange={()=>toggleSel(p.id)} style={{accentColor:t.chk,cursor:"pointer",width:16,height:16}}/></td>
                   )}
@@ -540,7 +538,7 @@ export default function ProjectsPage(){
                   <td style={{padding:"12px 12px",color:t.textSoft,fontSize:12,whiteSpace:"nowrap"}}>{fmtDate(p.startDate)}</td>
                   <td style={{padding:"12px 12px",color:t.textSoft,fontSize:12,whiteSpace:"nowrap"}}>{fmtDate(p.endDate)}</td>
                   <td style={{padding:"12px 12px"}}>{owner&&<div style={{width:28,height:28,borderRadius:8,background:avGrad(owner.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff"}} title={owner.name}>{ini(owner.name)}</div>}</td>
-                  <td style={{padding:"12px 8px"}} onClick={e=>e.stopPropagation()}><RowActions project={p} t={t} onEdit={()=>openEdit(p)} onArchive={()=>archiveProject(p.id)} onDelete={()=>{setSelected(new Set([p.id]));setConfirmDel(true);}}/></td>
+                  <td style={{padding:"12px 8px",pointerEvents:canInteract?"auto":"none"}} onClick={e=>e.stopPropagation()}><RowActions project={p} t={t} onEdit={()=>{ if (canInteract) openEdit(p); }} onArchive={()=>{ if (canInteract) archiveProject(p.id); }} onDelete={()=>{ if (!canInteract) return; setSelected(new Set([p.id]));setConfirmDel(true); }}/></td>
                 </tr>);})}
               {filtered.length===0&&(<tr><td colSpan={can(role, 'projectsPage', 'deleteProject') ? 11 : 10} style={{textAlign:"center",padding:"56px 20px"}}>{viewTab==="archived"?<><Archive size={32} style={{color:t.textDim,marginBottom:12}}/><div style={{color:t.textMuted,fontSize:15,fontWeight:600}}>No archived projects</div><div style={{color:t.textDim,fontSize:13,marginTop:4}}>Archived projects will appear here</div></>:<><Search size={32} style={{color:t.textDim,marginBottom:12}}/><div style={{color:t.textMuted,fontSize:15,fontWeight:600}}>{search?"No projects match your search":"No projects yet"}</div><div style={{color:t.textDim,fontSize:13,marginTop:4}}>{search?"Try a different search term":"Click \"Add project\" to get started"}</div></>}</td></tr>)}
             </tbody>
