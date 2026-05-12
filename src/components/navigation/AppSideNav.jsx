@@ -11,9 +11,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Shield,
-  // DEV: Testing RBAC - Remove after testing
-  LogIn,
-  // DEV: End
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAppDialog } from "../../context/AppDialogContext.jsx";
@@ -21,9 +18,6 @@ import { useSlapAnimation } from "../../context/SlapAnimationContext.jsx";
 import { useAppTheme } from "../../context/ThemeContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { can } from "../../constants/permissions.js";
-// DEV: Testing RBAC - Remove after testing
-import { DevLoginSelector } from "../DevLoginSelector.jsx";
-// DEV: End
 import "./AppSideNav.css";
 
 const COLLAPSE_KEY = "alloc8-sidenav-collapsed";
@@ -47,7 +41,6 @@ function AppSideNav() {
   const { triggerSlap } = useSlapAnimation();
   const { theme } = useAppTheme();
   const { currentUser } = useAuth();
-  const [, setRoleToggle] = useState(0); // Force re-render on role change
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -62,39 +55,7 @@ function AppSideNav() {
     (item) => !item.requiresPermission || can((currentUser?.access || "").toLowerCase(), item.requiresPermission.page, item.requiresPermission.action)
   );
 
-  const isDevMode = import.meta.env.VITE_LOGIN_SKIP_AUTH === "true";
-  const ROLE_CYCLE = ["Member", "Manager", "Admin"];
-  // DEV: Testing RBAC - Remove after testing
-  const [loginSelectorOpen, setLoginSelectorOpen] = useState(false);
 
-  const handleSelectPerson = useCallback((person) => {
-    const updated = { ...person };
-    try {
-      localStorage.setItem("float_current_user", JSON.stringify(updated));
-    } catch {
-      /* ignore */
-    }
-    setLoginSelectorOpen(false);
-    setRoleToggle((t) => t + 1);
-    window.location.reload();
-  }, []);
-  // DEV: End
-
-  const cycleRole = useCallback(() => {
-    const currentRole = currentUser?.access || "Member";
-    const currentIndex = ROLE_CYCLE.indexOf(currentRole);
-    const nextIndex = (currentIndex + 1) % ROLE_CYCLE.length;
-    const nextRole = ROLE_CYCLE[nextIndex];
-
-    const updated = { ...currentUser, access: nextRole };
-    try {
-      localStorage.setItem("float_current_user", JSON.stringify(updated));
-    } catch {
-      /* ignore */
-    }
-    setRoleToggle((t) => t + 1);
-    window.location.reload();
-  }, [currentUser]);
 
   useEffect(() => {
     try {
@@ -227,42 +188,6 @@ function AppSideNav() {
       <div className="app-sidenav-spacer" />
 
       <div className="app-sidenav-footer" role="group" aria-label="Account and help">
-        {isDevMode && (
-          <>
-            {/* DEV: Testing RBAC - Remove after testing */}
-            <motion.button
-              type="button"
-              className="app-sidenav-foot-btn"
-              title="Switch to a different person from Supabase"
-              onClick={() => setLoginSelectorOpen(true)}
-              whileHover={{ scale: 1.06 }}
-              whileTap={{ scale: 0.94 }}
-            >
-              <LogIn size={18} strokeWidth={1.9} aria-hidden />
-              {!collapsed && (
-                <span className="app-sidenav-foot-label" style={{ fontSize: "11px", fontWeight: 600 }}>
-                  Login As
-                </span>
-              )}
-            </motion.button>
-            {/* DEV: End */}
-            <motion.button
-              type="button"
-              className="app-sidenav-foot-btn"
-              title={`Current role: ${currentUser?.access || "Member"} — click to cycle`}
-              onClick={cycleRole}
-              whileHover={{ scale: 1.06 }}
-              whileTap={{ scale: 0.94 }}
-            >
-              <Shield size={18} strokeWidth={1.9} aria-hidden />
-              {!collapsed && (
-                <span className="app-sidenav-foot-label" style={{ fontSize: "11px", fontWeight: 600 }}>
-                  {currentUser?.access || "Member"}
-                </span>
-              )}
-            </motion.button>
-          </>
-        )}
         <NavLink
           to="/settings"
           className={({ isActive }) =>
@@ -311,9 +236,7 @@ function AppSideNav() {
         </motion.button>
       </div>
 
-      {/* DEV: Testing RBAC - Remove after testing */}
-      {isDevMode && <DevLoginSelector isOpen={loginSelectorOpen} onSelectPerson={handleSelectPerson} />}
-      {/* DEV: End */}
+
     </aside>
   );
 }
