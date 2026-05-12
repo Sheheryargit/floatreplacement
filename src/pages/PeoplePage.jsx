@@ -83,6 +83,9 @@ function toggleArr(list, v) {
 export default function PeoplePage() {
   const { currentUser } = useAuth();
   const role = (currentUser?.access || "").toLowerCase();
+  const canCreatePerson = can(role, "peoplePage", "createPerson");
+  const canShowSelectColumn =
+    can(role, "peoplePage", "deletePerson") && can(role, "peoplePage", "interactAll");
   const { theme: mode } = useAppTheme();
   const t = T[mode];
 
@@ -823,10 +826,12 @@ export default function PeoplePage() {
                 </div>
               )}
             </div>
-            <Button type="button" variant="secondary" size="md" style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <Download size={14} /> Import
-            </Button>
-            {can(role, 'peoplePage', 'createPerson') && (
+            {canCreatePerson && (
+              <Button type="button" variant="secondary" size="md" style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <Download size={14} /> Import
+              </Button>
+            )}
+            {canCreatePerson && (
               <Button type="button" variant="primary" size="md" onClick={openAdd} style={{ display: "flex", alignItems: "center", gap: 7 }}>
               <UserPlus size={14} /> Add person
               </Button>
@@ -919,7 +924,7 @@ export default function PeoplePage() {
           <table>
             <thead>
               <tr style={{ borderBottom:`2px solid ${t.border}` }}>
-                {can(role, 'peoplePage', 'deletePerson') && (
+                {canShowSelectColumn && (
                   <th style={{ width:48,padding:"14px 14px" }}><input type="checkbox" checked={selected.size===filteredSorted.length&&filteredSorted.length>0} onChange={toggleAll} style={{ accentColor:t.chk,cursor:"pointer",width:16,height:16 }}/></th>
                 )}
                 {["Name","Role","Department","Access","Tags","Type",""].map((h,i)=>(
@@ -947,7 +952,7 @@ export default function PeoplePage() {
                       if (!sel) e.currentTarget.style.background = sel ? t.selRow : "transparent";
                     }}
                   >
-                    {can(role, 'peoplePage', 'deletePerson') && (
+                    {canShowSelectColumn && (
                       <td style={{ padding:"12px 14px" }} onClick={(e)=>e.stopPropagation()}>
                         <input type="checkbox" checked={sel} onChange={()=>toggleSel(p.id)} style={{ accentColor:t.chk,cursor:"pointer",width:16,height:16 }}/>
                       </td>
@@ -990,7 +995,7 @@ export default function PeoplePage() {
                 );
               })}
               {filteredSorted.length===0 && (
-                <tr><td colSpan={can(role, 'people', 'deletePerson') ? 8 : 7} style={{ textAlign:"center",padding:"56px 20px" }}>
+                <tr><td colSpan={canShowSelectColumn ? 8 : 7} style={{ textAlign:"center",padding:"56px 20px" }}>
                   {viewTab==="archived"
                     ? <><Archive size={32} style={{ color:t.textDim,marginBottom:12 }}/><div style={{ color:t.textMuted,fontSize:15,fontWeight:600 }}>No archived people</div><div style={{ color:t.textDim,fontSize:13,marginTop:4 }}>Archived team members will appear here</div></>
                     : <><Search size={32} style={{ color:t.textDim,marginBottom:12 }}/><div style={{ color:t.textMuted,fontSize:15,fontWeight:600 }}>{search||advActiveCount?"No people match filters":"No people yet"}</div><div style={{ color:t.textDim,fontSize:13,marginTop:4 }}>{search||advActiveCount?"Try adjusting search or open Filters to clear criteria":"Click \"Add person\" to get started"}</div></>
