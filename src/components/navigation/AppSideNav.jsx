@@ -30,9 +30,9 @@ const COLLAPSE_KEY = "alloc8-sidenav-collapsed";
 
 const NAV = [
   { to: "/", end: true, icon: CalendarDays, label: "Schedule" },
-  { to: "/people", icon: Users, label: "People" },
-  { to: "/projects", icon: FolderOpen, label: "Projects" },
-  { to: "/report", icon: BarChart3, label: "Report", requiresPermission: { page: "reporting", action: "viewReporting" } },
+  { to: "/people", icon: Users, label: "People", requiresPermission: { page: "peoplePage", action: "viewPeoplePage" }},
+  { to: "/projects", icon: FolderOpen, label: "Projects", requiresPermission: { page: "projectsPage", action: "viewProjectsPage" }},
+  { to: "/report", icon: BarChart3, label: "Report", requiresPermission: { page: "reporting", action: "viewReportingPage" } },
 ];
 
 const V2_MODAL = {
