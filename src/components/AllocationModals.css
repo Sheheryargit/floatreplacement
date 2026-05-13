@@ -74,10 +74,29 @@
   border: 1px solid;
   padding: 24px 28px 20px;
   box-shadow: var(--shadow-lg, 0 24px 80px rgba(0, 0, 0, 0.45));
+  position: relative;
+}
+
+/* Let the portaled project picker extend past inner scroll clipping while open */
+.lpam-modal.lpam-modal--project-picker-open {
+  overflow: visible;
+}
+
+.lpam-modal.lpam-modal--project-picker-open .lpam-modal-body {
+  overflow: visible;
+}
+
+.lpam-project-menu-portal-host {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6000;
+  isolation: isolate;
 }
 
 .lpam-modal > .lpam-head,
-.lpam-modal > .lpam-tabs--motion {
+.lpam-modal > .lpam-tabs--motion,
+.lpam-modal > .lpam-create-tabs-premium {
   flex-shrink: 0;
 }
 
@@ -91,7 +110,7 @@
 }
 
 .lpam-modal[data-state="open"] {
-  position: fixed;
+  position: fixed !important;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
@@ -101,7 +120,7 @@
 }
 
 .lpam-modal[data-state="closed"] {
-  position: fixed;
+  position: fixed !important;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
@@ -321,6 +340,62 @@
   padding: 8px;
 }
 
+/* Portaled inside Dialog.Content; position absolute + coords from trigger (FocusScope-safe) */
+.lpam-menu-project-float {
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid;
+  box-shadow:
+    0 22px 56px rgba(0, 0, 0, 0.32),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  pointer-events: auto;
+  min-height: 0;
+  z-index: 1;
+}
+
+.lpam-menu-project-float .lpam-menu-scroll {
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.lpam-menu-scroll--grouped {
+  padding-top: 2px;
+}
+
+.lpam-menu-client-block {
+  margin-bottom: 6px;
+}
+
+.lpam-menu-client-block:last-child {
+  margin-bottom: 0;
+}
+
+.lpam-menu-client-heading {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 8px 10px 4px 10px;
+  margin: 0;
+}
+
+.lpam-menu-item--project-row {
+  padding-left: 12px;
+}
+
+.lpam-project-swatch--menu {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.lpam-project-swatch--trigger {
+  border-radius: 50%;
+}
+
 .lpam-menu-search {
   flex: 0 0 auto;
   padding: 2px 2px 6px;
@@ -453,6 +528,28 @@
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: left;
+}
+
+.lpam-menu-item-label--stacked {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+}
+
+.lpam-menu-item-title {
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.lpam-menu-item-sub {
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.2;
 }
 
 .lpam-project-create {
@@ -681,7 +778,15 @@
   gap: 12px;
   padding-top: 16px;
   margin-top: 0;
-  border-top: 1px solid rgba(128, 128, 128, 0.2);
+  border-top-width: 0;
+}
+
+.lpam-modal.lpam-detail .lpam-detail-tabs {
+  margin-bottom: 0;
+}
+
+.lpam-modal.lpam-detail .lpam-detail-tabs + .lpam-modal-body {
+  padding-top: 10px;
 }
 
 .lpam-meta {
@@ -689,6 +794,241 @@
   align-items: center;
   gap: 8px;
   font-size: 12px;
+}
+
+/* Shared allocation modals — circular close matches production */
+.lpam-modal.lpam-detail .lpam-icon-close,
+.lpam-modal.lpam-create .lpam-icon-close {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.18s ease;
+}
+
+:root[data-theme="light"] .lpam-modal.lpam-detail .lpam-icon-close,
+:root[data-theme="light"] .lpam-modal.lpam-create .lpam-icon-close {
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+.lpam-modal.lpam-detail .lpam-icon-close:hover,
+.lpam-modal.lpam-create .lpam-icon-close:hover {
+  border-radius: 999px !important;
+  background: color-mix(in srgb, var(--color-brand, #0088ff) 14%, transparent) !important;
+}
+
+/* Create / edit — segmented Allocation | Leave chrome */
+.lpam-create-tabs-premium {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 5px;
+  margin: 2px 0 18px;
+  border-radius: 14px;
+  box-sizing: border-box;
+}
+
+:root[data-theme="dark"] .lpam-create-tabs-premium {
+  background: color-mix(in srgb, #fff 5%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.045),
+    0 6px 24px rgba(0, 0, 0, 0.22);
+}
+
+:root[data-theme="light"] .lpam-create-tabs-premium {
+  background: color-mix(in srgb, #0f172a 4%, #f8fafc);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 0 0 1px rgba(15, 23, 42, 0.07),
+    0 4px 18px rgba(15, 23, 42, 0.05);
+}
+
+.lpam-create-tab-chip {
+  border: none;
+  border-radius: 11px;
+  padding: 11px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  transition:
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.18s ease,
+    opacity 0.18s ease;
+  background: transparent;
+}
+
+.lpam-create-tab-chip:focus-visible {
+  outline: 2px solid var(--color-brand, #0088ff);
+  outline-offset: 2px;
+}
+
+.lpam-create-tab-chip:active:not(:disabled) {
+  transform: scale(0.982);
+}
+
+.lpam-create-tab-chip--disabled {
+  pointer-events: none;
+}
+
+:root[data-theme="dark"] .lpam-create-tab-chip:not(.lpam-create-tab-chip--active):hover:not(:disabled) {
+  background: color-mix(in srgb, #fff 6%, transparent);
+}
+
+:root[data-theme="light"] .lpam-create-tab-chip:not(.lpam-create-tab-chip--active):hover {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+/* Stage card inside create modal — cohesive inset surface */
+:root[data-theme="dark"] .lpam-modal.lpam-create .lpam-create-stage {
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, #ffffff 6%, transparent) 0%,
+    color-mix(in srgb, #fff 3%, transparent) 100%
+  ) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 10px 32px rgba(0, 0, 0, 0.2) !important;
+}
+
+:root[data-theme="light"] .lpam-modal.lpam-create .lpam-create-stage {
+  background: #fff !important;
+  border-color: color-mix(in srgb, var(--color-border, #e0e4ef) 92%, transparent) !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.95) inset,
+    0 10px 28px rgba(15, 23, 42, 0.05) !important;
+}
+
+.lpam-modal.lpam-create .lpam-create-actions {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: stretch;
+  gap: 10px;
+}
+
+@media (min-width: 480px) {
+  .lpam-modal.lpam-create .lpam-create-actions {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}
+
+.lpam-modal.lpam-create .lpam-create-actions .lpam-btn-primary:not(.lpam-btn-leave) {
+  background-image: linear-gradient(180deg, #1aa3ff 0%, var(--color-brand, #0088ff) 100%);
+  box-shadow:
+    0 8px 28px rgba(0, 136, 255, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.lpam-modal.lpam-create .lpam-create-actions .lpam-btn-primary:not(.lpam-btn-leave):hover:not(:disabled) {
+  filter: brightness(1.045);
+}
+
+.lpam-modal.lpam-create .lpam-create-actions .lpam-btn-secondary {
+  font-weight: 700;
+  border-radius: 10px;
+}
+
+.lpam-detail-extend-drawer {
+  margin: 6px 0 16px;
+  border-radius: 12px;
+}
+
+.lpam-detail-extend-drawer-sum {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.lpam-detail-extend-drawer-sum::-webkit-details-marker {
+  display: none;
+}
+
+.lpam-detail-extend-drawer-ico {
+  flex-shrink: 0;
+  color: inherit;
+  opacity: 0.88;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lpam-detail-extend-drawer[open] .lpam-detail-extend-drawer-ico {
+  transform: rotate(90deg);
+}
+
+.lpam-detail-extend-drawer-label {
+  flex-shrink: 0;
+}
+
+.lpam-detail-extend-drawer-hint {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 550;
+}
+
+@media (max-width: 420px) {
+  .lpam-detail-extend-drawer-hint {
+    flex-basis: 100%;
+    margin-left: 0;
+    padding-left: 28px;
+  }
+}
+
+.lpam-extend-card-wrap--drawer {
+  padding: 12px 0 2px;
+  margin-bottom: 0;
+}
+
+.lpam-modal.lpam-detail .lpam-btn-delete-solid {
+  border: none;
+  color: #fff !important;
+  background: linear-gradient(180deg, #e11d48 0%, #b91c1c 100%);
+  box-shadow:
+    0 4px 16px rgba(220, 38, 38, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.lpam-modal.lpam-detail .lpam-btn-delete-solid:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+:root[data-theme="light"] .lpam-modal.lpam-detail .lpam-btn-delete-solid {
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+}
+
+.lpam-modal.lpam-detail .lpam-btn-edit-solid:not(.lpam-btn-leave) {
+  background-image: linear-gradient(180deg, #1aa3ff 0%, var(--color-brand, #0088ff) 100%);
+  box-shadow:
+    0 6px 26px rgba(0, 136, 255, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.lpam-modal.lpam-detail .lpam-btn-edit-solid:not(.lpam-btn-leave):hover {
+  filter: brightness(1.05);
 }
 
 /* ── Tabs ────────────────────────────────────────────────────── */
@@ -871,4 +1211,175 @@
 
 .lpam-btn-leave:hover {
   filter: brightness(1.08);
+}
+
+/* Extend allocation (detail modal) */
+.lpam-extend-card-wrap {
+  margin: 14px 0 4px;
+}
+
+.lpam-extend-card {
+  border-radius: 16px;
+  border-width: 1px;
+  border-style: solid;
+  padding: 16px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.lpam-extend-title-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.lpam-extend-accent-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+
+.lpam-extend-title {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.lpam-extend-sub {
+  font-size: 12px;
+  line-height: 1.45;
+  margin-top: 4px;
+  max-width: 44ch;
+}
+
+.lpam-extend-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lpam-extend-chip {
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: 1px solid;
+  cursor: pointer;
+  transition: transform 0.14s ease, box-shadow 0.18s ease, filter 0.14s ease;
+}
+
+.lpam-extend-chip:active {
+  transform: scale(0.98);
+}
+
+.lpam-extend-chip--narrow {
+  padding-inline: 11px;
+}
+
+.lpam-extend-custom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.lpam-extend-step {
+  min-width: 40px;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  border: none;
+}
+
+.lpam-extend-input {
+  width: 48px;
+  text-align: center;
+  border: none;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.lpam-extend-input:focus {
+  outline: none;
+}
+
+.lpam-extend-preview {
+  border-radius: 13px;
+  border: 1px solid;
+  padding: 11px 13px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lpam-extend-preview-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  font-weight: 630;
+}
+
+.lpam-extend-preview-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+.lpam-extend-delta {
+  font-weight: 600;
+}
+
+.lpam-btn.lpam-extend-apply {
+  margin-top: 2px;
+  padding-top: 11px;
+  padding-bottom: 11px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lpam-extend-chip:active {
+    transform: none;
+  }
+}
+
+/* Schedule v2: template row + PH chips */
+.lpam-template-field {
+  margin-top: 10px;
+}
+
+.lpam-ph-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lpam-ph-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11.5px;
+  font-weight: 620;
+  line-height: 1.25;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(180, 120, 0, 0.35);
+}
+
+:root[data-theme="light"] .lpam-ph-chip {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.lpam-ph-overlap-box--v2 {
+  border-radius: 8px !important;
 }

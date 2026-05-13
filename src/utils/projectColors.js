@@ -61,6 +61,80 @@ export function projectToAllocationLabel(p) {
   return name || code || `Project #${p.id}`;
 }
 
+const PICKER_HINT_SEP = " – ";
+
+/**
+ * Canonical allocation label per non-archived project (picker / filters use registry for duplicates).
+ */
+export function allocationProjectLabelList(projects) {
+  return (projects || []).filter((p) => p && !p.archived).map((p) => projectToAllocationLabel(p));
+}
+
+/** Registry labels plus extra strings; unique and sorted. */
+export function buildAllocationProjectOptionStrings(projects, extraAllocationLabels) {
+  const fromProjects = allocationProjectLabelList(projects);
+  const extras = extraAllocationLabels || [];
+  return Array.from(new Set([...fromProjects, ...extras])).sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: "base" })
+  );
+}
+
+/**
+ * Resolve a picker / stored allocation `project` string back to a registry row
+ * (including disambiguated labels from {@link allocationProjectLabelList}).
+ */
+export function matchProjectFromAllocationPickerLabel(label, projects) {
+  const t = String(label ?? "").trim();
+  if (!t) return undefined;
+  const active = (projects || []).filter((p) => p && !p.archived);
+
+  const i = t.lastIndexOf(" (");
+  if (i > 0 && t.endsWith(")")) {
+    const base = t.slice(0, i).trim();
+    const hint = t.slice(i + 2, -1).trim();
+    const candidates = active.filter((p) => projectToAllocationLabel(p) === base);
+    if (!candidates.length) return undefined;
+
+    if (hint.includes(PICKER_HINT_SEP)) {
+      const [c, frag] = hint.split(PICKER_HINT_SEP).map((s) => s.trim());
+      const fragNorm = frag.replace(/-/g, "");
+      const hit =
+        candidates.find(
+          (p) =>
+            String(p.client || "").trim() === c &&
+            String(p.id ?? "")
+              .replace(/-/g, "")
+              .startsWith(fragNorm)
+        ) || undefined;
+      if (hit) return hit;
+    }
+
+    const byClient = candidates.find((p) => String(p.client || "").trim() === hint);
+    if (byClient) return byClient;
+
+    const hintNorm = hint.replace(/-/g, "").replace(/^#/, "");
+    return (
+      candidates.find((p) =>
+        String(p.id ?? "")
+          .replace(/-/g, "")
+          .startsWith(hintNorm)
+      ) || undefined
+    );
+  }
+
+  const exact = active.filter((p) => projectToAllocationLabel(p) === t);
+  if (exact.length === 1) return exact[0];
+  if (exact.length > 1) {
+    return [...exact].sort((a, b) => String(a.id).localeCompare(String(b.id)))[0];
+  }
+  return undefined;
+}
+
+export function registryProjectIdForPickerLabel(label, projects) {
+  const row = matchProjectFromAllocationPickerLabel(label, projects);
+  return row?.id != null ? String(row.id) : undefined;
+}
+
 /** Distinct accent for tag chips (different salt than allocation hashing). */
 export function tagAccentHexFromLabel(label) {
   const h = hashString(`tag:\x00${label}`);
@@ -74,7 +148,9 @@ export function tagAccentHexFromLabel(label) {
 export function resolveColorForProjectLabel(label, projects) {
   const t = (label || "").trim();
   if (!t) return PROJECT_COLOR_PALETTE[0];
-  const match = projects.find((p) => projectToAllocationLabel(p) === t);
+  const match =
+    projects.find((p) => projectToAllocationLabel(p) === t) ||
+    matchProjectFromAllocationPickerLabel(t, projects);
   if (match?.color && typeof match.color === "string" && /^#([0-9A-Fa-f]{6})$/.test(match.color.trim())) {
     return match.color.trim();
   }
@@ -88,8 +164,18 @@ export function resolveColorForProjectLabel(label, projects) {
  */
 export function colorForAllocationBar(alloc, projects) {
   const label = (alloc.project || "").trim();
+  const pid = alloc.projectId != null ? String(alloc.projectId) : "";
+  if (pid) {
+    const byId = projects.find((p) => String(p.id) === pid);
+    const mcId = byId?.color;
+    if (mcId && typeof mcId === "string" && /^#([0-9A-Fa-f]{6})$/i.test(mcId.trim())) {
+      return mcId.trim();
+    }
+  }
   if (label) {
-    const match = projects.find((p) => projectToAllocationLabel(p) === label);
+    const match =
+      projects.find((p) => projectToAllocationLabel(p) === label) ||
+      matchProjectFromAllocationPickerLabel(label, projects);
     const mc = match?.color;
     if (mc && typeof mc === "string" && /^#([0-9A-Fa-f]{6})$/i.test(mc.trim())) {
       return mc.trim();

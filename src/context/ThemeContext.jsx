@@ -9,6 +9,8 @@ import {
 } from "react";
 
 const STORAGE_KEY = "float-replacement-theme";
+const PALETTE_STORAGE_KEY = "alloc8-palette";
+const CANVAS_TINT_STORAGE_KEY = "alloc8-custom-canvas-hex";
 
 const ThemeContext = createContext(null);
 
@@ -33,28 +35,98 @@ function resolveTheme(preference) {
   return preference;
 }
 
-function syncThemeDom(resolved) {
+/** @returns {"default" | "studio"} */
+function readStoredPalette() {
+  try {
+    const s = localStorage.getItem(PALETTE_STORAGE_KEY);
+    if (s === "studio") return "studio";
+  } catch {
+    /* ignore */
+  }
+  return "default";
+}
+
+/** @returns {string} normalized #rrggbb or "" */
+function readStoredCanvasTint() {
+  try {
+    const s = localStorage.getItem(CANVAS_TINT_STORAGE_KEY)?.trim();
+    if (s && /^#[0-9A-Fa-f]{6}$/.test(s)) return s.toLowerCase();
+  } catch {
+    /* ignore */
+  }
+  return "";
+}
+
+/** @param {string} hex */
+function normalizeCanvasTintHex(hex) {
+  const t = (hex || "").trim().toLowerCase();
+  if (/^#[0-9a-f]{6}$/.test(t)) return t;
+  return "";
+}
+
+/**
+ * @param {"dark" | "light"} resolvedTheme
+ * @param {string} hex #rrggbb
+ */
+export function computeShellBackground(resolvedTheme, hex) {
+  const n = normalizeCanvasTintHex(hex);
+  if (!n) return null;
+  if (resolvedTheme === "light") {
+    return `color-mix(in srgb, ${n} 16%, #f4f6fa)`;
+  }
+  return `color-mix(in srgb, ${n} 38%, #0f1117)`;
+}
+
+function syncAppearanceDom(resolvedTheme, palette, canvasTintHex) {
   if (typeof document === "undefined") return;
-  document.documentElement.dataset.theme = resolved;
-  document.documentElement.removeAttribute("data-palette");
-  document.documentElement.style.colorScheme = resolved === "dark" ? "dark" : "light";
+  const el = document.documentElement;
+  el.dataset.theme = resolvedTheme;
+  if (palette === "studio") {
+    el.dataset.palette = "studio";
+  } else {
+    el.removeAttribute("data-palette");
+  }
+  el.style.colorScheme = resolvedTheme === "dark" ? "dark" : "light";
+
+  const normalized = normalizeCanvasTintHex(canvasTintHex);
+  if (normalized) {
+    el.dataset.customCanvas = "on";
+    el.style.setProperty("--alloc8-canvas-tint", normalized);
+  } else {
+    delete el.dataset.customCanvas;
+    el.style.removeProperty("--alloc8-canvas-tint");
+  }
+
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {
-    meta.setAttribute("content", resolved === "dark" ? "#0F1117" : "#F4F6FA");
+    if (normalized) {
+      meta.setAttribute("content", normalized);
+    } else {
+      const darkBg = palette === "studio" ? "#07080c" : "#0F1117";
+      const lightBg = palette === "studio" ? "#fafafa" : "#F4F6FA";
+      meta.setAttribute("content", resolvedTheme === "dark" ? darkBg : lightBg);
+    }
   }
 }
 
 export function ThemeProvider({ children }) {
   const [themePreference, setThemePreferenceState] = useState(() => readStoredPreference());
+  const [palettePreference, setPalettePreferenceState] = useState(() => readStoredPalette());
+  const [canvasTintHex, setCanvasTintHexState] = useState(() => readStoredCanvasTint());
 
   const resolvedTheme = useMemo(
     () => resolveTheme(themePreference),
     [themePreference]
   );
 
+  const shellBackground = useMemo(
+    () => computeShellBackground(resolvedTheme, canvasTintHex),
+    [resolvedTheme, canvasTintHex]
+  );
+
   useLayoutEffect(() => {
-    syncThemeDom(resolvedTheme);
-  }, [resolvedTheme]);
+    syncAppearanceDom(resolvedTheme, palettePreference, canvasTintHex);
+  }, [resolvedTheme, palettePreference, canvasTintHex]);
 
   useEffect(() => {
     try {
@@ -65,15 +137,39 @@ export function ThemeProvider({ children }) {
   }, [themePreference]);
 
   useEffect(() => {
+    try {
+      localStorage.setItem(
+        PALETTE_STORAGE_KEY,
+        palettePreference === "studio" ? "studio" : "default"
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [palettePreference]);
+
+  useEffect(() => {
+    try {
+      const n = normalizeCanvasTintHex(canvasTintHex);
+      if (n) {
+        localStorage.setItem(CANVAS_TINT_STORAGE_KEY, n);
+      } else {
+        localStorage.removeItem(CANVAS_TINT_STORAGE_KEY);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [canvasTintHex]);
+
+  useEffect(() => {
     if (themePreference !== "system") return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
-      syncThemeDom(getSystemTheme());
+      syncAppearanceDom(getSystemTheme(), palettePreference, canvasTintHex);
     };
     mq.addEventListener("change", onChange);
-    syncThemeDom(resolveTheme("system"));
+    syncAppearanceDom(resolveTheme("system"), palettePreference, canvasTintHex);
     return () => mq.removeEventListener("change", onChange);
-  }, [themePreference]);
+  }, [themePreference, palettePreference, canvasTintHex]);
 
   const setThemePreference = useCallback((next) => {
     setThemePreferenceState((prev) =>
@@ -89,6 +185,21 @@ export function ThemeProvider({ children }) {
     });
   }, []);
 
+  const setPalettePreference = useCallback((next) => {
+    setPalettePreferenceState((prev) => {
+      const resolved = typeof next === "function" ? next(prev) : next;
+      return resolved === "studio" ? "studio" : "default";
+    });
+  }, []);
+
+  const setCanvasTintHex = useCallback((next) => {
+    setCanvasTintHexState((prev) => {
+      const raw = typeof next === "function" ? next(prev) : next;
+      if (raw == null || String(raw).trim() === "") return "";
+      return String(raw).trim();
+    });
+  }, []);
+
   const value = useMemo(
     () => ({
       /** Resolved appearance: "dark" | "light" */
@@ -96,8 +207,26 @@ export function ThemeProvider({ children }) {
       themePreference,
       setThemePreference,
       toggleTheme,
+      /** Visual preset: "default" | "studio" (typography + neutrals) */
+      palette: palettePreference,
+      setPalettePreference,
+      /** Optional #rrggbb — tints page canvas behind surfaces (saved locally). */
+      canvasTintHex,
+      setCanvasTintHex,
+      /** color-mix() for People/Projects shells when tint active; else null. */
+      shellBackground,
     }),
-    [resolvedTheme, themePreference, setThemePreference, toggleTheme]
+    [
+      resolvedTheme,
+      themePreference,
+      setThemePreference,
+      toggleTheme,
+      palettePreference,
+      setPalettePreference,
+      canvasTintHex,
+      setCanvasTintHex,
+      shellBackground,
+    ]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { useReducedMotion } from "framer-motion";
 import { motion } from "framer-motion";
 import { isStaticUi } from "../../config/uiMode.js";
@@ -27,37 +27,6 @@ export default function GlobalBackground() {
     () => createParticles(reduceMotion || lowGpu || staticUi ? 0 : 12),
     [reduceMotion, lowGpu, staticUi]
   );
-  const rafRef = useRef(0);
-  const pendingRef = useRef(null);
-
-  useEffect(() => {
-    if (staticUi) return undefined;
-    const applyPointer = () => {
-      rafRef.current = 0;
-      const e = pendingRef.current;
-      if (!e) return;
-      pendingRef.current = null;
-      const x = (e.clientX / window.innerWidth) * 100;
-      const y = (e.clientY / window.innerHeight) * 100;
-      document.documentElement.style.setProperty("--mx", `${x}%`);
-      document.documentElement.style.setProperty("--my", `${y}%`);
-    };
-
-    const handlePointerMove = (e) => {
-      pendingRef.current = e;
-      if (rafRef.current) return;
-      rafRef.current = requestAnimationFrame(applyPointer);
-    };
-
-    document.documentElement.style.setProperty("--mx", "50%");
-    document.documentElement.style.setProperty("--my", "50%");
-
-    window.addEventListener("pointermove", handlePointerMove, { passive: true });
-    return () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, [staticUi]);
 
   if (staticUi) {
     return <div className="global-bg-container global-bg-container--static" aria-hidden />;
@@ -67,7 +36,6 @@ export default function GlobalBackground() {
     <div className="global-bg-container" aria-hidden="true">
       <div className="global-bg" />
       <div className="global-aurora" />
-      <div className="global-spotlight" />
       <div className="global-vignette" />
       <div className="global-grid" />
       <div className="global-noise" />

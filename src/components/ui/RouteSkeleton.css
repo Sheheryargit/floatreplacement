@@ -93,3 +93,15 @@
     background-position: -200% 0;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .route-skeleton-pulse {
+    animation: none;
+    background: var(--route-sk-shimmer, rgba(255, 255, 255, 0.06));
+  }
+}
+
+html[data-low-gpu="1"] .route-skeleton-pulse {
+  animation: none;
+  background: var(--route-sk-shimmer, rgba(255, 255, 255, 0.06));
+}

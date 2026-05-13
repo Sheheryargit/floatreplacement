@@ -22,6 +22,9 @@ export default defineConfig({
     strictPort: false,
   },
   build: {
+    // Keep all CSS in a single stylesheet so lazy route/component updates
+    // cannot reference a missing per-chunk CSS file after deployments.
+    cssCodeSplit: false,
     rollupOptions: {
       output: {
         manualChunks(id) {

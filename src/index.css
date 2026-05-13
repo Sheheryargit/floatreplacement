@@ -1,7 +1,10 @@
 @import "./styles/design-system.css";
+@import "./styles/palette-studio.css";
 @import "./styles/semantic-ui.css";
 @import "./styles/global-bg.css";
+@import "./styles/motion-surface.css";
 @import "./styles/static-ui.css";
+@import "./styles/custom-canvas.css";
 
 *,
 *::before,
@@ -154,4 +157,44 @@ body {
   box-shadow:
     0 12px 32px rgba(15, 23, 42, 0.12),
     0 2px 8px rgba(15, 23, 42, 0.06) !important;
+}
+
+/* Keyboard — skip to primary landmark (#main-content) */
+.skip-to-main {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 10001;
+  padding: 10px 18px;
+  margin: 0;
+  transform: translate(-100%, -100%);
+  opacity: 0;
+  pointer-events: none;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid color-mix(in srgb, var(--color-brand) 35%, var(--color-border));
+  border-radius: var(--radius-button);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  box-shadow: var(--shadow-md);
+  transition:
+    transform 0.18s var(--ease-out-ui, ease-out),
+    opacity 0.18s ease;
+}
+
+.skip-to-main:focus {
+  transform: translate(12px, 12px);
+  opacity: 1;
+  pointer-events: auto;
+  outline: none;
+  box-shadow:
+    var(--shadow-md),
+    0 0 0 3px color-mix(in srgb, var(--color-brand) 45%, transparent);
+}
+
+.skip-to-main:focus-visible {
+  transform: translate(12px, 12px);
+  opacity: 1;
+  pointer-events: auto;
 }

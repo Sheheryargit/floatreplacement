@@ -151,16 +151,18 @@ export default function AnimatedAppLoader() {
   const reduceMotion = useReducedMotion();
   const mode = useMemo(() => MODES[Math.floor(Math.random() * MODES.length)], []);
 
+  // Static UI (`static-ui.css`) forces transitions to ~0ms on all nodes; skipping the opacity
+  // fade avoids a reduced-motion viewport that stays at initial opacity (blank screen).
   return (
     <motion.div
       className="float-app-loader"
       role="status"
       aria-busy="true"
       aria-label="Loading"
-      initial={{ opacity: 0 }}
+      initial={reduceMotion ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.22 }}
+      transition={reduceMotion ? { duration: 0 } : { duration: 0.22 }}
     >
       <div className="float-app-loader-rail" aria-hidden>
         {!reduceMotion ? (

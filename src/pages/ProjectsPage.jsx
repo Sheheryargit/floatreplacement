@@ -11,12 +11,19 @@ import { FloatSelect, FloatPersonPicker } from "../components/ui/FloatSelect.jsx
 import { PROJECT_COLOR_PALETTE, avatarGradientFromName } from "../utils/projectColors.js";
 import { tagChromaProps } from "../utils/tagChroma.js";
 import { toast } from "sonner";
+import {
+  showCenterActionFeedback,
+  useAlloc8ActionFeedbackMount,
+} from "../context/CenterActionFeedbackContext.jsx";
 import { useFixedAnchorDropdown } from "../hooks/useFixedAnchorDropdown.js";
+import { WORKSPACE_THEME as T } from "../theme/workspacePalette.js";
+import { EmptyState } from "../components/ui/EmptyState.jsx";
+import "./ProjectsPage.css";
+import "../styles/premium-person-modal.css";
 import {
   Users,
   FolderOpen,
   Plus,
-  Download,
   Trash2,
   Search,
   X,
@@ -64,10 +71,6 @@ const fmtDate = (d) => { if(!d)return"—"; const dt=new Date(d); return dt.toLo
 /** Cap staggered row enter animations — large tables stay responsive */
 const TABLE_ROW_ENTER_ANIM_MAX = 32;
 
-const T = {
-  dark: { bg:"#0f1117",surface:"#181c26",surfRaised:"#1e2235",surfAlt:"#1a1e2e",border:"#2a2f45",borderSub:"#323852",borderIn:"#3a4060",text:"#f0f2f8",textSoft:"#9ba4b8",textMuted:"#7b82a0",textDim:"#4a5168",accent:"#0088ff",accentHov:"#1a9bff",accentTxt:"#ffffff",accentGlow:"rgba(0,136,255,0.15)",sidebar:"#0f1117",sidebarAct:"rgba(0,136,255,0.08)",rowHov:"#151a24",tagBg:"rgba(124,106,247,0.12)",tagTxt:"#a599fc",btnSec:"#1e2235",btnSecHov:"#252a3d",btnSecTxt:"#c4c9d8",danger:"#ef4444",dangerHov:"#dc2626",dangerSoft:"rgba(239,68,68,0.16)",dangerTxt:"#fff",dangerGlow:"0 4px 24px rgba(239,68,68,0.25)",success:"#22c55e",successHov:"#16a34a",successSoft:"rgba(34,197,94,0.14)",successGlow:"0 4px 20px rgba(34,197,94,0.22)",warn:"#f59e0b",warnHov:"#d97706",warnTxt:"#0f172a",warnSoft:"rgba(245,158,11,0.16)",warnGlow:"0 4px 20px rgba(245,158,11,0.2)",info:"#38bdf8",infoSoft:"rgba(56,189,248,0.14)",overlay:"rgba(0,0,0,0.6)",shadow:"0 32px 100px rgba(0,0,0,0.55)",chk:"#0088ff",scroll:"#2a2f45",selRow:"rgba(0,136,255,0.06)",focus:"#0088ff",toastBg:"#181c26",toastBdr:"#2a2f45",tabActiveBg:"rgba(0,136,255,0.12)",tabHovBg:"rgba(0,136,255,0.06)" },
-  light: { bg:"#f4f6fa",surface:"#ffffff",surfRaised:"#ffffff",surfAlt:"#e8ebf4",border:"#e0e4ef",borderSub:"#e4e8f0",borderIn:"#d4d8e4",text:"#12151f",textSoft:"#4a5168",textMuted:"#5c6478",textDim:"#9ca3b8",accent:"#0077e6",accentHov:"#0088ff",accentTxt:"#ffffff",accentGlow:"rgba(0,136,255,0.12)",sidebar:"#ffffff",sidebarAct:"rgba(0,136,255,0.08)",rowHov:"#f4f6fa",tagBg:"rgba(124,106,247,0.1)",tagTxt:"#5b4fcf",btnSec:"#e8ebf4",btnSecHov:"#dde1ec",btnSecTxt:"#3e4560",danger:"#ef4444",dangerHov:"#dc2626",dangerSoft:"rgba(239,68,68,0.1)",dangerTxt:"#fff",dangerGlow:"0 4px 18px rgba(239,68,68,0.2)",success:"#16a34a",successHov:"#15803d",successSoft:"rgba(22,163,74,0.1)",successGlow:"0 4px 16px rgba(22,163,74,0.18)",warn:"#d97706",warnHov:"#b45309",warnTxt:"#fff",warnSoft:"rgba(217,119,6,0.1)",warnGlow:"0 4px 16px rgba(217,119,6,0.16)",info:"#0284c7",infoSoft:"rgba(2,132,199,0.1)",overlay:"rgba(15,18,28,0.35)",shadow:"0 32px 100px rgba(0,0,0,0.12)",chk:"#0077e6",scroll:"#d4d8e0",selRow:"rgba(0,136,255,0.08)",focus:"#0088ff",toastBg:"#ffffff",toastBdr:"#e0e4ef",tabActiveBg:"rgba(0,136,255,0.1)",tabHovBg:"rgba(0,136,255,0.05)" },
-};
 
 
 /* ═══════════════════ CONFIRM ═══════════════════ */
@@ -414,7 +417,7 @@ export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,c
    APP
    ═══════════════════════════════════════════════════════════ */
 export default function ProjectsPage(){
-  const { theme: mode } = useAppTheme();
+  const { theme: mode, shellBackground } = useAppTheme();
   const { currentUser } = useAuth();
   const role = (currentUser?.access || "").toLowerCase();
   const canCreateProject = can(role, "projectsPage", "createProject");
@@ -440,6 +443,7 @@ export default function ProjectsPage(){
   const[editingProject,setEditingProject]=useState(null);
   const[confirmDel,setConfirmDel]=useState(false);
   const[mounted,setMounted]=useState(false);
+  const setAlloc8FeedbackDock = useAlloc8ActionFeedbackMount();
 
   useEffect(()=>{setMounted(true);},[]);
 
@@ -462,40 +466,104 @@ export default function ProjectsPage(){
   const archivedCount=projects.filter(p=>p.archived).length;
   const toggleSel=id=>setSelected(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
   const toggleAll=()=>setSelected(selected.size===filtered.length?new Set():new Set(filtered.map(p=>p.id)));
-  const doDelete=async()=>{const c=selected.size;const ids=[...selected];const prev=projects;setProjects(projects.filter(p=>!selected.has(p.id)));setSelected(new Set());setConfirmDel(false);try{if(isSupabaseConfigured) await syncProjectsDelete(ids);toast.error(`${c} project${c===1?"":"s"} removed`);}catch(e){setProjects(prev);toast.error("Delete failed",{description:e?.message||String(e)});} };
-  const archiveProject=async(id)=>{const p=projects.find(x=>x.id===id);const next={...p,archived:!p.archived};const prev=projects;setProjects(projects.map(x=>x.id===id?next:x));setSelected(new Set());try{if(isSupabaseConfigured) await syncProjectUpdate(next);toast.warning(`${p.name} ${p.archived?"restored":"archived"}`);}catch(e){setProjects(prev);toast.error("Update failed",{description:e?.message||String(e)});} };
+  const doDelete = async () => {
+    const c = selected.size;
+    const ids = [...selected];
+    const prev = projects;
+    setProjects(projects.filter((p) => !selected.has(p.id)));
+    setSelected(new Set());
+    setConfirmDel(false);
+    try {
+      if (isSupabaseConfigured) await syncProjectsDelete(ids);
+      showCenterActionFeedback({
+        action: "remove",
+        title: "Removed",
+        subtitle: `${c} project${c === 1 ? "" : "s"} removed from the registry.`,
+      });
+    } catch (e) {
+      setProjects(prev);
+      toast.error("Delete failed", { description: e?.message || String(e) });
+    }
+  };
+
+  const archiveProject = async (id) => {
+    const p = projects.find((x) => x.id === id);
+    const next = { ...p, archived: !p.archived };
+    const prev = projects;
+    setProjects(projects.map((x) => (x.id === id ? next : x)));
+    setSelected(new Set());
+    try {
+      if (isSupabaseConfigured) await syncProjectUpdate(next);
+      showCenterActionFeedback({
+        action: "update",
+        title: next.archived ? "Archived" : "Restored",
+        subtitle: p.name,
+      });
+    } catch (e) {
+      setProjects(prev);
+      toast.error("Update failed", { description: e?.message || String(e) });
+    }
+  };
   const openAdd=()=>{setEditingProject(null);setModalOpen(true);};
   const openEdit=p=>{setEditingProject(p);setModalOpen(true);};
-  const handleSave=async(form)=>{const clean={...form};delete clean._colorOpen;
-    if(editingProject){
-      const draft={...clean,id:editingProject.id,archived:editingProject.archived};
-      try{
-        const saved=isSupabaseConfigured? await syncProjectUpdate(draft):draft;
-        setProjects(projects.map(p=>p.id===editingProject.id?saved:p).sort((a,b)=>a.name.localeCompare(b.name)));
-        toast.success(`${form.name} updated`);
-        setModalOpen(false);setEditingProject(null);
-      }catch(e){toast.error("Update failed",{description:e?.message||String(e)});}
+  const handleSave = async (form) => {
+    const clean = { ...form };
+    delete clean._colorOpen;
+    if (editingProject) {
+      const draft = { ...clean, id: editingProject.id, archived: editingProject.archived };
+      try {
+        const saved = isSupabaseConfigured ? await syncProjectUpdate(draft) : draft;
+        setProjects(projects.map((p) => (p.id === editingProject.id ? saved : p)).sort((a, b) => a.name.localeCompare(b.name)));
+        showCenterActionFeedback({
+          action: "update",
+          title: "Updated",
+          subtitle: (form.name || "").trim() || editingProject.name || "Project",
+        });
+        setModalOpen(false);
+        setEditingProject(null);
+      } catch (e) {
+        toast.error("Update failed", { description: e?.message || String(e) });
+      }
     } else {
-      const tempId=typeof crypto!=="undefined"&&typeof crypto.randomUUID==="function"?crypto.randomUUID():`tmp_${Date.now()}`;
-      const draft={...clean,id:tempId,archived:false};
-      try{
-        const saved=isSupabaseConfigured? await syncProjectCreate(draft):draft;
-        setProjects([...projects,saved].sort((a,b)=>a.name.localeCompare(b.name)));
-        toast.success(`${form.name} created`);
-        setModalOpen(false);setEditingProject(null);
-      }catch(e){toast.error("Save failed",{description:e?.message||String(e)});}
+      const tempId =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `tmp_${Date.now()}`;
+      const draft = { ...clean, id: tempId, archived: false };
+      try {
+        const saved = isSupabaseConfigured ? await syncProjectCreate(draft) : draft;
+        setProjects([...projects, saved].sort((a, b) => a.name.localeCompare(b.name)));
+        showCenterActionFeedback({
+          action: "add",
+          title: "Saved",
+          subtitle: (form.name || "").trim() || "New project",
+        });
+        setModalOpen(false);
+        setEditingProject(null);
+      } catch (e) {
+        toast.error("Save failed", { description: e?.message || String(e) });
+      }
     }
   };
   const handleModalArchive=()=>{if(editingProject){archiveProject(editingProject.id);setModalOpen(false);setEditingProject(null);}};
 
-  return(
-    <div style={{display:"flex",minHeight:"100vh",background:t.bg,color:t.text,fontFamily:"var(--font-body, 'DM Sans', system-ui, sans-serif)",fontSize:14,transition:"background 0.35s ease,color 0.35s ease"}}>
+  return (
+    <div
+      className="projects-page-root"
+      data-theme={mode === "light" ? "light" : "dark"}
+      style={{
+        background: shellBackground ?? t.bg,
+        color: t.text,
+        fontFamily: "var(--font-body, 'DM Sans', system-ui, sans-serif)",
+        fontSize: 14,
+      }}
+    >
       <AppSideNav />
 
-      <main style={{flex:1,minWidth:0,padding:"24px 36px"}}>
-        <header style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-          <h1 style={{fontSize:26,fontWeight:700,margin:0,letterSpacing:-0.5}}>Projects</h1>
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+      <main id="main-content" className="projects-page-main">
+        <header className="projects-page-header">
+          <h1 className="projects-page-title">Projects</h1>
+          <div className="projects-page-toolbar">
             <div style={{position:"relative"}}><Search size={15} style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:t.textMuted}}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search projects…" style={{width:search?240:180,background:t.surface,border:`1.5px solid ${t.borderIn}`,borderRadius:8,padding:"8px 12px 8px 34px",color:t.text,fontSize:13,outline:"none",transition:"all 0.25s"}} onFocus={e=>{e.target.style.width="240px";e.target.style.borderColor=t.focus;e.target.style.boxShadow=`0 0 0 3px ${t.accentGlow}`;}} onBlur={e=>{if(!search)e.target.style.width="180px";e.target.style.borderColor=t.borderIn;e.target.style.boxShadow="none";}}/>{search&&<X size={14} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",color:t.textMuted,cursor:"pointer"}} onClick={()=>setSearch("")}/>}</div>
             {canCreateProject && (
               <Button type="button" variant="secondary" size="md" style={{ display: "flex", alignItems: "center", gap: 7 }}><Download size={14}/> Import</Button>
@@ -506,8 +574,14 @@ export default function ProjectsPage(){
           </div>
         </header>
 
+        <div
+          ref={setAlloc8FeedbackDock}
+          data-alloc8-action-feedback-mount
+          className="projects-action-feedback-mount"
+        />
+
         {/* Tabs + Bulk */}
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,marginTop:8}}>
+        <div className="projects-page-tabs-row">
           <div style={{display:"flex",gap:2,background:t.surfAlt,borderRadius:10,padding:3,border:`1px solid ${t.border}`}}>
             {[{key:"active",label:"Active",count:activeCount,icon:FolderOpen},{key:"archived",label:"Archived",count:archivedCount,icon:Archive}].map(vt=>{const Icon=vt.icon;const active=viewTab===vt.key;return(<button key={vt.key} onClick={()=>{setViewTab(vt.key);setSelected(new Set());}} style={{padding:"8px 18px",fontSize:13,fontWeight:active?700:500,cursor:"pointer",background:active?t.surface:"transparent",border:active?`1px solid ${t.border}`:"1px solid transparent",color:active?t.text:t.textMuted,borderRadius:8,display:"flex",alignItems:"center",gap:7,transition:"all 0.2s",boxShadow:active?"0 1px 3px rgba(0,0,0,0.06)":"none"}} onMouseEnter={e=>{if(!active)e.currentTarget.style.color=t.textSoft;}} onMouseLeave={e=>{if(!active)e.currentTarget.style.color=t.textMuted;}}><Icon size={14}/> {vt.label}<span style={{background:active?t.accentGlow:t.surfAlt,color:active?t.accent:t.textDim,borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700,marginLeft:2}}>{vt.count}</span></button>);})}
           </div>
@@ -518,9 +592,20 @@ export default function ProjectsPage(){
           )}
         </div>
 
-        {/* Table */}
-        <div style={{background:t.surface,borderRadius:12,border:`1px solid ${t.border}`,overflow:"hidden",transition:"background 0.35s",boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
-          <div style={{overflowX:"auto"}}>
+        {/* Table — class hooks custom-canvas tint over inline surface/border */}
+        <div
+          className="projects-page-table-card"
+          data-theme={mode === "light" ? "light" : "dark"}
+          style={{
+            background: t.surface,
+            borderRadius: 12,
+            border: `1px solid ${t.border}`,
+            overflow: "hidden",
+            transition: "background 0.35s",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+          }}
+        >
+          <div className="projects-page-table-scroll">
           <table style={{width:"100%",borderCollapse:"collapse",minWidth:900}}>
             <thead><tr style={{borderBottom:`2px solid ${t.border}`}}>
               {canShowSelectColumn && (
@@ -545,7 +630,29 @@ export default function ProjectsPage(){
                   <td style={{padding:"12px 12px"}}>{owner&&<div style={{width:28,height:28,borderRadius:8,background:avGrad(owner.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff"}} title={owner.name}>{ini(owner.name)}</div>}</td>
                   <td style={{padding:"12px 8px",pointerEvents:canInteract?"auto":"none"}} onClick={e=>e.stopPropagation()}><RowActions project={p} t={t} onEdit={()=>{ if (canInteract) openEdit(p); }} onArchive={()=>{ if (canInteract) archiveProject(p.id); }} onDelete={()=>{ if (!canInteract) return; setSelected(new Set([p.id]));setConfirmDel(true); }}/></td>
                 </tr>);})}
-              {filtered.length===0&&(<tr><td colSpan={canShowSelectColumn ? 11 : 10} style={{textAlign:"center",padding:"56px 20px"}}>{viewTab==="archived"?<><Archive size={32} style={{color:t.textDim,marginBottom:12}}/><div style={{color:t.textMuted,fontSize:15,fontWeight:600}}>No archived projects</div><div style={{color:t.textDim,fontSize:13,marginTop:4}}>Archived projects will appear here</div></>:<><Search size={32} style={{color:t.textDim,marginBottom:12}}/><div style={{color:t.textMuted,fontSize:15,fontWeight:600}}>{search?"No projects match your search":"No projects yet"}</div><div style={{color:t.textDim,fontSize:13,marginTop:4}}>{search?"Try a different search term":"Click \"Add project\" to get started"}</div></>}</td></tr>)}
+              {filtered.length===0&&(
+                <tr>
+                  <td colSpan={canShowSelectColumn ? 11 : 10} style={{ padding: 0, borderBottom: "none" }}>
+                    <div style={{ padding: "56px 20px" }}>
+                      {viewTab==="archived" ? (
+                        <EmptyState
+                          icon={Archive}
+                          title="No archived projects"
+                          description="Archived projects will appear here."
+                        />
+                      ) : (
+                        <EmptyState
+                          icon={Search}
+                          title={search ? "No projects match your search" : "No projects yet"}
+                          description={
+                            search ? "Try a different search term." : "Click “Add project” to get started."
+                          }
+                        />
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
           </div>

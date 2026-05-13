@@ -9,14 +9,10 @@ import {
 } from "../data/workspaceSeedConstants.js";
 import { DEFAULT_DEPARTMENTS } from "../constants/departments.js";
 import {
-  PROJECTS_SEED,
   SEED_CLIENTS,
   SEED_PROJECT_TAGS,
 } from "../data/projectsSeed.js";
-import {
-  projectToAllocationLabel,
-  resolveColorForProjectLabel,
-} from "../utils/projectColors.js";
+import { buildAllocationProjectOptionStrings } from "../utils/projectColors.js";
 import { loadWorkspaceFromSupabase } from "../lib/api/loadWorkspace.js";
 import {
   defaultWorkspaceAllocationWindow,
@@ -45,6 +41,9 @@ const LEGACY_STORAGE_KEY = "float-workspace-v1";
 /** Debounce window for postgres_changes → full reload (coalesces bursts from many editors). */
 const WORKSPACE_REALTIME_DEBOUNCE_MS = 900;
 
+/** If Supabase hangs, still leave the animated loader instead of trapping the user indefinitely. */
+const WORKSPACE_READY_FALLBACK_MS = 25_000;
+
 function dbSync(fn) {
   if (!isSupabaseConfigured) return;
   Promise.resolve()
@@ -61,28 +60,12 @@ function clonePeople() {
   return PEOPLE_SEED.map((p) => ({ ...p, tags: [...p.tags] }));
 }
 
-function cloneProjects() {
-  return PROJECTS_SEED.map((p) => ({
-    ...p,
-    tags: [...p.tags],
-    teamIds: [...(p.teamIds || [])],
-  }));
-}
-
 /** Offline / no env: full in-memory seed. Supabase: empty core until fetch completes. */
 function buildInitialSlices() {
   if (!isSupabaseConfigured) {
     return {
       people: clonePeople(),
-      projects: cloneProjects().map((p) => {
-        const label = projectToAllocationLabel({ ...p, id: p.id });
-        const hasHex =
-          p.color && typeof p.color === "string" && /^#([0-9A-Fa-f]{6})$/.test(p.color.trim());
-        return {
-          ...p,
-          color: hasHex ? p.color.trim() : resolveColorForProjectLabel(label, []),
-        };
-      }),
+      projects: [],
       allocations: [],
       publicHolidayAllocations: [],
       roles: [...SEED_ROLES],
@@ -399,13 +382,7 @@ export function useAppData() {
   );
 
   const allocationProjectOptions = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          ...state.projects.map(projectToAllocationLabel),
-          ...state.extraAllocationLabels,
-        ])
-      ).sort((a, b) => a.localeCompare(b)),
+    () => buildAllocationProjectOptionStrings(state.projects, state.extraAllocationLabels),
     [state.projects, state.extraAllocationLabels]
   );
 
@@ -437,6 +414,7 @@ export function AppDataProvider({ children }) {
 
     let cancelled = false;
     let timer = null;
+    let readyFallbackTimer = null;
     /** Tables touched since last flush; coalesced into one debounced partial refresh. */
     const dirtyRealtime = new Set();
 
@@ -526,6 +504,10 @@ export function AppDataProvider({ children }) {
       )
       .subscribe();
 
+    readyFallbackTimer = window.setTimeout(() => {
+      if (!cancelled) useAppStore.setState({ workspaceReady: true });
+    }, WORKSPACE_READY_FALLBACK_MS);
+
     loadWorkspaceFromSupabase()
       .then((data) => {
         if (cancelled || !data) return;
@@ -533,11 +515,18 @@ export function AppDataProvider({ children }) {
       })
       .catch((e) => console.warn("[float] Supabase load:", e?.message || e))
       .finally(() => {
+        if (readyFallbackTimer != null) {
+          window.clearTimeout(readyFallbackTimer);
+          readyFallbackTimer = null;
+        }
         if (!cancelled) useAppStore.setState({ workspaceReady: true });
       });
 
     return () => {
       cancelled = true;
+      if (readyFallbackTimer != null) {
+        window.clearTimeout(readyFallbackTimer);
+      }
       document.removeEventListener("visibilitychange", onVisibilityChange);
       if (timer) clearTimeout(timer);
       dirtyRealtime.clear();

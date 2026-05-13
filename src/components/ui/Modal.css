@@ -1,16 +1,7 @@
-/* Above .login-page (z-index 300) and command palette (400) so app dialogs always stack on top. */
-.float-modal-root {
+.float-modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 500;
-  pointer-events: auto;
-}
-
-.float-modal-backdrop {
-  position: absolute;
-  inset: 0;
-  border: none;
-  padding: 0;
   cursor: pointer;
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(14px) saturate(1.15);
@@ -22,8 +13,9 @@
 }
 
 .float-modal-center {
-  position: absolute;
+  position: fixed;
   inset: 0;
+  z-index: 501;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -34,24 +26,29 @@
 .float-modal-panel {
   position: relative;
   width: min(420px, 100%);
+  max-height: min(560px, 90vh);
+  overflow: auto;
   padding: var(--space-6) var(--space-6) var(--space-5);
   border-radius: var(--radius-modal);
   pointer-events: auto;
+  outline: none;
   background: color-mix(in srgb, var(--color-surface, #181c26) 96%, transparent);
-  border: 1px solid var(--color-border, #2a2f45);
+  border: 1.5px solid color-mix(in srgb, var(--color-brand, #0088ff) 28%, var(--color-border, #2a2f45));
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
     0 24px 64px rgba(0, 0, 0, 0.45),
-    0 8px 24px rgba(0, 136, 255, 0.08);
+    0 8px 28px rgba(0, 136, 255, 0.12),
+    0 0 0 1px color-mix(in srgb, var(--color-brand, #0088ff) 22%, transparent);
 }
 
 :root[data-theme="light"] .float-modal-panel {
-  background: #ffffff;
-  border-color: rgba(0, 0, 0, 0.08);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border: 1.5px solid color-mix(in srgb, var(--color-brand, #0088ff) 38%, #cbd5e1);
   box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.04) inset,
-    0 24px 56px rgba(15, 23, 42, 0.12),
-    0 8px 20px rgba(0, 136, 255, 0.06);
+    0 0 0 1px rgba(255, 255, 255, 1) inset,
+    0 0 0 1px color-mix(in srgb, var(--color-brand, #0088ff) 35%, rgba(148, 163, 184, 0.55)),
+    0 28px 64px rgba(15, 23, 42, 0.14),
+    0 10px 32px color-mix(in srgb, var(--color-brand, #0088ff) 14%, transparent);
 }
 
 .float-modal-close {
