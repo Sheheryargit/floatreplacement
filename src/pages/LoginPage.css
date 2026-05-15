@@ -1908,3 +1908,29 @@ html[data-low-gpu="1"] .login-page-particle {
     max-width: min(300px, calc(100vw - 120px));
   }
 }
+
+/* Sign-in-as roster picker (RBAC identity) */
+.login-page-sign-in-as {
+  margin-bottom: 6px;
+}
+
+.login-page-field-wrapper--signin-as {
+  margin-bottom: 0;
+}
+
+select.login-page-select {
+  cursor: pointer;
+  appearance: auto;
+}
+
+.login-page-roster-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--color-muted) 88%, var(--color-text));
+}
+
+.login-page-roster-hint--hint {
+  margin-top: 8px;
+  margin-bottom: 4px;
+}

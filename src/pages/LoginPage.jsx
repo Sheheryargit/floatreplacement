@@ -8,11 +8,14 @@ import {
   Filter,
   Lock,
   ArrowRight,
+  User,
 } from "lucide-react";
 import { siJira, siMicrosoftoutlook } from "simple-icons";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useAppDialog } from "../context/AppDialogContext.jsx";
+import { useAppStore } from "../context/AppDataContext.jsx";
+import { isSupabaseConfigured } from "../lib/supabase.js";
 import "./LoginPage.css";
 
 function HudTicker() {
@@ -32,6 +35,18 @@ const ACCESS_PASSWORD =
 
 const SESSION_DEFAULT_NAME =
   String(import.meta.env.VITE_SESSION_DISPLAY_NAME ?? "").trim() || "Workspace session";
+
+/** Select value for full-access demo identity (not tied to a roster row). */
+const SIGN_IN_AS_ADMIN = "__admin__";
+
+/** Map People directory access label → RBAC key in `constants/permissions.js`. */
+function accessLabelToRole(label) {
+  const s = String(label ?? "").trim().toLowerCase();
+  if (s === "admin") return "admin";
+  if (s === "manager") return "manager";
+  if (s === "member") return "member";
+  return "member";
+}
 
 const SIGN_IN_HOLD_MS = 5000;
 const SSO_TRIPLE_WINDOW_MS = 720;
@@ -381,6 +396,7 @@ export default function LoginPage() {
   const { theme } = useAppTheme();
   const { unlock } = useAuth();
   const { openDialog } = useAppDialog();
+  const people = useAppStore((s) => s.people);
   const reduceMotion = useReducedMotion();
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -400,6 +416,49 @@ export default function LoginPage() {
   const ssoTapRef = useRef({ id: null, count: 0, timer: null });
   const [welcomeOpen, setWelcomeOpen] = useState(false);
   const [welcomeProvider, setWelcomeProvider] = useState(null);
+
+  const rosterReady = !isSupabaseConfigured || people.length > 0;
+  const signInChoices = useMemo(
+    () =>
+      [...(people || [])]
+        .filter((p) => !p.archived)
+        .sort((a, b) => String(a.name).localeCompare(String(b.name))),
+    [people]
+  );
+
+  const [signInAsKey, setSignInAsKey] = useState(SIGN_IN_AS_ADMIN);
+
+  useEffect(() => {
+    if (signInAsKey === SIGN_IN_AS_ADMIN) return;
+    const id = Number(signInAsKey);
+    if (!signInChoices.some((p) => p.id === id)) {
+      setSignInAsKey(SIGN_IN_AS_ADMIN);
+    }
+  }, [signInChoices, signInAsKey]);
+
+  const resolveUnlockIdentity = useCallback(() => {
+    if (signInAsKey === SIGN_IN_AS_ADMIN) {
+      return {
+        displayName: SESSION_DEFAULT_NAME,
+        id: null,
+        access: "admin",
+      };
+    }
+    const id = Number(signInAsKey);
+    const person = signInChoices.find((p) => p.id === id);
+    if (!person) {
+      return {
+        displayName: SESSION_DEFAULT_NAME,
+        id: null,
+        access: "admin",
+      };
+    }
+    return {
+      displayName: person.name,
+      id: person.id,
+      access: accessLabelToRole(person.access),
+    };
+  }, [signInAsKey, signInChoices]);
 
   const creditZoneVariants = useMemo(() => {
     if (reduceMotion) {
@@ -543,9 +602,9 @@ export default function LoginPage() {
     setEmptyPulse(false);
     setAuthExit(true);
     window.setTimeout(() => {
-      unlock({ displayName: SESSION_DEFAULT_NAME });
+      unlock(resolveUnlockIdentity());
     }, 440);
-  }, [password, unlock, openDialog]);
+  }, [password, unlock, openDialog, resolveUnlockIdentity]);
 
   const finishHoldAndSubmit = useCallback(() => {
     holdPointerIdRef.current = null;
@@ -629,8 +688,10 @@ export default function LoginPage() {
   const completeSsoWelcome = useCallback(() => {
     flushSsoTriple();
     const label = SSO_PROVIDERS.find((p) => p.id === welcomeProvider)?.label ?? "Signed in";
-    unlock({ displayName: label });
-  }, [unlock, flushSsoTriple, welcomeProvider]);
+    const identity = resolveUnlockIdentity();
+    const displayName = identity.id != null ? identity.displayName : label;
+    unlock({ displayName, id: identity.id, access: identity.access });
+  }, [unlock, flushSsoTriple, welcomeProvider, resolveUnlockIdentity]);
 
   const handleSsoActivate = useCallback(
     (id) => {
@@ -816,6 +877,41 @@ export default function LoginPage() {
                   <span className="login-page-divider-line" />
                   <span className="login-page-divider-or">Password</span>
                   <span className="login-page-divider-line" />
+                </div>
+
+                {!rosterReady && isSupabaseConfigured ? (
+                  <p className="login-page-roster-hint" role="status">
+                    Loading workspace roster…
+                  </p>
+                ) : null}
+
+                <div className="login-page-sign-in-as">
+                  <label className="login-page-pwd-label" htmlFor="login-sign-in-as">
+                    Sign in as
+                  </label>
+                  <div className="login-page-field-wrapper login-page-field-wrapper--signin-as">
+                    <div className="login-page-field">
+                      <User className="login-page-field-icon" size={18} strokeWidth={2} aria-hidden />
+                      <select
+                        id="login-sign-in-as"
+                        className="login-page-input login-page-select"
+                        value={signInAsKey}
+                        onChange={(e) => setSignInAsKey(e.target.value)}
+                        disabled={authExit || welcomeOpen}
+                        aria-describedby="login-sign-in-as-hint"
+                      >
+                        <option value={SIGN_IN_AS_ADMIN}>Workspace admin (full access)</option>
+                        {signInChoices.map((p) => (
+                          <option key={p.id} value={String(p.id)}>
+                            {p.name} · {String(p.access || "—")}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <p id="login-sign-in-as-hint" className="login-page-roster-hint login-page-roster-hint--hint">
+                    Roster access drives permissions (member / manager). Admin is unrestricted.
+                  </p>
                 </div>
 
                 <form
