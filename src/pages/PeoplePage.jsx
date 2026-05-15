@@ -1096,7 +1096,7 @@ export default function PeoplePage() {
               })}
               {filteredSorted.length===0 && (
                 <tr>
-                  td colSpan={canShowSelectColumn ? 8 : 7} style={{ padding: 0, borderBottom: "none" }}>
+                  <td colSpan={canShowSelectColumn ? 8 : 7} style={{ padding: 0, borderBottom: "none" }}>
                     <div style={{ padding: "56px 20px" }}>
                       {viewTab === "archived" ? (
                         <EmptyState

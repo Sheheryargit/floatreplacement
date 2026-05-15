@@ -48,6 +48,55 @@ function loadPersistedUser() {
   }
 }
 
+/** Shape: `{ id, access, displayName }` — `access` is a `permissions.js` role key. */
+function normalizeCurrentUser(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const id =
+    raw.id != null && raw.id !== ""
+      ? Number(raw.id)
+      : null;
+  const access =
+    typeof raw.access === "string" && raw.access.trim()
+      ? raw.access.trim().toLowerCase()
+      : "member";
+  const displayName =
+    typeof raw.displayName === "string" ? raw.displayName.trim() : "";
+  return { id: Number.isFinite(id) ? id : null, access, displayName };
+}
+
+function persistCurrentUser(user) {
+  try {
+    if (!user) localStorage.removeItem(PERSISTED_USER_KEY);
+    else localStorage.setItem(PERSISTED_USER_KEY, JSON.stringify(user));
+  } catch {
+    /* ignore */
+  }
+}
+
+function readInitialCurrentUser() {
+  const persisted = normalizeCurrentUser(loadPersistedUser());
+  if (persisted) return persisted;
+  if (loginSkipAuth) {
+    return {
+      id: null,
+      access: "admin",
+      displayName: readSessionProfile().displayName || "",
+    };
+  }
+  try {
+    if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(STORAGE_KEY) === "1") {
+      return {
+        id: null,
+        access: "admin",
+        displayName: readSessionProfile().displayName || "",
+      };
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 export function AuthProvider({ children }) {
   const [sessionProfile, setSessionProfileState] = useState(() => {
     if (typeof sessionStorage === "undefined") return { displayName: "" };
@@ -70,6 +119,8 @@ export function AuthProvider({ children }) {
     }
   });
 
+  const [currentUser, setCurrentUser] = useState(readInitialCurrentUser);
+
   const unlock = useCallback((opts) => {
     const displayName =
       typeof opts?.displayName === "string" ? opts.displayName.trim() : "";
@@ -86,6 +137,32 @@ export function AuthProvider({ children }) {
     }
     setSessionProfileState(nextProfile);
     setOk(true);
+
+    setCurrentUser((prev) => {
+      const persisted = normalizeCurrentUser(loadPersistedUser());
+      const base = persisted ?? prev;
+      const id =
+        opts?.id != null && opts.id !== ""
+          ? Number(opts.id)
+          : base?.id ?? null;
+      const accessFromOpts =
+        opts?.access != null && String(opts.access).trim()
+          ? String(opts.access).trim().toLowerCase()
+          : null;
+      const access = accessFromOpts || base?.access || "admin";
+      const dn =
+        displayName ||
+        base?.displayName ||
+        readSessionProfile().displayName ||
+        "";
+      const next = {
+        id: Number.isFinite(id) ? id : null,
+        access,
+        displayName: dn,
+      };
+      persistCurrentUser(next);
+      return next;
+    });
   }, []);
 
 
@@ -99,6 +176,7 @@ export function AuthProvider({ children }) {
     }
     setSessionProfileState({ displayName: "" });
     setOk(false);
+    persistCurrentUser(null);
     setCurrentUser(null);
   }, []);
 
@@ -116,8 +194,9 @@ export function AuthProvider({ children }) {
       unlock,
       lock,
       sessionDisplayName: sessionProfile.displayName,
+      currentUser,
     }),
-    [ok, unlock, lock, sessionProfile.displayName]
+    [ok, unlock, lock, sessionProfile.displayName, currentUser]
   );
 
   return (

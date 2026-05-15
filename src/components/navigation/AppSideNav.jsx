@@ -40,7 +40,7 @@ function AppSideNav() {
   const { openDialog } = useAppDialog();
   const { triggerSlap } = useSlapAnimation();
   const { theme } = useAppTheme();
-  const { sessionDisplayName } = useAuth();
+  const { sessionDisplayName, currentUser } = useAuth();
   const avatarLetter =
     initialsFromDisplayName(sessionDisplayName) || "?";
 

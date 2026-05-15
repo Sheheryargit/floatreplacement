@@ -1,5 +1,3 @@
-import { view } from "framer-motion/client";
-
 /**
  * Role-Based Access Control (RBAC) Permissions System
  * Defines granular permissions for each role across different pages/features
