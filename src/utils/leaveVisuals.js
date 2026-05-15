@@ -47,14 +47,14 @@ export function leaveTimelineIconKey(id) {
 export function leaveAccentTheme(typeId) {
   const t = normalizeLeaveTypeId(typeId);
   const themes = {
-    annual: { solid: "#14b8a6", soft: "rgba(20, 184, 166, 0.22)", glow: "rgba(20, 184, 166, 0.45)" },
-    sick: { solid: "#0ea5e9", soft: "rgba(14, 165, 233, 0.2)", glow: "rgba(14, 165, 233, 0.4)" },
-    personal: { solid: "#a78bfa", soft: "rgba(167, 139, 250, 0.22)", glow: "rgba(167, 139, 250, 0.42)" },
-    parental: { solid: "#f472b6", soft: "rgba(244, 114, 182, 0.22)", glow: "rgba(244, 114, 182, 0.4)" },
-    bereavement: { solid: "#818cf8", soft: "rgba(129, 140, 248, 0.22)", glow: "rgba(129, 140, 248, 0.4)" },
-    unpaid: { solid: "#f59e0b", soft: "rgba(245, 158, 11, 0.22)", glow: "rgba(245, 158, 11, 0.42)" },
-    public_holiday: { solid: "#eab308", soft: "rgba(234, 179, 8, 0.22)", glow: "rgba(234, 179, 8, 0.4)" },
-    other: { solid: "#94a3b8", soft: "rgba(148, 163, 184, 0.22)", glow: "rgba(148, 163, 184, 0.35)" },
+    annual: { solid: "#0d9488", soft: "rgba(13, 148, 136, 0.28)", glow: "rgba(45, 212, 191, 0.5)" },
+    sick: { solid: "#0284c7", soft: "rgba(2, 132, 199, 0.26)", glow: "rgba(56, 189, 248, 0.48)" },
+    personal: { solid: "#7c3aed", soft: "rgba(124, 58, 237, 0.24)", glow: "rgba(167, 139, 250, 0.45)" },
+    parental: { solid: "#db2777", soft: "rgba(219, 39, 119, 0.24)", glow: "rgba(244, 114, 182, 0.45)" },
+    bereavement: { solid: "#4f46e5", soft: "rgba(79, 70, 229, 0.24)", glow: "rgba(129, 140, 248, 0.42)" },
+    unpaid: { solid: "#d97706", soft: "rgba(217, 119, 6, 0.26)", glow: "rgba(251, 191, 36, 0.45)" },
+    public_holiday: { solid: "#ca8a04", soft: "rgba(202, 138, 4, 0.28)", glow: "rgba(250, 204, 21, 0.5)" },
+    other: { solid: "#64748b", soft: "rgba(100, 116, 139, 0.26)", glow: "rgba(148, 163, 184, 0.38)" },
   };
   return themes[t] || themes.other;
 }

@@ -16,6 +16,8 @@ export function SettingsItem({
   dim,
   showChevron,
   className,
+  /** When true, the trailing control spans the full row below label (better for wide controls). */
+  trailFullWidth,
 }) {
   const interactive = Boolean(onClick) && !disabled;
   return (
@@ -25,6 +27,7 @@ export function SettingsItem({
         interactive && "float-settings-item--interactive",
         disabled && "float-settings-item--disabled",
         dim && "float-settings-item--dim",
+        trailFullWidth && "float-settings-item--trail-full",
         className
       )}
       onClick={interactive ? onClick : undefined}

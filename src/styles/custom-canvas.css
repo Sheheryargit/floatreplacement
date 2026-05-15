@@ -1,0 +1,234 @@
+/**
+ * Workspace canvas tint — html[data-custom-canvas="on"] + --alloc8-canvas-tint (#rrggbb).
+ * Loaded after palette-studio. Covers shell, slide nav, schedule calendar tokens, reporting,
+ * settings, global semantic surfaces, and table chrome (!important beats inline custom props).
+ */
+
+/* ── Global semantic (modals, body, chrome using design tokens) ───────── */
+html[data-custom-canvas="on"][data-theme="dark"] {
+  --color-bg: color-mix(in srgb, var(--alloc8-canvas-tint) 44%, #040608);
+  --color-surface: color-mix(in srgb, var(--alloc8-canvas-tint) 26%, #0a1122);
+  --color-surface-2: color-mix(in srgb, var(--alloc8-canvas-tint) 28%, #101830);
+  --color-border: color-mix(in srgb, var(--alloc8-canvas-tint) 22%, #1e2846);
+}
+
+html[data-custom-canvas="on"][data-theme="light"] {
+  --color-bg: color-mix(in srgb, var(--alloc8-canvas-tint) 18%, #f2f5fa);
+  --color-surface: color-mix(in srgb, var(--alloc8-canvas-tint) 10%, #ffffff);
+  --color-surface-2: color-mix(in srgb, var(--alloc8-canvas-tint) 12%, #e8ebf4);
+  --color-border: color-mix(in srgb, var(--alloc8-canvas-tint) 10%, #e0e4ef);
+}
+
+/* Studio palette uses stronger neutrals — re-tint when both active */
+html[data-custom-canvas="on"][data-palette="studio"][data-theme="dark"] {
+  --color-bg: color-mix(in srgb, var(--alloc8-canvas-tint) 48%, #03040a);
+  --color-surface: color-mix(in srgb, var(--alloc8-canvas-tint) 30%, #0c0e12);
+  --color-surface-2: color-mix(in srgb, var(--alloc8-canvas-tint) 32%, #12141a);
+  --color-border: color-mix(in srgb, var(--alloc8-canvas-tint) 24%, #252830);
+}
+
+html[data-custom-canvas="on"][data-palette="studio"][data-theme="light"] {
+  --color-bg: color-mix(in srgb, var(--alloc8-canvas-tint) 14%, #fafafa);
+  --color-surface: color-mix(in srgb, var(--alloc8-canvas-tint) 8%, #ffffff);
+  --color-surface-2: color-mix(in srgb, var(--alloc8-canvas-tint) 10%, #f4f4f4);
+  --color-border: color-mix(in srgb, var(--alloc8-canvas-tint) 8%, #dbdbdb);
+}
+
+/* ── Global cinematic backdrop ─────────────────────────────────────────── */
+html[data-custom-canvas="on"] .global-bg {
+  background:
+    radial-gradient(ellipse 120% 80% at 50% 42%, color-mix(in srgb, var(--alloc8-canvas-tint) 38%, transparent) 0%, transparent 46%),
+    radial-gradient(ellipse 90% 60% at 8% 12%, color-mix(in srgb, var(--alloc8-canvas-tint) 28%, transparent) 0%, transparent 48%),
+    radial-gradient(ellipse 70% 50% at 92% 18%, color-mix(in srgb, var(--alloc8-canvas-tint) 22%, transparent) 0%, transparent 50%),
+    linear-gradient(
+      168deg,
+      color-mix(in srgb, var(--alloc8-canvas-tint) 52%, #03040a) 0%,
+      color-mix(in srgb, var(--alloc8-canvas-tint) 38%, #080a10) 50%,
+      color-mix(in srgb, var(--alloc8-canvas-tint) 55%, #020308) 100%
+    );
+}
+
+html[data-custom-canvas="on"][data-theme="light"] .global-bg {
+  background:
+    radial-gradient(ellipse 120% 80% at 50% 40%, color-mix(in srgb, var(--alloc8-canvas-tint) 22%, transparent) 0%, transparent 44%),
+    radial-gradient(ellipse 90% 55% at 100% 12%, color-mix(in srgb, var(--alloc8-canvas-tint) 14%, transparent) 0%, transparent 48%),
+    linear-gradient(
+      168deg,
+      color-mix(in srgb, var(--alloc8-canvas-tint) 12%, #eef2f8) 0%,
+      color-mix(in srgb, var(--alloc8-canvas-tint) 6%, #f7f9fc) 45%,
+      color-mix(in srgb, var(--alloc8-canvas-tint) 10%, #eef2f8) 100%
+    );
+}
+
+/* ── Primary slide nav (all routes) ───────────────────────────────────── */
+html[data-custom-canvas="on"] .app-sidenav[data-theme="dark"] {
+  --app-sidebar: color-mix(in srgb, var(--alloc8-canvas-tint) 32%, #0c0e14);
+  --app-border: color-mix(in srgb, var(--alloc8-canvas-tint) 26%, #2a2f45);
+  --app-sidenav-hover: color-mix(in srgb, var(--alloc8-canvas-tint) 12%, rgba(255, 255, 255, 0.04));
+  --app-sidenav-active-bg: color-mix(in srgb, var(--alloc8-canvas-tint) 8%, rgba(0, 136, 255, 0.12));
+}
+
+html[data-custom-canvas="on"] .app-sidenav[data-theme="light"] {
+  --app-sidebar: color-mix(in srgb, var(--alloc8-canvas-tint) 12%, #f4f6fa);
+  --app-border: color-mix(in srgb, var(--alloc8-canvas-tint) 10%, #e0e4ef);
+  --app-sidenav-hover: color-mix(in srgb, var(--alloc8-canvas-tint) 8%, rgba(0, 0, 0, 0.04));
+  --app-sidenav-active-bg: color-mix(in srgb, var(--alloc8-canvas-tint) 6%, rgba(0, 136, 255, 0.1));
+}
+
+html[data-custom-canvas="on"][data-palette="studio"] .app-sidenav[data-theme="dark"] {
+  --app-sidebar: color-mix(in srgb, var(--alloc8-canvas-tint) 36%, #08090d);
+  --app-border: color-mix(in srgb, var(--alloc8-canvas-tint) 28%, #23262f);
+}
+
+html[data-custom-canvas="on"][data-palette="studio"] .app-sidenav[data-theme="light"] {
+  --app-sidebar: color-mix(in srgb, var(--alloc8-canvas-tint) 10%, #ffffff);
+  --app-border: color-mix(in srgb, var(--alloc8-canvas-tint) 8%, #dbdbdb);
+}
+
+/* ── Schedule (.lp-root) — calendar, grid, people strip, subbars ───────── */
+html[data-custom-canvas="on"] .lp-root[data-theme="dark"] {
+  --bg: color-mix(in srgb, var(--alloc8-canvas-tint) 40%, #0a0b10);
+  --grid-bg: color-mix(in srgb, var(--alloc8-canvas-tint) 36%, #0a0b10);
+  --sidebar: color-mix(in srgb, var(--alloc8-canvas-tint) 30%, #0c0e14);
+  --surface: color-mix(in srgb, var(--alloc8-canvas-tint) 28%, #141820);
+  --surf-alt: color-mix(in srgb, var(--alloc8-canvas-tint) 30%, #181d28);
+  --border: color-mix(in srgb, var(--alloc8-canvas-tint) 24%, #262b3a);
+  --border-sub: color-mix(in srgb, var(--alloc8-canvas-tint) 22%, #2c3144);
+  --btn-sec: color-mix(in srgb, var(--alloc8-canvas-tint) 28%, #1a1f2a);
+  --btn-sec-hov: color-mix(in srgb, var(--alloc8-canvas-tint) 30%, #222836);
+  --grid-line: color-mix(in srgb, var(--alloc8-canvas-tint) 24%, #2a3040);
+  --grid-line-soft: color-mix(in srgb, var(--alloc8-canvas-tint) 22%, #303648);
+  --scroll: color-mix(in srgb, var(--alloc8-canvas-tint) 26%, #2f3548);
+}
+
+html[data-custom-canvas="on"] .lp-root[data-theme="light"] {
+  --bg: color-mix(in srgb, var(--alloc8-canvas-tint) 14%, #f4f6fa);
+  --grid-bg: color-mix(in srgb, var(--alloc8-canvas-tint) 10%, #f4f6fa);
+  --sidebar: color-mix(in srgb, var(--alloc8-canvas-tint) 8%, #ffffff);
+  --surface: color-mix(in srgb, var(--alloc8-canvas-tint) 10%, #ffffff);
+  --surf-alt: color-mix(in srgb, var(--alloc8-canvas-tint) 12%, #e8ebf4);
+  --border: color-mix(in srgb, var(--alloc8-canvas-tint) 10%, #e0e4ef);
+  --border-sub: color-mix(in srgb, var(--alloc8-canvas-tint) 8%, #e4e8f0);
+  --btn-sec: color-mix(in srgb, var(--alloc8-canvas-tint) 12%, #e8ebf4);
+  --btn-sec-hov: color-mix(in srgb, var(--alloc8-canvas-tint) 14%, #dde1ec);
+  --grid-line: color-mix(in srgb, var(--alloc8-canvas-tint) 10%, #e0e4ef);
+  --grid-line-soft: color-mix(in srgb, var(--alloc8-canvas-tint) 8%, #e4e8f0);
+  --scroll: color-mix(in srgb, var(--alloc8-canvas-tint) 12%, #c8cdd8);
+}
+
+/* Studio schedule tokens — same element, higher html attribute count */
+html[data-custom-canvas="on"][data-palette="studio"] .lp-root[data-theme="dark"] {
+  --bg: color-mix(in srgb, var(--alloc8-canvas-tint) 42%, #05060a);
+  --surface: color-mix(in srgb, var(--alloc8-canvas-tint) 32%, #0c0e12);
+  --surf-alt: color-mix(in srgb, var(--alloc8-canvas-tint) 34%, #12141c);
+  --grid-bg: color-mix(in srgb, var(--alloc8-canvas-tint) 40%, #040508);
+  --grid-line: color-mix(in srgb, var(--alloc8-canvas-tint) 28%, #1e212b);
+  --grid-line-soft: color-mix(in srgb, var(--alloc8-canvas-tint) 26%, #262a36);
+  --sidebar: color-mix(in srgb, var(--alloc8-canvas-tint) 34%, #080910);
+  --border: color-mix(in srgb, var(--alloc8-canvas-tint) 26%, #23262f);
+  --border-sub: color-mix(in srgb, var(--alloc8-canvas-tint) 24%, #2c303c);
+}
+
+html[data-custom-canvas="on"][data-palette="studio"] .lp-root[data-theme="light"] {
+  --bg: color-mix(in srgb, var(--alloc8-canvas-tint) 12%, #fafafa);
+  --surface: color-mix(in srgb, var(--alloc8-canvas-tint) 8%, #ffffff);
+  --surf-alt: color-mix(in srgb, var(--alloc8-canvas-tint) 10%, #f5f5f5);
+  --grid-bg: color-mix(in srgb, var(--alloc8-canvas-tint) 10%, #fafafa);
+  --grid-line: color-mix(in srgb, var(--alloc8-canvas-tint) 8%, #dbdbdb);
+  --grid-line-soft: color-mix(in srgb, var(--alloc8-canvas-tint) 6%, #e8e8e8);
+  --sidebar: color-mix(in srgb, var(--alloc8-canvas-tint) 6%, #ffffff);
+  --border: color-mix(in srgb, var(--alloc8-canvas-tint) 8%, #dbdbdb);
+  --border-sub: color-mix(in srgb, var(--alloc8-canvas-tint) 6%, #e8e8e8);
+}
+
+/* ── Settings ─────────────────────────────────────────────────────────── */
+html[data-custom-canvas="on"] .settings-root[data-theme="dark"] {
+  --settings-bg: color-mix(in srgb, var(--alloc8-canvas-tint) 36%, #0b0e14);
+}
+
+html[data-custom-canvas="on"] .settings-root[data-theme="light"] {
+  --settings-bg: color-mix(in srgb, var(--alloc8-canvas-tint) 12%, #f6f7f9);
+}
+
+html[data-custom-canvas="on"][data-palette="studio"] .settings-root[data-theme="dark"] {
+  --settings-bg: color-mix(in srgb, var(--alloc8-canvas-tint) 40%, #060709);
+}
+
+html[data-custom-canvas="on"][data-palette="studio"] .settings-root[data-theme="light"] {
+  --settings-bg: color-mix(in srgb, var(--alloc8-canvas-tint) 10%, #fafafa);
+}
+
+/* ── Reporting ────────────────────────────────────────────────────────── */
+html[data-custom-canvas="on"] .reporting-root[data-theme="dark"] {
+  --bg: color-mix(in srgb, var(--alloc8-canvas-tint) 40%, #0f1117);
+  --surface: color-mix(in srgb, var(--alloc8-canvas-tint) 28%, #161a24);
+  --surf-alt: color-mix(in srgb, var(--alloc8-canvas-tint) 30%, #1a1f2c);
+  --border: color-mix(in srgb, var(--alloc8-canvas-tint) 24%, #2a2f45);
+  --border-sub: color-mix(in srgb, var(--alloc8-canvas-tint) 22%, #323852);
+}
+
+html[data-custom-canvas="on"] .reporting-root[data-theme="light"] {
+  --bg: color-mix(in srgb, var(--alloc8-canvas-tint) 12%, #f8f9fb);
+  --surface: color-mix(in srgb, var(--alloc8-canvas-tint) 8%, #ffffff);
+  --surf-alt: color-mix(in srgb, var(--alloc8-canvas-tint) 10%, #f3f4f8);
+  --border: color-mix(in srgb, var(--alloc8-canvas-tint) 8%, #e2e8f0);
+  --border-sub: color-mix(in srgb, var(--alloc8-canvas-tint) 6%, #cbd5e1);
+}
+
+html[data-custom-canvas="on"][data-palette="studio"] .reporting-root[data-theme="dark"] {
+  --bg: color-mix(in srgb, var(--alloc8-canvas-tint) 44%, #060709);
+  --surface: color-mix(in srgb, var(--alloc8-canvas-tint) 32%, #0f1014);
+  --surf-alt: color-mix(in srgb, var(--alloc8-canvas-tint) 34%, #14161d);
+  --border: color-mix(in srgb, var(--alloc8-canvas-tint) 26%, #23262f);
+  --border-sub: color-mix(in srgb, var(--alloc8-canvas-tint) 24%, #2c303c);
+}
+
+html[data-custom-canvas="on"][data-palette="studio"] .reporting-root[data-theme="light"] {
+  --bg: color-mix(in srgb, var(--alloc8-canvas-tint) 10%, #fafafa);
+  --surface: color-mix(in srgb, var(--alloc8-canvas-tint) 6%, #ffffff);
+  --surf-alt: color-mix(in srgb, var(--alloc8-canvas-tint) 8%, #f5f5f5);
+  --border: color-mix(in srgb, var(--alloc8-canvas-tint) 6%, #dbdbdb);
+  --border-sub: color-mix(in srgb, var(--alloc8-canvas-tint) 5%, #e8e8e8);
+}
+
+/* ── People table (inline --people-* on wrap — override with !important) ─ */
+html[data-custom-canvas="on"] .people-page-root[data-theme="dark"] .people-page-table-wrap {
+  --people-border: color-mix(in srgb, var(--alloc8-canvas-tint) 26%, #2a2f45) !important;
+  --people-surface: color-mix(in srgb, var(--alloc8-canvas-tint) 22%, #181c26) !important;
+}
+
+html[data-custom-canvas="on"] .people-page-root[data-theme="light"] .people-page-table-wrap {
+  --people-border: color-mix(in srgb, var(--alloc8-canvas-tint) 12%, #e0e4ef) !important;
+  --people-surface: color-mix(in srgb, var(--alloc8-canvas-tint) 8%, #ffffff) !important;
+}
+
+html[data-custom-canvas="on"][data-palette="studio"] .people-page-root[data-theme="dark"] .people-page-table-wrap {
+  --people-border: color-mix(in srgb, var(--alloc8-canvas-tint) 28%, #23262f) !important;
+  --people-surface: color-mix(in srgb, var(--alloc8-canvas-tint) 24%, #0f1014) !important;
+}
+
+html[data-custom-canvas="on"][data-palette="studio"] .people-page-root[data-theme="light"] .people-page-table-wrap {
+  --people-border: color-mix(in srgb, var(--alloc8-canvas-tint) 8%, #dbdbdb) !important;
+  --people-surface: color-mix(in srgb, var(--alloc8-canvas-tint) 5%, #ffffff) !important;
+}
+
+/* ── Projects main table card (inline bg/border) ───────────────────────── */
+html[data-custom-canvas="on"] .projects-page-table-card[data-theme="dark"] {
+  background: color-mix(in srgb, var(--alloc8-canvas-tint) 18%, #181c26) !important;
+  border-color: color-mix(in srgb, var(--alloc8-canvas-tint) 22%, #2a2f45) !important;
+}
+
+html[data-custom-canvas="on"] .projects-page-table-card[data-theme="light"] {
+  background: color-mix(in srgb, var(--alloc8-canvas-tint) 8%, #ffffff) !important;
+  border-color: color-mix(in srgb, var(--alloc8-canvas-tint) 10%, #e0e4ef) !important;
+}
+
+html[data-custom-canvas="on"][data-palette="studio"] .projects-page-table-card[data-theme="dark"] {
+  background: color-mix(in srgb, var(--alloc8-canvas-tint) 22%, #0f1014) !important;
+  border-color: color-mix(in srgb, var(--alloc8-canvas-tint) 24%, #23262f) !important;
+}
+
+html[data-custom-canvas="on"][data-palette="studio"] .projects-page-table-card[data-theme="light"] {
+  background: color-mix(in srgb, var(--alloc8-canvas-tint) 6%, #ffffff) !important;
+  border-color: color-mix(in srgb, var(--alloc8-canvas-tint) 7%, #dbdbdb) !important;
+}

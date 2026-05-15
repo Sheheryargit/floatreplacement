@@ -3,7 +3,6 @@ import {
   Users,
   User,
   Plus,
-  Download,
   Trash2,
   Search,
   X,
@@ -28,6 +27,7 @@ import { syncPersonAvailabilityFromForm } from "../lib/api/personAvailability.js
 import { previewAvailabilityHours } from "../utils/availabilityPreview.js";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
 import { Button } from "../components/ui/Button.jsx";
+import { EmptyState } from "../components/ui/EmptyState.jsx";
 import PersonModal, {
   T,
   Confirm,
@@ -37,6 +37,10 @@ import PersonModal, {
   avGrad,
 } from "../components/PersonModal.jsx";
 import { toast } from "sonner";
+import {
+  showCenterActionFeedback,
+  useAlloc8ActionFeedbackMount,
+} from "../context/CenterActionFeedbackContext.jsx";
 import { tagChromaProps } from "../utils/tagChroma.js";
 import {
   SCHEDULE_SORT_OPTIONS,
@@ -49,6 +53,7 @@ import { findLeaveOverlapWithWorkRange } from "../utils/allocationLeaveConflict.
 import { mergeScheduleAllocations } from "../utils/scheduleAllocationsMerge.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { can } from "../constants/permissions.js";
+import { usePremiumV2 } from "../context/PremiumV2Context.jsx";
 import "./PeoplePage.css";
 
 /** Cap staggered row enter animations — large tables stay responsive */
@@ -86,8 +91,9 @@ export default function PeoplePage() {
   const canCreatePerson = can(role, "peoplePage", "createPerson");
   const canShowSelectColumn =
     can(role, "peoplePage", "deletePerson") && can(role, "peoplePage", "interactAll");
-  const { theme: mode } = useAppTheme();
+  const { theme: mode, shellBackground } = useAppTheme();
   const t = T[mode];
+  const setAlloc8FeedbackDock = useAlloc8ActionFeedbackMount();
 
   const {
     people,
@@ -118,6 +124,8 @@ export default function PeoplePage() {
     () => mergeScheduleAllocations(allocations, publicHolidayAllocations),
     [allocations, publicHolidayAllocations]
   );
+
+  const { premiumV2Enabled, premiumV2Templates } = usePremiumV2();
 
   const [selected,setSelected]=useState(new Set());
   const [search,setSearch]=useState("");
@@ -230,17 +238,60 @@ export default function PeoplePage() {
       try {
         const saved = isSupabaseConfigured ? await syncAllocationCreate(createdDraft) : createdDraft;
         setAllocations((prev) => [...prev, saved]);
-        toast.success(payload.isLeave ? "Leave saved" : "Allocation saved", {
-          description: payload.isLeave
-            ? `${payload.startDate} → ${payload.endDate}`
-            : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
-          duration: 2800,
-        });
+
+        if (premiumV2Enabled && saved?.id) {
+          const savedSnap = saved;
+          toast.success(payload.isLeave ? "Leave saved" : "Saved", {
+            description: payload.isLeave
+              ? `${payload.startDate} → ${payload.endDate}`
+              : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
+            duration: 9000,
+            action: {
+              label: "Undo",
+              onClick: () => {
+                void (async () => {
+                  const uid = savedSnap.id;
+                  setAllocations((cur) => cur.filter((a) => a.id !== uid));
+                  try {
+                    if (isSupabaseConfigured) await syncAllocationDelete(uid);
+                    showCenterActionFeedback({
+                      action: "remove",
+                      title: "Undone",
+                      subtitle: "Removed what you had just saved.",
+                    });
+                  } catch (err) {
+                    setAllocations((cur) =>
+                      cur.some((a) => a.id === uid) ? cur : [...cur, savedSnap]
+                    );
+                    toast.error("Undo failed", { description: err?.message || String(err) });
+                  }
+                })();
+              },
+            },
+          });
+        } else {
+          showCenterActionFeedback({
+            action: "add",
+            title: payload.isLeave ? "Leave saved" : "Saved",
+            subtitle: payload.isLeave
+              ? `${payload.startDate} → ${payload.endDate}`
+              : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
+          });
+        }
       } catch (e) {
         toast.error("Save failed", { description: e?.message || String(e) });
       }
     },
-    [setAllocations, projects, scheduleAllocations, people, syncAllocationCreate]
+    [
+      setAllocations,
+      projects,
+      scheduleAllocations,
+      people,
+      syncAllocationCreate,
+      premiumV2Enabled,
+      isSupabaseConfigured,
+      syncAllocationDelete,
+    ]
   );
 
   useEffect(()=>{ setMounted(true); },[]);
@@ -487,8 +538,44 @@ export default function PeoplePage() {
   const toggleSel=(id)=>setSelected((p)=>{ const n=new Set(p); n.has(id)?n.delete(id):n.add(id); return n; });
   const toggleAll=()=>setSelected(selected.size===filteredSorted.length?new Set():new Set(filteredSorted.map((p)=>p.id)));
 
-  const doDelete=async()=>{ const c=selected.size; const ids=[...selected]; const prev=people; setPeople(people.filter((p)=>!selected.has(p.id))); setSelected(new Set()); setConfirmDel(false); try{ if(isSupabaseConfigured) await syncPeopleDelete(ids); toast.error(`${c} ${c===1?"person":"people"} removed`);} catch(e){ setPeople(prev); toast.error("Delete failed",{description:e?.message||String(e)});} };
-  const archivePerson=async(id)=>{ const p=people.find((x)=>x.id===id); const next={...p,archived:!p.archived}; const prev=people; setPeople(people.map((x)=>x.id===id?next:x)); setSelected(new Set()); try{ if(isSupabaseConfigured) await syncPersonUpdate(next); toast.warning(`${p.name} ${p.archived?"restored":"archived"}`);} catch(e){ setPeople(prev); toast.error("Update failed",{description:e?.message||String(e)});} };
+  const doDelete = async () => {
+    const c = selected.size;
+    const ids = [...selected];
+    const prev = people;
+    setPeople(people.filter((p) => !selected.has(p.id)));
+    setSelected(new Set());
+    setConfirmDel(false);
+    try {
+      if (isSupabaseConfigured) await syncPeopleDelete(ids);
+      showCenterActionFeedback({
+        action: "remove",
+        title: "Removed",
+        subtitle: `${c} ${c === 1 ? "person" : "people"} removed from the directory.`,
+      });
+    } catch (e) {
+      setPeople(prev);
+      toast.error("Delete failed", { description: e?.message || String(e) });
+    }
+  };
+
+  const archivePerson = async (id) => {
+    const p = people.find((x) => x.id === id);
+    const next = { ...p, archived: !p.archived };
+    const prev = people;
+    setPeople(people.map((x) => (x.id === id ? next : x)));
+    setSelected(new Set());
+    try {
+      if (isSupabaseConfigured) await syncPersonUpdate(next);
+      showCenterActionFeedback({
+        action: "update",
+        title: next.archived ? "Archived" : "Restored",
+        subtitle: p.name,
+      });
+    } catch (e) {
+      setPeople(prev);
+      toast.error("Update failed", { description: e?.message || String(e) });
+    }
+  };
 
   const openAdd=()=>{ setEditingPerson(null); setModalOpen(true); };
   const openEdit=(person)=>{ setEditingPerson(person); setModalOpen(true); };
@@ -520,7 +607,11 @@ export default function PeoplePage() {
       try{
         const saved = isSupabaseConfigured ? await syncPersonUpdate(draft) : draft;
         setPeople(people.map((p)=>p.id===editingPerson.id?saved:p).sort((a,b)=>a.name.localeCompare(b.name)));
-        toast.success(`${form.name} updated`);
+        showCenterActionFeedback({
+          action: "update",
+          title: "Updated",
+          subtitle: (form.name || editingPerson.name || "").trim() || "Person",
+        });
         await syncAvailAfterSave(saved);
         setModalOpen(false); setEditingPerson(null);
       } catch(e){
@@ -532,7 +623,11 @@ export default function PeoplePage() {
       try{
         const saved = isSupabaseConfigured ? await syncPersonCreate(draft) : draft;
         setPeople([...people,saved].sort((a,b)=>a.name.localeCompare(b.name)));
-        toast.success(`${form.name} added to directory`);
+        showCenterActionFeedback({
+          action: "add",
+          title: "Saved",
+          subtitle: (form.name || "").trim() || "New person",
+        });
         await syncAvailAfterSave(saved);
         setModalOpen(false); setEditingPerson(null);
       } catch(e){
@@ -549,7 +644,7 @@ export default function PeoplePage() {
       className="people-page-root"
       data-theme={mode === "light" ? "light" : "dark"}
       style={{
-        background: t.bg,
+        background: shellBackground ?? t.bg,
         color: t.text,
         fontFamily: "var(--font-body, 'DM Sans', system-ui, sans-serif)",
         fontSize: 14,
@@ -558,7 +653,7 @@ export default function PeoplePage() {
     >
       <AppSideNav />
 
-      <main className="people-page-main">
+      <main id="main-content" className="people-page-main">
         {/* Header */}
         <header className="people-page-header" style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8 }}>
           <h1 style={{ fontSize:26,fontWeight:700,margin:0,letterSpacing:-0.5 }}>People</h1>
@@ -839,6 +934,12 @@ export default function PeoplePage() {
           </div>
         </header>
 
+        <div
+          ref={setAlloc8FeedbackDock}
+          data-alloc8-action-feedback-mount
+          className="people-action-feedback-mount"
+        />
+
         {/* Active / Archived Tabs + Bulk Delete */}
         <div className="people-page-toolbar" style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,marginTop:8,flexWrap:"wrap",gap:10 }}>
           <div style={{ display:"flex",gap:2,background:t.surfAlt,borderRadius:10,padding:3,border:`1px solid ${t.border}` }}>
@@ -994,12 +1095,33 @@ export default function PeoplePage() {
                 );
               })}
               {filteredSorted.length===0 && (
-                <tr><td colSpan={canShowSelectColumn ? 8 : 7} style={{ textAlign:"center",padding:"56px 20px" }}>
-                  {viewTab==="archived"
-                    ? <><Archive size={32} style={{ color:t.textDim,marginBottom:12 }}/><div style={{ color:t.textMuted,fontSize:15,fontWeight:600 }}>No archived people</div><div style={{ color:t.textDim,fontSize:13,marginTop:4 }}>Archived team members will appear here</div></>
-                    : <><Search size={32} style={{ color:t.textDim,marginBottom:12 }}/><div style={{ color:t.textMuted,fontSize:15,fontWeight:600 }}>{search||advActiveCount?"No people match filters":"No people yet"}</div><div style={{ color:t.textDim,fontSize:13,marginTop:4 }}>{search||advActiveCount?"Try adjusting search or open Filters to clear criteria":"Click \"Add person\" to get started"}</div></>
-                  }
-                </td></tr>
+                <tr>
+                  td colSpan={canShowSelectColumn ? 8 : 7} style={{ padding: 0, borderBottom: "none" }}>
+                    <div style={{ padding: "56px 20px" }}>
+                      {viewTab === "archived" ? (
+                        <EmptyState
+                          icon={Archive}
+                          title="No archived people"
+                          description="Archived team members will appear here."
+                        />
+                      ) : (
+                        <EmptyState
+                          icon={Search}
+                          title={
+                            search || advActiveCount
+                              ? "No people match filters"
+                              : "No people yet"
+                          }
+                          description={
+                            search || advActiveCount
+                              ? "Try adjusting search or open Filters to clear criteria."
+                              : 'Click “Add person” to get started.'
+                          }
+                        />
+                      )}
+                    </div>
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -1037,6 +1159,10 @@ export default function PeoplePage() {
         projects={allocationProjectOptions}
         projectRegistry={projects}
         onAddProject={addAllocationProjectLabel}
+        allocations={scheduleAllocations}
+        publicHolidayAllocations={publicHolidayAllocations}
+        premiumV2Enabled={premiumV2Enabled}
+        premiumV2Templates={premiumV2Templates}
         t={t}
       />
 

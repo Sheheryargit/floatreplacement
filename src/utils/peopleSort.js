@@ -71,8 +71,13 @@ function countWeekdaysBetweenKeys(startKey, endKey) {
 }
 
 export function allocationHasPersonSchedule(a, pid) {
-  if (Array.isArray(a.personIds) && a.personIds.length > 0) return a.personIds.includes(pid);
-  return a.personId === pid;
+  if (pid == null) return false;
+  const needle = String(pid);
+  if (Array.isArray(a.personIds) && a.personIds.length > 0) {
+    return a.personIds.some((id) => String(id) === needle);
+  }
+  if (a.personId == null) return false;
+  return String(a.personId) === needle;
 }
 
 /** Approximate total booked hours for a person across all allocations (for People directory sort). */

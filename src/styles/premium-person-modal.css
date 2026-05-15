@@ -1,0 +1,47 @@
+/**
+ * Profile / workspace modals use .float-premium-modal outside .lp-root (People page).
+ * Theme via :root[data-theme].
+ */
+
+/*
+ * Exclude `.lpam-modal` (allocation create/detail Radix dialogs). They reuse
+ * `.float-premium-modal` plus `.lpam-modal[data-state="open"] { position: fixed }`;
+ * otherwise this rule wins in dark-only (higher specificity) and the panel loses
+ * fixed centering → backdrop shows with no visible modal.
+ */
+:root[data-theme="dark"] .float-premium-modal:not(.lpam-modal) {
+  border-radius: 20px !important;
+  box-shadow:
+    0 36px 80px rgba(0, 0, 0, 0.52),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+    0 0 100px rgba(108, 140, 255, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    inset 0 3px 0 0 color-mix(in srgb, var(--color-brand) 75%, var(--color-accent, #7c6af7)) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+:root[data-theme="light"] .float-premium-modal:not(.lpam-modal) {
+  border-radius: 20px !important;
+  box-shadow:
+    0 26px 64px rgba(15, 18, 28, 0.12),
+    0 0 0 1px rgba(255, 255, 255, 1) inset,
+    0 0 80px color-mix(in srgb, var(--color-brand) 10%, transparent),
+    inset 0 3px 0 0 color-mix(in srgb, var(--color-brand) 70%, var(--color-accent, #7c6af7)) !important;
+}
+
+.float-modal-overlay-dim {
+  backdrop-filter: blur(16px) saturate(1.12);
+  -webkit-backdrop-filter: blur(16px) saturate(1.12);
+  background: color-mix(in srgb, #040814 78%, transparent) !important;
+}
+
+:root[data-theme="light"] .float-modal-overlay-dim {
+  background: color-mix(in srgb, #0f172a 28%, transparent) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .float-modal-panel-enter {
+    animation-duration: 0.14s !important;
+  }
+}

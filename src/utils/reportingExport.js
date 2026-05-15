@@ -5,6 +5,10 @@
 function escapeCSV(value) {
   if (value === null || value === undefined) return "";
   const str = String(value);
+  const normalized = str.trim();
+  // Treat placeholder dashes as empty cells in exports.
+  // This avoids mojibake like "‚Äî" in spreadsheet tools and keeps missing values blank.
+  if (normalized === "—" || normalized === "–" || normalized === "-") return "";
   if (str.includes(",") || str.includes('"') || str.includes("\n")) {
     return `"${str.replace(/"/g, '""')}"`;
   }

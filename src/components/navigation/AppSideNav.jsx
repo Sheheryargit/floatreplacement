@@ -16,7 +16,7 @@ import { motion } from "framer-motion";
 import { useAppDialog } from "../../context/AppDialogContext.jsx";
 import { useSlapAnimation } from "../../context/SlapAnimationContext.jsx";
 import { useAppTheme } from "../../context/ThemeContext.jsx";
-import { useAuth } from "../../context/AuthContext.jsx";
+import { useAuth, initialsFromDisplayName } from "../../context/AuthContext.jsx";
 import { can } from "../../constants/permissions.js";
 import "./AppSideNav.css";
 
@@ -40,7 +40,9 @@ function AppSideNav() {
   const { openDialog } = useAppDialog();
   const { triggerSlap } = useSlapAnimation();
   const { theme } = useAppTheme();
-  const { currentUser } = useAuth();
+  const { sessionDisplayName } = useAuth();
+  const avatarLetter =
+    initialsFromDisplayName(sessionDisplayName) || "?";
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -229,7 +231,7 @@ function AppSideNav() {
           whileTap={{ scale: 0.94 }}
         >
           <span className="app-sidenav-avatar-letter" aria-hidden>
-            S
+            {avatarLetter}
           </span>
           <span className="app-sidenav-avatar-dot" aria-hidden />
           <span className="visually-hidden">Open profile</span>

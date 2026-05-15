@@ -1,0 +1,193 @@
+/*
+ * Allocation feedback: add = green, update = orange, remove = red.
+ * --anchored: inside schedule/people header strip. --floating: fallback (no dock).
+ */
+.caf-root {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.caf-root--floating {
+  position: fixed;
+  z-index: 320;
+  left: 50%;
+  top: clamp(132px, 20vh, 220px);
+  transform: translateX(-50%);
+  width: min(90vw, 360px);
+}
+
+/* Out of document flow so the schedule header strip keeps zero height (no row jump). */
+.caf-root--anchored {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -22px;
+  z-index: 60;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0;
+  transform: none;
+  min-height: 0;
+}
+
+.caf-pill {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: min(100%, 360px);
+  padding: 8px 16px 8px 10px;
+  border-radius: 999px;
+  font-family: var(--font-display, "Syne", system-ui, sans-serif);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.32),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  transition: none;
+}
+
+.caf-pill-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 0;
+}
+
+.caf-pill-title {
+  font-size: 1.02rem;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+}
+
+.caf-pill-sub {
+  font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  opacity: 0.88;
+  line-height: 1.32;
+  max-width: 40ch;
+}
+
+.caf-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  color: #fff;
+}
+
+/* ── Success actions (Check icon) ── */
+.caf-icon--action-add {
+  background: linear-gradient(145deg, #22c55e, #15803d);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.42);
+}
+
+.caf-icon--action-update {
+  background: linear-gradient(145deg, #fb923c, #ea580c);
+  box-shadow: 0 4px 12px rgba(251, 146, 60, 0.38);
+}
+
+.caf-icon--action-remove {
+  background: linear-gradient(145deg, #f87171, #dc2626);
+  box-shadow: 0 4px 12px rgba(248, 113, 113, 0.38);
+}
+
+html[data-theme="dark"] .caf-pill--success.caf-pill--action-add {
+  background: linear-gradient(165deg, #132a1e 0%, #0f1f17 100%);
+  color: #ecfdf5;
+  border-color: rgba(34, 197, 94, 0.35);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.38),
+    0 0 22px rgba(34, 197, 94, 0.1);
+}
+
+html[data-theme="light"] .caf-pill--success.caf-pill--action-add {
+  background: linear-gradient(180deg, #ffffff 0%, #ecfdf5 100%);
+  color: #052e16;
+  border-color: rgba(22, 163, 74, 0.28);
+  box-shadow:
+    0 10px 26px rgba(15, 23, 42, 0.08),
+    0 0 0 1px rgba(255, 255, 255, 0.9) inset;
+}
+
+html[data-theme="dark"] .caf-pill--success.caf-pill--action-update {
+  background: linear-gradient(165deg, #2a1f12 0%, #1a140c 100%);
+  color: #fff7ed;
+  border-color: rgba(251, 146, 60, 0.4);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.38),
+    0 0 22px rgba(251, 146, 60, 0.1);
+}
+
+html[data-theme="light"] .caf-pill--success.caf-pill--action-update {
+  background: linear-gradient(180deg, #ffffff 0%, #fff7ed 100%);
+  color: #431407;
+  border-color: rgba(234, 88, 12, 0.3);
+  box-shadow:
+    0 10px 26px rgba(15, 23, 42, 0.08),
+    0 0 0 1px rgba(255, 255, 255, 0.9) inset;
+}
+
+html[data-theme="dark"] .caf-pill--success.caf-pill--action-remove {
+  background: linear-gradient(165deg, #2a1518 0%, #171010 100%);
+  color: #fef2f2;
+  border-color: rgba(248, 113, 113, 0.38);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.38),
+    0 0 20px rgba(239, 68, 68, 0.08);
+}
+
+html[data-theme="light"] .caf-pill--success.caf-pill--action-remove {
+  background: linear-gradient(180deg, #ffffff 0%, #fef2f2 100%);
+  color: #450a0a;
+  border-color: rgba(220, 38, 38, 0.28);
+  box-shadow:
+    0 10px 26px rgba(15, 23, 42, 0.08),
+    0 0 0 1px rgba(255, 255, 255, 0.9) inset;
+}
+
+/* ── Error / warning (unchanged semantics) ── */
+.caf-icon--error {
+  background: linear-gradient(145deg, #ef4444, #b91c1c);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+}
+
+.caf-icon--warn {
+  background: linear-gradient(145deg, #fbbf24, #d97706);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+}
+
+html[data-theme="dark"] .caf-pill--error {
+  background: linear-gradient(165deg, #2a1518 0%, #1a1012 100%);
+  color: #fef2f2;
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+html[data-theme="light"] .caf-pill--error {
+  background: linear-gradient(180deg, #fff 0%, #fef2f2 100%);
+  color: #450a0a;
+  border-color: rgba(185, 28, 28, 0.2);
+}
+
+html[data-theme="dark"] .caf-pill--warning {
+  background: linear-gradient(165deg, #2a2412 0%, #1c180c 100%);
+  color: #fffbeb;
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+html[data-theme="light"] .caf-pill--warning {
+  background: linear-gradient(180deg, #fff 0%, #fffbeb 100%);
+  color: #422006;
+  border-color: rgba(180, 83, 9, 0.2);
+}
