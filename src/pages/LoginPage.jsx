@@ -422,8 +422,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (signInAsKey === SIGN_IN_AS_ADMIN) return;
-    const id = Number(signInAsKey);
-    if (!signInChoices.some((p) => p.id === id)) {
+    if (!signInChoices.some((p) => String(p.id) === String(signInAsKey))) {
       setSignInAsKey(SIGN_IN_AS_ADMIN);
     }
   }, [signInChoices, signInAsKey]);
@@ -436,8 +435,7 @@ export default function LoginPage() {
         access: "admin",
       };
     }
-    const id = Number(signInAsKey);
-    const person = signInChoices.find((p) => p.id === id);
+    const person = signInChoices.find((p) => String(p.id) === String(signInAsKey));
     if (!person) {
       return {
         displayName: SESSION_DEFAULT_NAME,
@@ -445,10 +443,37 @@ export default function LoginPage() {
         access: "admin",
       };
     }
+    const displayName = String(person.name || "").trim() || "Teammate";
+    const rawId = typeof person.id === "number" ? person.id : Number(person.id);
     return {
-      displayName: person.name,
-      id: person.id,
+      displayName,
+      id: Number.isFinite(rawId) ? rawId : null,
       access: personAccessLabelToRbacRole(person.access),
+    };
+  }, [signInAsKey, signInChoices]);
+
+  const selectedIdentityPreview = useMemo(() => {
+    if (signInAsKey === SIGN_IN_AS_ADMIN) {
+      return {
+        title: "Workspace admin",
+        detail: "Full permissions — People, Projects, Report, and schedule.",
+        rbacLabel: "admin",
+      };
+    }
+    const person = signInChoices.find((p) => String(p.id) === String(signInAsKey));
+    if (!person) {
+      return {
+        title: "Could not resolve person",
+        detail: "Pick someone from the list again.",
+        rbacLabel: "—",
+      };
+    }
+    const acc = String(person.access || "User").trim() || "User";
+    const rbac = personAccessLabelToRbacRole(person.access);
+    return {
+      title: String(person.name || "").trim() || "Teammate",
+      detail: `Directory access: ${acc}. App permissions use RBAC role “${rbac}”.`,
+      rbacLabel: rbac,
     };
   }, [signInAsKey, signInChoices]);
 
@@ -836,40 +861,16 @@ export default function LoginPage() {
                 <p className="login-page-card-kicker">Secure access</p>
                 <h2 className="login-page-card-title">Sign in to Alloc8</h2>
                 <p className="login-page-card-sub">
-                  Enterprise workspace gate. Use your password until SSO is connected — same
-                  policies, full audit trail.
+                  Choose who you are, enter the workspace password, then hold <strong>Sign in</strong> for five
+                  seconds — or press <strong>Enter</strong> in the password field. Your name and permissions match
+                  the person you pick below.
                 </p>
 
-                <div className="login-page-sso">
-                  <div className="login-page-sso-row" role="group" aria-label="Sign-in options">
-                    {SSO_PROVIDERS.map((p) => (
-                      <motion.button
-                        key={p.id}
-                        type="button"
-                        className={`login-page-sso-btn ${p.toneClass}`}
-                        onClick={() => handleSsoActivate(p.id)}
-                        disabled={authExit || welcomeOpen || emptyPulse}
-                        whileHover={reduceMotion || authExit || welcomeOpen || emptyPulse ? {} : { y: -3, scale: 1.03 }}
-                        whileTap={reduceMotion ? {} : { scale: 0.94 }}
-                        aria-label={`${p.label}: triple-click for demo sign-in`}
-                        title={`${p.label}: triple-click to unlock (demo)`}
-                      >
-                        <span className="login-page-sso-btn-glow" aria-hidden />
-                        <SsoTileIcon provider={p} />
-                      </motion.button>
-                    ))}
-                  </div>
-                </div>
-
-                <div
-                  className="login-page-divider login-page-divider--or"
-                  role="separator"
-                  aria-hidden
-                >
-                  <span className="login-page-divider-line" />
-                  <span className="login-page-divider-or">Password</span>
-                  <span className="login-page-divider-line" />
-                </div>
+                <ol className="login-page-login-steps" aria-label="Sign-in steps">
+                  <li>Select <strong>Sign in as</strong> (workspace admin or a teammate).</li>
+                  <li>Type the workspace password.</li>
+                  <li>Hold <strong>Sign in</strong> until it completes, or press Enter.</li>
+                </ol>
 
                 {!rosterReady && isSupabaseConfigured ? (
                   <p className="login-page-roster-hint" role="status">
@@ -879,7 +880,7 @@ export default function LoginPage() {
 
                 <div className="login-page-sign-in-as">
                   <label className="login-page-pwd-label" htmlFor="login-sign-in-as">
-                    Sign in as
+                    Step 1 — Sign in as
                   </label>
                   <div className="login-page-field-wrapper login-page-field-wrapper--signin-as">
                     <div className="login-page-field">
@@ -890,7 +891,8 @@ export default function LoginPage() {
                         value={signInAsKey}
                         onChange={(e) => setSignInAsKey(e.target.value)}
                         disabled={authExit || welcomeOpen}
-                        aria-describedby="login-sign-in-as-hint"
+                        aria-describedby="login-sign-in-as-hint login-identity-preview"
+                        autoFocus
                       >
                         <option value={SIGN_IN_AS_ADMIN}>Workspace admin (full access)</option>
                         {signInChoices.map((p) => (
@@ -901,9 +903,28 @@ export default function LoginPage() {
                       </select>
                     </div>
                   </div>
+                  <div
+                    id="login-identity-preview"
+                    className="login-page-identity-preview"
+                    aria-live="polite"
+                  >
+                    <p className="login-page-identity-preview-label">You’ll open the app as</p>
+                    <p className="login-page-identity-preview-name">{selectedIdentityPreview.title}</p>
+                    <p className="login-page-identity-preview-detail">{selectedIdentityPreview.detail}</p>
+                  </div>
                   <p id="login-sign-in-as-hint" className="login-page-roster-hint login-page-roster-hint--hint">
-                    Roster access drives permissions (member / manager). Admin is unrestricted.
+                    After sign-in, your avatar and session use this name. SSO (below) uses the same identity.
                   </p>
+                </div>
+
+                <div
+                  className="login-page-divider login-page-divider--or"
+                  role="separator"
+                  aria-hidden
+                >
+                  <span className="login-page-divider-line" />
+                  <span className="login-page-divider-or">Workspace password</span>
+                  <span className="login-page-divider-line" />
                 </div>
 
                 <form
@@ -913,7 +934,7 @@ export default function LoginPage() {
                   }}
                 >
                   <label className="login-page-pwd-label" htmlFor="login-workspace-password">
-                    Workspace password
+                    Step 2 — Workspace password
                   </label>
                   <motion.div 
                     className={`login-page-field-wrapper ${emptyPulse ? "is-empty-lock" : ""}`}
@@ -948,7 +969,6 @@ export default function LoginPage() {
                         }}
                         onAnimationEnd={() => setShake(false)}
                         autoComplete="current-password"
-                        autoFocus
                         disabled={authExit || emptyPulse || welcomeOpen}
                       />
                     </div>
@@ -1015,6 +1035,39 @@ export default function LoginPage() {
                     </motion.button>
                   </motion.div>
                 </form>
+
+                <div
+                  className="login-page-divider login-page-divider--or"
+                  role="separator"
+                  aria-hidden
+                >
+                  <span className="login-page-divider-line" />
+                  <span className="login-page-divider-or">Or demo SSO</span>
+                  <span className="login-page-divider-line" />
+                </div>
+
+                <p className="login-page-sso-lede">Optional: triple-tap a provider — uses the same <strong>Sign in as</strong> identity above.</p>
+
+                <div className="login-page-sso">
+                  <div className="login-page-sso-row" role="group" aria-label="Demo SSO sign-in options">
+                    {SSO_PROVIDERS.map((p) => (
+                      <motion.button
+                        key={p.id}
+                        type="button"
+                        className={`login-page-sso-btn ${p.toneClass}`}
+                        onClick={() => handleSsoActivate(p.id)}
+                        disabled={authExit || welcomeOpen || emptyPulse}
+                        whileHover={reduceMotion || authExit || welcomeOpen || emptyPulse ? {} : { y: -3, scale: 1.03 }}
+                        whileTap={reduceMotion ? {} : { scale: 0.94 }}
+                        aria-label={`${p.label}: triple-click for demo sign-in`}
+                        title={`${p.label}: triple-click to unlock (demo)`}
+                      >
+                        <span className="login-page-sso-btn-glow" aria-hidden />
+                        <SsoTileIcon provider={p} />
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
 
                 <p className="login-page-legal">
                   By continuing you agree to your organization&apos;s policies.
