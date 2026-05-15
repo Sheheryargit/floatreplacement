@@ -16,7 +16,14 @@ const SCALE = [1, 0.98, 1];
 const DURATION = 0.42;
 const EASE = [0.22, 1, 0.36, 1];
 
-const shellStyle = { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" };
+const shellStyle = {
+  flex: 1,
+  minHeight: 0,
+  minWidth: 0,
+  display: "flex",
+  flexDirection: "column",
+  overflow: "hidden",
+};
 
 /**
  * Shakes the wrapped subtree; flash overlay is a fixed sibling (not affected by transform).
