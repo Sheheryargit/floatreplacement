@@ -141,6 +141,27 @@ export function AuthProvider({ children }) {
     setCurrentUser((prev) => {
       const persisted = normalizeCurrentUser(loadPersistedUser());
       const base = persisted ?? prev;
+
+      /** Login sends `{ id, access, displayName }` (id may be null). Skip merging stale `float_current_user`. */
+      const fullIdentityFromLogin =
+        opts != null && "access" in opts && "id" in opts && typeof opts.displayName === "string";
+
+      if (fullIdentityFromLogin) {
+        const id =
+          opts.id != null && opts.id !== ""
+            ? Number(opts.id)
+            : null;
+        const access = String(opts.access ?? "").trim().toLowerCase() || "user";
+        const dn = opts.displayName.trim() || readSessionProfile().displayName || "";
+        const next = {
+          id: Number.isFinite(id) ? id : null,
+          access,
+          displayName: dn,
+        };
+        persistCurrentUser(next);
+        return next;
+      }
+
       const id =
         opts != null && "id" in opts
           ? opts.id != null && opts.id !== ""
