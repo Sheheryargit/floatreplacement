@@ -142,8 +142,10 @@ export function AuthProvider({ children }) {
       const persisted = normalizeCurrentUser(loadPersistedUser());
       const base = persisted ?? prev;
       const id =
-        opts?.id != null && opts.id !== ""
-          ? Number(opts.id)
+        opts != null && "id" in opts
+          ? opts.id != null && opts.id !== ""
+            ? Number(opts.id)
+            : null
           : base?.id ?? null;
       const accessFromOpts =
         opts?.access != null && String(opts.access).trim()
