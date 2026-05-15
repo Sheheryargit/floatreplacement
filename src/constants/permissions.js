@@ -3,6 +3,7 @@
  * Defines granular permissions for each role across different pages/features
  */
 export const USER_ROLES = {
+  USER: "user",
   MEMBER: "member",
   MANAGER: "manager",
   ADMIN: "admin",
@@ -15,6 +16,41 @@ export const USER_ROLES = {
 
 
 export const PERMISSIONS = {
+  /** Default tier: same caps as member (schedule self; no People/Projects until promoted). */
+  user: {
+    schedule: {
+      interactTeam: false,
+      interactAll: false,
+      createPerson: false,
+    },
+    personModal: {
+      editTeam: false,
+      editAll: false,
+      deletePerson: false,
+    },
+    allocationModal: {
+      editTeam: false,
+      editAll: false,
+    },
+    peoplePage: {
+      interactTeam: false,
+      interactAll: false,
+      createPerson: false,
+      deletePerson: false,
+      viewPeoplePage: false,
+    },
+    projectsPage: {
+      interactTeam: false,
+      interactAll: false,
+      createProject: false,
+      deleteProject: false,
+      viewProjectsPage: false,
+    },
+    reporting: {
+      viewReportingPage: false,
+    },
+  },
+
   member: {
     // Landing Page / Schedule View
     schedule: {
@@ -154,11 +190,26 @@ export const PERMISSIONS = {
 
 /**
  * Check if a role has permission to perform an action on a page
- * @param {*} role The access level of the user (e.g., "member", "manager", "admin")
+ * @param {*} role The access level of the user (e.g., "user", "member", "manager", "admin")
  * @param {*} page The page or feature being accessed (e.g., "schedule", "personModal", "peoplePage", "projectsPage", "reporting", "settings")
  * @param {*} action The action being performed (e.g., "interactAll", "interactTeam", "editAll", "createPerson")
  * @returns 
  */
 export function can(role, page, action) {
   return PERMISSIONS[role]?.[page]?.[action] ?? false;
+}
+
+/**
+ * Map People `access` column / UI label to RBAC role key for `can()`.
+ * Empty, em dash, and legacy "—" → `user`.
+ */
+export function personAccessLabelToRbacRole(label) {
+  const s = String(label ?? "").trim().toLowerCase();
+  if (s === "admin") return "admin";
+  if (s === "manager") return "manager";
+  if (s === "member") return "member";
+  if (s === "user") return "user";
+  if (s === "no access rights") return "user";
+  if (s === "" || s === "—" || s === "\u2014") return "user";
+  return "user";
 }

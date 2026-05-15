@@ -1,6 +1,12 @@
 import { supabase, isSupabaseConfigured } from "../supabase.js";
 import { legacyHolidaysToRegion, regionToLegacyHolidays } from "../../constants/auHolidayRegions.js";
 
+function normalizeAccessStored(access) {
+  const t = String(access ?? "").trim();
+  if (!t || t === "—") return "User";
+  return t;
+}
+
 function personToRow(p) {
   const region = p.publicHolidayRegion ?? legacyHolidaysToRegion(p.holidays);
   return {
@@ -8,7 +14,7 @@ function personToRow(p) {
     email: p.email ?? "",
     role: p.role ?? "—",
     department: p.department ?? "",
-    access: p.access ?? "—",
+    access: normalizeAccessStored(p.access),
     tags: Array.isArray(p.tags) ? p.tags : [],
     type: p.type ?? "Employee",
     cost_rate: String(p.costRate ?? "0"),
@@ -36,7 +42,7 @@ function rowToPerson(row) {
     email: row.email ?? "",
     role: row.role ?? "—",
     department: row.department ?? "",
-    access: row.access ?? "—",
+    access: normalizeAccessStored(row.access),
     tags: Array.isArray(row.tags) ? [...row.tags] : [],
     type: row.type ?? "Employee",
     costRate: row.cost_rate ?? "0",

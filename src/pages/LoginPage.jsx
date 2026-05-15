@@ -16,6 +16,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useAppDialog } from "../context/AppDialogContext.jsx";
 import { useAppStore } from "../context/AppDataContext.jsx";
 import { isSupabaseConfigured } from "../lib/supabase.js";
+import { personAccessLabelToRbacRole } from "../constants/permissions.js";
 import "./LoginPage.css";
 
 function HudTicker() {
@@ -38,15 +39,6 @@ const SESSION_DEFAULT_NAME =
 
 /** Select value for full-access demo identity (not tied to a roster row). */
 const SIGN_IN_AS_ADMIN = "__admin__";
-
-/** Map People directory access label → RBAC key in `constants/permissions.js`. */
-function accessLabelToRole(label) {
-  const s = String(label ?? "").trim().toLowerCase();
-  if (s === "admin") return "admin";
-  if (s === "manager") return "manager";
-  if (s === "member") return "member";
-  return "member";
-}
 
 const SIGN_IN_HOLD_MS = 5000;
 const SSO_TRIPLE_WINDOW_MS = 720;
@@ -456,7 +448,7 @@ export default function LoginPage() {
     return {
       displayName: person.name,
       id: person.id,
-      access: accessLabelToRole(person.access),
+      access: personAccessLabelToRbacRole(person.access),
     };
   }, [signInAsKey, signInChoices]);
 
@@ -903,7 +895,7 @@ export default function LoginPage() {
                         <option value={SIGN_IN_AS_ADMIN}>Workspace admin (full access)</option>
                         {signInChoices.map((p) => (
                           <option key={p.id} value={String(p.id)}>
-                            {p.name} · {String(p.access || "—")}
+                            {p.name} · {String(p.access || "User")}
                           </option>
                         ))}
                       </select>

@@ -58,7 +58,7 @@ function normalizeCurrentUser(raw) {
   const access =
     typeof raw.access === "string" && raw.access.trim()
       ? raw.access.trim().toLowerCase()
-      : "member";
+      : "user";
   const displayName =
     typeof raw.displayName === "string" ? raw.displayName.trim() : "";
   return { id: Number.isFinite(id) ? id : null, access, displayName };

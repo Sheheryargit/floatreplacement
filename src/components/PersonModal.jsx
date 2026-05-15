@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Users, FolderOpen,
+  Users, User, FolderOpen,
   Plus, Trash2, X, ChevronRight,
   AlertTriangle, UserPlus, Shield, Clock,
   Palmtree, Briefcase, Tag, DollarSign, Mail, Info, Calendar,
@@ -44,7 +44,7 @@ import "../styles/premium-person-modal.css";
 /* ═══════════════════ DATA ═══════════════════ */
 const TYPES = ["Employee","Contractor","Placeholder"];
 const ACCESS_OPTS = [
-  { value:"none", label:"No access rights", desc:"", icon:Shield },
+  { value:"user", label:"User", desc:"Default access — schedule self; no People/Projects until promoted", icon:User },
   { value:"member", label:"Member", desc:"Can view Schedule and optionally manage their own tasks and/or time off", icon:Users },
   { value:"manager", label:"Manager", desc:"Can manage specific Departments, People, and/or Projects", icon:Briefcase },
 ];
@@ -80,19 +80,19 @@ const personToForm = (p) => ({
   name:p.name, email:p.email||"", role:p.role==="—"?"No role":p.role,
   costRate:p.costRate||"0", billRate:p.billRate||"0",
   department:p.department||"No department", tags:[...p.tags], type:p.type||"Employee",
-  access: ACCESS_OPTS.find((a)=>a.label===p.access)?.value || "none",
+  access: ACCESS_OPTS.find((a)=>a.label===p.access)?.value || "user",
   startDate:p.startDate||"2026-01-01", endDate:p.endDate||"", workType:p.workType||"Full-time",
   notes:p.notes||"",
   publicHolidayRegion: p.publicHolidayRegion ?? legacyHolidaysToRegion(p.holidays),
   ...AVAIL_DEFAULTS,
 });
 const formToPerson = (form, id, archived) => {
-  const al = ACCESS_OPTS.find((a)=>a.value===form.access)?.label||"—";
+  const al = ACCESS_OPTS.find((a)=>a.value===form.access)?.label||"User";
   const region = form.publicHolidayRegion ?? legacyHolidaysToRegion(form.holidays);
   return {
     id, name:form.name, email:form.email, role:form.role==="No role"?"—":form.role,
     department:form.department==="No department"?"":form.department,
-    access:form.access==="none"?"—":al, tags:[...form.tags], type:form.type,
+    access: form.access === "none" ? "User" : al, tags:[...form.tags], type:form.type,
     costRate:form.costRate, billRate:form.billRate, startDate:form.startDate,
     endDate:form.endDate, workType:form.workType, notes:form.notes,
     publicHolidayRegion: region,
@@ -940,7 +940,7 @@ function PersonModal({
       setTabKey(visibleTabs[0]?.key || 'info');
       setForm(editPerson ? personToForm(editPerson) : {
         name:"",email:"",role:"No role",costRate:"0",billRate:"0",
-        department:"No department",tags:[],type:"Employee",access:"none",
+        department:"No department",tags:[],type:"Employee",access:"user",
         startDate:"2026-01-01",endDate:"",workType:"Full-time",notes:"",publicHolidayRegion:"None",
         ...AVAIL_DEFAULTS,
       });

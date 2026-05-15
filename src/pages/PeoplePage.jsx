@@ -74,7 +74,7 @@ const DEPT_EMPTY = "__dept_empty__";
 const PERSON_TYPES = ["Employee", "Contractor", "Placeholder"];
 const WORK_TYPES = ["Full-time", "Part-time"];
 const ACCESS_FILTER_OPTS = [
-  { value: "—", label: "No access" },
+  { value: "User", label: "User" },
   { value: "Member", label: "Member" },
   { value: "Manager", label: "Manager" },
 ];
@@ -450,8 +450,13 @@ export default function PeoplePage() {
       }
 
       if (advAccess.length) {
-        const a = p.access || "—";
-        if (!advAccess.includes(a)) return false;
+        const raw = (p.access || "").trim();
+        const tier = !raw || raw === "—" ? "User" : raw;
+        const ok = advAccess.some((want) => {
+          if (want === "User") return tier === "User" || !raw || raw === "—";
+          return tier === want;
+        });
+        if (!ok) return false;
       }
 
       if (advWorkTypes.length) {
@@ -1070,7 +1075,13 @@ export default function PeoplePage() {
                       {p.department&&<span style={{ display:"inline-flex",alignItems:"center",gap:4 }}><ChevronRight size={12} style={{ color:t.textDim }}/>{p.department}</span>}
                     </td>
                     <td style={{ padding:"12px 16px" }}>
-                      {p.access!=="—"?(<span style={{ background:t.accentGlow,color:t.accent,borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:600,display:"inline-flex",alignItems:"center",gap:4 }}><Shield size={11}/> {p.access}</span>):<span style={{ color:t.textDim }}>—</span>}
+                      {(() => {
+                        const raw = (p.access || "").trim();
+                        const label = !raw || raw === "—" ? "User" : p.access;
+                        return (
+                          <span style={{ background:t.accentGlow,color:t.accent,borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:600,display:"inline-flex",alignItems:"center",gap:4 }}><Shield size={11}/> {label}</span>
+                        );
+                      })()}
                     </td>
                     <td style={{ padding:"12px 16px" }}>
                       <div style={{ display:"flex",gap:5,flexWrap:"wrap" }}>
