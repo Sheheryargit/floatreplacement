@@ -2545,7 +2545,7 @@ export default function LandingPage() {
                 <Share size={18} />
               </button>
 
-              {(can(role, 'schedule', 'createProject') || can(role, 'schedule', 'createPerson')) && (
+              {(can(role, 'schedule', 'createProject')) && (
                 <div className="lp-dropdown-wrap" ref={addWrapRef}>
                   <button
                     type="button"
