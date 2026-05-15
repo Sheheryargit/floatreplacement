@@ -174,6 +174,8 @@ const ROW_MENU_Z_PANEL = 10041;
 /* ═══════════════════ ROW ACTIONS MENU (portaled — escapes table overflow/stacking) ═══════════════════ */
 function RowActions({ person, onEdit, onArchive, onDelete, t }) {
   const [open, setOpen] = useState(false);
+  const { currentUser } = useAuth();
+  const role = (currentUser?.access || "").toLowerCase();
   const close = useCallback(() => setOpen(false), []);
   const { triggerRef, menuRef, pos } = useFixedAnchorDropdown(open, close);
   const panelBg = t.bg === "#0f1117" || t.bg === "#0b0e14" ? "#111627" : "#ffffff";
@@ -232,8 +234,10 @@ function RowActions({ person, onEdit, onArchive, onDelete, t }) {
                   action: () => { onArchive(); setOpen(false); },
                   color: t.warn,
                 },
-                { icon: Trash2, label: "Delete", action: () => { onDelete(); setOpen(false); }, color: t.danger },
-              ].map((item, i) => (
+                ...(can(role, "personModal", "deletePerson")
+                  ? [{ icon: Trash2, label: "Delete", action: () => { onDelete(); setOpen(false); }, color: t.danger }]
+                  : []),
+              ].map((item, i, arr) => (
                 <div
                   key={i}
                   role="menuitem"
@@ -251,7 +255,7 @@ function RowActions({ person, onEdit, onArchive, onDelete, t }) {
                     fontWeight: 500,
                     color: item.color,
                     transition: "background 0.12s",
-                    borderBottom: i < 2 ? `1px solid ${sep}` : "none",
+                    borderBottom: i < arr.length - 1 ? `1px solid ${sep}` : "none",
                   }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = t.bg === "#0f1117" || t.bg === "#0b0e14" ? "#1a2236" : "#f0f2f5")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}

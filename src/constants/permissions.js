@@ -29,6 +29,7 @@ export const PERMISSIONS = {
     personModal: {
       editTeam: false,
       editAll: false,
+      deletePerson: false,
     },
 
     // Allocation Modal
@@ -73,6 +74,7 @@ export const PERMISSIONS = {
     personModal: {
       editTeam: true,
       editAll: false,
+      deletePerson: false,
     },
 
     // Allocation Modal
@@ -117,6 +119,7 @@ export const PERMISSIONS = {
     personModal: {
       editTeam: true,
       editAll: true,
+      deletePerson: true,
     },
 
     // Allocation Modal

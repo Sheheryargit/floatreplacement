@@ -988,8 +988,7 @@ export default function PeoplePage() {
                           if (!canInteract) return;
                           setSelected(new Set([p.id]));
                           setConfirmDel(true);
-                        }}
-                        canDelete={can(role, 'people', 'deletePerson')} />
+                        }} />
                     </td>
                   </tr>
                 );
