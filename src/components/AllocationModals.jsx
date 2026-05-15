@@ -189,20 +189,20 @@ export function CreateAllocationModal({
     if (editAllocation) {
       return [editAllocation.isLeave ? "leave" : "allocation"];
     }
-    const role = (currentUser?.access || "").toLowerCase();
-    if (can(role, 'allocationModal', 'editAll')) {
-      // Admin can create both allocation and leave for anyone
-      return ['allocation', 'leave'];
-    } else if (can(role, 'allocationModal', 'editTeam')) {
-      // Manager can only create allocation for people they own
-      // If only assigning to self, restrict to leave only
-      const assigningSelf = assignedIds.length === 1 && assignedIds[0] === currentUser?.id;
-      return assigningSelf ? ['leave'] : ['allocation', 'leave'];
-    } else {
-      // Member can only create leave for themselves
-      return ['leave'];
+    const rbac = (currentUser?.access || "").toLowerCase();
+    if (can(rbac, "allocationModal", "editAll")) {
+      return ["allocation", "leave"];
     }
-  }, [currentUser, assignedIds]);
+    if (can(rbac, "allocationModal", "editTeam")) {
+      return ["allocation", "leave"];
+    }
+    if (can(rbac, "allocationModal", "editSelf")) {
+      const assigningSelf =
+        assignedIds.length === 1 && String(assignedIds[0]) === String(currentUser?.id);
+      return assigningSelf ? ["allocation", "leave"] : ["leave"];
+    }
+    return ["leave"];
+  }, [currentUser, assignedIds, editAllocation]);
 
   useEffect(() => {
     if (!visibleAllocationTabs.includes(activeTab) && visibleAllocationTabs.length > 0) {
@@ -272,8 +272,21 @@ export function CreateAllocationModal({
     if (pre) setProject(pre);
     else setProject(list[0] ?? "");
     setAllocationProjectId(resolveProjectIdForCanonicalLabel(nextProj, projectRegistry));
+    const rbac = (currentUser?.access || "").toLowerCase();
+    const selfOnlyAllocator =
+      !can(rbac, "allocationModal", "editAll") &&
+      !can(rbac, "allocationModal", "editTeam") &&
+      can(rbac, "allocationModal", "editSelf");
     const nextAssigned =
-      preselectPerson != null ? [preselectPerson.id] : people[0] != null ? [people[0].id] : [];
+      preselectPerson != null
+        ? [preselectPerson.id]
+        : selfOnlyAllocator &&
+            currentUser?.id != null &&
+            people.some((p) => String(p.id) === String(currentUser.id))
+          ? [currentUser.id]
+          : people[0] != null
+            ? [people[0].id]
+            : [];
     let hoursDefault = "7.5";
     if (
       premiumV2Enabled &&
@@ -313,6 +326,7 @@ export function CreateAllocationModal({
     defaultTab,
     allocations,
     premiumV2Enabled,
+    currentUser,
   ]);
 
   useEffect(() => {

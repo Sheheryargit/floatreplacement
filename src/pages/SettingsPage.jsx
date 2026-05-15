@@ -44,6 +44,7 @@ import {
   writePremiumV2Enabled,
 } from "../config/premiumV2Prefs.js";
 import { resetPremiumV2Templates } from "../config/premiumV2Templates.js";
+import { ROLE_HELP } from "../constants/permissions.js";
 import { SettingsItem } from "../components/ui/SettingsItem.jsx";
 import { ThemePreferenceControl } from "../components/ui/ThemePreferenceControl.jsx";
 import { PalettePreferenceControl } from "../components/ui/PalettePreferenceControl.jsx";
@@ -240,6 +241,29 @@ export default function SettingsPage() {
                 theme={theme}
               />
             </SettingsItem>
+          </div>
+        </section>
+
+        <section className="settings-section" aria-labelledby="settings-roles">
+          <h2 id="settings-roles" className="settings-h2">
+            Workspace roles
+          </h2>
+          <p className="settings-section-desc">
+            Permissions come from your roster access (User / Member / Manager) or workspace admin. This is what
+            each tier can do in the current app build.
+          </p>
+          <div className="settings-card settings-card--glow settings-roles-card">
+            {ROLE_HELP.map((r) => (
+              <article key={r.key} className="settings-role-block">
+                <h3 className="settings-role-title">{r.title}</h3>
+                <p className="settings-role-sub">{r.subtitle}</p>
+                <ul className="settings-role-bullets">
+                  {r.bullets.map((b) => (
+                    <li key={b}>{b}</li>
+                  ))}
+                </ul>
+              </article>
+            ))}
           </div>
         </section>
 

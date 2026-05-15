@@ -372,6 +372,52 @@
   box-shadow: 0 1px 4px rgba(67, 56, 202, 0.25);
 }
 
+.settings-roles-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings-role-block {
+  padding-bottom: 18px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border, #334155) 70%, transparent);
+}
+
+.settings-role-block:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.settings-role-title {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text, #f8fafc);
+}
+
+.settings-role-sub {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--color-muted, #94a3b8) 90%, var(--color-text, #f8fafc));
+}
+
+.settings-role-bullets {
+  margin: 0;
+  padding-left: 1.15rem;
+  font-size: 13px;
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--color-muted, #94a3b8) 82%, var(--color-text, #f8fafc));
+}
+
+.settings-role-bullets li {
+  margin-bottom: 6px;
+}
+
+.settings-role-bullets li:last-child {
+  margin-bottom: 0;
+}
+
 @media (max-width: 640px) {
   .settings-main {
     padding: var(--space-6) var(--space-4) var(--space-8);
