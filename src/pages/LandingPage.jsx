@@ -2409,7 +2409,6 @@ export default function LandingPage() {
 
   const canManageSelectedAllocation = useMemo(() => {
     if (!selectedAllocation || selectedAllocation.syntheticPublicHoliday) return false;
-    if (!currentUser?.id) return false;
     const ids =
       selectedAllocation.personIds?.length > 0
         ? selectedAllocation.personIds
@@ -2417,11 +2416,14 @@ export default function LandingPage() {
           ? [selectedAllocation.personId]
           : [];
     if (ids.length === 0) return false;
+    /** Full workspace session (`id` null) still uses RBAC admin — must not require a roster id. */
+    if (can(role, "allocationModal", "editAll")) return true;
+    if (!currentUser?.id) return false;
     return ids.every((id) => {
       const person = people.find((p) => String(p.id) === String(id));
       return person ? canInteractSchedulePerson(person) : false;
     });
-  }, [selectedAllocation, currentUser?.id, people, canInteractSchedulePerson]);
+  }, [selectedAllocation, currentUser?.id, people, canInteractSchedulePerson, role]);
 
   const openEdit = useCallback((person) => {
     setEditingPerson(person);

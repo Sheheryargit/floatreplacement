@@ -1014,11 +1014,18 @@
 }
 
 .login-page-card-sub {
-  margin: 0 0 28px;
+  margin: 0 0 10px;
   font-size: 0.91rem;
-  line-height: 1.58;
+  line-height: 1.5;
   letter-spacing: -0.012em;
   color: color-mix(in srgb, var(--color-muted) 94%, var(--color-text));
+}
+
+.login-page-card-meta {
+  margin: 0 0 20px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--color-muted) 90%, var(--color-text));
 }
 
 .login-page-sso {
@@ -1909,7 +1916,22 @@ html[data-low-gpu="1"] .login-page-particle {
   }
 }
 
-/* Sign-in-as roster picker (RBAC identity) */
+/* Sign-in card — mode + preview */
+.login-page-card-section {
+  margin: 0 0 4px;
+  padding-top: 4px;
+}
+
+.login-page-card-section-title {
+  display: block;
+  margin: 0 0 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-muted) 88%, var(--color-text));
+}
+
 .login-page-sign-in-as {
   margin-bottom: 6px;
 }
@@ -1952,11 +1974,23 @@ select.login-page-select {
 }
 
 .login-page-identity-preview {
-  margin-top: 12px;
+  margin-top: 14px;
   padding: 12px 14px;
   border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--color-border) 88%, transparent);
   background: color-mix(in srgb, var(--color-surface) 40%, transparent);
+}
+
+.login-page-identity-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.login-page-identity-preview-head .login-page-identity-preview-label {
+  margin: 0;
 }
 
 .login-page-identity-preview-label {
@@ -1970,7 +2004,7 @@ select.login-page-select {
 
 .login-page-identity-preview-name {
   margin: 0 0 6px;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--color-text);
@@ -1981,6 +2015,110 @@ select.login-page-select {
   font-size: 12px;
   line-height: 1.45;
   color: color-mix(in srgb, var(--color-muted) 88%, var(--color-text));
+}
+
+.login-page-identity-preview-rbac {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--color-muted) 82%, var(--color-text));
+}
+
+.login-page-identity-preview-rbac-pill {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-brand) 16%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-brand) 28%, var(--color-border));
+}
+
+.login-page-mode-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 0;
+}
+
+.login-page-mode-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 88%, transparent);
+  background: color-mix(in srgb, var(--color-surface) 35%, transparent);
+  color: var(--color-text);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.login-page-mode-btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-accent, #0088ff) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-surface) 55%, transparent);
+}
+
+.login-page-mode-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.login-page-mode-btn--active {
+  border-color: color-mix(in srgb, var(--color-accent, #0088ff) 70%, var(--color-border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent, #0088ff) 25%, transparent);
+  background: color-mix(in srgb, var(--color-accent, #0088ff) 12%, var(--color-surface));
+}
+
+.login-page-mode-btn-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 2px;
+}
+
+.login-page-mode-btn-sub {
+  display: block;
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 400;
+  color: color-mix(in srgb, var(--color-muted) 88%, var(--color-text));
+}
+
+.login-page-shuffle-pick {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-accent, #0088ff) 42%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent, #0088ff) 10%, transparent);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-accent, #0088ff) 95%, var(--color-text));
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.login-page-shuffle-pick:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent, #0088ff) 18%, transparent);
+}
+
+.login-page-shuffle-pick:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .login-page-sso-lede {

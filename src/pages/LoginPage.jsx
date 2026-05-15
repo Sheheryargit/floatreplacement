@@ -8,7 +8,6 @@ import {
   Filter,
   Lock,
   ArrowRight,
-  User,
 } from "lucide-react";
 import { siJira, siMicrosoftoutlook } from "simple-icons";
 import { useAppTheme } from "../context/ThemeContext.jsx";
@@ -36,9 +35,6 @@ const ACCESS_PASSWORD =
 
 const SESSION_DEFAULT_NAME =
   String(import.meta.env.VITE_SESSION_DISPLAY_NAME ?? "").trim() || "Workspace session";
-
-/** Select value for full-access demo identity (not tied to a roster row). */
-const SIGN_IN_AS_ADMIN = "__admin__";
 
 const SIGN_IN_HOLD_MS = 5000;
 const SSO_TRIPLE_WINDOW_MS = 720;
@@ -384,6 +380,27 @@ const heroItemVisible = {
   show: { opacity: 1, y: 0 },
 };
 
+function pickRandomPerson(list) {
+  if (!list.length) return null;
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function peopleManagers(people) {
+  return (people || [])
+    .filter((p) => !p.archived)
+    .filter((p) => personAccessLabelToRbacRole(p.access) === "manager");
+}
+
+/** Prefer directory User rows; if none, Member rows (demo “user tier”). */
+function peopleUserTierPool(people) {
+  const active = (people || []).filter((p) => !p.archived);
+  const users = active.filter((p) => personAccessLabelToRbacRole(p.access) === "user");
+  if (users.length) return { pool: users, sourceLabel: "User" };
+  const members = active.filter((p) => personAccessLabelToRbacRole(p.access) === "member");
+  if (members.length) return { pool: members, sourceLabel: "Member" };
+  return { pool: [], sourceLabel: null };
+}
+
 export default function LoginPage() {
   const { theme } = useAppTheme();
   const { unlock } = useAuth();
@@ -418,24 +435,70 @@ export default function LoginPage() {
     [people]
   );
 
-  const [signInAsKey, setSignInAsKey] = useState(SIGN_IN_AS_ADMIN);
+  const managerPool = useMemo(() => peopleManagers(signInChoices), [signInChoices]);
+  const userTierPool = useMemo(() => peopleUserTierPool(signInChoices), [signInChoices]);
+
+  const [signInMode, setSignInMode] = useState("full");
+  const [pickedPerson, setPickedPerson] = useState(null);
+
+  const selectSignInMode = useCallback(
+    (mode) => {
+      setSignInMode(mode);
+      if (mode === "full") {
+        setPickedPerson(null);
+        return;
+      }
+      if (mode === "manager") {
+        setPickedPerson(pickRandomPerson(managerPool));
+        return;
+      }
+      setPickedPerson(pickRandomPerson(userTierPool.pool));
+    },
+    [managerPool, userTierPool.pool]
+  );
+
+  const reshufflePick = useCallback(() => {
+    if (signInMode === "manager") {
+      setPickedPerson(pickRandomPerson(managerPool));
+      return;
+    }
+    if (signInMode === "user") {
+      setPickedPerson(pickRandomPerson(userTierPool.pool));
+    }
+  }, [signInMode, managerPool, userTierPool.pool]);
 
   useEffect(() => {
-    if (signInAsKey === SIGN_IN_AS_ADMIN) return;
-    if (!signInChoices.some((p) => String(p.id) === String(signInAsKey))) {
-      setSignInAsKey(SIGN_IN_AS_ADMIN);
+    if (signInMode === "full") return;
+    if (signInMode === "manager") {
+      const pool = managerPool;
+      if (!pool.length) {
+        setPickedPerson(null);
+        return;
+      }
+      setPickedPerson((prev) =>
+        prev && pool.some((p) => String(p.id) === String(prev.id)) ? prev : pickRandomPerson(pool)
+      );
+      return;
     }
-  }, [signInChoices, signInAsKey]);
+    const pool = userTierPool.pool;
+    if (!pool.length) {
+      setPickedPerson(null);
+      return;
+    }
+    setPickedPerson((prev) =>
+      prev && pool.some((p) => String(p.id) === String(prev.id)) ? prev : pickRandomPerson(pool)
+    );
+  }, [signInMode, managerPool, userTierPool.pool]);
 
   const resolveUnlockIdentity = useCallback(() => {
-    if (signInAsKey === SIGN_IN_AS_ADMIN) {
+    if (signInMode === "full") {
       return {
         displayName: SESSION_DEFAULT_NAME,
         id: null,
         access: "admin",
       };
     }
-    const person = signInChoices.find((p) => String(p.id) === String(signInAsKey));
+    const person = pickedPerson;
     if (!person) {
       return {
         displayName: SESSION_DEFAULT_NAME,
@@ -450,32 +513,65 @@ export default function LoginPage() {
       id: Number.isFinite(rawId) ? rawId : null,
       access: personAccessLabelToRbacRole(person.access),
     };
-  }, [signInAsKey, signInChoices]);
+  }, [signInMode, pickedPerson]);
 
   const selectedIdentityPreview = useMemo(() => {
-    if (signInAsKey === SIGN_IN_AS_ADMIN) {
+    if (signInMode === "full") {
       return {
         title: "Workspace admin",
-        detail: "Full permissions — People, Projects, Report, and schedule.",
+        detail: "Not linked to a People row. Full schedule, People, Projects, and Report.",
         rbacLabel: "admin",
       };
     }
-    const person = signInChoices.find((p) => String(p.id) === String(signInAsKey));
-    if (!person) {
+    if (signInMode === "manager") {
+      const pool = managerPool;
+      if (!pool.length) {
+        return {
+          title: "No managers",
+          detail: "Add at least one person with Manager access in People, or use workspace admin.",
+          rbacLabel: "—",
+        };
+      }
+      if (!pickedPerson) {
+        return {
+          title: "Drawing…",
+          detail: `${pool.length} manager${pool.length === 1 ? "" : "s"} on the roster.`,
+          rbacLabel: "—",
+        };
+      }
+      const acc = String(pickedPerson.access || "Manager").trim() || "Manager";
+      const rbac = personAccessLabelToRbacRole(pickedPerson.access);
+      const name = String(pickedPerson.name || "").trim() || "Teammate";
       return {
-        title: "Could not resolve person",
-        detail: "Pick someone from the list again.",
+        title: name,
+        detail: `People · ${acc} · ${pool.length} manager${pool.length === 1 ? "" : "s"} available`,
+        rbacLabel: rbac,
+      };
+    }
+    const { pool, sourceLabel } = userTierPool;
+    if (!pool.length) {
+      return {
+        title: "No user-tier rows",
+        detail: "Add people with User (or Member) access, or pick another mode.",
         rbacLabel: "—",
       };
     }
-    const acc = String(person.access || "User").trim() || "User";
-    const rbac = personAccessLabelToRbacRole(person.access);
+    if (!pickedPerson) {
+      return {
+        title: "Drawing…",
+        detail: `${pool.length} ${sourceLabel?.toLowerCase() ?? "user"} row${pool.length === 1 ? "" : "s"}.`,
+        rbacLabel: "—",
+      };
+    }
+    const acc = String(pickedPerson.access || sourceLabel || "User").trim() || "User";
+    const rbac = personAccessLabelToRbacRole(pickedPerson.access);
+    const name = String(pickedPerson.name || "").trim() || "Teammate";
     return {
-      title: String(person.name || "").trim() || "Teammate",
-      detail: `Directory access: ${acc}. App permissions use RBAC role “${rbac}”.`,
+      title: name,
+      detail: `People · ${acc} · random from ${sourceLabel} pool (${pool.length})`,
       rbacLabel: rbac,
     };
-  }, [signInAsKey, signInChoices]);
+  }, [signInMode, pickedPerson, managerPool, userTierPool]);
 
   const creditZoneVariants = useMemo(() => {
     if (reduceMotion) {
@@ -614,6 +710,26 @@ export default function LoginPage() {
       });
       return;
     }
+    if (signInMode === "manager") {
+      if (!managerPool.length || !pickedPerson) {
+        openDialog({
+          title: "Cannot sign in as Manager",
+          message:
+            "There is no one with Manager directory access in the roster yet. Add a Manager in People or choose full workspace access.",
+        });
+        return;
+      }
+    }
+    if (signInMode === "user") {
+      if (!userTierPool.pool.length || !pickedPerson) {
+        openDialog({
+          title: "Cannot sign in as User",
+          message:
+            "There is no one with User (or Member) directory access in the roster. Add people in People or choose another mode.",
+        });
+        return;
+      }
+    }
     setError("");
     setPwdRejected(false);
     setEmptyPulse(false);
@@ -621,7 +737,7 @@ export default function LoginPage() {
     window.setTimeout(() => {
       unlock(resolveUnlockIdentity());
     }, 440);
-  }, [password, unlock, openDialog, resolveUnlockIdentity]);
+  }, [password, unlock, openDialog, resolveUnlockIdentity, signInMode, managerPool, userTierPool, pickedPerson]);
 
   const finishHoldAndSubmit = useCallback(() => {
     holdPointerIdRef.current = null;
@@ -861,59 +977,105 @@ export default function LoginPage() {
                 <p className="login-page-card-kicker">Secure access</p>
                 <h2 className="login-page-card-title">Sign in to Alloc8</h2>
                 <p className="login-page-card-sub">
-                  Choose who you are, enter the workspace password, then hold <strong>Sign in</strong> for five
-                  seconds — or press <strong>Enter</strong> in the password field. Your name and permissions match
-                  the person you pick below.
+                  Choose a mode, enter the workspace password, then hold <strong>Sign in</strong> for five seconds
+                  (or press <strong>Enter</strong>).
                 </p>
-
-                <ol className="login-page-login-steps" aria-label="Sign-in steps">
-                  <li>Select <strong>Sign in as</strong> (workspace admin or a teammate).</li>
-                  <li>Type the workspace password.</li>
-                  <li>Hold <strong>Sign in</strong> until it completes, or press Enter.</li>
-                </ol>
+                <p className="login-page-card-meta">
+                  Random options sample your People directory. <strong>Shuffle</strong> picks someone else in the
+                  same pool.
+                </p>
 
                 {!rosterReady && isSupabaseConfigured ? (
                   <p className="login-page-roster-hint" role="status">
-                    Loading workspace roster…
+                    Loading roster…
                   </p>
                 ) : null}
 
-                <div className="login-page-sign-in-as">
-                  <label className="login-page-pwd-label" htmlFor="login-sign-in-as">
-                    Step 1 — Sign in as
-                  </label>
-                  <div className="login-page-field-wrapper login-page-field-wrapper--signin-as">
-                    <div className="login-page-field">
-                      <User className="login-page-field-icon" size={18} strokeWidth={2} aria-hidden />
-                      <select
-                        id="login-sign-in-as"
-                        className="login-page-input login-page-select"
-                        value={signInAsKey}
-                        onChange={(e) => setSignInAsKey(e.target.value)}
-                        disabled={authExit || welcomeOpen}
-                        aria-describedby="login-sign-in-as-hint login-identity-preview"
-                        autoFocus
-                      >
-                        <option value={SIGN_IN_AS_ADMIN}>Workspace admin (full access)</option>
-                        {signInChoices.map((p) => (
-                          <option key={p.id} value={String(p.id)}>
-                            {p.name} · {String(p.access || "User")}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                <div className="login-page-card-section">
+                  <span className="login-page-card-section-title" id="login-sign-in-mode-label">
+                    Sign-in mode
+                  </span>
+                  <div
+                    className="login-page-mode-grid"
+                    role="radiogroup"
+                    aria-labelledby="login-sign-in-mode-label"
+                  >
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={signInMode === "full"}
+                      className={
+                        "login-page-mode-btn" + (signInMode === "full" ? " login-page-mode-btn--active" : "")
+                      }
+                      disabled={authExit || welcomeOpen}
+                      onClick={() => selectSignInMode("full")}
+                    >
+                      <span className="login-page-mode-btn-title">Workspace admin</span>
+                      <span className="login-page-mode-btn-sub">Full access · not tied to a person row</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={signInMode === "manager"}
+                      className={
+                        "login-page-mode-btn" +
+                        (signInMode === "manager" ? " login-page-mode-btn--active" : "")
+                      }
+                      disabled={authExit || welcomeOpen || !rosterReady}
+                      onClick={() => selectSignInMode("manager")}
+                    >
+                      <span className="login-page-mode-btn-title">Random manager</span>
+                      <span className="login-page-mode-btn-sub">Anyone with Manager in People</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={signInMode === "user"}
+                      className={
+                        "login-page-mode-btn" + (signInMode === "user" ? " login-page-mode-btn--active" : "")
+                      }
+                      disabled={authExit || welcomeOpen || !rosterReady}
+                      onClick={() => selectSignInMode("user")}
+                    >
+                      <span className="login-page-mode-btn-title">Random user</span>
+                      <span className="login-page-mode-btn-sub">User rows, else Member if needed</span>
+                    </button>
                   </div>
+
                   <div
                     id="login-identity-preview"
                     className="login-page-identity-preview"
                     aria-live="polite"
+                    aria-describedby="login-sign-in-as-hint"
                   >
-                    <p className="login-page-identity-preview-label">You’ll open the app as</p>
+                    <div className="login-page-identity-preview-head">
+                      <p className="login-page-identity-preview-label">Preview</p>
+                      {rosterReady &&
+                      ((signInMode === "manager" && managerPool.length > 0) ||
+                        (signInMode === "user" && userTierPool.pool.length > 0)) ? (
+                        <button
+                          type="button"
+                          className="login-page-shuffle-pick"
+                          disabled={authExit || welcomeOpen}
+                          onClick={reshufflePick}
+                          aria-label={
+                            signInMode === "manager"
+                              ? "Pick another random manager"
+                              : "Pick another random user"
+                          }
+                        >
+                          Shuffle
+                        </button>
+                      ) : null}
+                    </div>
                     <p className="login-page-identity-preview-name">{selectedIdentityPreview.title}</p>
                     <p className="login-page-identity-preview-detail">{selectedIdentityPreview.detail}</p>
+                    <p className="login-page-identity-preview-rbac">
+                      App role <span className="login-page-identity-preview-rbac-pill">{selectedIdentityPreview.rbacLabel}</span>
+                    </p>
                   </div>
                   <p id="login-sign-in-as-hint" className="login-page-roster-hint login-page-roster-hint--hint">
-                    After sign-in, your avatar and session use this name. SSO (below) uses the same identity.
+                    Same identity is used after sign-in and for SSO below.
                   </p>
                 </div>
 
@@ -934,7 +1096,7 @@ export default function LoginPage() {
                   }}
                 >
                   <label className="login-page-pwd-label" htmlFor="login-workspace-password">
-                    Step 2 — Workspace password
+                    Password
                   </label>
                   <motion.div 
                     className={`login-page-field-wrapper ${emptyPulse ? "is-empty-lock" : ""}`}
