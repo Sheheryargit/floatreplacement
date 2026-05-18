@@ -6,6 +6,7 @@ import {
   useMemo,
   useEffect,
 } from "react";
+import { isSupabaseConfigured, supabase } from "../lib/supabase.js";
 
 const STORAGE_KEY = "float_auth_session";
 const PROFILE_KEY = "float_auth_profile";
@@ -21,6 +22,37 @@ function readSessionProfile() {
     return { displayName: typeof o?.displayName === "string" ? o.displayName : "" };
   } catch {
     return { displayName: "" };
+  }
+}
+
+/** Display label from Supabase user (OAuth / SSO). */
+function displayNameFromSupabaseUser(user) {
+  if (!user) return "";
+  const metaName =
+    typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name.trim() : "";
+  const metaNameAzure =
+    typeof user.user_metadata?.name === "string" ? user.user_metadata.name.trim() : "";
+  const email = typeof user.email === "string" ? user.email.trim() : "";
+  const fromEmail =
+    email && email.includes("@")
+      ? email
+          .split("@")[0]
+          .split(/[._]/)
+          .filter(Boolean)
+          .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
+          .join(" ")
+      : "";
+  const localPart = email.includes("@") ? email.split("@")[0] : "";
+  return metaName || metaNameAzure || fromEmail || localPart || "Workspace member";
+}
+
+/** Clears app gate flags only — used after Supabase emits SIGNED_OUT (avoid recursive signOut). */
+function clearStoredGate() {
+  try {
+    sessionStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(PROFILE_KEY);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -76,15 +108,72 @@ export function AuthProvider({ children }) {
   }, []);
 
   const lock = useCallback(() => {
-    try {
-      sessionStorage.removeItem(STORAGE_KEY);
-      sessionStorage.removeItem(PROFILE_KEY);
-    } catch {
-      /* ignore */
-    }
-    setSessionProfileState({ displayName: "" });
-    setOk(false);
+    void (async () => {
+      try {
+        if (isSupabaseConfigured && supabase) {
+          await supabase.auth.signOut();
+        }
+      } catch {
+        /* ignore */
+      }
+      clearStoredGate();
+      setSessionProfileState({ displayName: "" });
+      setOk(false);
+    })();
   }, []);
+
+  /** Restore SSO session when returning from OAuth and keep gate in sync. */
+  useEffect(() => {
+    if (loginSkipAuth || !isSupabaseConfigured || !supabase) return undefined;
+
+    const hydrateFromSession = (session) => {
+      const u = session?.user;
+      if (!u) return;
+      unlock({ displayName: displayNameFromSupabaseUser(u) });
+    };
+
+    let unsub;
+    try {
+      const result = supabase.auth.onAuthStateChange((event, session) => {
+        if (
+          event === "INITIAL_SESSION" ||
+          event === "SIGNED_IN" ||
+          event === "TOKEN_REFRESHED"
+        ) {
+          hydrateFromSession(session ?? null);
+          return;
+        }
+        if (event === "PASSWORD_RECOVERY") {
+          hydrateFromSession(session ?? null);
+          return;
+        }
+        if (event === "SIGNED_OUT") {
+          clearStoredGate();
+          setSessionProfileState({ displayName: "" });
+          setOk(false);
+          return;
+        }
+      });
+      unsub = result?.data?.subscription;
+    } catch {
+      return undefined;
+    }
+
+    let canceled = false;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (canceled) return;
+      hydrateFromSession(data.session);
+    });
+
+    return () => {
+      canceled = true;
+      try {
+        unsub?.unsubscribe();
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [loginSkipAuth, unlock]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;

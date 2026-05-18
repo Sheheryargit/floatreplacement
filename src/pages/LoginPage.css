@@ -7,11 +7,19 @@
   inset: 0;
   z-index: 300;
   display: flex;
+  flex-direction: column;
   align-items: stretch;
-  justify-content: center;
-  /* Clear fixed Deloitte plate + EaaS strip (taller logo needs more top air) */
-  padding: clamp(92px, 11vw, 118px) clamp(16px, 4vw, 48px) clamp(48px, 8vh, 72px);
-  overflow: auto;
+  justify-content: flex-start;
+  min-height: 100vh;
+  min-height: 100dvh;
+  /* Top: clear fixed Deloitte + EaaS; bottom: HUD + attribution + safe-area */
+  padding-top: clamp(60px, 7.6vw, 92px);
+  padding-left: clamp(16px, 4vw, 48px);
+  padding-right: clamp(16px, 4vw, 48px);
+  padding-bottom: clamp(88px, 12vh, 120px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   font-family: var(--font-body);
 }
 
@@ -383,11 +391,11 @@
   z-index: 1;
   display: grid;
   width: 100%;
-  max-width: 1140px;
-  margin: auto;
-  align-items: center;
-  gap: clamp(36px, 5.5vw, 72px);
-  grid-template-columns: 1fr min(412px, 100%);
+  max-width: 1320px;
+  margin: 0 auto;
+  align-items: start;
+  gap: clamp(18px, 3.2vw, 40px);
+  grid-template-columns: minmax(0, 1fr) clamp(448px, 33vw, 540px);
 }
 
 .login-page-hero {
@@ -395,7 +403,16 @@
 }
 
 .login-page-hero-inner {
-  max-width: 540px;
+  max-width: min(640px, 100%);
+}
+
+/* Wrapper stays sticky; inner motion.div may transform without breaking sticky. */
+@media (min-width: 901px) and (min-height: 600px) {
+  .login-page-card-sticky-shell {
+    position: sticky;
+    align-self: start;
+    top: max(52px, calc(env(safe-area-inset-top, 0px) + 40px));
+  }
 }
 
 .login-page-feature-loop-wrap {
@@ -698,6 +715,10 @@
   overflow: visible;
 }
 
+.login-page-pwd-form > .login-page-submit {
+  margin-top: 14px;
+}
+
 .login-page-submit {
   position: relative;
   display: flex;
@@ -910,30 +931,34 @@
 
 .login-page-card-ring {
   position: absolute;
-  inset: -2px;
-  border-radius: 18px;
+  inset: -1px;
+  border-radius: 22px;
   background: conic-gradient(
-    from 210deg,
+    from 220deg,
     transparent 0deg,
-    rgba(0, 136, 255, 0.45) 55deg,
-    rgba(124, 106, 247, 0.35) 130deg,
-    rgba(0, 229, 255, 0.3) 200deg,
-    transparent 280deg,
+    color-mix(in srgb, var(--login-deloitte-green) 62%, transparent) 46deg,
+    rgba(148, 163, 184, 0.2) 120deg,
+    color-mix(in srgb, var(--login-deloitte-green) 52%, transparent) 200deg,
+    transparent 300deg,
     transparent 360deg
   );
-  opacity: 0.55;
-  filter: blur(0.5px);
+  opacity: 0.44;
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .login-page-card-ring {
-    animation: loginRingSpin 14s linear infinite;
+    animation: loginRingPulse 14s ease-in-out infinite alternate;
   }
 }
 
-@keyframes loginRingSpin {
-  to {
-    transform: rotate(360deg);
+@keyframes loginRingPulse {
+  0% {
+    opacity: 0.35;
+    filter: blur(1px);
+  }
+  100% {
+    opacity: 0.52;
+    filter: blur(0.35px);
   }
 }
 
@@ -944,8 +969,8 @@
   border-radius: 24px;
   background: radial-gradient(
     circle at 50% 0%,
-    color-mix(in srgb, var(--color-brand) 12%, transparent),
-    transparent 55%
+    color-mix(in srgb, var(--login-deloitte-green) 28%, transparent),
+    transparent 58%
   );
   pointer-events: none;
   z-index: -1;
@@ -955,334 +980,504 @@
 .login-page-card {
   position: relative;
   width: 100%;
-  border-radius: 14px;
+  border-radius: 22px;
   /* Solid panel avoids backdrop-filter + preserve-3d compositing (GPU crashes in some Chromium/Brave builds). */
-  background: rgba(12, 14, 22, 0.96);
-  border: 1px solid color-mix(in srgb, var(--color-brand) 28%, var(--color-border));
+  background: linear-gradient(
+    148deg,
+    rgba(17, 20, 24, 0.98) 0%,
+    rgba(10, 12, 17, 1) 26%,
+    color-mix(in srgb, var(--login-deloitte-green) 6%, rgba(11, 14, 24, 0.99)) 72%,
+    rgba(13, 16, 24, 0.99) 100%
+  );
+  border: 1px solid color-mix(in srgb, #fff 8%, transparent);
   box-shadow:
-    0 0 0 1px rgba(0, 229, 255, 0.08) inset,
-    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
-    0 48px 120px rgba(0, 0, 0, 0.58),
-    0 0 80px color-mix(in srgb, var(--color-brand) 10%, transparent),
-    0 0 1px rgba(0, 229, 255, 0.25);
+    0 0 0 1px rgba(15, 23, 42, 0.5) inset,
+    0 1px 0 color-mix(in srgb, var(--login-deloitte-green) 28%, transparent) inset,
+    0 52px 100px rgba(0, 0, 0, 0.52),
+    0 26px 50px rgba(0, 0, 0, 0.32),
+    0 0 0 1px color-mix(in srgb, var(--login-deloitte-green) 18%, transparent);
   overflow: hidden;
 }
 
 .login-page-card-inner {
   position: relative;
   z-index: 3;
-  padding: 44px 40px 36px;
+  padding: 0;
   pointer-events: auto !important;
 }
 
-.login-page-card-header-accent {
-  position: absolute;
-  top: 0;
-  left: 40px;
-  right: 40px;
-  height: 3px;
-  border-radius: 0 0 3px 3px;
+.login-page-card-masthead {
+  position: relative;
+  text-align: center;
+  border-radius: 21px 21px 0 0;
+  overflow: hidden;
+}
+
+.login-page-card-masthead-core {
+  display: flex;
+  flex-direction: column;
+}
+
+.login-page-card-masthead-ribbon {
+  display: block;
+  height: 5px;
+  width: 100%;
+  flex-shrink: 0;
   background: linear-gradient(
     90deg,
-    transparent,
-    color-mix(in srgb, var(--color-brand) 55%, transparent) 20%,
-    color-mix(in srgb, var(--login-deloitte-green) 45%, transparent) 50%,
-    color-mix(in srgb, var(--color-brand-light) 50%, transparent) 80%,
-    transparent
+    transparent 2%,
+    color-mix(in srgb, var(--login-deloitte-green) 88%, #2d4210),
+    var(--login-deloitte-green),
+    color-mix(in srgb, var(--login-deloitte-green) 70%, var(--color-brand-light)),
+    var(--login-deloitte-green),
+    color-mix(in srgb, var(--login-deloitte-green) 88%, #2d4210),
+    transparent 98%
   );
-  opacity: 0.9;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset;
+}
+
+.login-page-card-masthead-plate {
+  position: relative;
+  padding: clamp(22px, 4.5vw, 30px) clamp(22px, 5vw, 36px);
+  background: radial-gradient(
+    120% 160% at 50% -20%,
+    rgba(255, 255, 255, 0.94) 0%,
+    #f8faf7 42%,
+    #eef2ea 72%,
+    #e8ede4 100%
+  );
+  border-bottom: 1px solid color-mix(in srgb, var(--login-deloitte-green) 28%, transparent);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 12px 32px rgba(0, 0, 0, 0.2);
+}
+
+.login-page-card-deloitte-logo {
+  display: block;
+  margin: 0 auto;
+  height: clamp(36px, 6.5vw, 48px);
+  width: auto;
+  max-width: min(296px, 88%);
+  object-fit: contain;
+  filter:
+    drop-shadow(0 1px 2px rgba(15, 23, 42, 0.08))
+    drop-shadow(0 8px 20px rgba(134, 188, 37, 0.12));
+}
+
+.login-page-card-masthead-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 24px 20px;
+  background: linear-gradient(
+    185deg,
+    color-mix(in srgb, #040608 94%, transparent) 0%,
+    rgba(13, 16, 21, 0.62) 100%
+  );
+  border-bottom: 1px solid color-mix(in srgb, var(--login-deloitte-green) 22%, transparent);
+}
+
+.login-page[data-theme="light"] .login-page-card-masthead-meta {
+  background: linear-gradient(180deg, rgba(247, 250, 244, 0.98) 0%, rgba(255, 255, 255, 0.94) 100%);
+  border-bottom-color: color-mix(in srgb, var(--login-deloitte-green) 28%, var(--color-border));
+}
+
+.login-page-card-masthead-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--login-deloitte-green) 92%, var(--color-muted));
+  background: color-mix(in srgb, var(--login-deloitte-green) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--login-deloitte-green) 38%, transparent);
+  box-shadow: 0 0 28px color-mix(in srgb, var(--login-deloitte-green) 14%, transparent);
+}
+
+.login-page[data-theme="light"] .login-page-card-masthead-chip {
+  background: rgba(255, 255, 255, 0.9);
+  color: color-mix(in srgb, #2f4a12 92%, var(--color-text));
+  border-color: color-mix(in srgb, var(--login-deloitte-green) 45%, transparent);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
+}
+
+.login-page-card-masthead-brand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  row-gap: 4px;
+}
+
+.login-page-card-masthead-brand-mark {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--color-text);
+}
+
+.login-page-card-masthead-brand-mark .alloc8-wordmark-eight {
+  color: color-mix(in srgb, var(--login-deloitte-green) 94%, var(--color-brand-light));
+}
+
+.login-page-card-masthead-brand-sub {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-muted) 88%, var(--color-text));
+}
+
+@media (min-width: 901px) {
+  .login-page-card-masthead-core {
+    flex-direction: row;
+    align-items: stretch;
+    border-bottom: 1px solid color-mix(in srgb, var(--login-deloitte-green) 22%, transparent);
+  }
+
+  .login-page[data-theme="light"] .login-page-card-masthead-core {
+    border-bottom-color: color-mix(in srgb, var(--login-deloitte-green) 28%, var(--color-border));
+  }
+
+  .login-page-card-masthead-plate {
+    flex: 1.15;
+    min-width: 0;
+    border-bottom: none;
+    padding: clamp(16px, 3.2vw, 24px) clamp(14px, 3.8vw, 28px);
+    border-right: 1px solid color-mix(in srgb, var(--login-deloitte-green) 28%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .login-page[data-theme="light"] .login-page-card-masthead-plate {
+    border-right-color: color-mix(in srgb, var(--login-deloitte-green) 24%, var(--color-border));
+  }
+
+  .login-page-card-masthead-meta {
+    flex: 1;
+    min-width: 0;
+    align-items: flex-start;
+    border-bottom: none;
+    padding: 14px 20px;
+    justify-content: center;
+  }
+
+  .login-page-card-masthead-meta .login-page-card-masthead-brand {
+    justify-content: flex-start;
+    text-align: left;
+    width: 100%;
+  }
+
+  .login-page-card-deloitte-logo {
+    max-width: min(280px, 100%);
+  }
+}
+
+.login-page-card-body {
+  padding: 28px clamp(26px, 5vw, 42px) 36px;
+}
+
+.login-page[data-theme="light"] .login-page-card-masthead-plate {
+  background: radial-gradient(
+    120% 140% at 50% -10%,
+    #ffffff 0%,
+    #fbfcfb 52%,
+    #f4f7f3 100%
+  );
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 1) inset,
+    0 10px 28px rgba(15, 23, 42, 0.08);
+  border-bottom-color: color-mix(in srgb, var(--login-deloitte-green) 24%, var(--color-border));
 }
 
 .login-page-card-kicker {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--color-brand-light) 42%, var(--color-muted));
+  color: color-mix(in srgb, var(--login-deloitte-green) 48%, var(--color-muted));
 }
 
 .login-page-card-title {
-  margin: 0 0 12px;
+  margin: 0 0 20px;
   font-family: var(--font-display);
-  font-size: clamp(1.5rem, 4vw, 1.72rem);
-  font-weight: 700;
-  letter-spacing: -0.038em;
-  line-height: 1.12;
-  color: var(--color-text);
-}
-
-.login-page-card-sub {
-  margin: 0 0 28px;
-  font-size: 0.91rem;
-  line-height: 1.58;
-  letter-spacing: -0.012em;
-  color: color-mix(in srgb, var(--color-muted) 94%, var(--color-text));
-}
-
-.login-page-sso {
-  margin-bottom: 20px;
-}
-
-.login-page-sso-row {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  align-items: stretch;
-  justify-content: center;
-  gap: 10px;
-  width: 100%;
-}
-
-.login-page-sso-btn {
-  position: relative;
-  display: flex;
-  flex: 1 1 0;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
-  min-width: 0;
-  min-height: 48px;
-  max-height: 52px;
-  padding: 10px 8px;
-  border: none;
-  border-radius: 12px;
-  cursor: pointer;
-  color: #fff;
-  font-family: var(--font-body);
-  overflow: hidden;
-  isolation: isolate;
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.12) inset,
-    0 10px 28px rgba(0, 0, 0, 0.35);
-  transition:
-    box-shadow 0.3s ease,
-    filter 0.25s ease;
-}
-
-.login-page-sso-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  filter: grayscale(0.35);
-}
-
-.login-page-sso-btn-glow {
-  position: absolute;
-  inset: -40%;
-  border-radius: 50%;
-  opacity: 0.35;
-  filter: blur(28px);
-  pointer-events: none;
-  z-index: 0;
-  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.5), transparent 55%);
-}
-
-.login-page-sso-btn .login-page-sso-brand-svg {
-  position: relative;
-  z-index: 1;
-  width: min(26px, 5.5vw);
-  height: min(26px, 5.5vw);
-  flex-shrink: 0;
-  filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.35));
-}
-
-.login-page-sso-btn .login-page-sso-brand-svg--slack-official,
-.login-page-sso-btn .login-page-sso-brand-svg--on-brand {
-  filter: none;
-}
-
-.login-page-sso-btn--google {
-  background: linear-gradient(145deg, #4a5568 0%, #1a1d24 55%, #0f1118 100%);
-}
-
-/* Atlassian Jira — brand blue #0052CC (atlassian.design), white glyph */
-.login-page-sso-btn--jira {
-  background: linear-gradient(155deg, #003d99 0%, #0052cc 48%, #0747a6 100%);
-}
-
-/* Microsoft Outlook — product blue #0078D4 (Microsoft 365 / Fluent), white glyph */
-.login-page-sso-btn--outlook {
-  background: linear-gradient(155deg, #004578 0%, #0078d4 50%, #005a9e 100%);
-}
-
-/* Slack — full-color mark on white/neutral (Slack brand guidelines: color logo on white) */
-.login-page-sso-btn--slack {
-  background: linear-gradient(180deg, #ffffff 0%, #ececf1 100%);
-  box-shadow:
-    0 0 0 1px rgba(15, 23, 42, 0.1) inset,
-    0 0 0 1px rgba(255, 255, 255, 0.55) inset,
-    0 8px 22px rgba(0, 0, 0, 0.28);
-}
-
-.login-page-sso-btn--slack .login-page-sso-btn-glow {
-  opacity: 0.18;
-}
-
-/* Full-screen welcome after triple-click SSO (above login chrome) */
-.login-page--welcome .login-page-shell,
-.login-page--welcome .login-page-corner-deloitte,
-.login-page--welcome .login-page-corner-eaas,
-.login-page--welcome .login-page-attribution,
-.login-page--welcome .login-page-hud {
-  pointer-events: none;
-  filter: saturate(0.65) brightness(0.55);
-}
-
-.login-welcome-root {
-  position: fixed;
-  inset: 0;
-  z-index: 360;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  pointer-events: auto;
-  background: rgba(2, 4, 12, 0.72);
-}
-
-.login-page[data-theme="light"] .login-welcome-root {
-  background: rgba(15, 23, 42, 0.45);
-}
-
-.login-welcome-aurora {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse 80% 60% at 20% 30%, color-mix(in srgb, var(--color-brand) 35%, transparent), transparent 55%),
-    radial-gradient(ellipse 70% 50% at 85% 20%, color-mix(in srgb, var(--login-deloitte-green) 28%, transparent), transparent 50%),
-    radial-gradient(ellipse 60% 45% at 50% 100%, rgba(124, 106, 247, 0.2), transparent 45%);
-  opacity: 0.85;
-  animation: loginWelcomeAurora 4s ease-in-out infinite;
-}
-
-@keyframes loginWelcomeAurora {
-  0%,
-  100% {
-    opacity: 0.72;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.95;
-    transform: scale(1.03);
-  }
-}
-
-.login-welcome-floaties {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.login-welcome-floaty {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  user-select: none;
-  line-height: 1;
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
-}
-
-.login-welcome-card {
-  position: relative;
-  z-index: 2;
-  width: min(440px, 100%);
-  padding: 36px 32px 34px;
-  border-radius: 20px;
-  background: linear-gradient(
-    165deg,
-    color-mix(in srgb, var(--color-surface) 92%, #0a0c12) 0%,
-    rgba(12, 14, 22, 0.94) 100%
-  );
-  border: 1.5px solid color-mix(in srgb, var(--color-brand) 42%, var(--color-border));
-  box-shadow:
-    0 0 0 1px rgba(0, 229, 255, 0.1) inset,
-    0 32px 80px rgba(0, 0, 0, 0.55),
-    0 0 60px color-mix(in srgb, var(--color-brand) 18%, transparent);
-}
-
-.login-page[data-theme="light"] .login-welcome-card {
-  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
-  border-color: color-mix(in srgb, var(--color-brand) 35%, #cbd5e1);
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 1) inset,
-    0 28px 64px rgba(15, 23, 42, 0.16),
-    0 0 48px color-mix(in srgb, var(--color-brand) 14%, transparent);
-}
-
-.login-welcome-kicker {
-  margin: 0 0 10px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: color-mix(in srgb, var(--color-brand-light) 55%, var(--color-muted));
-}
-
-.login-welcome-title {
-  margin: 0 0 12px;
-  font-family: var(--font-display);
-  font-size: clamp(1.65rem, 4.5vw, 2.1rem);
-  font-weight: 800;
-  letter-spacing: -0.04em;
+  font-size: clamp(1.55rem, 4.2vw, 1.88rem);
+  font-weight: 750;
+  letter-spacing: -0.045em;
   line-height: 1.1;
   color: var(--color-text);
 }
 
-.login-welcome-sub {
-  margin: 0 0 16px;
-  font-size: 0.98rem;
-  font-weight: 600;
-  color: color-mix(in srgb, var(--login-deloitte-green) 75%, var(--color-text));
+.login-page-sso-enterprise.login-sso-modern {
+  margin-bottom: 24px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, #fff 10%, transparent);
+  background:
+    radial-gradient(
+      120% 90% at 12% -24%,
+      color-mix(in srgb, var(--login-deloitte-green) 26%, transparent),
+      transparent 58%
+    ),
+    linear-gradient(168deg, rgba(255, 255, 255, 0.055), rgba(0, 0, 0, 0.12));
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.32) inset,
+    0 28px 56px rgba(0, 0, 0, 0.38);
 }
 
-.login-welcome-lede {
-  margin: 0 0 22px;
-  font-size: 0.92rem;
-  line-height: 1.55;
-  color: color-mix(in srgb, var(--color-muted) 90%, var(--color-text));
+.login-page[data-theme="light"] .login-page-sso-enterprise.login-sso-modern {
+  border: 1px solid color-mix(in srgb, var(--login-deloitte-green) 22%, var(--color-border));
+  background:
+    radial-gradient(
+      ellipse 150% 100% at 18% -40%,
+      color-mix(in srgb, var(--login-deloitte-green) 20%, transparent),
+      transparent 62%
+    ),
+    linear-gradient(185deg, #ffffff, rgba(247, 250, 245, 0.98));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.98) inset,
+    0 22px 48px rgba(15, 23, 42, 0.08);
 }
 
-.login-welcome-em {
-  font-style: italic;
-  color: color-mix(in srgb, var(--color-brand-light) 70%, var(--color-text));
-}
-
-.login-welcome-pulse-row {
+.login-sso-modern-toolbar {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 0 3px;
+}
+
+.login-sso-modern-pill {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--login-deloitte-green) 88%, var(--color-text));
+}
+
+.login-page[data-theme="light"] .login-sso-modern-pill {
+  color: color-mix(in srgb, #1e3110 88%, var(--color-text));
+}
+
+.login-sso-modern-hint {
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-muted) 85%, var(--color-text));
+}
+
+.login-sso-enterprise-btn {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  margin: 0;
+  padding: 18px 20px;
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: left;
+  border: 1px solid transparent;
+  transition:
+    box-shadow 0.3s ease,
+    border-color 0.25s ease,
+    background 0.25s ease,
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.25s ease;
+}
+
+.login-sso-enterprise-btn.login-sso-modern-cta {
+  background: linear-gradient(
+    162deg,
+    color-mix(in srgb, var(--login-deloitte-green) 105%, #7eb020),
+    color-mix(in srgb, var(--login-deloitte-green) 72%, #1d2a0d),
+    #0b1009 100%
+  );
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.38) inset,
+    0 20px 44px rgba(0, 0, 0, 0.42),
+    0 10px 28px color-mix(in srgb, var(--login-deloitte-green) 32%, transparent);
+  color: #f2f9ec;
+}
+
+.login-sso-enterprise-btn.login-sso-modern-cta:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.42) inset,
+    0 26px 52px rgba(0, 0, 0, 0.45),
+    0 12px 36px color-mix(in srgb, var(--login-deloitte-green) 38%, transparent);
+}
+
+.login-page[data-theme="light"] .login-sso-enterprise-btn.login-sso-modern-cta {
+  color: #0f1808;
+  background: linear-gradient(
+    168deg,
+    color-mix(in srgb, var(--login-deloitte-green) 88%, #f0f8e8),
+    color-mix(in srgb, var(--login-deloitte-green) 98%, #7cb31c)
+  );
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.75) inset,
+    0 18px 36px rgba(15, 23, 42, 0.12);
+}
+
+.login-page[data-theme="light"] .login-sso-enterprise-btn.login-sso-modern-cta:hover:not(:disabled) {
+  filter: brightness(1.03);
+}
+
+.login-sso-enterprise-btn:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px rgba(12, 16, 20, 0.95),
+    0 0 0 4px color-mix(in srgb, var(--login-deloitte-green) 90%, transparent);
+}
+
+.login-sso-enterprise-btn.login-sso-modern-cta:focus-visible {
+  box-shadow:
+    0 0 0 2px rgba(12, 16, 20, 0.95),
+    0 0 0 5px rgba(242, 249, 236, 0.55),
+    0 20px 44px rgba(0, 0, 0, 0.42);
+}
+
+.login-sso-enterprise-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.12);
+}
+
+.login-sso-enterprise-btn-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.login-sso-email-icon-wrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 10px;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  color: color-mix(in srgb, var(--login-deloitte-green) 82%, var(--color-text));
+  background: linear-gradient(
+    152deg,
+    color-mix(in srgb, var(--login-deloitte-green) 22%, transparent),
+    color-mix(in srgb, #fff 5%, transparent)
+  );
+  border: 1px solid color-mix(in srgb, var(--login-deloitte-green) 48%, var(--color-border));
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+    0 10px 28px rgba(0, 0, 0, 0.26);
 }
 
-.login-welcome-pulse {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-brand-light);
-  box-shadow: 0 0 16px color-mix(in srgb, var(--color-brand) 60%, transparent);
-  animation: loginWelcomePulse 0.9s ease-in-out infinite;
+.login-page[data-theme="light"] .login-sso-email-icon-wrap {
+  color: color-mix(in srgb, #2f4a12 88%, var(--color-text));
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.98),
+    color-mix(in srgb, var(--login-deloitte-green) 10%, transparent)
+  );
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.95) inset,
+    0 8px 22px rgba(15, 23, 42, 0.1);
 }
 
-.login-welcome-pulse--delay {
-  animation-delay: 0.15s;
+.login-sso-email-icon-wrap--busy {
+  border-style: dashed;
+  opacity: 0.92;
 }
 
-.login-welcome-pulse--delay2 {
-  animation-delay: 0.3s;
+
+.login-sso-enterprise-spinner {
+  flex-shrink: 0;
+  color: var(--color-brand-light);
+  animation: loginSsoSpin 0.95s linear infinite;
 }
 
-@keyframes loginWelcomePulse {
-  0%,
-  100% {
-    opacity: 0.35;
-    transform: scale(0.85);
+@keyframes loginSsoSpin {
+  from {
+    transform: rotate(0deg);
   }
-  50% {
-    opacity: 1;
-    transform: scale(1.12);
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.login-sso-enterprise-btn-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.login-sso-enterprise-btn-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--color-text);
+}
+
+.login-sso-enterprise-btn-sub {
+  font-size: 11px;
+  font-weight: 550;
+  line-height: 1.38;
+  color: color-mix(in srgb, var(--color-muted) 94%, var(--color-text));
+  letter-spacing: 0.01em;
+}
+
+.login-sso-enterprise-btn.login-sso-modern-cta .login-sso-enterprise-btn-title {
+  color: inherit;
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: -0.024em;
+}
+
+.login-sso-enterprise-btn.login-sso-modern-cta .login-sso-enterprise-btn-sub {
+  color: color-mix(in srgb, currentColor 74%, transparent);
+  font-weight: 580;
+  font-size: 11px;
+}
+
+.login-sso-enterprise-btn.login-sso-modern-cta .login-sso-email-icon-wrap {
+  background: rgba(255, 255, 255, 0.13);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  color: #f2f9ec;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset;
+}
+
+.login-page[data-theme="light"] .login-sso-enterprise-btn.login-sso-modern-cta .login-sso-email-icon-wrap {
+  background: rgba(14, 26, 14, 0.1);
+  border-color: rgba(14, 26, 14, 0.22);
+  color: #111b0d;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+.login-sso-enterprise-btn.login-sso-modern-cta .login-sso-enterprise-spinner {
+  color: currentColor;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-sso-enterprise-spinner {
+    animation-duration: 1.45s;
   }
 }
 
@@ -1306,8 +1501,8 @@
 
 .login-page-divider--or {
   gap: 14px;
-  margin-top: 4px;
-  margin-bottom: 18px;
+  margin-top: 2px;
+  margin-bottom: 20px;
 }
 
 .login-page-divider-line {
@@ -1316,19 +1511,24 @@
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in srgb, var(--color-border) 85%, transparent) 25%,
-    color-mix(in srgb, var(--color-border) 85%, transparent) 75%,
+    color-mix(in srgb, var(--color-border) 88%, transparent) 22%,
+    color-mix(in srgb, var(--login-deloitte-green) 35%, transparent) 50%,
+    color-mix(in srgb, var(--color-border) 88%, transparent) 78%,
     transparent
   );
 }
 
 .login-page-divider-or {
   flex-shrink: 0;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: color-mix(in srgb, var(--color-muted) 88%, var(--color-text));
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--login-deloitte-green) 11%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 65%, transparent);
 }
 
 .login-page-pwd-form {
@@ -1347,10 +1547,10 @@
 
 .login-page-field-wrapper {
   position: relative;
-  border-radius: 11px;
+  border-radius: 14px;
   will-change: width, transform;
   overflow: hidden;
-  height: 48px;
+  height: 52px;
   margin-bottom: 12px;
   border: 1px solid color-mix(in srgb, var(--color-border) 90%, transparent);
   background: color-mix(in srgb, #0a0c12 70%, transparent);
@@ -1699,29 +1899,23 @@
 }
 
 .login-page[data-theme="light"] .login-page-card {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: color-mix(in srgb, var(--color-brand) 22%, var(--color-border));
+  background: linear-gradient(
+    170deg,
+    rgba(255, 255, 255, 0.97),
+    rgba(248, 250, 247, 0.94),
+    rgba(255, 255, 255, 0.96)
+  );
+  border-color: color-mix(in srgb, var(--login-deloitte-green) 35%, var(--color-border));
   box-shadow:
-    0 0 0 1px rgba(0, 136, 255, 0.06) inset,
-    0 0 0 1px rgba(255, 255, 255, 0.95) inset,
-    0 36px 72px rgba(15, 23, 42, 0.1),
-    0 0 80px rgba(0, 136, 255, 0.06);
+    0 0 0 1px color-mix(in srgb, var(--login-deloitte-green) 12%, transparent) inset,
+    0 2px 0 rgba(255, 255, 255, 0.98) inset,
+    0 40px 80px rgba(15, 23, 42, 0.12),
+    0 16px 40px rgba(15, 23, 42, 0.06),
+    0 0 120px rgba(134, 188, 37, 0.1);
 }
 
 .login-page[data-theme="light"] .login-page-card-ring {
   opacity: 0.35;
-}
-
-.login-page[data-theme="light"] .login-page-sso-btn {
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.2) inset,
-    0 10px 28px rgba(15, 23, 42, 0.12);
-}
-
-.login-page[data-theme="light"] .login-page-sso-btn--slack {
-  box-shadow:
-    0 0 0 1px rgba(15, 23, 42, 0.1) inset,
-    0 8px 22px rgba(15, 23, 42, 0.1);
 }
 
 .login-page[data-theme="light"] .login-page-input {
@@ -1829,10 +2023,71 @@ html[data-low-gpu="1"] .login-page-particle {
   }
 }
 
+@media (max-height: 780px) {
+  .login-page {
+    padding-top: clamp(56px, 6.5vw, 80px);
+    padding-bottom: 80px;
+  }
+
+  .login-page-shell {
+    gap: clamp(16px, 3vw, 28px);
+  }
+
+  .login-page-feature-loop-frame {
+    min-height: 100px;
+    padding: 14px 16px 16px;
+  }
+
+  .login-page-hero-lead {
+    margin-bottom: 22px;
+    font-size: 1rem;
+  }
+
+  .login-page-feature-loop-wrap {
+    margin-bottom: 18px;
+  }
+
+  .login-page-card-masthead-plate {
+    padding: clamp(16px, 3vw, 22px) clamp(18px, 4vw, 28px);
+  }
+
+  .login-page-card-masthead-meta {
+    padding: 12px 18px 14px;
+  }
+
+  .login-page-card-body {
+    padding: 20px clamp(22px, 4.5vw, 36px) 28px;
+  }
+
+  .login-page-sso-enterprise.login-sso-modern {
+    padding: 13px;
+  }
+}
+
+@media (max-height: 680px) {
+  .login-page-hero-title {
+    font-size: clamp(1.72rem, 4vw, 2.35rem);
+  }
+
+  .login-page-feature-loop-slide .login-page-feature-loop-title {
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+
+  .login-page-card-deloitte-logo {
+    height: clamp(30px, 5.5vw, 42px);
+  }
+}
+
 @media (max-width: 900px) {
+  .login-page-card-sticky-shell {
+    position: relative;
+    top: auto !important;
+  }
+
   .login-page-shell {
     grid-template-columns: 1fr;
-    max-width: 440px;
+    max-width: min(492px, calc(100vw - 36px));
   }
 
   .login-page-hero {
@@ -1874,8 +2129,8 @@ html[data-low-gpu="1"] .login-page-particle {
 }
 
 @media (max-width: 480px) {
-  .login-page-card-inner {
-    padding: 34px 24px 30px;
+  .login-page-card-body {
+    padding: 20px clamp(18px, 5vw, 28px) 26px;
   }
 
   .login-page-hero-title {

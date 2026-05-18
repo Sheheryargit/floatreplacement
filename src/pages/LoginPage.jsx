@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   CalendarDays,
@@ -8,11 +8,13 @@ import {
   Filter,
   Lock,
   ArrowRight,
+  Loader2,
+  Mail,
 } from "lucide-react";
-import { siJira, siMicrosoftoutlook } from "simple-icons";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useAppDialog } from "../context/AppDialogContext.jsx";
+import { isSupabaseConfigured, supabase } from "../lib/supabase.js";
 import "./LoginPage.css";
 
 function HudTicker() {
@@ -33,250 +35,62 @@ const ACCESS_PASSWORD =
 const SESSION_DEFAULT_NAME =
   String(import.meta.env.VITE_SESSION_DISPLAY_NAME ?? "").trim() || "Workspace session";
 
-const SIGN_IN_HOLD_MS = 5000;
-const SSO_TRIPLE_WINDOW_MS = 720;
-const SSO_WELCOME_MS = 3000;
-const SSO_WELCOME_MS_REDUCED = 750;
+/** Optional—for Azure AD, steers corporate login (e.g. deloitte.com). Set `VITE_SSO_EMAIL_DOMAIN` in `.env.local`. */
+const SSO_EMAIL_DOMAIN_HINT =
+  String(import.meta.env.VITE_SSO_EMAIL_DOMAIN ?? "").trim() || "";
 
-const SSO_PROVIDERS = [
-  { id: "google", label: "Google", toneClass: "login-page-sso-btn--google" },
-  { id: "jira", label: "Jira", icon: siJira, toneClass: "login-page-sso-btn--jira" },
-  { id: "outlook", label: "Outlook", icon: siMicrosoftoutlook, toneClass: "login-page-sso-btn--outlook" },
-  { id: "slack", label: "Slack", toneClass: "login-page-sso-btn--slack" },
-];
-
-/** Slack octothorpe — eight subpaths from Simple Icons geometry, Slack core palette (media kit). */
-const SLACK_MARK_PATHS = [
-  "M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52z",
-  "M6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z",
-  "M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834z",
-  "M8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z",
-  "M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834z",
-  "M17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312z",
-  "M15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52z",
-  "M15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z",
-];
-const SLACK_MARK_FILLS = ["#E01E5A", "#E01E5A", "#36C5F0", "#36C5F0", "#2EB67D", "#2EB67D", "#ECB22E", "#ECB22E"];
-
-/** Google “G” — standard four-color mark used on enterprise login rows */
-function GoogleMulticolorMark() {
-  return (
-    <svg
-      className="login-page-sso-brand-svg login-page-sso-brand-svg--google"
-      viewBox="0 0 24 24"
-      aria-hidden
-    >
-      <path
-        fill="#4285F4"
-        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-      />
-      <path
-        fill="#34A853"
-        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-      />
-      <path
-        fill="#EA4335"
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-      />
-    </svg>
-  );
-}
-
-function SsoBrandIcon({ icon, fill, className }) {
-  const cn = ["login-page-sso-brand-svg", className].filter(Boolean).join(" ");
-  return (
-    <svg className={cn} viewBox="0 0 24 24" role="img" aria-hidden xmlns="http://www.w3.org/2000/svg">
-      <path fill={fill ?? `#${icon.hex}`} d={icon.path} />
-    </svg>
-  );
-}
-
-/** Official four-color Slack mark (Slack media kit palette); white tile per brand guidelines */
-function SlackMulticolorMark() {
-  return (
-    <svg
-      className="login-page-sso-brand-svg login-page-sso-brand-svg--slack-official"
-      viewBox="0 0 24 24"
-      aria-hidden
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      {SLACK_MARK_PATHS.map((d, i) => (
-        <path key={`slack-seg-${i}`} fill={SLACK_MARK_FILLS[i]} d={d} />
-      ))}
-    </svg>
-  );
-}
-
-function SsoTileIcon({ provider }) {
-  if (provider.id === "google") return <GoogleMulticolorMark />;
-  if (provider.id === "slack") return <SlackMulticolorMark />;
-  if (provider.icon) {
-    const onBrand = provider.id === "jira" || provider.id === "outlook";
-    return (
-      <SsoBrandIcon
-        icon={provider.icon}
-        fill={onBrand ? "#ffffff" : undefined}
-        className={onBrand ? "login-page-sso-brand-svg--on-brand" : undefined}
-      />
-    );
-  }
-  return null;
-}
-
-const WELCOME_FLOAT = ["🎯", "✨", "📊", "🚀", "💼", "🧠", "⚡", "🎉", "🔮", "📈"];
-
-/** Percent [left, top] for floating emoji layer */
-const WELCOME_FLOAT_POS = [
-  [8, 14],
-  [82, 10],
-  [18, 68],
-  [88, 52],
-  [12, 42],
-  [62, 78],
-  [48, 22],
-  [34, 58],
-  [72, 36],
-  [52, 48],
-];
-
-const WELCOME_TAGLINE = {
-  google: "Google workspace — synced.",
-  jira: "Jira streams — wired in.",
-  outlook: "Outlook calendar — locked.",
-  slack: "Slack signals — live.",
+const heroStagger = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.065, delayChildren: 0.04 },
+  },
 };
 
-function SsoWelcomeCeremony({ providerId, reduceMotion, onDone }) {
-  useEffect(() => {
-    const ms = reduceMotion ? SSO_WELCOME_MS_REDUCED : SSO_WELCOME_MS;
-    const id = window.setTimeout(onDone, ms);
-    return () => window.clearTimeout(id);
-  }, [reduceMotion, onDone]);
+const heroStaggerVisible = {
+  hidden: { opacity: 1 },
+  show: { opacity: 1 },
+};
 
-  const tag = WELCOME_TAGLINE[providerId] ?? "Your command surface is ready.";
-  const container = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: reduceMotion ? { duration: 0.2 } : { staggerChildren: 0.14, delayChildren: 0.08 },
-    },
-  };
-  const item = {
-    hidden: reduceMotion
-      ? { opacity: 0 }
-      : { opacity: 0, y: 22, scale: 0.92, filter: "blur(10px)" },
-    show: reduceMotion
-      ? { opacity: 1, transition: { duration: 0.2 } }
-      : {
-          opacity: 1,
-          y: 0,
-          scale: 1,
-          filter: "blur(0px)",
-          transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] },
-        },
-  };
+const heroItem = {
+  hidden: { opacity: 0, y: 16 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] },
+  },
+};
 
-  return (
-    <motion.div
-      className="login-welcome-root"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="login-welcome-title"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.35 }}
-    >
-      <div className="login-welcome-aurora" aria-hidden />
-      <div className="login-welcome-floaties" aria-hidden>
-        {!reduceMotion &&
-          WELCOME_FLOAT.map((ch, i) => (
-            <motion.span
-              key={`${ch}-${i}`}
-              className="login-welcome-floaty"
-              initial={{ opacity: 0, scale: 0, rotate: -20 }}
-              animate={{
-                opacity: [0, 1, 0.85],
-                scale: [0.2, 1.15, 1],
-                rotate: [0, 8, -6],
-                y: [0, -6, 0],
-              }}
-              transition={{
-                duration: 2.2,
-                delay: 0.15 + i * 0.09,
-                ease: [0.16, 1, 0.3, 1],
-              }}
-              style={{
-                left: `${WELCOME_FLOAT_POS[i % WELCOME_FLOAT_POS.length][0]}%`,
-                top: `${WELCOME_FLOAT_POS[i % WELCOME_FLOAT_POS.length][1]}%`,
-              }}
-            >
-              {ch}
-            </motion.span>
-          ))}
-      </div>
-      <motion.div
-        className="login-welcome-card"
-        initial={reduceMotion ? false : { scale: 0.92, y: 24 }}
-        animate={{ scale: 1, y: 0 }}
-        transition={reduceMotion ? { duration: 0.2 } : { type: "spring", stiffness: 280, damping: 24 }}
-      >
-        <motion.div variants={container} initial="hidden" animate="show">
-          <motion.p id="login-welcome-title" className="login-welcome-kicker" variants={item}>
-            You did the triple-tap handshake 🤝
-          </motion.p>
-          <motion.h2 className="login-welcome-title" variants={item}>
-            Welcome to Alloc8
-          </motion.h2>
-          <motion.p className="login-welcome-sub" variants={item}>
-            {tag}
-          </motion.p>
-          <motion.p className="login-welcome-lede" variants={item}>
-            Spinning up people, projects, and allocations…
-            <br />
-            <span className="login-welcome-em">Hold tight — magic loading bar not included.</span> ✨
-          </motion.p>
-          <motion.div className="login-welcome-pulse-row" variants={item} aria-hidden>
-            <span className="login-welcome-pulse" />
-            <span className="login-welcome-pulse login-welcome-pulse--delay" />
-            <span className="login-welcome-pulse login-welcome-pulse--delay2" />
-          </motion.div>
-        </motion.div>
-      </motion.div>
-    </motion.div>
-  );
-}
+const heroItemVisible = {
+  hidden: { opacity: 1, y: 0 },
+  show: { opacity: 1, y: 0 },
+};
 
-/** Live tiles — real Alloc8 areas (Schedule, People, Projects, Report, filters). */
 const featureLoopSlides = [
   {
     icon: CalendarDays,
     title:
-      "Schedule — week-based timeline: allocations per person, drag to move or resize bars, and spot conflicts next to public holidays.",
+      "Schedule — week-based timeline with allocations per person, drag-adjust bars, holidays, and conflict visibility.",
   },
   {
     icon: Users,
     title:
-      "People — roster with roles, departments, tags, and availability; open a person to edit details synced with your workspace.",
+      "People — roster by role, department, and tags with availability surfaced next to allocations.",
   },
   {
     icon: FolderOpen,
     title:
-      "Projects — clients and projects drive allocation labels and colors so hours roll up cleanly for delivery and finance.",
+      "Projects — clients and projects drive allocation labels and colors across delivery views.",
   },
   {
     icon: BarChart3,
     title:
-      "Report — utilization and scheduled cost, group by people or projects, advanced filters, and CSV export for leadership packs.",
+      "Reporting — utilization, scheduled views, grouping, filters, and export for stakeholder packs.",
   },
   {
     icon: Filter,
     title:
-      "Schedule filters — starred people and tags, saved rules, and density controls so the board shows exactly the slice you need.",
+      "Filters — saved slices, starred people, and density controls tuned for large teams.",
   },
 ];
 
@@ -297,7 +111,7 @@ function FeatureRotator({ reduceMotion }) {
 
   if (reduceMotion) {
     return (
-      <ul className="login-page-feature-loop login-page-feature-loop--static" aria-label="Alloc8 features">
+      <ul className="login-page-feature-loop login-page-feature-loop--static" aria-label="Alloc8 capabilities">
         {featureLoopSlides.map(({ icon: Icon, title }) => (
           <li key={title} className="login-page-feature-loop-static-item">
             <span className="login-page-feature-loop-icon" aria-hidden>
@@ -317,7 +131,7 @@ function FeatureRotator({ reduceMotion }) {
       className="login-page-feature-loop"
       role="region"
       aria-roledescription="carousel"
-      aria-label="Alloc8 product features"
+      aria-label="Alloc8 capability highlights"
       aria-live="polite"
     >
       <div className="login-page-feature-loop-frame">
@@ -349,57 +163,20 @@ function FeatureRotator({ reduceMotion }) {
   );
 }
 
-const heroStagger = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.065, delayChildren: 0.04 },
-  },
-};
-
-/** Reduced / static-ui: avoids `opacity: 0` initial state when CSS kills motion timing (hero must not stay blank). */
-const heroStaggerVisible = {
-  hidden: { opacity: 1 },
-  show: { opacity: 1 },
-};
-
-const heroItem = {
-  hidden: { opacity: 0, y: 16 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] },
-  },
-};
-
-const heroItemVisible = {
-  hidden: { opacity: 1, y: 0 },
-  show: { opacity: 1, y: 0 },
-};
-
 export default function LoginPage() {
   const { theme } = useAppTheme();
   const { unlock } = useAuth();
   const { openDialog } = useAppDialog();
   const reduceMotion = useReducedMotion();
+
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  /** After correct password — full-screen fade then `unlock` (no lingering “authenticating” chrome). */
   const [authExit, setAuthExit] = useState(false);
   const [shake, setShake] = useState(false);
   const [pwdRejected, setPwdRejected] = useState(false);
   const [emptyPulse, setEmptyPulse] = useState(false);
   const [creditHot, setCreditHot] = useState(false);
-  const [holdProgress, setHoldProgress] = useState(0);
-  const [holdShrinking, setHoldShrinking] = useState(false);
-  const holdRafRef = useRef(null);
-  const holdShrinkTimerRef = useRef(null);
-  const holdPointerIdRef = useRef(null);
-  const holdAnchorRef = useRef(0);
-  const holdCompletingRef = useRef(false);
-  const ssoTapRef = useRef({ id: null, count: 0, timer: null });
-  const [welcomeOpen, setWelcomeOpen] = useState(false);
-  const [welcomeProvider, setWelcomeProvider] = useState(null);
+  const [ssoLoading, setSsoLoading] = useState(false);
 
   const creditZoneVariants = useMemo(() => {
     if (reduceMotion) {
@@ -495,29 +272,7 @@ export default function LoginPage() {
     }
   }, []);
 
-  const clearHoldTracking = useCallback(() => {
-    if (holdRafRef.current != null) {
-      cancelAnimationFrame(holdRafRef.current);
-      holdRafRef.current = null;
-    }
-    if (holdShrinkTimerRef.current != null) {
-      clearTimeout(holdShrinkTimerRef.current);
-      holdShrinkTimerRef.current = null;
-    }
-    holdPointerIdRef.current = null;
-    holdCompletingRef.current = false;
-    setHoldProgress(0);
-  }, []);
-
-  useEffect(() => () => {
-    if (holdRafRef.current != null) cancelAnimationFrame(holdRafRef.current);
-    if (holdShrinkTimerRef.current != null) clearTimeout(holdShrinkTimerRef.current);
-  }, []);
-
   const submit = useCallback(() => {
-    setHoldShrinking(false);
-    setHoldProgress(0);
-    holdCompletingRef.current = false;
     const p = password.trim();
     if (!p) {
       setPwdRejected(false);
@@ -547,135 +302,58 @@ export default function LoginPage() {
     }, 440);
   }, [password, unlock, openDialog]);
 
-  const finishHoldAndSubmit = useCallback(() => {
-    holdPointerIdRef.current = null;
-    if (holdRafRef.current != null) {
-      cancelAnimationFrame(holdRafRef.current);
-      holdRafRef.current = null;
-    }
-    if (reduceMotion) {
-      setHoldProgress(0);
-      setHoldShrinking(false);
-      submit();
-      holdCompletingRef.current = false;
+  const startDeloitteEmailSso = useCallback(async () => {
+    if (!isSupabaseConfigured || !supabase) {
+      openDialog({
+        title: "Deloitte email SSO isn’t wired up yet",
+        message:
+          "Add your Supabase URL and anon key, then enable Authentication → Microsoft (Azure AD). That verifies your Deloitte work email through SSO. Add this site’s URL to redirect allowlists.",
+      });
       return;
     }
-    setHoldShrinking(true);
-    holdShrinkTimerRef.current = window.setTimeout(() => {
-      holdShrinkTimerRef.current = null;
-      setHoldShrinking(false);
-      setHoldProgress(0);
-      submit();
-      holdCompletingRef.current = false;
-    }, 480);
-  }, [reduceMotion, submit]);
-
-  const onSignInPointerDown = useCallback(
-    (e) => {
-      if (authExit || emptyPulse || welcomeOpen || e.button !== 0) return;
-      e.preventDefault();
-      holdCompletingRef.current = false;
-      holdPointerIdRef.current = e.pointerId;
-      holdAnchorRef.current = performance.now();
-      try {
-        e.currentTarget.setPointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
+    setSsoLoading(true);
+    try {
+      const pathname = window.location.pathname || "/";
+      const redirectTo = `${window.location.origin}${pathname}`;
+      const queryParams = { prompt: "select_account" };
+      if (SSO_EMAIL_DOMAIN_HINT) {
+        queryParams.domain_hint = SSO_EMAIL_DOMAIN_HINT;
       }
-      const tick = () => {
-        const elapsed = performance.now() - holdAnchorRef.current;
-        const p = Math.min(1, elapsed / SIGN_IN_HOLD_MS);
-        setHoldProgress(p);
-        if (p >= 1) {
-          if (holdRafRef.current != null) {
-            cancelAnimationFrame(holdRafRef.current);
-            holdRafRef.current = null;
-          }
-          holdCompletingRef.current = true;
-          finishHoldAndSubmit();
-          return;
-        }
-        holdRafRef.current = requestAnimationFrame(tick);
-      };
-      holdRafRef.current = requestAnimationFrame(tick);
-    },
-    [authExit, emptyPulse, welcomeOpen, finishHoldAndSubmit]
-  );
-
-  const onSignInPointerEnd = useCallback(
-    (e) => {
-      if (holdPointerIdRef.current !== e.pointerId) return;
-      try {
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "azure",
+        options: {
+          redirectTo,
+          scopes: "openid profile email",
+          queryParams,
+        },
+      });
+      if (error) {
+        openDialog({
+          title: "Email sign-in couldn’t start",
+          message:
+            error.message ??
+            "Ask your administrator to confirm Azure AD and redirect URLs are configured for Deloitte email SSO.",
+        });
+        setSsoLoading(false);
       }
-      if (holdCompletingRef.current || holdShrinkTimerRef.current != null) return;
-      clearHoldTracking();
-    },
-    [clearHoldTracking]
-  );
-
-  const flushSsoTriple = useCallback(() => {
-    const r = ssoTapRef.current;
-    if (r.timer != null) {
-      window.clearTimeout(r.timer);
-      r.timer = null;
+    } catch (e) {
+      openDialog({
+        title: "Email sign-in couldn’t start",
+        message: e instanceof Error ? e.message : "Unexpected error starting Deloitte email SSO.",
+      });
+      setSsoLoading(false);
     }
-    r.id = null;
-    r.count = 0;
-  }, []);
-
-  const completeSsoWelcome = useCallback(() => {
-    flushSsoTriple();
-    const label = SSO_PROVIDERS.find((p) => p.id === welcomeProvider)?.label ?? "Signed in";
-    unlock({ displayName: label });
-  }, [unlock, flushSsoTriple, welcomeProvider]);
-
-  const handleSsoActivate = useCallback(
-    (id) => {
-      if (authExit || welcomeOpen || emptyPulse) return;
-      const r = ssoTapRef.current;
-      if (r.timer != null) {
-        window.clearTimeout(r.timer);
-        r.timer = null;
-      }
-      if (r.id !== id) {
-        r.id = id;
-        r.count = 0;
-      }
-      r.count += 1;
-      if (r.count >= 3) {
-        r.count = 0;
-        r.id = null;
-        setWelcomeProvider(id);
-        setWelcomeOpen(true);
-        return;
-      }
-      r.timer = window.setTimeout(() => {
-        r.count = 0;
-        r.id = null;
-        r.timer = null;
-      }, SSO_TRIPLE_WINDOW_MS);
-    },
-    [authExit, welcomeOpen, emptyPulse]
-  );
-
-  useEffect(
-    () => () => {
-      const r = ssoTapRef.current;
-      if (r.timer != null) window.clearTimeout(r.timer);
-    },
-    []
-  );
+  }, [openDialog]);
 
   const cardSpring = reduceMotion
     ? {}
     : { type: "spring", stiffness: 420, damping: 36, mass: 0.85 };
 
+  const gateBusy = authExit || emptyPulse || ssoLoading;
+
   return (
     <div
-      className={`login-page${welcomeOpen ? " login-page--welcome" : ""}${authExit ? " login-page--auth-exit" : ""}`}
+      className={`login-page${authExit ? " login-page--auth-exit" : ""}`}
       data-theme={theme === "light" ? "light" : "dark"}
     >
       <div className="login-page-atmosphere" aria-hidden>
@@ -716,13 +394,10 @@ export default function LoginPage() {
             initial="hidden"
             animate="show"
           >
-            <motion.div
-              variants={reduceMotion ? heroItemVisible : heroItem}
-              className="login-page-hero-badge-wrap"
-            >
+            <motion.div variants={reduceMotion ? heroItemVisible : heroItem} className="login-page-hero-badge-wrap">
               <div className="login-page-hero-badge login-page-hero-badge--futurist">
                 <span className="login-page-hero-badge-pulse" aria-hidden />
-                AI-operated workforce intelligence
+                Deloitte · Workforce scheduling · Email SSO ready
               </div>
             </motion.div>
             <motion.div variants={reduceMotion ? heroItemVisible : heroItem}>
@@ -734,43 +409,38 @@ export default function LoginPage() {
               className="login-page-hero-title"
               variants={reduceMotion ? heroItemVisible : heroItem}
             >
-              <span className="login-page-hero-title-line">Operate the future of work.</span>
+              <span className="login-page-hero-title-line">Capacity, people, and projects in one place.</span>
               <span className="login-page-hero-title-line login-page-hero-title-line--grad">
-                Agents, people, one command surface.
+                Trusted planning for regulated delivery teams.
               </span>
             </motion.h1>
             <motion.p
               className="login-page-hero-lead"
               variants={reduceMotion ? heroItemVisible : heroItem}
             >
-              Enterprise-grade workforce intelligence — AI agents amplify planners while
-              governance, audit trails, and role-aware controls stay in command.
+              Internal resource scheduling for portfolio delivery — streamlined shell, audited access,
+              and clear ownership across engagements.
             </motion.p>
-            <motion.div
-              variants={reduceMotion ? heroItemVisible : heroItem}
-              className="login-page-feature-loop-wrap"
-            >
+            <motion.div variants={reduceMotion ? heroItemVisible : heroItem} className="login-page-feature-loop-wrap">
               <p className="login-page-feature-loop-label">
                 <span className="login-page-feature-loop-label-cursor" aria-hidden />
-                Live capability stream
+                Platform overview
               </p>
               <FeatureRotator reduceMotion={reduceMotion} />
             </motion.div>
-            <motion.p
-              className="login-page-hero-trust"
-              variants={reduceMotion ? heroItemVisible : heroItem}
-            >
+            <motion.p className="login-page-hero-trust" variants={reduceMotion ? heroItemVisible : heroItem}>
               <span className="login-page-hero-trust-dot" aria-hidden />
               <span className="login-page-hero-trust-text">
-                Models nominal · human-in-the-loop · audit-ready telemetry
+                Deloitte work email SSO (Azure AD) · audited gate · fallback workspace password
               </span>
             </motion.p>
           </motion.div>
         </section>
 
+        <div className="login-page-card-sticky-shell">
         <motion.div
           className="login-page-card-tilt"
-          initial={reduceMotion ? false : { opacity: 0, y: 36 }}
+          initial={reduceMotion ? false : { opacity: 0, y: 22 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={cardSpring}
         >
@@ -779,42 +449,74 @@ export default function LoginPage() {
             <div className="login-page-card">
               <div className="login-page-card-sheen" aria-hidden />
               <div className="login-page-card-inner">
-                <div className="login-page-card-header-accent" aria-hidden />
-                <p className="login-page-card-kicker">Secure access</p>
-                <h2 className="login-page-card-title">Sign in to Alloc8</h2>
-                <p className="login-page-card-sub">
-                  Enterprise workspace gate. Use your password until SSO is connected — same
-                  policies, full audit trail.
-                </p>
-
-                <div className="login-page-sso">
-                  <div className="login-page-sso-row" role="group" aria-label="Sign-in options">
-                    {SSO_PROVIDERS.map((p) => (
-                      <motion.button
-                        key={p.id}
-                        type="button"
-                        className={`login-page-sso-btn ${p.toneClass}`}
-                        onClick={() => handleSsoActivate(p.id)}
-                        disabled={authExit || welcomeOpen || emptyPulse}
-                        whileHover={reduceMotion || authExit || welcomeOpen || emptyPulse ? {} : { y: -3, scale: 1.03 }}
-                        whileTap={reduceMotion ? {} : { scale: 0.94 }}
-                        aria-label={`${p.label}: triple-click for demo sign-in`}
-                        title={`${p.label}: triple-click to unlock (demo)`}
-                      >
-                        <span className="login-page-sso-btn-glow" aria-hidden />
-                        <SsoTileIcon provider={p} />
-                      </motion.button>
-                    ))}
+                <div className="login-page-card-masthead">
+                  <div className="login-page-card-masthead-ribbon" aria-hidden />
+                  <div className="login-page-card-masthead-core">
+                    <div className="login-page-card-masthead-plate">
+                      <img
+                        src="/branding/deloitte-logo.png"
+                        alt="Deloitte"
+                        width={296}
+                        height={48}
+                        decoding="async"
+                        className="login-page-card-deloitte-logo"
+                      />
+                    </div>
+                    <div className="login-page-card-masthead-meta">
+                      <span className="login-page-card-masthead-chip">Authorized access only</span>
+                      <div className="login-page-card-masthead-brand">
+                        <span className="login-page-card-masthead-brand-mark">
+                          Alloc<span className="alloc8-wordmark-eight">8</span>
+                        </span>
+                        <span className="login-page-card-masthead-brand-sub">Scheduling workspace</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div
-                  className="login-page-divider login-page-divider--or"
-                  role="separator"
-                  aria-hidden
-                >
+                <div className="login-page-card-body">
+                <p className="login-page-card-kicker">Enterprise access</p>
+                <h2 className="login-page-card-title">Sign in with your Deloitte email</h2>
+
+                <div className="login-page-sso-enterprise login-sso-modern" aria-labelledby="sso-primary-label">
+                  <div className="login-sso-modern-toolbar">
+                    <span id="sso-primary-label" className="login-sso-modern-pill">
+                      SSO · Deloitte work email
+                    </span>
+                    <span className="login-sso-modern-hint">Encrypted session</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="login-sso-enterprise-btn login-sso-modern-cta"
+                    onClick={() => void startDeloitteEmailSso()}
+                    disabled={gateBusy}
+                    aria-label="Continue with Deloitte work email via single sign-on"
+                  >
+                    <span className="login-sso-enterprise-btn-inner">
+                      {ssoLoading ? (
+                        <span className="login-sso-email-icon-wrap login-sso-email-icon-wrap--busy" aria-hidden>
+                          <Loader2 className="login-sso-enterprise-spinner" size={22} strokeWidth={2.2} />
+                        </span>
+                      ) : (
+                        <span className="login-sso-email-icon-wrap" aria-hidden>
+                          <Mail className="login-sso-email-icon" size={22} strokeWidth={2.05} />
+                        </span>
+                      )}
+                      <span className="login-sso-enterprise-btn-text-wrap">
+                        <span className="login-sso-enterprise-btn-title">
+                          {ssoLoading ? "Opening sign-in…" : "Continue with Deloitte email"}
+                        </span>
+                        <span className="login-sso-enterprise-btn-sub">
+                          Opens your firm&apos;s Microsoft work account • Returns here when done
+                        </span>
+                      </span>
+                    </span>
+                  </button>
+                </div>
+
+                <div className="login-page-divider login-page-divider--or" role="separator">
                   <span className="login-page-divider-line" />
-                  <span className="login-page-divider-or">Password</span>
+                  <span className="login-page-divider-or">Alternative</span>
                   <span className="login-page-divider-line" />
                 </div>
 
@@ -822,19 +524,27 @@ export default function LoginPage() {
                   className="login-page-pwd-form"
                   onSubmit={(e) => {
                     e.preventDefault();
+                    if (authExit || ssoLoading) return;
+                    submit();
                   }}
                 >
                   <label className="login-page-pwd-label" htmlFor="login-workspace-password">
                     Workspace password
                   </label>
-                  <motion.div 
+                  <motion.div
                     className={`login-page-field-wrapper ${emptyPulse ? "is-empty-lock" : ""}`}
-                    animate={emptyPulse ? { width: 50, x: "calc(50% - 25px)", background: "rgba(255, 60, 60, 0.15)", borderColor: "rgba(255, 60, 60, 0.6)" } : { width: "100%", x: 0, background: "rgba(0, 0, 0, 0)", borderColor: "rgba(255, 255, 255, 0.08)" }}
-                    transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 20 }}
+                    animate={
+                      emptyPulse
+                        ? {
+                            scale: 0.995,
+                          }
+                        : { scale: 1 }
+                    }
+                    transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 28 }}
                     onAnimationComplete={() => {
-                        if (emptyPulse) {
-                          setTimeout(() => setEmptyPulse(false), 900);
-                        }
+                      if (emptyPulse) {
+                        setTimeout(() => setEmptyPulse(false), 900);
+                      }
                     }}
                   >
                     <div className="login-page-field">
@@ -843,7 +553,7 @@ export default function LoginPage() {
                         id="login-workspace-password"
                         type="password"
                         className={`login-page-input${shake && (error || pwdRejected) && !emptyPulse ? " login-page-input--error" : ""}`}
-                        placeholder={emptyPulse ? "" : "Enter password"}
+                        placeholder={emptyPulse ? "" : "Enter workspace password"}
                         value={password}
                         onChange={(e) => {
                           setPassword(e.target.value);
@@ -852,16 +562,10 @@ export default function LoginPage() {
                           setShake(false);
                           setEmptyPulse(false);
                         }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !authExit && !emptyPulse && !welcomeOpen) {
-                            e.preventDefault();
-                            submit();
-                          }
-                        }}
                         onAnimationEnd={() => setShake(false)}
                         autoComplete="current-password"
-                        autoFocus
-                        disabled={authExit || emptyPulse || welcomeOpen}
+                        autoFocus={!ssoLoading}
+                        disabled={authExit || ssoLoading || emptyPulse}
                       />
                     </div>
                   </motion.div>
@@ -882,64 +586,36 @@ export default function LoginPage() {
                     )}
                   </AnimatePresence>
 
-                  <motion.div
-                    className="login-page-submit-wrap"
-                    initial={false}
-                    animate={
-                      holdShrinking
-                        ? {
-                            width: 56,
-                            x: "calc(50% - 28px)",
-                            transition: { duration: 0.42, ease: [0.32, 0, 0.67, 1] },
-                          }
-                        : {
-                            width: "100%",
-                            x: 0,
-                            transition: { duration: 0.32, ease: [0.16, 1, 0.3, 1] },
-                          }
-                    }
+                  <motion.button
+                    type="submit"
+                    className="login-page-submit"
+                    disabled={authExit || ssoLoading || emptyPulse}
+                    whileHover={reduceMotion ? {} : { scale: gateBusy ? 1 : 1.02 }}
+                    whileTap={reduceMotion ? {} : { scale: gateBusy ? 1 : 0.99 }}
+                    aria-label="Sign in with workspace password"
                   >
-                    <motion.button
-                      type="button"
-                      className={`login-page-submit${holdProgress > 0 && !holdShrinking && !authExit ? " login-page-submit--holding" : ""}`}
-                      disabled={authExit || emptyPulse || welcomeOpen}
-                      aria-label="Sign in: hold five seconds, or press Enter in the password field"
-                      onPointerDown={onSignInPointerDown}
-                      onPointerUp={onSignInPointerEnd}
-                      onPointerCancel={onSignInPointerEnd}
-                      onLostPointerCapture={onSignInPointerEnd}
-                      whileHover={
-                        reduceMotion || authExit || emptyPulse || welcomeOpen || holdProgress > 0
-                          ? {}
-                          : { scale: 1.02 }
-                      }
-                      whileTap={{}}
-                    >
-                      <span
-                        className="login-page-submit-hold-track"
-                        aria-hidden
-                        style={{ "--hold-p": String(holdProgress) }}
-                      />
-                      <span className="login-page-submit-inner">
-                        <span className="login-page-button-text">Sign in</span>
-                        <ArrowRight className="login-page-arrow" size={20} strokeWidth={2.25} aria-hidden />
-                      </span>
-                    </motion.button>
-                  </motion.div>
+                    <span className="login-page-submit-inner">
+                      <span className="login-page-button-text">Sign in with password</span>
+                      <ArrowRight className="login-page-arrow" size={20} strokeWidth={2.25} aria-hidden />
+                    </span>
+                  </motion.button>
                 </form>
 
                 <p className="login-page-legal">
-                  By continuing you agree to your organization&apos;s policies.
+                  By continuing you agree to your organisation&apos;s acceptable use policies and Deloitte
+                  data-handling guidelines.
                 </p>
 
                 <p className="login-page-footer">
                   Alloc8
                   <span className="login-page-tagline">Every person. Every project. In place.</span>
                 </p>
+                </div>
               </div>
             </div>
           </div>
         </motion.div>
+        </div>
       </main>
 
       <div className="login-page-attribution" aria-label="Credit">
@@ -983,27 +659,16 @@ export default function LoginPage() {
         </motion.div>
       </div>
 
-      <AnimatePresence>
-        {welcomeOpen && welcomeProvider ? (
-          <SsoWelcomeCeremony
-            key="welcome"
-            providerId={welcomeProvider}
-            reduceMotion={reduceMotion}
-            onDone={completeSsoWelcome}
-          />
-        ) : null}
-      </AnimatePresence>
-
       <footer className="login-page-hud" aria-hidden>
         <span className="login-page-hud-seg">ALLOC8</span>
         <span className="login-page-hud-sep">·</span>
-        <span className="login-page-hud-seg login-page-hud-seg--ai">AI OPS</span>
+        <span className="login-page-hud-seg login-page-hud-seg--ok">ACCESS GATE</span>
         <span className="login-page-hud-sep">·</span>
-        <span className="login-page-hud-seg login-page-hud-seg--ok">ENV READY</span>
+        <span className="login-page-hud-seg">{isSupabaseConfigured ? "EMAIL SSO" : "SSO IDLE"}</span>
         <span className="login-page-hud-sep">·</span>
         <HudTicker />
         <span className="login-page-hud-sep">·</span>
-        <span className="login-page-hud-seg login-page-hud-blink">LIVE</span>
+        <span className="login-page-hud-seg login-page-hud-blink">SECURE CH</span>
       </footer>
     </div>
   );
