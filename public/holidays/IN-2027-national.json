@@ -1,0 +1,122 @@
+[
+  {
+    "date": "2027-01-26",
+    "name": "Republic Day",
+    "localName": "Republic Day",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2027-03-06",
+    "name": "Maha Shivaratri",
+    "localName": "Maha Shivaratri",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2027-03-10",
+    "name": "Id-ul-Fitr (estimated)",
+    "localName": "Id-ul-Fitr (estimated)",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2027-03-26",
+    "name": "Good Friday",
+    "localName": "Good Friday",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2027-04-18",
+    "name": "Mahavir Jayanti",
+    "localName": "Mahavir Jayanti",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2027-05-17",
+    "name": "Bakrid (estimated)",
+    "localName": "Bakrid (estimated)",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2027-05-20",
+    "name": "Buddha Purnima",
+    "localName": "Buddha Purnima",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2027-06-16",
+    "name": "Muharram (estimated)",
+    "localName": "Muharram (estimated)",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2027-08-15",
+    "name": "Independence Day; Milad-un-Nabi (estimated)",
+    "localName": "Independence Day; Milad-un-Nabi (estimated)",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2027-08-25",
+    "name": "Janmashtami",
+    "localName": "Janmashtami",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2027-10-02",
+    "name": "Gandhi Jayanti",
+    "localName": "Gandhi Jayanti",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2027-10-09",
+    "name": "Dussehra",
+    "localName": "Dussehra",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2027-10-29",
+    "name": "Diwali",
+    "localName": "Diwali",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2027-11-14",
+    "name": "Guru Nanak Jayanti",
+    "localName": "Guru Nanak Jayanti",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2027-12-25",
+    "name": "Christmas",
+    "localName": "Christmas",
+    "types": [
+      "Public"
+    ]
+  }
+]

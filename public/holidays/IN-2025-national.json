@@ -1,0 +1,122 @@
+[
+  {
+    "date": "2025-01-26",
+    "name": "Republic Day",
+    "localName": "Republic Day",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-02-26",
+    "name": "Maha Shivaratri",
+    "localName": "Maha Shivaratri",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-03-31",
+    "name": "Id-ul-Fitr",
+    "localName": "Id-ul-Fitr",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-04-10",
+    "name": "Mahavir Jayanti",
+    "localName": "Mahavir Jayanti",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-04-18",
+    "name": "Good Friday",
+    "localName": "Good Friday",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-05-12",
+    "name": "Buddha Purnima",
+    "localName": "Buddha Purnima",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-06-07",
+    "name": "Bakrid",
+    "localName": "Bakrid",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-07-06",
+    "name": "Muharram",
+    "localName": "Muharram",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-08-15",
+    "name": "Independence Day",
+    "localName": "Independence Day",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-08-16",
+    "name": "Janmashtami",
+    "localName": "Janmashtami",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-09-05",
+    "name": "Milad-un-Nabi",
+    "localName": "Milad-un-Nabi",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-10-02",
+    "name": "Dussehra; Gandhi Jayanti",
+    "localName": "Dussehra; Gandhi Jayanti",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-10-20",
+    "name": "Diwali",
+    "localName": "Diwali",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-11-05",
+    "name": "Guru Nanak Jayanti",
+    "localName": "Guru Nanak Jayanti",
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-12-25",
+    "name": "Christmas",
+    "localName": "Christmas",
+    "types": [
+      "Public"
+    ]
+  }
+]

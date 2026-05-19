@@ -1,0 +1,670 @@
+{
+  "IN-AN": [
+    {
+      "date": "2026-03-26",
+      "name": "Ram Navami",
+      "localName": "Ram Navami",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-08-26",
+      "name": "Milad-un-Nabi (estimated); Onam",
+      "localName": "Milad-un-Nabi (estimated); Onam",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-AP": [
+    {
+      "date": "2026-03-19",
+      "name": "Ugadi",
+      "localName": "Ugadi",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-11-01",
+      "name": "Andhra Pradesh Foundation Day",
+      "localName": "Andhra Pradesh Foundation Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-AS": [
+    {
+      "date": "2026-01-14",
+      "name": "Magh Bihu",
+      "localName": "Magh Bihu",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-12-02",
+      "name": "Assam Day",
+      "localName": "Assam Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-BR": [
+    {
+      "date": "2026-03-22",
+      "name": "Bihar Day",
+      "localName": "Bihar Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-11-15",
+      "name": "Chhath Puja",
+      "localName": "Chhath Puja",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-CG": [
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-11-01",
+      "name": "Chhattisgarh Foundation Day",
+      "localName": "Chhattisgarh Foundation Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-CH": [
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-DL": [
+    {
+      "date": "2026-11-15",
+      "name": "Chhath Puja",
+      "localName": "Chhath Puja",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-GA": [
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-12-19",
+      "name": "Goa Liberation Day",
+      "localName": "Goa Liberation Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-GJ": [
+    {
+      "date": "2026-01-14",
+      "name": "Uttarayan",
+      "localName": "Uttarayan",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Buddha Purnima; Gujarat Day",
+      "localName": "Buddha Purnima; Gujarat Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-08-15",
+      "name": "Independence Day; Parsi New Year (Shahenshahi)",
+      "localName": "Independence Day; Parsi New Year (Shahenshahi)",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-10-31",
+      "name": "Sardar Vallabhbhai Patel Jayanti",
+      "localName": "Sardar Vallabhbhai Patel Jayanti",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-HP": [
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-15",
+      "name": "Himachal Day",
+      "localName": "Himachal Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-HR": [
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-11-01",
+      "name": "Haryana Foundation Day",
+      "localName": "Haryana Foundation Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-JH": [
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-11-15",
+      "name": "Chhath Puja; Jharkhand Formation Day",
+      "localName": "Chhath Puja; Jharkhand Formation Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-JK": [
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-KA": [
+    {
+      "date": "2026-03-19",
+      "name": "Ugadi",
+      "localName": "Ugadi",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-11-01",
+      "name": "Karnataka Rajyotsava",
+      "localName": "Karnataka Rajyotsava",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-KL": [
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-08-26",
+      "name": "Milad-un-Nabi (estimated); Onam",
+      "localName": "Milad-un-Nabi (estimated); Onam",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-11-01",
+      "name": "Kerala Foundation Day",
+      "localName": "Kerala Foundation Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-LA": [
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-MH": [
+    {
+      "date": "2026-02-19",
+      "name": "Chhatrapati Shivaji Maharaj Jayanti",
+      "localName": "Chhatrapati Shivaji Maharaj Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-03-03",
+      "name": "Holi",
+      "localName": "Holi",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-03-19",
+      "name": "Gudi Padwa",
+      "localName": "Gudi Padwa",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Buddha Purnima; Maharashtra Day",
+      "localName": "Buddha Purnima; Maharashtra Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-08-15",
+      "name": "Independence Day; Parsi New Year (Shahenshahi)",
+      "localName": "Independence Day; Parsi New Year (Shahenshahi)",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-MP": [
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-11-01",
+      "name": "Madhya Pradesh Foundation Day",
+      "localName": "Madhya Pradesh Foundation Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-MZ": [
+    {
+      "date": "2026-02-20",
+      "name": "Mizoram State Day",
+      "localName": "Mizoram State Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-NL": [
+    {
+      "date": "2026-12-01",
+      "name": "Nagaland State Inauguration Day",
+      "localName": "Nagaland State Inauguration Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-OD": [
+    {
+      "date": "2026-04-01",
+      "name": "Odisha Day (Utkala Dibasa)",
+      "localName": "Odisha Day (Utkala Dibasa)",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-15",
+      "name": "Maha Vishuva Sankranti / Pana Sankranti",
+      "localName": "Maha Vishuva Sankranti / Pana Sankranti",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-PB": [
+    {
+      "date": "2026-01-13",
+      "name": "Lohri",
+      "localName": "Lohri",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti; Vaisakhi",
+      "localName": "Dr. B. R. Ambedkar's Jayanti; Vaisakhi",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-11-01",
+      "name": "New Punjab Day",
+      "localName": "New Punjab Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-PY": [
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-08-16",
+      "name": "Puducherry De Jure Transfer Day",
+      "localName": "Puducherry De Jure Transfer Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-11-01",
+      "name": "Puducherry Liberation Day",
+      "localName": "Puducherry Liberation Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-RJ": [
+    {
+      "date": "2026-03-30",
+      "name": "Rajasthan Day",
+      "localName": "Rajasthan Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-06-17",
+      "name": "Maharana Pratap Jayanti",
+      "localName": "Maharana Pratap Jayanti",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-SK": [
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-05-16",
+      "name": "Sikkim State Day",
+      "localName": "Sikkim State Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-TN": [
+    {
+      "date": "2026-01-14",
+      "name": "Pongal",
+      "localName": "Pongal",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-01-15",
+      "name": "Thiruvalluvar Day / Mattu Pongal",
+      "localName": "Thiruvalluvar Day / Mattu Pongal",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-01-16",
+      "name": "Uzhavar Thirunal",
+      "localName": "Uzhavar Thirunal",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti; Puthandu (Tamil New Year)",
+      "localName": "Dr. B. R. Ambedkar's Jayanti; Puthandu (Tamil New Year)",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-TS": [
+    {
+      "date": "2026-03-19",
+      "name": "Ugadi",
+      "localName": "Ugadi",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-06-02",
+      "name": "Telangana Formation Day",
+      "localName": "Telangana Formation Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-08-10",
+      "name": "Bonalu",
+      "localName": "Bonalu",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-10-10",
+      "name": "Bathukamma Festival",
+      "localName": "Bathukamma Festival",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-UK": [
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-UP": [
+    {
+      "date": "2026-01-24",
+      "name": "UP Formation Day",
+      "localName": "UP Formation Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-11-15",
+      "name": "Chhath Puja",
+      "localName": "Chhath Puja",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-WB": [
+    {
+      "date": "2026-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-04-15",
+      "name": "Pohela Boishakh",
+      "localName": "Pohela Boishakh",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2026-05-09",
+      "name": "Rabindra Jayanti",
+      "localName": "Rabindra Jayanti",
+      "types": [
+        "Public"
+      ]
+    }
+  ]
+}

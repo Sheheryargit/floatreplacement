@@ -1,4 +1,9 @@
-/** Load AU holiday JSON from `public/holidays/` (Vite). */
+/** Load country holiday JSON from `public/holidays/` (Vite). */
+
+import {
+  inferHolidayCountry,
+  normalizeHolidayRegion,
+} from "../constants/auHolidayRegions.js";
 
 function jsonUrl(relativePath) {
   const base = import.meta.env.BASE_URL || "/";
@@ -15,47 +20,52 @@ function parseIsoDateBound(s) {
 }
 
 /**
- * @param {Array<{ id: number, startDate?: string, endDate?: string, publicHolidayRegion?: string }>} people
- * @returns {Promise<Array<{ person_id: number, holiday_date: string, name: string, holiday_type: string }>>}
+ * @param {Array<{ id: string, startDate?: string, endDate?: string, publicHolidayCountry?: string, publicHolidayRegion?: string, holidays?: string }>} people
+ * @returns {Promise<Array<{ person_id: string, holiday_date: string, name: string, holiday_type: string }>>}
  */
 export async function buildPublicHolidayRowsFromStaticJson(people) {
   const withRegion = (people || []).filter((p) => {
-    const r = p.publicHolidayRegion != null ? String(p.publicHolidayRegion).trim() : "";
-    return r !== "" && r.toLowerCase() !== "none";
+    const c = inferHolidayCountry(p);
+    return c !== "None";
   });
   if (withRegion.length === 0) return [];
 
   const y0 = new Date().getFullYear();
   const y1 = y0 + 1;
-  const nationalByYear = new Map();
-  const statesByYear = new Map();
+  const countries = [...new Set(withRegion.map((p) => inferHolidayCountry(p)))];
 
-  for (const y of [y0, y1]) {
-    try {
-      const [natRes, stRes] = await Promise.all([
-        fetch(jsonUrl(`holidays/AU-${y}-national.json`)),
-        fetch(jsonUrl(`holidays/AU-${y}-states.json`)),
-      ]);
-      if (!natRes.ok || !stRes.ok) continue;
-      nationalByYear.set(y, await natRes.json());
-      statesByYear.set(y, await stRes.json());
-    } catch {
-      /* ignore missing files / network */
+  const nationalByCountryYear = new Map();
+  const statesByCountryYear = new Map();
+
+  for (const country of countries) {
+    for (const y of [y0, y1]) {
+      try {
+        const [natRes, stRes] = await Promise.all([
+          fetch(jsonUrl(`holidays/${country}-${y}-national.json`)),
+          fetch(jsonUrl(`holidays/${country}-${y}-states.json`)),
+        ]);
+        if (!natRes.ok || !stRes.ok) continue;
+        nationalByCountryYear.set(`${country}|${y}`, await natRes.json());
+        statesByCountryYear.set(`${country}|${y}`, await stRes.json());
+      } catch {
+        /* ignore missing files / network */
+      }
     }
   }
 
   const rows = [];
 
   for (const p of withRegion) {
-    const pid = Number(p.id);
-    if (!Number.isFinite(pid)) continue;
-    const region = String(p.publicHolidayRegion).trim();
+    const pid = p.id != null ? String(p.id).trim() : "";
+    if (!pid) continue;
+    const country = inferHolidayCountry(p);
+    const region = normalizeHolidayRegion(p.publicHolidayRegion, country);
     const dStart = parseIsoDateBound(p.startDate);
     const dEnd = parseIsoDateBound(p.endDate);
 
     for (const y of [y0, y1]) {
-      const national = nationalByYear.get(y);
-      const states = statesByYear.get(y);
+      const national = nationalByCountryYear.get(`${country}|${y}`);
+      const states = statesByCountryYear.get(`${country}|${y}`);
       if (!national || !states) continue;
 
       const seen = new Set();
@@ -78,7 +88,7 @@ export async function buildPublicHolidayRowsFromStaticJson(people) {
 
       for (const h of national) addHoliday(h);
 
-      if (region !== "AU") {
+      if (region !== country) {
         const stateList = states[region];
         if (Array.isArray(stateList)) {
           for (const h of stateList) addHoliday(h);

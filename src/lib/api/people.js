@@ -1,8 +1,14 @@
 import { supabase, isSupabaseConfigured } from "../supabase.js";
-import { legacyHolidaysToRegion, regionToLegacyHolidays } from "../../constants/auHolidayRegions.js";
+import {
+  inferHolidayCountry,
+  legacyHolidaysToRegion,
+  normalizeHolidayRegion,
+  regionToLegacyHolidays,
+} from "../../constants/auHolidayRegions.js";
 
 function personToRow(p) {
-  const region = p.publicHolidayRegion ?? legacyHolidaysToRegion(p.holidays);
+  const country = inferHolidayCountry(p);
+  const region = normalizeHolidayRegion(p.publicHolidayRegion ?? legacyHolidaysToRegion(p.holidays), country);
   return {
     name: p.name,
     email: p.email ?? "",
@@ -17,6 +23,7 @@ function personToRow(p) {
     end_date: p.endDate ?? "",
     work_type: p.workType ?? "Full-time",
     notes: p.notes ?? "",
+    public_holiday_country: country,
     public_holiday_region: region,
     holidays: regionToLegacyHolidays(region),
     archived: !!p.archived,
@@ -26,10 +33,16 @@ function personToRow(p) {
 
 function rowToPerson(row) {
   if (!row) return null;
-  const region =
+  const regionRaw =
     row.public_holiday_region != null && String(row.public_holiday_region).trim() !== ""
       ? String(row.public_holiday_region).trim()
       : legacyHolidaysToRegion(row.holidays);
+  const country = inferHolidayCountry({
+    publicHolidayCountry: row.public_holiday_country,
+    publicHolidayRegion: regionRaw,
+    holidays: row.holidays,
+  });
+  const region = normalizeHolidayRegion(regionRaw, country);
   return {
     id: row.id,
     name: row.name,
@@ -45,6 +58,7 @@ function rowToPerson(row) {
     endDate: row.end_date ?? "",
     workType: row.work_type ?? "Full-time",
     notes: row.notes ?? "",
+    publicHolidayCountry: country,
     publicHolidayRegion: region,
     holidays: regionToLegacyHolidays(region),
     archived: !!row.archived,

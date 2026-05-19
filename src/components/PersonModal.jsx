@@ -19,8 +19,11 @@ import { showCenterActionFeedback } from "../context/CenterActionFeedbackContext
 import { DepartmentSelector } from "./DepartmentSelector.jsx";
 import { FloatSelect } from "./ui/FloatSelect.jsx";
 import {
-  AU_PUBLIC_HOLIDAY_REGION_OPTIONS,
+  inferHolidayCountry,
   legacyHolidaysToRegion,
+  normalizeHolidayRegion,
+  PUBLIC_HOLIDAY_COUNTRY_OPTIONS,
+  regionOptionsForCountry,
   regionToLegacyHolidays,
 } from "../constants/auHolidayRegions.js";
 import { leaveLabel } from "./AllocationModals.jsx";
@@ -75,24 +78,33 @@ const DAY_FIELDS = [
 ];
 
 const personToForm = (p) => ({
+  publicHolidayCountry: inferHolidayCountry(p),
   name:p.name, email:p.email||"", role:p.role==="—"?"No role":p.role,
   costRate:p.costRate||"0", billRate:p.billRate||"0",
   department:p.department||"No department", tags:[...p.tags], type:p.type||"Employee",
   access: ACCESS_OPTS.find((a)=>a.label===p.access)?.value || "none",
   startDate:p.startDate||"2026-01-01", endDate:p.endDate||"", workType:p.workType||"Full-time",
   notes:p.notes||"",
-  publicHolidayRegion: p.publicHolidayRegion ?? legacyHolidaysToRegion(p.holidays),
+  publicHolidayRegion: normalizeHolidayRegion(
+    p.publicHolidayRegion ?? legacyHolidaysToRegion(p.holidays),
+    inferHolidayCountry(p)
+  ),
   ...AVAIL_DEFAULTS,
 });
 const formToPerson = (form, id, archived) => {
   const al = ACCESS_OPTS.find((a)=>a.value===form.access)?.label||"—";
-  const region = form.publicHolidayRegion ?? legacyHolidaysToRegion(form.holidays);
+  const country = inferHolidayCountry(form);
+  const region = normalizeHolidayRegion(
+    form.publicHolidayRegion ?? legacyHolidaysToRegion(form.holidays),
+    country
+  );
   return {
     id, name:form.name, email:form.email, role:form.role==="No role"?"—":form.role,
     department:form.department==="No department"?"":form.department,
     access:form.access==="none"?"—":al, tags:[...form.tags], type:form.type,
     costRate:form.costRate, billRate:form.billRate, startDate:form.startDate,
     endDate:form.endDate, workType:form.workType, notes:form.notes,
+    publicHolidayCountry: country,
     publicHolidayRegion: region,
     holidays: regionToLegacyHolidays(region),
     archived:!!archived,
@@ -537,6 +549,11 @@ function TimeOffTab({ form, setForm, t, editPerson, allocations = [], onOpenCrea
       .slice(0, 14);
   }, [allocations, editPerson?.id, todayIso]);
 
+  const regionOptions = useMemo(
+    () => regionOptionsForCountry(form.publicHolidayCountry),
+    [form.publicHolidayCountry]
+  );
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
       {editPerson && onOpenCreateLeave ? (
@@ -641,15 +658,39 @@ function TimeOffTab({ form, setForm, t, editPerson, allocations = [], onOpenCrea
       </div>
 
       <div>
+        <label style={Lbl(t)}>Public holidays country</label>
+        <FloatSelect
+          t={t}
+          value={form.publicHolidayCountry}
+          onChange={(country) =>
+            setForm({
+              ...form,
+              publicHolidayCountry: country,
+              publicHolidayRegion: normalizeHolidayRegion(form.publicHolidayRegion, country),
+            })
+          }
+          options={PUBLIC_HOLIDAY_COUNTRY_OPTIONS}
+          placeholder="Select country"
+          creatable={false}
+          searchPlaceholder="Search countries..."
+        />
+      </div>
+
+      <div>
         <label style={Lbl(t)}>Public holidays region</label>
         <FloatSelect
           t={t}
           value={form.publicHolidayRegion}
-          onChange={(v) => setForm({ ...form, publicHolidayRegion: v })}
-          options={AU_PUBLIC_HOLIDAY_REGION_OPTIONS}
+          onChange={(v) =>
+            setForm({
+              ...form,
+              publicHolidayRegion: normalizeHolidayRegion(v, form.publicHolidayCountry),
+            })
+          }
+          options={regionOptions}
           placeholder="Select region"
           creatable={false}
-          searchPlaceholder="Search regions…"
+          searchPlaceholder="Search regions..."
         />
       </div>
     </div>
@@ -914,7 +955,8 @@ function PersonModal({
       setForm(editPerson ? personToForm(editPerson) : {
         name:"",email:"",role:"No role",costRate:"0",billRate:"0",
         department:"No department",tags:[],type:"Employee",access:"none",
-        startDate:"2026-01-01",endDate:"",workType:"Full-time",notes:"",publicHolidayRegion:"None",
+        startDate:"2026-01-01",endDate:"",workType:"Full-time",notes:"",
+        publicHolidayCountry:"None",publicHolidayRegion:"None",
         ...AVAIL_DEFAULTS,
       });
       setDirty(false);

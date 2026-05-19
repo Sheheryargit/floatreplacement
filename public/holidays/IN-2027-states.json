@@ -1,0 +1,686 @@
+{
+  "IN-AN": [
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-04-15",
+      "name": "Ram Navami",
+      "localName": "Ram Navami",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-09-12",
+      "name": "Onam",
+      "localName": "Onam",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-AP": [
+    {
+      "date": "2027-04-07",
+      "name": "Ugadi",
+      "localName": "Ugadi",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-11-01",
+      "name": "Andhra Pradesh Foundation Day",
+      "localName": "Andhra Pradesh Foundation Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-AS": [
+    {
+      "date": "2027-01-15",
+      "name": "Magh Bihu",
+      "localName": "Magh Bihu",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-12-02",
+      "name": "Assam Day",
+      "localName": "Assam Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-BR": [
+    {
+      "date": "2027-03-22",
+      "name": "Bihar Day",
+      "localName": "Bihar Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-11-04",
+      "name": "Chhath Puja",
+      "localName": "Chhath Puja",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-CG": [
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-11-01",
+      "name": "Chhattisgarh Foundation Day",
+      "localName": "Chhattisgarh Foundation Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-CH": [
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-DL": [
+    {
+      "date": "2027-11-04",
+      "name": "Chhath Puja",
+      "localName": "Chhath Puja",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-GA": [
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-12-19",
+      "name": "Goa Liberation Day",
+      "localName": "Goa Liberation Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-GJ": [
+    {
+      "date": "2027-01-15",
+      "name": "Uttarayan",
+      "localName": "Uttarayan",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Gujarat Day",
+      "localName": "Gujarat Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-08-15",
+      "name": "Independence Day; Milad-un-Nabi (estimated); Parsi New Year (Shahenshahi)",
+      "localName": "Independence Day; Milad-un-Nabi (estimated); Parsi New Year (Shahenshahi)",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-10-31",
+      "name": "Sardar Vallabhbhai Patel Jayanti",
+      "localName": "Sardar Vallabhbhai Patel Jayanti",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-HP": [
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-04-15",
+      "name": "Himachal Day",
+      "localName": "Himachal Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-HR": [
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-11-01",
+      "name": "Haryana Foundation Day",
+      "localName": "Haryana Foundation Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-JH": [
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-11-04",
+      "name": "Chhath Puja",
+      "localName": "Chhath Puja",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-11-15",
+      "name": "Jharkhand Formation Day",
+      "localName": "Jharkhand Formation Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-JK": [
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-KA": [
+    {
+      "date": "2027-04-07",
+      "name": "Ugadi",
+      "localName": "Ugadi",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-11-01",
+      "name": "Karnataka Rajyotsava",
+      "localName": "Karnataka Rajyotsava",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-KL": [
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-09-12",
+      "name": "Onam",
+      "localName": "Onam",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-11-01",
+      "name": "Kerala Foundation Day",
+      "localName": "Kerala Foundation Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-LA": [
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-MH": [
+    {
+      "date": "2027-02-19",
+      "name": "Chhatrapati Shivaji Maharaj Jayanti",
+      "localName": "Chhatrapati Shivaji Maharaj Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-03-22",
+      "name": "Holi",
+      "localName": "Holi",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-04-07",
+      "name": "Gudi Padwa",
+      "localName": "Gudi Padwa",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Maharashtra Day",
+      "localName": "Maharashtra Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-08-15",
+      "name": "Independence Day; Milad-un-Nabi (estimated); Parsi New Year (Shahenshahi)",
+      "localName": "Independence Day; Milad-un-Nabi (estimated); Parsi New Year (Shahenshahi)",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-MP": [
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-11-01",
+      "name": "Madhya Pradesh Foundation Day",
+      "localName": "Madhya Pradesh Foundation Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-MZ": [
+    {
+      "date": "2027-02-20",
+      "name": "Mizoram State Day",
+      "localName": "Mizoram State Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-NL": [
+    {
+      "date": "2027-12-01",
+      "name": "Nagaland State Inauguration Day",
+      "localName": "Nagaland State Inauguration Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-OD": [
+    {
+      "date": "2027-04-01",
+      "name": "Odisha Day (Utkala Dibasa)",
+      "localName": "Odisha Day (Utkala Dibasa)",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-04-15",
+      "name": "Maha Vishuva Sankranti / Pana Sankranti",
+      "localName": "Maha Vishuva Sankranti / Pana Sankranti",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-PB": [
+    {
+      "date": "2027-01-13",
+      "name": "Lohri",
+      "localName": "Lohri",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-01-15",
+      "name": "Guru Gobind Singh Jayanti",
+      "localName": "Guru Gobind Singh Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti; Vaisakhi",
+      "localName": "Dr. B. R. Ambedkar's Jayanti; Vaisakhi",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-11-01",
+      "name": "New Punjab Day",
+      "localName": "New Punjab Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-PY": [
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-08-16",
+      "name": "Puducherry De Jure Transfer Day",
+      "localName": "Puducherry De Jure Transfer Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-11-01",
+      "name": "Puducherry Liberation Day",
+      "localName": "Puducherry Liberation Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-RJ": [
+    {
+      "date": "2027-03-30",
+      "name": "Rajasthan Day",
+      "localName": "Rajasthan Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-06-07",
+      "name": "Maharana Pratap Jayanti",
+      "localName": "Maharana Pratap Jayanti",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-SK": [
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Sikkim State Day",
+      "localName": "Sikkim State Day",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-TN": [
+    {
+      "date": "2027-01-15",
+      "name": "Pongal",
+      "localName": "Pongal",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-01-16",
+      "name": "Thiruvalluvar Day / Mattu Pongal",
+      "localName": "Thiruvalluvar Day / Mattu Pongal",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-01-17",
+      "name": "Uzhavar Thirunal",
+      "localName": "Uzhavar Thirunal",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti; Puthandu (Tamil New Year)",
+      "localName": "Dr. B. R. Ambedkar's Jayanti; Puthandu (Tamil New Year)",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-TS": [
+    {
+      "date": "2027-04-07",
+      "name": "Ugadi",
+      "localName": "Ugadi",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-06-02",
+      "name": "Telangana Formation Day",
+      "localName": "Telangana Formation Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-08-02",
+      "name": "Bonalu",
+      "localName": "Bonalu",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-09-29",
+      "name": "Bathukamma Festival",
+      "localName": "Bathukamma Festival",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-UK": [
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-UP": [
+    {
+      "date": "2027-01-24",
+      "name": "UP Formation Day",
+      "localName": "UP Formation Day",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-11-04",
+      "name": "Chhath Puja",
+      "localName": "Chhath Puja",
+      "types": [
+        "Public"
+      ]
+    }
+  ],
+  "IN-WB": [
+    {
+      "date": "2027-04-14",
+      "name": "Dr. B. R. Ambedkar's Jayanti",
+      "localName": "Dr. B. R. Ambedkar's Jayanti",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-04-15",
+      "name": "Pohela Boishakh",
+      "localName": "Pohela Boishakh",
+      "types": [
+        "Public"
+      ]
+    },
+    {
+      "date": "2027-05-09",
+      "name": "Rabindra Jayanti",
+      "localName": "Rabindra Jayanti",
+      "types": [
+        "Public"
+      ]
+    }
+  ]
+}
