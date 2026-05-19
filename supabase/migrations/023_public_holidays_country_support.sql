@@ -22,13 +22,13 @@ CREATE TABLE IF NOT EXISTS public.holiday_catalog (
   region_codes text[]
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_holiday_catalog_country_date_name_scope
-  ON public.holiday_catalog (
-    country_code,
-    holiday_date,
-    name,
-    COALESCE(array_to_string(region_codes, '|'), '')
-  );
+CREATE UNIQUE INDEX IF NOT EXISTS uq_holiday_catalog_country_date_name_national
+  ON public.holiday_catalog (country_code, holiday_date, name)
+  WHERE region_codes IS NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_holiday_catalog_country_date_name_regions
+  ON public.holiday_catalog (country_code, holiday_date, name, region_codes)
+  WHERE region_codes IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_holiday_catalog_country_year
   ON public.holiday_catalog (country_code, year);
