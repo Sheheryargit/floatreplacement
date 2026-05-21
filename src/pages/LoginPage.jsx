@@ -178,6 +178,30 @@ export default function LoginPage() {
   const [creditHot, setCreditHot] = useState(false);
   const [ssoLoading, setSsoLoading] = useState(false);
 
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const u = new URL(window.location.href);
+    const code = u.searchParams.get("error") || u.searchParams.get("error_code");
+    const desc = u.searchParams.get("error_description");
+    if (!code && !desc) return;
+    const message = [desc, code].filter(Boolean).join(" — ");
+    let readable = message.replace(/\+/g, " ");
+    try {
+      readable = decodeURIComponent(readable);
+    } catch {
+      /* keep as-is */
+    }
+    openDialog({
+      title: "Deloitte email sign-in could not complete",
+      message: readable,
+    });
+    u.searchParams.delete("error");
+    u.searchParams.delete("error_code");
+    u.searchParams.delete("error_description");
+    const next = `${u.pathname}${u.search}${u.hash}`;
+    window.history.replaceState({}, "", next);
+  }, [openDialog]);
+
   const creditZoneVariants = useMemo(() => {
     if (reduceMotion) {
       return {

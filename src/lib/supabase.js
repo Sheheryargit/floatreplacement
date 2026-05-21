@@ -28,6 +28,14 @@ export const isSupabaseConfigured = Boolean(url && key);
  */
 export const supabase = isSupabaseConfigured
   ? createClient(url, key, {
+      auth: {
+        // Browser OAuth with Hosted Supabase returns ?code= (PKCE). Default supabase-js is `implicit`;
+        // that breaks Microsoft/Azure SSO callback handling and keeps users on the login screen.
+        flowType: "pkce",
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
       realtime: {
         params: { eventsPerSecond: 12 },
       },

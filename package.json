@@ -17,6 +17,7 @@
     "supabase:db:reset": "supabase db reset",
     "supabase:db:push": "supabase db push",
     "supabase:link": "supabase link",
+    "sso:configure": "node scripts/configure-deloitte-sso.mjs",
     "fetch-holidays": "node scripts/fetch-au-holidays.mjs",
     "migrate:float-csv": "node scripts/migrate-float-people-csv.mjs",
     "migrate:float-csv:dry": "node scripts/migrate-float-people-csv.mjs --dry-run"
