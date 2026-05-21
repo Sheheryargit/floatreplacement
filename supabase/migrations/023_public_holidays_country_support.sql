@@ -119,26 +119,29 @@ BEGIN
   y1 := y0 + 1;
 
   INSERT INTO public.person_public_holidays (person_id, holiday_date, name, holiday_type)
-  SELECT
-    p_person_id,
-    hc.holiday_date,
-    hc.name,
-    hc.holiday_type
-  FROM
-    public.holiday_catalog hc
-  WHERE
-    hc.country_code = c
-    AND hc.year IN (y0, y1)
-    AND (d_start IS NULL OR hc.holiday_date >= d_start)
-    AND (d_end IS NULL OR hc.holiday_date <= d_end)
-    AND (
-      hc.is_national = TRUE
-      OR (
-        hc.region_codes IS NOT NULL
-        AND r <> c
-        AND r = ANY (hc.region_codes)
+  SELECT * FROM (
+    SELECT
+      p_person_id AS person_id,
+      hc.holiday_date,
+      hc.name,
+      hc.holiday_type
+    FROM
+      public.holiday_catalog hc
+    WHERE
+      hc.country_code = c
+      AND hc.year IN (y0, y1)
+      AND (d_start IS NULL OR hc.holiday_date >= d_start)
+      AND (d_end IS NULL OR hc.holiday_date <= d_end)
+      AND (
+        hc.is_national = TRUE
+        OR (
+          hc.region_codes IS NOT NULL
+          AND r <> c
+          AND r = ANY (hc.region_codes)
+        )
       )
-    );
+  ) AS rows
+  ON CONFLICT DO NOTHING;
 END;
 $$;
 
