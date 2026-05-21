@@ -317,6 +317,20 @@ skip_nonce_check = false
 # If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
 email_optional = false
 
+# Azure (Microsoft Entra ID) — same fields as Dashboard → Providers → Azure. For hosted Supabase, configure there;
+# uncomment below only for local `supabase start`. Secret: set SUPABASE_AUTH_EXTERNAL_AZURE_SECRET (never commit).
+# Single-tenant ("My organization only"): set url = "https://login.microsoftonline.com/<DIRECTORY_TENANT_ID>"
+# Azure Web redirect → include your Supabase callback, e.g. https://<project-ref>.supabase.co/auth/v1/callback
+#
+# [auth.external.azure]
+# enabled = true
+# client_id = ""
+# secret = "env(SUPABASE_AUTH_EXTERNAL_AZURE_SECRET)"
+# redirect_uri = ""
+# url = "https://login.microsoftonline.com/<YOUR_DIRECTORY_TENANT_ID>"
+# skip_nonce_check = false
+# email_optional = false
+
 # Allow Solana wallet holders to sign in to your project via the Sign in with Solana (SIWS, EIP-4361) standard.
 # You can configure "web3" rate limit in the [auth.rate_limit] section and set up [auth.captcha] if self-hosting.
 [auth.web3.solana]

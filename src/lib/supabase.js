@@ -3,7 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 const url = import.meta.env.VITE_SUPABASE_URL?.trim();
 const key =
   import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() ||
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY?.trim();
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY?.trim() ||
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
 
 /** Anon key is safe to ship in the browser; enforce HTTPS + RLS on the server. */
 function assertProductionSupabaseUrl(u) {
@@ -28,6 +29,14 @@ export const isSupabaseConfigured = Boolean(url && key);
  */
 export const supabase = isSupabaseConfigured
   ? createClient(url, key, {
+      auth: {
+        // Browser OAuth with Hosted Supabase returns ?code= (PKCE). Default supabase-js is `implicit`;
+        // that breaks Microsoft/Azure SSO callback handling and keeps users on the login screen.
+        flowType: "pkce",
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
       realtime: {
         params: { eventsPerSecond: 12 },
       },
