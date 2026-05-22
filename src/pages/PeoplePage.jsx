@@ -432,9 +432,6 @@ export default function PeoplePage() {
     advTags,
     advTypes,
     advWorkTypes,
-    role,
-    currentUser?.id,
-    projects,
   ]);
 
   const peopleOrderMap = useMemo(() => {
