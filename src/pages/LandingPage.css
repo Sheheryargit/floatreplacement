@@ -54,6 +54,7 @@
   min-height: 0;
   height: 100%;
   max-height: 100%;
+  overflow: hidden;
   display: flex;
   background: var(--bg);
   color: var(--text);
@@ -432,6 +433,15 @@
   flex-wrap: wrap;
 }
 
+.lp-toolbar-left {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lp-toolbar-right {
+  flex: 0 0 auto;
+}
+
 /* Portal target: zero height so the pill overlays the gap without shifting the schedule. */
 .lp-schedule-feedback-mount {
   width: 100%;
@@ -568,13 +578,22 @@
 
 .lp-dropdown-wrap {
   position: relative;
+  max-width: 100%;
 }
 
 .lp-popover {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  min-width: 260px;
+  left: auto;
+  min-width: min(260px, calc(100vw - 32px));
+  max-width: min(420px, calc(100vw - 20px));
+  max-height: min(72vh, 560px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+  width: max-content;
   padding: 10px;
   border-radius: 10px;
   border: 1px solid var(--border);

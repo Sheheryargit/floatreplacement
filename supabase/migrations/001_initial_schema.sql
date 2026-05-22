@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS people (
   email text DEFAULT '',
   role text DEFAULT '—',
   department text DEFAULT '',
-  access text DEFAULT '—',
+  access text DEFAULT 'User',
   tags text[] DEFAULT '{}',
   type text DEFAULT 'Employee',
   cost_rate text DEFAULT '0',

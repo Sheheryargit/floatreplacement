@@ -115,6 +115,8 @@ import { buildAllocationsByPerson, getPersonAllocations } from "../utils/allocat
 import { mergeScheduleAllocations } from "../utils/scheduleAllocationsMerge.js";
 import { isSupabaseConfigured } from "../lib/supabase.js";
 import { dismissPublicHolidayForPerson } from "../lib/api/personPublicHolidays.js";
+import { useAuth } from "../context/AuthContext.jsx";
+import { can } from "../constants/permissions.js";
 import {
   normalizeLeaveTypeId,
   leaveTimelineIconKey,
@@ -679,6 +681,7 @@ function leaveBarHeightPx(alloc) {
 const timelineRowEqual = (prev, next) => {
   if (prev.p !== next.p) return false;
   if (prev.i !== next.i) return false;
+  if (prev.canInteract !== next.canInteract) return false;
   if (prev.viewMode !== next.viewMode) return false;
   if (prev.anchorDate?.getTime?.() !== next.anchorDate?.getTime?.()) return false;
   if (prev.utilizationMode !== next.utilizationMode) return false;
@@ -709,6 +712,8 @@ function buildWorkAllocationTitle(alloc, projectName, hoursLabel) {
 const TimelineRow = memo(function TimelineRow({
   p,
   i,
+  canInteract,
+  canOpenPersonModal,
   personAllocations,
   projects,
   scheduleModel,
@@ -991,14 +996,17 @@ const TimelineRow = memo(function TimelineRow({
                 className="lp-person-main-col"
                 onClick={(e) => {
                   if (e.target.closest(".lp-person-add-banner")) return;
+                  if (!canOpenPersonModal) return;
                   openEdit(p);
                 }}
               >
                 <button
                   type="button"
                   className="lp-person-identity-hit"
+                  disabled={!canOpenPersonModal}
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (!canOpenPersonModal) return;
                     openEdit(p);
                   }}
                 >
@@ -1071,16 +1079,18 @@ const TimelineRow = memo(function TimelineRow({
                   <button
                     type="button"
                     className="lp-sched-add-btn lp-sched-add-btn--inline"
-                    disabled={noWorkingDaysInView}
+                    disabled={!canInteract || noWorkingDaysInView}
                     title={
-                      noWorkingDaysInView
+                      !canInteract
+                        ? "You cannot interact with this person"
+                        : noWorkingDaysInView
                         ? "No working days in this view (all days have leave or are unavailable)"
                         : "Add allocation (blocked on leave days when you save)"
                     }
                     aria-label={`Add allocation for ${p.name}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (noWorkingDaysInView) return;
+                      if (!canInteract || noWorkingDaysInView) return;
                       openCreateAllocation(p);
                     }}
                   >
@@ -1093,7 +1103,10 @@ const TimelineRow = memo(function TimelineRow({
           <button
             type="button"
             className="lp-person-row lp-person-hours-hit"
-            onClick={() => openEdit(p)}
+            onClick={() => {
+              if (!canOpenPersonModal) return;
+              openEdit(p);
+            }}
             title={hoursHitTitle}
           >
             <span className={"lp-person-hours" + hoursToneClass}>{right}</span>
@@ -1104,12 +1117,15 @@ const TimelineRow = memo(function TimelineRow({
         <div
           className="lp-grid-stack"
           style={{
-            cursor: "pointer",
+            cursor: canInteract ? "pointer" : "not-allowed",
             ["--lp-alloc-lane-count"]: allocLaneCount,
             ["--lp-sched-alloc-content-h"]: `${schedAllocContentH}px`,
             ["--lp-leave-min-h"]: leaveMinH > 0 ? `${leaveMinH}px` : undefined,
           }}
-          onClick={(e) => handleTimelineClick(e, p, nCols)}
+          onClick={(e) => {
+            if (!canInteract) return;
+            handleTimelineClick(e, p, nCols, offDayColSet);
+          }}
         >
           <div className="lp-grid-week-lanes" style={{ gridTemplateColumns: gridTemplate }} aria-hidden>
             {scheduleModel.slots.map((slot, idx) => (
@@ -1479,6 +1495,8 @@ export default function LandingPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme } = useAppTheme();
+  const { currentUser } = useAuth();
+  const role = (currentUser?.access || "").toLowerCase();
   const t = T[theme];
   const setAlloc8FeedbackDock = useAlloc8ActionFeedbackMount();
 
@@ -1689,8 +1707,26 @@ export default function LandingPage() {
     [scheduleModel]
   );
 
+  const canInteractSchedulePerson = useCallback((p) => {
+    if (can(role, "schedule", "interactAll")) {
+      return true;
+    }
+    if (can(role, "schedule", "interactTeam")) {
+      const isSelf = p.id === currentUser?.id;
+      const isOnOwnedProject = projects.some(
+        (proj) =>
+          String(proj.owner) === String(currentUser?.id) &&
+          proj.teamIds &&
+          proj.teamIds.includes(p.id)
+      );
+      return isSelf || isOnOwnedProject;
+    }
+    return p.id === currentUser?.id;
+  }, [role, currentUser?.id, projects]);
+
   const { schedulePeople, schedulePeopleHoursInView } = useMemo(() => {
     let list = people.filter((p) => !p.archived);
+    
     list = list.filter((p) =>
       personMatchesScheduleFilter(p, scheduleFilterRules, {
         allocations: scheduleAllocations,
@@ -2371,6 +2407,24 @@ export default function LandingPage() {
       .join(", ");
   }, [selectedAllocation, people]);
 
+  const canManageSelectedAllocation = useMemo(() => {
+    if (!selectedAllocation || selectedAllocation.syntheticPublicHoliday) return false;
+    const ids =
+      selectedAllocation.personIds?.length > 0
+        ? selectedAllocation.personIds
+        : selectedAllocation.personId != null
+          ? [selectedAllocation.personId]
+          : [];
+    if (ids.length === 0) return false;
+    /** Full workspace session (`id` null) still uses RBAC admin — must not require a roster id. */
+    if (can(role, "allocationModal", "editAll")) return true;
+    if (!currentUser?.id) return false;
+    return ids.every((id) => {
+      const person = people.find((p) => String(p.id) === String(id));
+      return person ? canInteractSchedulePerson(person) : false;
+    });
+  }, [selectedAllocation, currentUser?.id, people, canInteractSchedulePerson, role]);
+
   const openEdit = useCallback((person) => {
     setEditingPerson(person);
     setModalOpen(true);
@@ -2792,38 +2846,41 @@ export default function LandingPage() {
                 <Share size={18} />
               </button>
 
-              <div className="lp-dropdown-wrap" ref={addWrapRef}>
-                <button
-                  type="button"
-                  className="lp-sched-add-btn"
-                  aria-label="Add new"
-                  aria-expanded={addMenuOpen}
-                  onClick={() => {
-                    setAddMenuOpen((o) => !o);
-                    setViewMenuOpen(false);
-                    setDensityOpen(false);
-                  }}
-                  style={{
-                    transform: addMenuOpen ? "rotate(45deg)" : "none",
-                    transition: "transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28)",
-                  }}
-                >
-                  <Plus size={16} strokeWidth={2.5} />
-                </button>
-                {addMenuOpen && (
+              {(can(role, 'schedule', 'createProject')) && (
+                <div className="lp-dropdown-wrap" ref={addWrapRef}>
+                  <button
+                    type="button"
+                    className="lp-sched-add-btn"
+                    aria-label="Add new"
+                    aria-expanded={addMenuOpen}
+                    onClick={() => {
+                      setAddMenuOpen((o) => !o);
+                      setViewMenuOpen(false);
+                      setDensityOpen(false);
+                    }}
+                    style={{
+                      transform: addMenuOpen ? "rotate(45deg)" : "none",
+                      transition: "transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28)",
+                    }}
+                  >
+                    <Plus size={16} strokeWidth={2.5} />
+                  </button>
+                  {addMenuOpen && (
                   <div className="lp-popover lp-popover-add" style={{ right: 0, minWidth: "200px", zIndex: 100 }}>
                     <div className="lp-popover-title">Create New</div>
-                    <button
-                      type="button"
-                      className="lp-popover-item"
-                      onClick={() => {
-                        setAddMenuOpen(false);
-                        openAdd();
-                      }}
-                    >
-                      <UserPlus size={16} strokeWidth={1.8} className="lp-popover-icon" />
-                      Person
-                    </button>
+                    {can((currentUser?.access || "").toLowerCase(), 'schedule', 'createPerson') && (
+                      <button
+                        type="button"
+                        className="lp-popover-item"
+                        onClick={() => {
+                          setAddMenuOpen(false);
+                          openAdd();
+                        }}
+                      >
+                        <UserPlus size={16} strokeWidth={1.8} className="lp-popover-icon" />
+                        Person
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="lp-popover-item"
@@ -2850,6 +2907,7 @@ export default function LandingPage() {
                   </div>
                 )}
               </div>
+              )}
             </div>
           </div>
 
@@ -2861,6 +2919,7 @@ export default function LandingPage() {
 
           <div className="lp-subbar">
             <div className="lp-subbar-people">
+              {can(role, 'schedule', 'createPerson') && (
               <div className="lp-subbar-people-icons">
                 <button
                   type="button"
@@ -2871,6 +2930,7 @@ export default function LandingPage() {
                   <UserPlus size={20} strokeWidth={2} />
                 </button>
               </div>
+              )}
               <div className="lp-dropdown-wrap" ref={sortWrapRef}>
                 <button
                   type="button"
@@ -3175,6 +3235,8 @@ export default function LandingPage() {
                       <TimelineRow
                         p={p}
                         i={i}
+                        canInteract={canInteractSchedulePerson(p)}
+                        canOpenPersonModal={can(role, "schedule", "interactAll")}
                         personAllocations={getPersonAllocations(allocationsByPerson, p.id)}
                         projects={projects}
                         scheduleModel={scheduleModel}
@@ -3265,12 +3327,12 @@ export default function LandingPage() {
         allocation={selectedAllocation}
         assigneeNames={selectedAssigneeNames}
         onClose={closeAllocationDetail}
-        onDelete={handleDeleteAllocation}
+        onDelete={canManageSelectedAllocation ? handleDeleteAllocation : undefined}
         onExtendAllocation={handleExtendAllocation}
         allocations={scheduleAllocations}
         publicHolidayAllocations={publicHolidayAllocations}
         onEditClick={
-          selectedAllocation
+          canManageSelectedAllocation && selectedAllocation
             ? () => {
                 setAllocEditing(selectedAllocation);
                 setAllocDetailOpen(false);

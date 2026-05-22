@@ -17,7 +17,7 @@ function personFromRow(id, name, role, department) {
     name,
     role: r,
     department: d,
-    access: "—",
+    access: "User", 
     tags: [],
     type: "Employee",
     costRate: "0",

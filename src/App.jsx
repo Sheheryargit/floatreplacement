@@ -15,6 +15,7 @@ import LoginPage from "./pages/LoginPage.jsx";
 import GlobalBackground from "./components/ui/GlobalBackground.jsx";
 import { Toaster } from "sonner";
 import { isStaticUi } from "./config/uiMode.js";
+import { can } from "./constants/permissions.js";
 import "./styles/premium-overlays.css";
 
 /** Opaque toast shell — detailed fills live in index.css (.alloc8-toast). */
@@ -35,11 +36,46 @@ const ProjectsPage = lazy(() => import("./pages/ProjectsPage.jsx"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage.jsx"));
 const ReportingPage = lazy(() => import("./pages/ReportingPage.jsx"));
 
+/**
+ * Route guard component that checks permissions before rendering
+ */
+function RequirePermission({ page, action, children }) {
+  const { currentUser } = useAuth();
+  const allowed = can(
+    (currentUser?.access ?? "").toLowerCase(),
+    page,
+    action
+  );
+  if (!allowed) return <Navigate to="/" replace />;
+  return children;
+}
+
 const workspaceRoutes = [
   { path: "/", element: <LandingPage /> },
-  { path: "/people", element: <PeoplePage /> },
-  { path: "/projects", element: <ProjectsPage /> },
-  { path: "/report", element: <ReportingPage /> },
+  {
+    path: "/people",
+    element: (
+      <RequirePermission page="peoplePage" action="viewPeoplePage">
+        <PeoplePage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: "/projects",
+    element: (
+      <RequirePermission page="projectsPage" action="viewProjectsPage">
+        <ProjectsPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: "/report",
+    element: (
+      <RequirePermission page="reporting" action="viewReportingPage">
+        <ReportingPage />
+      </RequirePermission>
+    ),
+  },
   { path: "/settings", element: <SettingsPage /> },
   { path: "*", element: <Navigate to="/" replace /> },
 ];

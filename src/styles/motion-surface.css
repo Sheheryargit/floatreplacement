@@ -17,6 +17,10 @@
 }
 
 .alloc8-route-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
   animation: alloc8-route-shell-in 0.32s var(--ease-out-ui, cubic-bezier(0.22, 1, 0.36, 1)) both;
 }
 

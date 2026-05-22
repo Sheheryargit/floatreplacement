@@ -10,21 +10,23 @@ import {
   Bell,
   ChevronLeft,
   ChevronRight,
+  Shield,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAppDialog } from "../../context/AppDialogContext.jsx";
 import { useSlapAnimation } from "../../context/SlapAnimationContext.jsx";
 import { useAppTheme } from "../../context/ThemeContext.jsx";
 import { useAuth, initialsFromDisplayName } from "../../context/AuthContext.jsx";
+import { can } from "../../constants/permissions.js";
 import "./AppSideNav.css";
 
 const COLLAPSE_KEY = "alloc8-sidenav-collapsed";
 
 const NAV = [
   { to: "/", end: true, icon: CalendarDays, label: "Schedule" },
-  { to: "/people", icon: Users, label: "People" },
-  { to: "/projects", icon: FolderOpen, label: "Projects" },
-  { to: "/report", icon: BarChart3, label: "Report" },
+  { to: "/people", icon: Users, label: "People", requiresPermission: { page: "peoplePage", action: "viewPeoplePage" }},
+  { to: "/projects", icon: FolderOpen, label: "Projects", requiresPermission: { page: "projectsPage", action: "viewProjectsPage" }},
+  { to: "/report", icon: BarChart3, label: "Report", requiresPermission: { page: "reporting", action: "viewReportingPage" } },
 ];
 
 const V2_MODAL = {
@@ -38,7 +40,7 @@ function AppSideNav() {
   const { openDialog } = useAppDialog();
   const { triggerSlap } = useSlapAnimation();
   const { theme } = useAppTheme();
-  const { sessionDisplayName } = useAuth();
+  const { sessionDisplayName, currentUser } = useAuth();
   const avatarLetter =
     initialsFromDisplayName(sessionDisplayName) || "?";
 
@@ -49,6 +51,13 @@ function AppSideNav() {
       return false;
     }
   });
+
+  // Filter nav items based on permissions
+  const visibleNav = NAV.filter(
+    (item) => !item.requiresPermission || can((currentUser?.access || "").toLowerCase(), item.requiresPermission.page, item.requiresPermission.action)
+  );
+
+
 
   useEffect(() => {
     try {
@@ -132,7 +141,7 @@ function AppSideNav() {
       </div>
 
       <nav className="app-sidenav-links">
-        {NAV.map((item) => {
+        {visibleNav.map((item) => {
           const Icon = item.icon;
           if (item.soon) {
             return (
@@ -228,6 +237,8 @@ function AppSideNav() {
           <span className="visually-hidden">Open profile</span>
         </motion.button>
       </div>
+
+
     </aside>
   );
 }
