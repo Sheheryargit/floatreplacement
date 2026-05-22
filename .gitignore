@@ -30,3 +30,4 @@ npm-debug.log*
 
 # One-off bundle for Supabase SQL Editor (regenerate locally; do not commit)
 supabase/alloc8-all-migrations-for-dashboard.sql
+float-people-*.csv
