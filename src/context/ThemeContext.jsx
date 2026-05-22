@@ -20,7 +20,7 @@ function getSystemTheme() {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-/** @returns {"system" | "dark" | "light"} First visit: explicit dark (not system). */
+/** @returns {"system" | "dark" | "light"} First visit: light (not system). */
 function readStoredPreference() {
   try {
     const s = localStorage.getItem(STORAGE_KEY);
@@ -28,7 +28,7 @@ function readStoredPreference() {
   } catch {
     /* ignore */
   }
-  return "dark";
+  return "light";
 }
 
 function resolveTheme(preference) {
@@ -40,12 +40,12 @@ function resolveTheme(preference) {
 function readStoredPalette() {
   try {
     const s = localStorage.getItem(PALETTE_STORAGE_KEY);
-    if (s === null || s === "") return "studio";
+    if (s === "default") return "default";
     if (s === "studio") return "studio";
   } catch {
     /* ignore */
   }
-  return "default";
+  return "studio";
 }
 
 /** @returns {string} normalized #rrggbb or "" */

@@ -192,7 +192,7 @@ export default function SettingsPage() {
             Appearance
           </h2>
           <p className="settings-section-desc settings-appearance-lede">
-            New sign-ins default to dark mode and Studio typography; you can match your OS, swap palette, light/dark, or tint the canvas—all personal tweaks.
+            New sign-ins default to light mode, Studio typography, and Pill allocation tiles; you can match your OS, swap palette, light/dark, or tint the canvas—all personal tweaks.
           </p>
           <p className="settings-local-privacy-note" role="note">
             Stored only on this browser—nothing here is synced to teammates or uploaded as workspace preferences.
