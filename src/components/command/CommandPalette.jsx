@@ -9,6 +9,7 @@ import {
   FolderOpen,
   Settings,
   UserPlus,
+  BarChart3,
 } from "lucide-react";
 import { useAppData } from "../../context/AppDataContext.jsx";
 import { useAppTheme } from "../../context/ThemeContext.jsx";
@@ -37,6 +38,13 @@ const ACTIONS = [
     meta: "/projects",
     path: "/projects",
     icon: FolderOpen,
+  },
+  {
+    id: "go-report",
+    title: "Reporting",
+    meta: "/report",
+    path: "/report",
+    icon: BarChart3,
   },
   {
     id: "go-settings",

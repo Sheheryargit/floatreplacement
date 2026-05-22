@@ -685,7 +685,6 @@ function leaveBarHeightPx(alloc) {
 const timelineRowEqual = (prev, next) => {
   if (prev.p !== next.p) return false;
   if (prev.i !== next.i) return false;
-  if (prev.canInteract !== next.canInteract) return false;
   if (prev.viewMode !== next.viewMode) return false;
   if (prev.anchorDate?.getTime?.() !== next.anchorDate?.getTime?.()) return false;
   if (prev.utilizationMode !== next.utilizationMode) return false;
@@ -716,8 +715,6 @@ function buildWorkAllocationTitle(alloc, projectName, hoursLabel) {
 const TimelineRow = memo(function TimelineRow({
   p,
   i,
-  canInteract,
-  canOpenPersonModal,
   personAllocations,
   projects,
   scheduleModel,
@@ -1000,17 +997,14 @@ const TimelineRow = memo(function TimelineRow({
                 className="lp-person-main-col"
                 onClick={(e) => {
                   if (e.target.closest(".lp-person-add-banner")) return;
-                  if (!canOpenPersonModal) return;
                   openEdit(p);
                 }}
               >
                 <button
                   type="button"
                   className="lp-person-identity-hit"
-                  disabled={!canOpenPersonModal}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (!canOpenPersonModal) return;
                     openEdit(p);
                   }}
                 >
@@ -1083,18 +1077,16 @@ const TimelineRow = memo(function TimelineRow({
                   <button
                     type="button"
                     className="lp-sched-add-btn lp-sched-add-btn--inline"
-                    disabled={!canInteract || noWorkingDaysInView}
+                    disabled={noWorkingDaysInView}
                     title={
-                      !canInteract
-                        ? "You cannot interact with this person"
-                        : noWorkingDaysInView
+                      noWorkingDaysInView
                         ? "No working days in this view (all days have leave or are unavailable)"
                         : "Add allocation (blocked on leave days when you save)"
                     }
                     aria-label={`Add allocation for ${p.name}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!canInteract || noWorkingDaysInView) return;
+                      if (noWorkingDaysInView) return;
                       openCreateAllocation(p);
                     }}
                   >
@@ -1107,10 +1099,7 @@ const TimelineRow = memo(function TimelineRow({
           <button
             type="button"
             className="lp-person-row lp-person-hours-hit"
-            onClick={() => {
-              if (!canOpenPersonModal) return;
-              openEdit(p);
-            }}
+            onClick={() => openEdit(p)}
             title={hoursHitTitle}
           >
             <span className={"lp-person-hours" + hoursToneClass}>{right}</span>
@@ -1121,15 +1110,12 @@ const TimelineRow = memo(function TimelineRow({
         <div
           className="lp-grid-stack"
           style={{
-            cursor: canInteract ? "pointer" : "not-allowed",
+            cursor: "pointer",
             ["--lp-alloc-lane-count"]: allocLaneCount,
             ["--lp-sched-alloc-content-h"]: `${schedAllocContentH}px`,
             ["--lp-leave-min-h"]: leaveMinH > 0 ? `${leaveMinH}px` : undefined,
           }}
-          onClick={(e) => {
-            if (!canInteract) return;
-            handleTimelineClick(e, p, nCols, offDayColSet);
-          }}
+          onClick={(e) => handleTimelineClick(e, p, nCols, offDayColSet)}
         >
           <div className="lp-grid-week-lanes" style={{ gridTemplateColumns: gridTemplate }} aria-hidden>
             {scheduleModel.slots.map((slot, idx) => (
@@ -3216,8 +3202,6 @@ export default function LandingPage() {
                       <TimelineRow
                         p={p}
                         i={i}
-                        canInteract
-                        canOpenPersonModal={true}
                         personAllocations={getPersonAllocations(allocationsByPerson, p.id)}
                         projects={projects}
                         scheduleModel={scheduleModel}

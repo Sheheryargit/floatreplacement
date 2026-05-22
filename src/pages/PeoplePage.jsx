@@ -18,7 +18,6 @@ import {
   Building2,
   Tag,
   Clock,
-  Download,
 } from "lucide-react";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useAppData } from "../context/AppDataContext.jsx";
@@ -861,9 +860,6 @@ export default function PeoplePage() {
                 </div>
               )}
             </div>
-            <Button type="button" variant="secondary" size="md" style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <Download size={14} /> Import
-            </Button>
             <Button type="button" variant="primary" size="md" onClick={openAdd} style={{ display: "flex", alignItems: "center", gap: 7 }}>
               <UserPlus size={14} /> Add person
             </Button>

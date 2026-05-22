@@ -254,66 +254,6 @@ html[data-theme="light"] .lp-invite-email:focus {
   cursor: not-allowed;
 }
 
-.lp-invite-role-seg {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  padding: 5px;
-  border-radius: 14px;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-html[data-theme="light"] .lp-invite-role-seg {
-  background: rgba(15, 23, 42, 0.04);
-  border-color: rgba(15, 23, 42, 0.1);
-}
-
-.lp-invite-role-pill {
-  position: relative;
-  padding: 11px 8px;
-  border: none;
-  border-radius: 11px;
-  background: transparent;
-  cursor: pointer;
-  font-family: var(--font-display, "Syne", system-ui, sans-serif);
-  font-size: 0.8125rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: inherit;
-  opacity: 0.55;
-  transition:
-    opacity 0.18s ease,
-    background 0.2s ease,
-    color 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.lp-invite-role-pill:hover:not(:disabled) {
-  opacity: 0.88;
-}
-
-.lp-invite-role-pill:disabled {
-  cursor: not-allowed;
-  opacity: 0.4;
-}
-
-.lp-invite-role-pill--on {
-  opacity: 1;
-  color: #fff;
-  background: linear-gradient(160deg, rgba(0, 136, 255, 0.95), rgba(88, 72, 220, 0.92));
-  box-shadow:
-    0 6px 20px rgba(0, 136, 255, 0.35),
-    0 0 0 1px rgba(255, 255, 255, 0.12) inset;
-}
-
-html[data-theme="light"] .lp-invite-role-pill--on {
-  color: #fff;
-  background: linear-gradient(160deg, #0077e6, #5b4fd4);
-  box-shadow: 0 6px 18px rgba(0, 119, 230, 0.28);
-}
-
 .lp-invite-foot {
   padding: 18px 28px 22px;
   display: flex;

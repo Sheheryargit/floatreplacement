@@ -35,6 +35,7 @@ import {
   normalizeFilterRules,
   deriveLegacyTagFilterFromRules,
 } from "../utils/scheduleAllocationFilter.js";
+import { toast } from "sonner";
 
 const LEGACY_STORAGE_KEY = "float-workspace-v1";
 
@@ -43,6 +44,14 @@ const WORKSPACE_REALTIME_DEBOUNCE_MS = 900;
 
 /** If Supabase hangs, still leave the animated loader instead of trapping the user indefinitely. */
 const WORKSPACE_READY_FALLBACK_MS = 25_000;
+
+function notifyWorkspaceLoadIssue(message, description) {
+  toast.error(message, {
+    description,
+    duration: 8000,
+    className: "alloc8-toast",
+  });
+}
 
 function dbSync(fn) {
   if (!isSupabaseConfigured) return;
@@ -418,14 +427,31 @@ export function AppDataProvider({ children }) {
     /** Tables touched since last flush; coalesced into one debounced partial refresh. */
     const dirtyRealtime = new Set();
 
-    const runFullReload = () => {
+    const runFullReload = (opts = {}) => {
       if (cancelled) return;
       loadWorkspaceFromSupabase()
         .then((data) => {
-          if (cancelled || !data) return;
+          if (cancelled) return;
+          if (!data) {
+            if (opts.notify) {
+              notifyWorkspaceLoadIssue(
+                "Workspace data unavailable",
+                "The server returned no data. Check your connection and try reloading."
+              );
+            }
+            return;
+          }
           mergeRemoteWorkspace(data);
         })
-        .catch((e) => console.warn("[float] Supabase reload:", e?.message || e));
+        .catch((e) => {
+          console.warn("[float] Supabase reload:", e?.message || e);
+          if (opts.notify) {
+            notifyWorkspaceLoadIssue(
+              "Could not load workspace",
+              e?.message || String(e)
+            );
+          }
+        });
     };
 
     const scheduleFullReload = () => {
@@ -510,10 +536,23 @@ export function AppDataProvider({ children }) {
 
     loadWorkspaceFromSupabase()
       .then((data) => {
-        if (cancelled || !data) return;
+        if (cancelled) return;
+        if (!data) {
+          notifyWorkspaceLoadIssue(
+            "Workspace data unavailable",
+            "The server returned no data. You may be offline or Supabase is misconfigured."
+          );
+          return;
+        }
         mergeRemoteWorkspace(data);
       })
-      .catch((e) => console.warn("[float] Supabase load:", e?.message || e))
+      .catch((e) => {
+        console.warn("[float] Supabase load:", e?.message || e);
+        notifyWorkspaceLoadIssue(
+          "Could not load workspace",
+          e?.message || String(e)
+        );
+      })
       .finally(() => {
         if (readyFallbackTimer != null) {
           window.clearTimeout(readyFallbackTimer);

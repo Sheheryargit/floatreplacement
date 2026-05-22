@@ -6,8 +6,11 @@ import {
   regionToLegacyHolidays,
 } from "../../constants/auHolidayRegions.js";
 
+/** All workspace members have full access; persisted for reporting compatibility. */
+const WORKSPACE_ACCESS = "Admin";
+
 function normalizeAccessStored() {
-  return "Admin";
+  return WORKSPACE_ACCESS;
 }
 
 function personToRow(p) {
@@ -18,7 +21,7 @@ function personToRow(p) {
     email: p.email ?? "",
     role: p.role ?? "—",
     department: p.department ?? "",
-    access: normalizeAccessStored(p.access),
+    access: WORKSPACE_ACCESS,
     tags: Array.isArray(p.tags) ? p.tags : [],
     type: p.type ?? "Employee",
     cost_rate: String(p.costRate ?? "0"),

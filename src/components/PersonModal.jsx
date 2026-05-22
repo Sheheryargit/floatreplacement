@@ -93,6 +93,7 @@ const formToPerson = (form, id, archived) => {
   return {
     id, name:form.name, email:form.email, role:form.role==="No role"?"—":form.role,
     department:form.department==="No department"?"":form.department,
+    access: "Admin",
     tags:[...form.tags], type:form.type,
     costRate:form.costRate, billRate:form.billRate, startDate:form.startDate,
     endDate:form.endDate, workType:form.workType, notes:form.notes,

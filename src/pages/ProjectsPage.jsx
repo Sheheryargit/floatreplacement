@@ -44,11 +44,9 @@ import {
   Briefcase,
   Palette,
   StickyNote,
-  Shield,
   UserCheck,
   UserMinus,
   Layers,
-  Download,
 } from "lucide-react";
 
 /* ═══════════════════ DATA ═══════════════════ */
@@ -361,13 +359,6 @@ export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,c
             <textarea value={form.notes} onChange={e=>upd({notes:e.target.value})} rows={3} style={{background:t.surfAlt,border:`1.5px solid ${t.borderIn}`,borderRadius:8,padding:"10px 14px",color:t.text,fontSize:14,outline:"none",resize:"vertical",minHeight:60,fontFamily:"inherit"}}/>
           </div>
 
-          <div style={{borderTop:`1px solid ${t.border}`,margin:"20px 0 4px",paddingTop:16}}>
-            <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",color:t.textSoft,fontSize:13}}>
-              <input type="checkbox" checked={form.managerEdit} onChange={e=>upd({managerEdit:e.target.checked})} style={{accentColor:t.chk,width:16,height:16}}/>
-              <Shield size={14} style={{color:t.textMuted}}/> Managers with 'manage projects' permission can edit this project
-            </label>
-          </div>
-
           {/* Team section */}
           <Section title="Team" icon={Users} count={form.teamIds.length} defaultOpen={form.teamIds.length>0} t={t}>
             <div style={{paddingTop:14,display:"flex",flexDirection:"column",gap:6}}>
@@ -547,7 +538,6 @@ export default function ProjectsPage(){
           <h1 className="projects-page-title">Projects</h1>
           <div className="projects-page-toolbar">
             <div style={{position:"relative"}}><Search size={15} style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:t.textMuted}}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search projects…" style={{width:search?240:180,background:t.surface,border:`1.5px solid ${t.borderIn}`,borderRadius:8,padding:"8px 12px 8px 34px",color:t.text,fontSize:13,outline:"none",transition:"all 0.25s"}} onFocus={e=>{e.target.style.width="240px";e.target.style.borderColor=t.focus;e.target.style.boxShadow=`0 0 0 3px ${t.accentGlow}`;}} onBlur={e=>{if(!search)e.target.style.width="180px";e.target.style.borderColor=t.borderIn;e.target.style.boxShadow="none";}}/>{search&&<X size={14} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",color:t.textMuted,cursor:"pointer"}} onClick={()=>setSearch("")}/>}</div>
-            <Button type="button" variant="secondary" size="md" style={{ display: "flex", alignItems: "center", gap: 7 }}><Download size={14}/> Import</Button>
             <Button type="button" variant="primary" size="md" onClick={openAdd} style={{ display: "flex", alignItems: "center", gap: 7 }}><Plus size={14}/> Add project</Button>
           </div>
         </header>

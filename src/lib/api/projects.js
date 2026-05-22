@@ -15,7 +15,7 @@ function projectToRow(p) {
     end_date: p.endDate ?? "",
     notes: p.notes ?? "",
     team_ids: teamIds,
-    manager_edit: !!p.managerEdit,
+    manager_edit: true,
     archived: !!p.archived,
     updated_at: new Date().toISOString(),
   };
