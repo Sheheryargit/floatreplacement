@@ -105,6 +105,17 @@ function displayNameFromSupabaseUser(user) {
   return metaName || metaNameAzure || fromEmail || localPart || "Workspace member";
 }
 
+/** Password gate (no Supabase JWT): `userSub` is null or omitted in the profile mirror. */
+function isPasswordWorkspaceGate() {
+  try {
+    if (localStorage.getItem(STORAGE_KEY) !== "1") return false;
+    const { userSub } = readSessionProfileMirror();
+    return userSub === null || userSub === undefined;
+  } catch {
+    return false;
+  }
+}
+
 /** Clears app gate flags only — used after Supabase emits SIGNED_OUT (avoid recursive signOut). */
 function clearStoredGate() {
   try {
@@ -202,8 +213,14 @@ export function AuthProvider({ children }) {
     const hydrateFromSession = (session) => {
       const u = session?.user ?? null;
 
-      /** Logged out → clear gate mirror (JWT may already be absent). */
+      /** No Supabase user: keep password workspace gate; only clear SSO-bound sessions. */
       if (!u) {
+        if (isPasswordWorkspaceGate()) {
+          const mirror = readSessionProfileMirror();
+          setSessionProfileState({ displayName: mirror.displayName });
+          setOk(true);
+          return;
+        }
         clearStoredGate();
         setSessionProfileState({ displayName: "" });
         setOk(false);

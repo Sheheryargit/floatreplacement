@@ -1867,12 +1867,6 @@ export default function LandingPage() {
     setAnchorDate(new Date());
     setTimelineOffsets({ prev: 1, next: 2 });
     lastAnchorKey.current = null;
-
-    // Fallback: Some browsers can temporarily desync horizontal scroll + virtualization
-    // during the "Today" jump. A hard reload is the simplest, reliable reset.
-    if (typeof window !== "undefined") {
-      window.setTimeout(() => window.location.reload(), 0);
-    }
   }, []);
 
   const applyTimeRangePreset = useCallback((presetId) => {
