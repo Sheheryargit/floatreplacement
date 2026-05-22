@@ -8,20 +8,79 @@ import {
 } from "react";
 import { isSupabaseConfigured, supabase } from "../lib/supabase.js";
 
+/** Browser gate flag (localStorage survives restarts — sessionStorage did not). */
 const STORAGE_KEY = "float_auth_session";
+
+/**
+ * Display label + optionally Supabase `user.id` so mirrors never apply to someone else after account switch.
+ * JSON: { displayName: string; userSub?: string | null } — omit userSub legacy (treated unknown).
+ */
 const PROFILE_KEY = "float_auth_profile";
+
+/** Earlier builds used sessionStorage; migrate once keys still exist before tab closed. */
+const LEGACY_GATE = "float_auth_session";
+const LEGACY_PROFILE = "float_auth_profile";
 
 /** When `true` in `.env.local`, skip the login gate (useful while SSO is UI-only). */
 const loginSkipAuth = import.meta.env.VITE_LOGIN_SKIP_AUTH === "true";
 
-function readSessionProfile() {
+function migrateLegacySessionStorageMirrorsOnce() {
+  if (typeof window === "undefined" || typeof localStorage === "undefined") return;
   try {
-    const raw = sessionStorage.getItem(PROFILE_KEY);
-    if (!raw) return { displayName: "" };
-    const o = JSON.parse(raw);
-    return { displayName: typeof o?.displayName === "string" ? o.displayName : "" };
+    if (localStorage.getItem(STORAGE_KEY) === "1") return;
+
+    let gate = "";
+    try {
+      gate = window.sessionStorage.getItem(LEGACY_GATE) ?? "";
+    } catch {
+      /* ignore */
+    }
+    if (gate !== "1") return;
+
+    let profileRaw = "";
+    try {
+      profileRaw = window.sessionStorage.getItem(LEGACY_PROFILE) ?? "";
+    } catch {
+      /* ignore */
+    }
+    localStorage.setItem(STORAGE_KEY, "1");
+    if (profileRaw) {
+      localStorage.setItem(PROFILE_KEY, profileRaw);
+    }
+    try {
+      sessionStorage.removeItem(LEGACY_GATE);
+      sessionStorage.removeItem(LEGACY_PROFILE);
+    } catch {
+      /* ignore */
+    }
   } catch {
-    return { displayName: "" };
+    /* ignore */
+  }
+}
+
+/** @typedef {{ displayName: string; userSub: string | null | undefined }} SessionProfileMirror */
+
+/** @returns {SessionProfileMirror} */
+function readSessionProfileMirror() {
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY);
+    if (!raw) return { displayName: "", userSub: undefined };
+    const o = JSON.parse(raw);
+    const displayName =
+      typeof o?.displayName === "string" ? String(o.displayName).trim() : "";
+    /** @type {string | null | undefined} */
+    let userSub = undefined;
+    if (Object.prototype.hasOwnProperty.call(o, "userSub")) {
+      userSub =
+        o.userSub === null
+          ? null
+          : typeof o.userSub === "string" && o.userSub.trim().length > 0
+            ? o.userSub.trim()
+            : undefined;
+    }
+    return { displayName, userSub };
+  } catch {
+    return { displayName: "", userSub: undefined };
   }
 }
 
@@ -49,8 +108,10 @@ function displayNameFromSupabaseUser(user) {
 /** Clears app gate flags only — used after Supabase emits SIGNED_OUT (avoid recursive signOut). */
 function clearStoredGate() {
   try {
-    sessionStorage.removeItem(STORAGE_KEY);
-    sessionStorage.removeItem(PROFILE_KEY);
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(PROFILE_KEY);
+    sessionStorage.removeItem(LEGACY_GATE);
+    sessionStorage.removeItem(LEGACY_PROFILE);
   } catch {
     /* ignore */
   }
@@ -67,12 +128,18 @@ export function initialsFromDisplayName(name) {
 
 const AuthContext = createContext(null);
 
+migrateLegacySessionStorageMirrorsOnce();
+
 export function AuthProvider({ children }) {
+
   const [sessionProfile, setSessionProfileState] = useState(() => {
-    if (typeof sessionStorage === "undefined") return { displayName: "" };
+    if (typeof window === "undefined" || typeof localStorage === "undefined") {
+      return { displayName: "" };
+    }
     try {
-      if (loginSkipAuth || sessionStorage.getItem(STORAGE_KEY) === "1") {
-        return readSessionProfile();
+      if (loginSkipAuth || localStorage.getItem(STORAGE_KEY) === "1") {
+        const r = readSessionProfileMirror();
+        return { displayName: r.displayName };
       }
     } catch {
       /* ignore */
@@ -83,27 +150,33 @@ export function AuthProvider({ children }) {
   const [ok, setOk] = useState(() => {
     if (loginSkipAuth) return true;
     try {
-      return sessionStorage.getItem(STORAGE_KEY) === "1";
+      return localStorage.getItem(STORAGE_KEY) === "1";
     } catch {
       return false;
     }
   });
 
   const unlock = useCallback((opts) => {
-    const displayName =
+    const displayNameRaw =
       typeof opts?.displayName === "string" ? opts.displayName.trim() : "";
-    const nextProfile = displayName ? { displayName } : readSessionProfile();
+
+    /** @type {SessionProfileMirror} */
+    let next = readSessionProfileMirror();
+    if (displayNameRaw) next = { ...next, displayName: displayNameRaw };
+    if (Object.prototype.hasOwnProperty.call(opts ?? {}, "userSub")) {
+      /** @type {string | null} */
+      const us = opts.userSub == null ? null : String(opts.userSub);
+      next = { ...next, userSub: us };
+    }
+    const nextProfile = { displayName: next.displayName, userSub: next.userSub };
+
     try {
-      sessionStorage.setItem(STORAGE_KEY, "1");
-      if (displayName) {
-        sessionStorage.setItem(PROFILE_KEY, JSON.stringify(nextProfile));
-      } else if (!sessionStorage.getItem(PROFILE_KEY)) {
-        sessionStorage.setItem(PROFILE_KEY, JSON.stringify({ displayName: "" }));
-      }
+      localStorage.setItem(STORAGE_KEY, "1");
+      localStorage.setItem(PROFILE_KEY, JSON.stringify(nextProfile));
     } catch {
       /* ignore */
     }
-    setSessionProfileState(nextProfile);
+    setSessionProfileState({ displayName: nextProfile.displayName });
     setOk(true);
   }, []);
 
@@ -127,9 +200,34 @@ export function AuthProvider({ children }) {
     if (loginSkipAuth || !isSupabaseConfigured || !supabase) return undefined;
 
     const hydrateFromSession = (session) => {
-      const u = session?.user;
-      if (!u) return;
-      unlock({ displayName: displayNameFromSupabaseUser(u) });
+      const u = session?.user ?? null;
+
+      /** Logged out → clear gate mirror (JWT may already be absent). */
+      if (!u) {
+        clearStoredGate();
+        setSessionProfileState({ displayName: "" });
+        setOk(false);
+        return;
+      }
+
+      const id = typeof u.id === "string" && u.id.trim() ? u.id.trim() : null;
+      if (!id) {
+        clearStoredGate();
+        setSessionProfileState({ displayName: "" });
+        setOk(false);
+        return;
+      }
+
+      const stale = readSessionProfileMirror();
+      if (
+        stale.userSub != null &&
+        typeof stale.userSub === "string" &&
+        stale.userSub !== id
+      ) {
+        clearStoredGate();
+      }
+
+      unlock({ displayName: displayNameFromSupabaseUser(u), userSub: id });
     };
 
     let unsub;
@@ -162,7 +260,7 @@ export function AuthProvider({ children }) {
     let canceled = false;
     void supabase.auth.getSession().then(({ data }) => {
       if (canceled) return;
-      hydrateFromSession(data.session);
+      hydrateFromSession(data.session ?? null);
     });
 
     return () => {

@@ -14,6 +14,11 @@
  *   VITE_SUPABASE_ANON_KEY   (or VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY)
  * Optional:
  *   SUPABASE_SERVICE_ROLE_KEY — use if RLS blocks bulk delete/insert with the anon key.
+ *   --dry-run               — fetch + plan only, no deletes/inserts.
+ *   --legacy-denominator    — divide weekly hours only by raw Mon–Fri count (ignore PH + CSV leave overlaps).
+ *
+ * Imports work + CSV leave rows. Skips SCHEDULED/CAPACITY and the footer Holiday legend.
+ * Leaves non-availability system rows unchanged (`availability_slot_key IS NOT NULL`).
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -124,6 +129,72 @@ function countWeekdaysInclusive(startIso, endIso) {
     t += 86400000;
   }
   return n;
+}
+
+/** Mon–Fri YYYY-MM-DD keys in `[start,end]` (UTC midnight math, matches spreadsheet dates). */
+function iterateWeekdayKeysUtc(startIso, endIso, fn) {
+  const [ys, ms, ds] = startIso.split("-").map(Number);
+  const [ye, me, de] = endIso.split("-").map(Number);
+  let t = Date.UTC(ys, ms - 1, ds);
+  const end = Date.UTC(ye, me - 1, de);
+  while (t <= end) {
+    const wd = new Date(t).getUTCDay();
+    if (wd >= 1 && wd <= 5) {
+      fn(toIsoUtc(new Date(t)));
+    }
+    t += 86400000;
+  }
+}
+
+function dateSetMergeInto(targetSet, isoKeys) {
+  for (const k of isoKeys) if (k) targetSet.add(String(k).slice(0, 10));
+}
+
+/** Count weekdays excluding weekends and any excluded calendar days (YYYY-MM-DD). */
+function countWeekdaysExcludingDateSet(startIso, endIso, excludeDates) {
+  const ex = excludeDates ?? new Set();
+  const [ys, ms, ds] = startIso.split("-").map(Number);
+  const [ye, me, de] = endIso.split("-").map(Number);
+  let t = Date.UTC(ys, ms - 1, ds);
+  const end = Date.UTC(ye, me - 1, de);
+  let n = 0;
+  while (t <= end) {
+    const wd = new Date(t).getUTCDay();
+    if (wd >= 1 && wd <= 5) {
+      const dk = toIsoUtc(new Date(t));
+      if (!ex.has(dk)) n++;
+    }
+    t += 86400000;
+  }
+  return n;
+}
+
+async function fetchPublicHolidayDatesByPerson(supabase, personIds) {
+  /** @type {Map<string, Set<string>>} */
+  const map = new Map();
+  const ids = [...new Set((personIds || []).map(String).filter(Boolean))];
+  if (ids.length === 0) return map;
+  for (const pid of ids) map.set(pid, new Set());
+  try {
+    const { data, error } = await supabase
+      .from("person_public_holidays")
+      .select("person_id, holiday_date")
+      .in("person_id", ids);
+    if (error) {
+      console.warn("[migrate] Could not load person_public_holidays:", error.message);
+      return map;
+    }
+    for (const row of data || []) {
+      const pid = String(row.person_id ?? "");
+      const dk = typeof row.holiday_date === "string" ? row.holiday_date.slice(0, 10) : "";
+      if (!pid || !dk) continue;
+      if (!map.has(pid)) map.set(pid, new Set());
+      map.get(pid).add(dk);
+    }
+  } catch (e) {
+    console.warn("[migrate] Holiday fetch threw:", String(e?.message || e));
+  }
+  return map;
 }
 
 function normName(s) {
@@ -313,7 +384,8 @@ async function main() {
 
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");
-  const posArgs = args.filter((a) => a !== "--dry-run");
+  const legacyDenominator = args.includes("--legacy-denominator");
+  const posArgs = args.filter((a) => !["--dry-run", "--legacy-denominator"].includes(a));
   const csvPath = path.isAbsolute(posArgs[0] ?? "")
     ? posArgs[0]
     : path.join(REPO_ROOT, posArgs[0] ?? "float-people-20260502-115907-12w.csv");
@@ -361,26 +433,72 @@ async function main() {
     archived: r.archived,
   }));
 
+  const unmatchedNames = [];
   const warnings = [];
-  const planned = [];
+  const weekCount = weekIsos.length;
+
+  /** Plain Mon–Fri keys from CSV Annual Leave rows per person (for splitting project hours). */
+  const leaveWeekdayKeysByPerson = new Map();
+
+  /** @type {Array<{ row: Record<string, any>; personId: string }>} */
+  const resolvedRows = [];
 
   for (const r of rows) {
     const { id: personId, warn } = resolvePersonId(r.name, r.department, people);
     if (warn) warnings.push(warn);
-    if (!personId) continue;
+    if (!personId) {
+      if ((r.name || "").trim()) unmatchedNames.push(String(r.name).trim());
+      continue;
+    }
+    resolvedRows.push({ row: r, personId });
+  }
 
-    const isLeave = Boolean(r.timeOff?.trim());
-    const weekCount = weekIsos.length;
+  for (const { row: r, personId } of resolvedRows) {
+    if (!r.timeOff?.trim()) continue;
     const runs = buildRuns(weekCount, (i) => r.hours[i]);
+    let set = leaveWeekdayKeysByPerson.get(personId);
+    if (!set) {
+      set = new Set();
+      leaveWeekdayKeysByPerson.set(personId, set);
+    }
+    for (const run of runs) {
+      const sm = weekIsos[run.startIdx];
+      const ef = addDaysUtc(weekIsos[run.endIdx], 4);
+      iterateWeekdayKeysUtc(sm, ef, (dk) => set.add(dk));
+    }
+  }
+
+  const personIdsDistinct = [...new Set(resolvedRows.map((x) => x.personId))];
+  const holidayByPerson = legacyDenominator
+    ? new Map()
+    : await fetchPublicHolidayDatesByPerson(supabase, personIdsDistinct);
+
+  const planned = [];
+
+  for (const { row: r, personId } of resolvedRows) {
+    const isLeave = Boolean(r.timeOff?.trim());
+    const runs = buildRuns(weekCount, (i) => r.hours[i]);
+    const phSet = legacyDenominator ? new Set() : (holidayByPerson.get(personId) ?? new Set());
+    const leaveDaySet = leaveWeekdayKeysByPerson.get(personId) ?? new Set();
+
+    const excludeProject = new Set(phSet);
+    if (!legacyDenominator) dateSetMergeInto(excludeProject, [...leaveDaySet]);
 
     for (const run of runs) {
       const startMonday = weekIsos[run.startIdx];
       const endFriday = addDaysUtc(weekIsos[run.endIdx], 4);
       const numWeeks = run.endIdx - run.startIdx + 1;
       const totalHours = run.hoursPerWeek * numWeeks;
-      const workingDays = countWeekdaysInclusive(startMonday, endFriday);
-      if (workingDays <= 0) continue;
-      const hoursPerDay = Math.round((totalHours / workingDays) * 10000) / 10000;
+
+      /** Leave: subtract public holidays only. Work: subtract PH + weekdays with CSV leave. */
+      let workingDays;
+      if (legacyDenominator) {
+        workingDays = countWeekdaysInclusive(startMonday, endFriday);
+      } else if (isLeave) {
+        workingDays = countWeekdaysExcludingDateSet(startMonday, endFriday, phSet);
+      } else {
+        workingDays = countWeekdaysExcludingDateSet(startMonday, endFriday, excludeProject);
+      }
 
       let projectLabel = "";
       let leaveType = null;
@@ -391,7 +509,22 @@ async function main() {
         projectLabel = r.timeOff.trim() || LEAVE_ID_TO_LABEL[leaveType];
       } else {
         projectLabel = buildProjectLabel(r.project, r.client);
+        if (!projectLabel.trim()) {
+          warnings.push(
+            `[skip] "${r.name}": ${totalHours}h (${startMonday}–${endFriday}) but blank Project/Client`
+          );
+          continue;
+        }
       }
+
+      if (workingDays <= 0) {
+        warnings.push(
+          `[skip] "${r.name}": "${projectLabel}" (${totalHours}h) → 0 countable weekdays ${startMonday}–${endFriday}`
+        );
+        continue;
+      }
+
+      const hoursPerDay = Math.round((totalHours / workingDays) * 10000) / 10000;
 
       const noteParts = [r.notes, r.task].filter(Boolean);
       const notes = noteParts.join(" · ");
@@ -418,10 +551,20 @@ async function main() {
   }
 
   console.log(
-    `CSV: ${csvPath}\nWeeks: ${weekIsos.length} (${weekIsos[0]} … ${addDaysUtc(weekIsos[weekIsos.length - 1], 4)})\nPlanned allocations: ${planned.length}`
+    (legacyDenominator
+      ? "Mode: `--legacy-denominator` — raw Mon–Fri count only.\n"
+      : "Mode: exclude `person_public_holidays` + weekdays covered by CSV leave rows.\n") +
+      `CSV: ${csvPath}\nWeeks: ${weekIsos.length} (${weekIsos[0]} … ${addDaysUtc(weekIsos[weekIsos.length - 1], 4)})\nPlanned allocations: ${planned.length}\nMatched CSV contributor rows → people: ${resolvedRows.length}`
   );
+
+  const uniqUnmatched = [...new Set(unmatchedNames)];
+  if (uniqUnmatched.length) {
+    console.log(`\nNo matching active person row for ${uniqUnmatched.length} name(s):`);
+    for (const n of uniqUnmatched.sort()) console.log(` - "${n}"`);
+  }
+
   if (warnings.length) {
-    console.log("\nWarnings:");
+    console.log("\nWarnings / skipped:");
     for (const w of [...new Set(warnings)]) console.log(" -", w);
   }
 

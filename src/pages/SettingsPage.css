@@ -145,6 +145,24 @@
   max-width: 52ch;
 }
 
+/* Appearance intro: tighter gap before local-only note */
+.settings-appearance-lede {
+  margin-bottom: var(--space-2);
+}
+
+/* Clarifies Appearance (and mindset): personal UI prefs ≠ workspace data. */
+.settings-local-privacy-note {
+  margin: 0 0 var(--space-4);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #94a3b8;
+  max-width: 54ch;
+}
+
+:root[data-theme="light"] .settings-local-privacy-note {
+  color: #64748b;
+}
+
 /* Second line inside a SettingsItem subtext (allocation blocks, etc.). */
 .float-settings-item-sub .settings-subtext-detail {
   display: block;

@@ -29,7 +29,8 @@ export function defaultWorkspaceAllocationWindow() {
   const start = new Date(now);
   start.setDate(start.getDate() - 90);
   const end = new Date(now);
-  end.setDate(end.getDate() + 365);
+  // +365 misses many imported / planned horizons (e.g. FY26 CSV blocks from May onward when device date is still 2025).
+  end.setDate(end.getDate() + 730);
   return { start, end };
 }
 

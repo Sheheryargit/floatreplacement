@@ -322,7 +322,7 @@ export default function LoginPage() {
     setEmptyPulse(false);
     setAuthExit(true);
     window.setTimeout(() => {
-      unlock({ displayName: SESSION_DEFAULT_NAME });
+      unlock({ displayName: SESSION_DEFAULT_NAME, userSub: null });
     }, 440);
   }, [password, unlock, openDialog]);
 
