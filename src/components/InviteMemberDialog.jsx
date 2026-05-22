@@ -1,17 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion, useReducedMotion } from "framer-motion";
-import { Check, Send, Shield, X } from "lucide-react";
+import { Check, Send, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "./ui/Button.jsx";
 import "./InviteMemberDialog.css";
 import "../styles/premium-overlays.css";
-
-const ACCESS_LEVELS = [
-  { id: "admin", label: "Admin" },
-  { id: "manager", label: "Manager" },
-  { id: "user", label: "User" },
-];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -19,13 +13,12 @@ const SHRINK_MS = 560;
 const SHRINK = { duration: 0.5, ease: [0.4, 0, 0.2, 1] };
 
 /**
- * Super-admin invite flow (placeholder): collects email + role; dialog shrinks + center “Sent”, then Sonner toast.
+ * Invite flow (placeholder): collects email; dialog shrinks + center “Sent”, then Sonner toast.
  * @param {{ open: boolean; onOpenChange: (open: boolean) => void; layout?: "default" | "full" }} props
  */
 export function InviteMemberDialog({ open, onOpenChange, layout = "default" }) {
   const reduceMotion = useReducedMotion();
   const [email, setEmail] = useState("");
-  const [roleId, setRoleId] = useState("user");
   const [sendPhase, setSendPhase] = useState("idle");
   const pendingRef = useRef(null);
   const shrinkTimerRef = useRef(null);
@@ -37,20 +30,17 @@ export function InviteMemberDialog({ open, onOpenChange, layout = "default" }) {
         shrinkTimerRef.current = null;
       }
       setEmail("");
-      setRoleId("user");
       setSendPhase("idle");
       pendingRef.current = null;
     }
   }, [open]);
-
-  const roleLabel = ACCESS_LEVELS.find((r) => r.id === roleId)?.label ?? roleId;
 
   const finishSend = () => {
     const p = pendingRef.current;
     if (!p) return;
     pendingRef.current = null;
     setSendPhase("idle");
-    toast.success(`${p.email} · ${p.roleLabel}`, {
+    toast.success(p.email, {
       description: "Delivery is still a placeholder.",
       className: "alloc8-toast float-schedule-view-toast",
     });
@@ -65,12 +55,12 @@ export function InviteMemberDialog({ open, onOpenChange, layout = "default" }) {
     }
 
     if (reduceMotion) {
-      pendingRef.current = { email: trimmed, roleLabel };
+      pendingRef.current = { email: trimmed };
       finishSend();
       return;
     }
 
-    pendingRef.current = { email: trimmed, roleLabel };
+    pendingRef.current = { email: trimmed };
     setSendPhase("shrinking");
     shrinkTimerRef.current = window.setTimeout(() => {
       shrinkTimerRef.current = null;
@@ -133,7 +123,7 @@ export function InviteMemberDialog({ open, onOpenChange, layout = "default" }) {
               transition={SHRINK}
             >
               <Dialog.Description className="lp-invite-sr-only">
-                Enter an email and choose Admin, Manager, or User access, then send an invitation.
+                Enter an email address, then send an invitation.
               </Dialog.Description>
 
               <div className="lp-invite-hero">
@@ -158,11 +148,7 @@ export function InviteMemberDialog({ open, onOpenChange, layout = "default" }) {
                 <Dialog.Title asChild>
                   <h2 className="lp-invite-title">Invite</h2>
                 </Dialog.Title>
-                <p className="lp-invite-lede">One link, the right access level.</p>
-                <span className="lp-invite-badge">
-                  <Shield size={11} strokeWidth={2.5} aria-hidden />
-                  Super admin
-                </span>
+                <p className="lp-invite-lede">Send a workspace invite link.</p>
               </div>
 
               <div className="lp-invite-body">
@@ -180,32 +166,6 @@ export function InviteMemberDialog({ open, onOpenChange, layout = "default" }) {
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={shrinking}
                   />
-                </div>
-                <div className="lp-invite-field">
-                  <span className="lp-invite-label" id="lp-invite-role-label">
-                    Role
-                  </span>
-                  <div
-                    className="lp-invite-role-seg"
-                    role="radiogroup"
-                    aria-labelledby="lp-invite-role-label"
-                  >
-                    {ACCESS_LEVELS.map((r) => (
-                      <button
-                        key={r.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={roleId === r.id}
-                        className={
-                          "lp-invite-role-pill" + (roleId === r.id ? " lp-invite-role-pill--on" : "")
-                        }
-                        onClick={() => setRoleId(r.id)}
-                        disabled={shrinking}
-                      >
-                        {r.label}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
 

@@ -4,8 +4,6 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { toast } from "sonner";
 import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from "framer-motion";
 import { X, ChevronDown, ArrowLeftRight, Zap, Trash2, Palmtree, ArrowRight } from "lucide-react";
-import { useAuth } from "../context/AuthContext.jsx";
-import { can } from "../constants/permissions.js";
 import {
   resolveColorForProjectLabel,
   projectToAllocationLabel,
@@ -161,8 +159,6 @@ export function CreateAllocationModal({
   premiumV2Templates,
 }) {
   const reduceMotion = useReducedMotion();
-  const { currentUser } = useAuth();
-  const role = (currentUser?.access || "").toLowerCase();
   const tplList = premiumV2Templates ?? [];
   /** Static UI clamps CSS animations globally — pair with `.lpam-modal` static-ui overrides to avoid invisible panels. */
   const clampMotion = useReducedMotion() || isStaticUi();
@@ -184,25 +180,12 @@ export function CreateAllocationModal({
   /** Registry project id when chosen from picker (disambiguates duplicate labels). */
   const [allocationProjectId, setAllocationProjectId] = useState("");
 
-  /** Check Permissions */
   const visibleAllocationTabs = useMemo(() => {
     if (editAllocation) {
       return [editAllocation.isLeave ? "leave" : "allocation"];
     }
-    const rbac = (currentUser?.access || "").toLowerCase();
-    if (can(rbac, "allocationModal", "editAll")) {
-      return ["allocation", "leave"];
-    }
-    if (can(rbac, "allocationModal", "editTeam")) {
-      return ["allocation", "leave"];
-    }
-    if (can(rbac, "allocationModal", "editSelf")) {
-      const assigningSelf =
-        assignedIds.length === 1 && String(assignedIds[0]) === String(currentUser?.id);
-      return assigningSelf ? ["allocation", "leave"] : ["leave"];
-    }
-    return ["leave"];
-  }, [currentUser, assignedIds, editAllocation]);
+    return ["allocation", "leave"];
+  }, [editAllocation]);
 
   useEffect(() => {
     if (!visibleAllocationTabs.includes(activeTab) && visibleAllocationTabs.length > 0) {
@@ -272,21 +255,12 @@ export function CreateAllocationModal({
     if (pre) setProject(pre);
     else setProject(list[0] ?? "");
     setAllocationProjectId(resolveProjectIdForCanonicalLabel(nextProj, projectRegistry));
-    const rbac = (currentUser?.access || "").toLowerCase();
-    const selfOnlyAllocator =
-      !can(rbac, "allocationModal", "editAll") &&
-      !can(rbac, "allocationModal", "editTeam") &&
-      can(rbac, "allocationModal", "editSelf");
     const nextAssigned =
       preselectPerson != null
         ? [preselectPerson.id]
-        : selfOnlyAllocator &&
-            currentUser?.id != null &&
-            people.some((p) => String(p.id) === String(currentUser.id))
-          ? [currentUser.id]
-          : people[0] != null
-            ? [people[0].id]
-            : [];
+        : people[0] != null
+          ? [people[0].id]
+          : [];
     let hoursDefault = "7.5";
     if (
       premiumV2Enabled &&
@@ -326,7 +300,6 @@ export function CreateAllocationModal({
     defaultTab,
     allocations,
     premiumV2Enabled,
-    currentUser,
   ]);
 
   useEffect(() => {

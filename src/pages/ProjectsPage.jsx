@@ -3,8 +3,6 @@ import { createPortal } from "react-dom";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useAppData } from "../context/AppDataContext.jsx";
 import { isSupabaseConfigured } from "../lib/supabase.js";
-import { useAuth } from "../context/AuthContext.jsx";
-import { can } from "../constants/permissions.js";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
 import { Button } from "../components/ui/Button.jsx";
 import { FloatSelect, FloatPersonPicker } from "../components/ui/FloatSelect.jsx";
@@ -419,11 +417,6 @@ export function ProjectModal({open,onClose,onSave,onArchive,editProject,people,c
    ═══════════════════════════════════════════════════════════ */
 export default function ProjectsPage(){
   const { theme: mode, shellBackground } = useAppTheme();
-  const { currentUser } = useAuth();
-  const role = (currentUser?.access || "").toLowerCase();
-  const canCreateProject = can(role, "projectsPage", "createProject");
-  const canShowSelectColumn =
-    can(role, "projectsPage", "deleteProject") && can(role, "projectsPage", "interactAll");
   const t=T[mode];
   const{
     people,
@@ -448,21 +441,9 @@ export default function ProjectsPage(){
 
   useEffect(()=>{setMounted(true);},[]);
 
-  const canInteractProject = useCallback((p) => {
-    if (can(role, "projectsPage", "interactAll")) {
-      return true;
-    }
-    if (can(role, "projectsPage", "interactTeam")) {
-      const isTeamMember = p.teamIds && p.teamIds.includes(currentUser?.id);
-      const isOwner = String(p.owner) === String(currentUser?.id);
-      return isTeamMember || isOwner;
-    }
-    return !!(p.teamIds && p.teamIds.includes(currentUser?.id));
-  }, [role, currentUser?.id]);
-
   const filtered=useMemo(()=>{const isArch=viewTab==="archived";return projects.filter(p=>{if(p.archived!==isArch)return false;
 
-      if(!search)return true;const s=search.toLowerCase();return p.name.toLowerCase().includes(s)||p.client.toLowerCase().includes(s)||p.code.toLowerCase().includes(s)||p.tags.some(tg=>tg.toLowerCase().includes(s));});},[projects,search,viewTab,role,currentUser?.id]);
+      if(!search)return true;const s=search.toLowerCase();return p.name.toLowerCase().includes(s)||p.client.toLowerCase().includes(s)||p.code.toLowerCase().includes(s)||p.tags.some(tg=>tg.toLowerCase().includes(s));});},[projects,search,viewTab]);
   const activeCount=projects.filter(p=>!p.archived).length;
   const archivedCount=projects.filter(p=>p.archived).length;
   const toggleSel=id=>setSelected(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
@@ -566,12 +547,8 @@ export default function ProjectsPage(){
           <h1 className="projects-page-title">Projects</h1>
           <div className="projects-page-toolbar">
             <div style={{position:"relative"}}><Search size={15} style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:t.textMuted}}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search projects…" style={{width:search?240:180,background:t.surface,border:`1.5px solid ${t.borderIn}`,borderRadius:8,padding:"8px 12px 8px 34px",color:t.text,fontSize:13,outline:"none",transition:"all 0.25s"}} onFocus={e=>{e.target.style.width="240px";e.target.style.borderColor=t.focus;e.target.style.boxShadow=`0 0 0 3px ${t.accentGlow}`;}} onBlur={e=>{if(!search)e.target.style.width="180px";e.target.style.borderColor=t.borderIn;e.target.style.boxShadow="none";}}/>{search&&<X size={14} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",color:t.textMuted,cursor:"pointer"}} onClick={()=>setSearch("")}/>}</div>
-            {canCreateProject && (
-              <Button type="button" variant="secondary" size="md" style={{ display: "flex", alignItems: "center", gap: 7 }}><Download size={14}/> Import</Button>
-            )}
-            {canCreateProject && (
-              <Button type="button" variant="primary" size="md" onClick={openAdd} style={{ display: "flex", alignItems: "center", gap: 7 }}><Plus size={14}/> Add project</Button>
-            )}
+            <Button type="button" variant="secondary" size="md" style={{ display: "flex", alignItems: "center", gap: 7 }}><Download size={14}/> Import</Button>
+            <Button type="button" variant="primary" size="md" onClick={openAdd} style={{ display: "flex", alignItems: "center", gap: 7 }}><Plus size={14}/> Add project</Button>
           </div>
         </header>
 
@@ -586,7 +563,7 @@ export default function ProjectsPage(){
           <div style={{display:"flex",gap:2,background:t.surfAlt,borderRadius:10,padding:3,border:`1px solid ${t.border}`}}>
             {[{key:"active",label:"Active",count:activeCount,icon:FolderOpen},{key:"archived",label:"Archived",count:archivedCount,icon:Archive}].map(vt=>{const Icon=vt.icon;const active=viewTab===vt.key;return(<button key={vt.key} onClick={()=>{setViewTab(vt.key);setSelected(new Set());}} style={{padding:"8px 18px",fontSize:13,fontWeight:active?700:500,cursor:"pointer",background:active?t.surface:"transparent",border:active?`1px solid ${t.border}`:"1px solid transparent",color:active?t.text:t.textMuted,borderRadius:8,display:"flex",alignItems:"center",gap:7,transition:"all 0.2s",boxShadow:active?"0 1px 3px rgba(0,0,0,0.06)":"none"}} onMouseEnter={e=>{if(!active)e.currentTarget.style.color=t.textSoft;}} onMouseLeave={e=>{if(!active)e.currentTarget.style.color=t.textMuted;}}><Icon size={14}/> {vt.label}<span style={{background:active?t.accentGlow:t.surfAlt,color:active?t.accent:t.textDim,borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700,marginLeft:2}}>{vt.count}</span></button>);})}
           </div>
-          {selected.size>0 && can(role, 'projectsPage', 'deleteProject') && (
+          {selected.size>0 && (
             <Button type="button" variant="destructive" size="md" onClick={()=>setConfirmDel(true)} className="alloc8-btn-enter" style={{ display: "flex", alignItems: "center", gap: 7 }}>
               <Trash2 size={14}/> Delete {selected.size} selected
             </Button>
@@ -609,17 +586,13 @@ export default function ProjectsPage(){
           <div className="projects-page-table-scroll">
           <table style={{width:"100%",borderCollapse:"collapse",minWidth:900}}>
             <thead><tr style={{borderBottom:`2px solid ${t.border}`}}>
-              {canShowSelectColumn && (
-                <th style={{width:48,padding:"14px 14px"}}><input type="checkbox" checked={selected.size===filtered.length&&filtered.length>0} onChange={toggleAll} style={{accentColor:t.chk,cursor:"pointer",width:16,height:16}}/></th>
-              )}
+              <th style={{width:48,padding:"14px 14px"}}><input type="checkbox" checked={selected.size===filtered.length&&filtered.length>0} onChange={toggleAll} style={{accentColor:t.chk,cursor:"pointer",width:16,height:16}}/></th>
               {["Project","Code","Client","Tags","Stage","Team","Start","End","Owner",""].map((h,i)=>(<th key={i} style={{textAlign:"left",padding:"14px 12px",fontSize:11,fontWeight:700,color:t.textMuted,textTransform:"uppercase",letterSpacing:0.8,whiteSpace:"nowrap",width:i===9?48:undefined}}>{h}</th>))}
             </tr></thead>
             <tbody>
-              {filtered.map((p,idx)=>{const sel=selected.has(p.id);const canInteract=canInteractProject(p);const stg=STAGES.find(s=>s.value===p.stage)||STAGES[0];const owner=people.find(o=>String(o.id)===String(p.owner));const teamPeople=p.teamIds.map(id=>people.find(x=>x.id===id)).filter(Boolean);return(
-                <tr key={p.id} onClick={()=>{ if (canInteract) openEdit(p); }} style={{borderBottom:`1px solid ${t.border}`,background:sel?t.selRow:"transparent",cursor:canInteract?"pointer":"not-allowed",transition:"background 0.12s",animation:mounted&&idx<TABLE_ROW_ENTER_ANIM_MAX?`rowIn 0.35s ease-out ${idx*0.025}s both`:"none"}} onMouseEnter={e=>{if(canInteract&&!sel)e.currentTarget.style.background=t.rowHov;}} onMouseLeave={e=>{if(!sel)e.currentTarget.style.background=sel?t.selRow:"transparent";}}>
-                  {canShowSelectColumn && (
-                    <td style={{padding:"12px 14px"}} onClick={e=>e.stopPropagation()}><input type="checkbox" checked={sel} onChange={()=>toggleSel(p.id)} style={{accentColor:t.chk,cursor:"pointer",width:16,height:16}}/></td>
-                  )}
+              {filtered.map((p,idx)=>{const sel=selected.has(p.id);const stg=STAGES.find(s=>s.value===p.stage)||STAGES[0];const owner=people.find(o=>String(o.id)===String(p.owner));const teamPeople=p.teamIds.map(id=>people.find(x=>x.id===id)).filter(Boolean);return(
+                <tr key={p.id} onClick={()=> openEdit(p)} style={{borderBottom:`1px solid ${t.border}`,background:sel?t.selRow:"transparent",cursor:"pointer",transition:"background 0.12s",animation:mounted&&idx<TABLE_ROW_ENTER_ANIM_MAX?`rowIn 0.35s ease-out ${idx*0.025}s both`:"none"}} onMouseEnter={e=>{if(!sel)e.currentTarget.style.background=t.rowHov;}} onMouseLeave={e=>{if(!sel)e.currentTarget.style.background=sel?t.selRow:"transparent";}}>
+                  <td style={{padding:"12px 14px"}} onClick={e=>e.stopPropagation()}><input type="checkbox" checked={sel} onChange={()=>toggleSel(p.id)} style={{accentColor:t.chk,cursor:"pointer",width:16,height:16}}/></td>
                   <td style={{padding:"12px 12px"}}><div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:4,height:28,borderRadius:2,background:p.color,flexShrink:0}}/><span style={{fontWeight:600,color:p.archived?t.textMuted:t.text,fontSize:14}}>{p.name}</span></div></td>
                   <td style={{padding:"12px 12px",color:p.code?t.textSoft:t.textDim,fontFamily:"'DM Mono', monospace",fontSize:12}}>{p.code||"—"}</td>
                   <td style={{padding:"12px 12px",color:t.textSoft,fontSize:13}}>{p.client||"—"}</td>
@@ -629,11 +602,11 @@ export default function ProjectsPage(){
                   <td style={{padding:"12px 12px",color:t.textSoft,fontSize:12,whiteSpace:"nowrap"}}>{fmtDate(p.startDate)}</td>
                   <td style={{padding:"12px 12px",color:t.textSoft,fontSize:12,whiteSpace:"nowrap"}}>{fmtDate(p.endDate)}</td>
                   <td style={{padding:"12px 12px"}}>{owner&&<div style={{width:28,height:28,borderRadius:8,background:avGrad(owner.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff"}} title={owner.name}>{ini(owner.name)}</div>}</td>
-                  <td style={{padding:"12px 8px",pointerEvents:canInteract?"auto":"none"}} onClick={e=>e.stopPropagation()}><RowActions project={p} t={t} onEdit={()=>{ if (canInteract) openEdit(p); }} onArchive={()=>{ if (canInteract) archiveProject(p.id); }} onDelete={()=>{ if (!canInteract) return; setSelected(new Set([p.id]));setConfirmDel(true); }}/></td>
+                  <td style={{padding:"12px 8px"}} onClick={e=>e.stopPropagation()}><RowActions project={p} t={t} onEdit={()=> openEdit(p)} onArchive={()=> archiveProject(p.id)} onDelete={()=>{ setSelected(new Set([p.id]));setConfirmDel(true); }}/></td>
                 </tr>);})}
               {filtered.length===0&&(
                 <tr>
-                  <td colSpan={canShowSelectColumn ? 11 : 10} style={{ padding: 0, borderBottom: "none" }}>
+                  <td colSpan={11} style={{ padding: 0, borderBottom: "none" }}>
                     <div style={{ padding: "56px 20px" }}>
                       {viewTab==="archived" ? (
                         <EmptyState

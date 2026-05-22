@@ -6,10 +6,8 @@ import {
   regionToLegacyHolidays,
 } from "../../constants/auHolidayRegions.js";
 
-function normalizeAccessStored(access) {
-  const t = String(access ?? "").trim();
-  if (!t || t === "—") return "User";
-  return t;
+function normalizeAccessStored() {
+  return "Admin";
 }
 
 function personToRow(p) {

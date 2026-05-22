@@ -44,7 +44,6 @@ import {
   writePremiumV2Enabled,
 } from "../config/premiumV2Prefs.js";
 import { resetPremiumV2Templates } from "../config/premiumV2Templates.js";
-import { ROLE_HELP } from "../constants/permissions.js";
 import { SettingsItem } from "../components/ui/SettingsItem.jsx";
 import { ThemePreferenceControl } from "../components/ui/ThemePreferenceControl.jsx";
 import { PalettePreferenceControl } from "../components/ui/PalettePreferenceControl.jsx";
@@ -185,7 +184,7 @@ export default function SettingsPage() {
             Alloc8
           </div>
           <h1 className="settings-title">Settings</h1>
-          <p className="settings-lede">Appearance, help, and workspace access.</p>
+          <p className="settings-lede">Appearance, help, and workspace preferences.</p>
         </motion.header>
 
         <section className="settings-section" aria-labelledby="settings-appearance">
@@ -244,29 +243,6 @@ export default function SettingsPage() {
                 theme={theme}
               />
             </SettingsItem>
-          </div>
-        </section>
-
-        <section className="settings-section" aria-labelledby="settings-roles">
-          <h2 id="settings-roles" className="settings-h2">
-            Workspace roles
-          </h2>
-          <p className="settings-section-desc">
-            Permissions come from your roster access (User / Member / Manager) or workspace admin. This is what
-            each tier can do in the current app build.
-          </p>
-          <div className="settings-card settings-card--glow settings-roles-card">
-            {ROLE_HELP.map((r) => (
-              <article key={r.key} className="settings-role-block">
-                <h3 className="settings-role-title">{r.title}</h3>
-                <p className="settings-role-sub">{r.subtitle}</p>
-                <ul className="settings-role-bullets">
-                  {r.bullets.map((b) => (
-                    <li key={b}>{b}</li>
-                  ))}
-                </ul>
-              </article>
-            ))}
           </div>
         </section>
 
@@ -444,14 +420,13 @@ export default function SettingsPage() {
             Team
           </h2>
           <p className="settings-section-desc">
-            Super-admin only. Add people by email and set their role before they sign in. Delivery is still a
-            placeholder.
+            Add people by email before they sign in. Delivery is still a placeholder.
           </p>
           <div className="settings-card settings-card--glow">
             <SettingsItem
               icon={Send}
               label="Invite team members"
-              subtext="Opens a centered invite dialog — email, role, then send."
+              subtext="Opens a centered invite dialog — email, then send."
               showChevron
               onClick={() => setInviteOpen(true)}
             />

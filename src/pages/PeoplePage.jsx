@@ -11,7 +11,6 @@ import {
   Check,
   ArrowDownUp,
   UserPlus,
-  Shield,
   Archive,
   ArchiveRestore,
   Filter,
@@ -52,8 +51,6 @@ import { CreateAllocationModal, leaveLabel } from "../components/AllocationModal
 import { resolveColorForProjectLabel } from "../utils/projectColors.js";
 import { findLeaveOverlapWithWorkRange } from "../utils/allocationLeaveConflict.js";
 import { mergeScheduleAllocations } from "../utils/scheduleAllocationsMerge.js";
-import { useAuth } from "../context/AuthContext.jsx";
-import { can } from "../constants/permissions.js";
 import { usePremiumV2 } from "../context/PremiumV2Context.jsx";
 import "./PeoplePage.css";
 
@@ -73,12 +70,6 @@ function shortenAllocLabel(s, maxLen) {
 const DEPT_EMPTY = "__dept_empty__";
 const PERSON_TYPES = ["Employee", "Contractor", "Placeholder"];
 const WORK_TYPES = ["Full-time", "Part-time"];
-const ACCESS_FILTER_OPTS = [
-  { value: "User", label: "User" },
-  { value: "Member", label: "Member" },
-  { value: "Manager", label: "Manager" },
-];
-
 function toggleArr(list, v) {
   return list.includes(v) ? list.filter((x) => x !== v) : [...list, v];
 }
@@ -87,11 +78,6 @@ function toggleArr(list, v) {
    APP
    ═══════════════════════════════════════════════════════════ */
 export default function PeoplePage() {
-  const { currentUser } = useAuth();
-  const role = (currentUser?.access || "").toLowerCase();
-  const canCreatePerson = can(role, "peoplePage", "createPerson");
-  const canShowSelectColumn =
-    can(role, "peoplePage", "deletePerson") && can(role, "peoplePage", "interactAll");
   const { theme: mode, shellBackground } = useAppTheme();
   const t = T[mode];
   const setAlloc8FeedbackDock = useAlloc8ActionFeedbackMount();
@@ -153,7 +139,6 @@ export default function PeoplePage() {
   const [advRoles, setAdvRoles] = useState([]);
   const [advTags, setAdvTags] = useState([]);
   const [advTypes, setAdvTypes] = useState([]);
-  const [advAccess, setAdvAccess] = useState([]);
   const [advWorkTypes, setAdvWorkTypes] = useState([]);
   const [advEmailMode, setAdvEmailMode] = useState("any");
   const [advEmailContains, setAdvEmailContains] = useState("");
@@ -346,7 +331,6 @@ export default function PeoplePage() {
     if (advRoles.length) n++;
     if (advTags.length) n++;
     if (advTypes.length) n++;
-    if (advAccess.length) n++;
     if (advWorkTypes.length) n++;
     return n;
   }, [
@@ -357,7 +341,6 @@ export default function PeoplePage() {
     advRoles,
     advTags,
     advTypes,
-    advAccess,
     advWorkTypes,
   ]);
 
@@ -372,23 +355,6 @@ export default function PeoplePage() {
     );
   }, [peopleInTab, filterPersonSearch]);
 
-  const canInteractPerson = useCallback((p) => {
-    if (can(role, "peoplePage", "interactAll")) {
-      return true;
-    }
-    if (can(role, "peoplePage", "interactTeam")) {
-      const isSelf = p.id === currentUser?.id;
-      const isOnOwnedProject = projects.some(
-        (proj) =>
-          String(proj.owner) === String(currentUser?.id) &&
-          proj.teamIds &&
-          proj.teamIds.includes(p.id)
-      );
-      return isSelf || isOnOwnedProject;
-    }
-    return p.id === currentUser?.id;
-  }, [role, currentUser?.id, projects]);
-
   const filtered = useMemo(() => {
     const isArch = viewTab === "archived";
     return people.filter((p) => {
@@ -402,7 +368,6 @@ export default function PeoplePage() {
         const email = (p.email || "").toLowerCase();
         const type = (p.type || "").toLowerCase();
         const wt = (p.workType || "").toLowerCase();
-        const acc = (p.access || "").toLowerCase();
         const nm = p.name.toLowerCase();
         const matchText =
           nm.includes(s) ||
@@ -411,7 +376,6 @@ export default function PeoplePage() {
           email.includes(s) ||
           type.includes(s) ||
           wt.includes(s) ||
-          acc.includes(s) ||
           tags.some((tg) => String(tg).toLowerCase().includes(s));
         if (!matchText) return false;
       }
@@ -449,16 +413,6 @@ export default function PeoplePage() {
         if (!advTypes.includes(ty)) return false;
       }
 
-      if (advAccess.length) {
-        const raw = (p.access || "").trim();
-        const tier = !raw || raw === "—" ? "User" : raw;
-        const ok = advAccess.some((want) => {
-          if (want === "User") return tier === "User" || !raw || raw === "—";
-          return tier === want;
-        });
-        if (!ok) return false;
-      }
-
       if (advWorkTypes.length) {
         const w = p.workType || "Full-time";
         if (!advWorkTypes.includes(w)) return false;
@@ -477,7 +431,6 @@ export default function PeoplePage() {
     advRoles,
     advTags,
     advTypes,
-    advAccess,
     advWorkTypes,
     role,
     currentUser?.id,
@@ -527,7 +480,6 @@ export default function PeoplePage() {
     setAdvRoles([]);
     setAdvTags([]);
     setAdvTypes([]);
-    setAdvAccess([]);
     setAdvWorkTypes([]);
     setAdvEmailMode("any");
     setAdvEmailContains("");
@@ -852,7 +804,7 @@ export default function PeoplePage() {
                         style={{ width:"100%",display:"flex",alignItems:"center",gap:8,padding:"10px 14px",background:"transparent",border:"none",cursor:"pointer",color:t.text,fontWeight:600,fontSize:13,textAlign:"left" }}>
                         <ChevronDown size={14} style={{ color:t.textMuted,flexShrink:0,transform:nestOpen.profile ? "rotate(0deg)" : "rotate(-90deg)",transition:"transform 0.2s" }} />
                         <Tag size={14} style={{ color:t.accent,flexShrink:0 }} />
-                        Tags, type, and access
+                        Tags and type
                       </button>
                       {nestOpen.profile && (
                         <div className="people-filter-nest-body" style={{ padding:"0 14px 12px 36px" }}>
@@ -889,21 +841,6 @@ export default function PeoplePage() {
                             </div>
                           </div>
                           <div>
-                            <span style={{ fontSize:11,fontWeight:600,color:t.textMuted }}>Access</span>
-                            <div className="people-filter-chip-row" style={{ marginTop:6 }}>
-                              {ACCESS_FILTER_OPTS.map((a) => {
-                                const on = advAccess.includes(a.value);
-                                return (
-                                  <button key={a.value} type="button" onClick={() => setAdvAccess((x) => toggleArr(x, a.value))}
-                                    style={{
-                                      padding:"5px 10px",borderRadius:8,fontSize:11,fontWeight:600,cursor:"pointer",
-                                      border:`1px solid ${on ? t.accent : t.border}`,background:on ? t.accentGlow : t.surfAlt,color:on ? t.accent : t.textSoft,
-                                    }}>{a.label}</button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                          <div>
                             <span style={{ fontSize:11,fontWeight:600,color:t.textMuted,display:"flex",alignItems:"center",gap:4 }}>
                               <Clock size={12} style={{ opacity:0.85 }} /> Work arrangement
                             </span>
@@ -927,16 +864,12 @@ export default function PeoplePage() {
                 </div>
               )}
             </div>
-            {canCreatePerson && (
-              <Button type="button" variant="secondary" size="md" style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                <Download size={14} /> Import
-              </Button>
-            )}
-            {canCreatePerson && (
-              <Button type="button" variant="primary" size="md" onClick={openAdd} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            <Button type="button" variant="secondary" size="md" style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <Download size={14} /> Import
+            </Button>
+            <Button type="button" variant="primary" size="md" onClick={openAdd} style={{ display: "flex", alignItems: "center", gap: 7 }}>
               <UserPlus size={14} /> Add person
-              </Button>
-            )}
+            </Button>
           </div>
         </header>
 
@@ -1004,7 +937,7 @@ export default function PeoplePage() {
                 </div>
               )}
             </div>
-          {selected.size>0 && can(role, 'peoplePage', 'deletePerson') && (
+          {selected.size>0 && (
             <Button
               type="button"
               variant="destructive"
@@ -1031,39 +964,34 @@ export default function PeoplePage() {
           <table>
             <thead>
               <tr style={{ borderBottom:`2px solid ${t.border}` }}>
-                {canShowSelectColumn && (
-                  <th style={{ width:48,padding:"14px 14px" }}><input type="checkbox" checked={selected.size===filteredSorted.length&&filteredSorted.length>0} onChange={toggleAll} style={{ accentColor:t.chk,cursor:"pointer",width:16,height:16 }}/></th>
-                )}
-                {["Name","Role","Department","Access","Tags","Type",""].map((h,i)=>(
-                  <th key={i} style={{ textAlign:"left",padding:"14px 16px",fontSize:11,fontWeight:700,color:t.textMuted,textTransform:"uppercase",letterSpacing:0.8,width:i===6?52:undefined }}>{h}</th>
+                <th style={{ width:48,padding:"14px 14px" }}><input type="checkbox" checked={selected.size===filteredSorted.length&&filteredSorted.length>0} onChange={toggleAll} style={{ accentColor:t.chk,cursor:"pointer",width:16,height:16 }}/></th>
+                {["Name","Role","Department","Tags","Type",""].map((h,i)=>(
+                  <th key={i} style={{ textAlign:"left",padding:"14px 16px",fontSize:11,fontWeight:700,color:t.textMuted,textTransform:"uppercase",letterSpacing:0.8,width:i===5?52:undefined }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filteredSorted.map((p,idx)=>{
                 const sel=selected.has(p.id);
-                const canInteract = canInteractPerson(p);
                 return (
                   <tr
                     key={p.id}
-                    onClick={()=>{ if (canInteract) openEdit(p); }}
+                    onClick={()=> openEdit(p)}
                     style={{
                       borderBottom:`1px solid ${t.border}`,background:sel?t.selRow:"transparent",
-                      cursor:canInteract?"pointer":"not-allowed",transition:"background 0.12s",
+                      cursor:"pointer",transition:"background 0.12s",
                       animation:mounted&&idx<TABLE_ROW_ENTER_ANIM_MAX?`rowIn 0.35s ease-out ${idx*0.025}s both`:"none",
                     }}
                     onMouseEnter={(e) => {
-                      if (canInteract && !sel) e.currentTarget.style.background = t.rowHov;
+                      if (!sel) e.currentTarget.style.background = t.rowHov;
                     }}
                     onMouseLeave={(e) => {
                       if (!sel) e.currentTarget.style.background = sel ? t.selRow : "transparent";
                     }}
                   >
-                    {canShowSelectColumn && (
-                      <td style={{ padding:"12px 14px" }} onClick={(e)=>e.stopPropagation()}>
-                        <input type="checkbox" checked={sel} onChange={()=>toggleSel(p.id)} style={{ accentColor:t.chk,cursor:"pointer",width:16,height:16 }}/>
-                      </td>
-                    )}
+                    <td style={{ padding:"12px 14px" }} onClick={(e)=>e.stopPropagation()}>
+                      <input type="checkbox" checked={sel} onChange={()=>toggleSel(p.id)} style={{ accentColor:t.chk,cursor:"pointer",width:16,height:16 }}/>
+                    </td>
                     <td style={{ padding:"12px 16px" }}>
                       <div style={{ display:"flex",alignItems:"center",gap:12 }}>
                         <div style={{ width:34,height:34,borderRadius:10,background:avGrad(p.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"#fff",flexShrink:0,boxShadow:"0 2px 8px rgba(0,0,0,0.15)",opacity:p.archived?0.5:1 }}>{ini(p.name)}</div>
@@ -1075,15 +1003,6 @@ export default function PeoplePage() {
                       {p.department&&<span style={{ display:"inline-flex",alignItems:"center",gap:4 }}><ChevronRight size={12} style={{ color:t.textDim }}/>{p.department}</span>}
                     </td>
                     <td style={{ padding:"12px 16px" }}>
-                      {(() => {
-                        const raw = (p.access || "").trim();
-                        const label = !raw || raw === "—" ? "User" : p.access;
-                        return (
-                          <span style={{ background:t.accentGlow,color:t.accent,borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:600,display:"inline-flex",alignItems:"center",gap:4 }}><Shield size={11}/> {label}</span>
-                        );
-                      })()}
-                    </td>
-                    <td style={{ padding:"12px 16px" }}>
                       <div style={{ display:"flex",gap:5,flexWrap:"wrap" }}>
                         {p.tags.slice(0,3).map((tag,j)=>{ const tp=tagChromaProps(tag,mode==="dark"); return <span key={j} className={tp.className} style={{ ...tp.style,fontSize:11 }}>{tag}</span>; })}
                         {p.tags.length>3&&<span style={{ color:t.textMuted,fontSize:11,fontWeight:650,padding:"3px 4px" }}>+{p.tags.length-3}</span>}
@@ -1091,14 +1010,13 @@ export default function PeoplePage() {
                     </td>
                     <td style={{ padding:"12px 16px",color:t.textSoft,fontWeight:500 }}>{p.type}</td>
                     <td
-                      style={{ padding:"12px 8px", opacity:canInteract?1:0.55, pointerEvents:canInteract?"auto":"none" }}
+                      style={{ padding:"12px 8px" }}
                       onClick={(e)=>e.stopPropagation()}
                     >
                       <RowActions person={p} t={t}
-                        onEdit={()=>{ if (canInteract) openEdit(p); }}
-                        onArchive={()=>{ if (canInteract) archivePerson(p.id); }}
+                        onEdit={()=> openEdit(p)}
+                        onArchive={()=> archivePerson(p.id)}
                         onDelete={() => {
-                          if (!canInteract) return;
                           setSelected(new Set([p.id]));
                           setConfirmDel(true);
                         }} />
@@ -1108,7 +1026,7 @@ export default function PeoplePage() {
               })}
               {filteredSorted.length===0 && (
                 <tr>
-                  <td colSpan={canShowSelectColumn ? 8 : 7} style={{ padding: 0, borderBottom: "none" }}>
+                  <td colSpan={7} style={{ padding: 0, borderBottom: "none" }}>
                     <div style={{ padding: "56px 20px" }}>
                       {viewTab === "archived" ? (
                         <EmptyState

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Users, FolderOpen,
   Plus, Trash2, X, ChevronRight,
-  AlertTriangle, UserPlus, Shield, Clock,
+  AlertTriangle, UserPlus, Clock,
   Palmtree, Briefcase, Tag, DollarSign, Mail, Info, Calendar,
   Archive, ArchiveRestore, Save, MoreHorizontal, Pencil, Bell,
 } from "lucide-react";
@@ -44,14 +44,8 @@ import "../styles/premium-person-modal.css";
 
 /* ═══════════════════ DATA ═══════════════════ */
 const TYPES = ["Employee","Contractor","Placeholder"];
-const ACCESS_OPTS = [
-  { value:"none", label:"No access rights", desc:"", icon:Shield },
-  { value:"member", label:"Member", desc:"Can view Schedule and optionally manage their own tasks and/or time off", icon:Users },
-  { value:"manager", label:"Manager", desc:"Can manage specific Departments, People, and/or Projects", icon:Briefcase },
-];
 const MODAL_TABS = [
   { key:"info", label:"Info", icon:Info },
-  { key:"access", label:"Access", icon:Shield },
   { key:"availability", label:"Availability", icon:Clock },
   { key:"timeoff", label:"Time Off", icon:Palmtree },
   { key:"projects", label:"Projects", icon:FolderOpen },
@@ -82,7 +76,6 @@ const personToForm = (p) => ({
   name:p.name, email:p.email||"", role:p.role==="—"?"No role":p.role,
   costRate:p.costRate||"0", billRate:p.billRate||"0",
   department:p.department||"No department", tags:[...p.tags], type:p.type||"Employee",
-  access: ACCESS_OPTS.find((a)=>a.label===p.access)?.value || "none",
   startDate:p.startDate||"2026-01-01", endDate:p.endDate||"", workType:p.workType||"Full-time",
   notes:p.notes||"",
   publicHolidayRegion: normalizeHolidayRegion(
@@ -92,7 +85,6 @@ const personToForm = (p) => ({
   ...AVAIL_DEFAULTS,
 });
 const formToPerson = (form, id, archived) => {
-  const al = ACCESS_OPTS.find((a)=>a.value===form.access)?.label||"—";
   const country = inferHolidayCountry(form);
   const region = normalizeHolidayRegion(
     form.publicHolidayRegion ?? legacyHolidaysToRegion(form.holidays),
@@ -101,7 +93,7 @@ const formToPerson = (form, id, archived) => {
   return {
     id, name:form.name, email:form.email, role:form.role==="No role"?"—":form.role,
     department:form.department==="No department"?"":form.department,
-    access:form.access==="none"?"—":al, tags:[...form.tags], type:form.type,
+    tags:[...form.tags], type:form.type,
     costRate:form.costRate, billRate:form.billRate, startDate:form.startDate,
     endDate:form.endDate, workType:form.workType, notes:form.notes,
     publicHolidayCountry: country,
@@ -341,21 +333,6 @@ function InfoTab({ form,setForm,roles,setRoles,depts,setDepts,tagOpts,setTagOpts
         /></div>
     </div>
   );
-}
-
-function AccessTab({ form,setForm,t }) {
-  return (<div><label style={Lbl(t)}>Access level</label>
-    <FloatSelect
-      t={t}
-      value={form.access}
-      onChange={(v)=>setForm({...form,access:v})}
-      options={ACCESS_OPTS}
-      placeholder="Select access level"
-      creatable={false}
-      searchPlaceholder="Search access levels…"
-      renderOption={(opt, th)=>(<div style={{ display:"flex",alignItems:"flex-start",gap:10 }}><div style={{ width:32,height:32,borderRadius:8,background:th.accentGlow,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2 }}><opt.icon size={16} style={{ color:th.accent }}/></div><div><div style={{ fontWeight:600,color:th.text,fontSize:14 }}>{opt.label}</div>{opt.desc?(<div style={{ fontSize:12,color:th.textMuted,marginTop:2,lineHeight:1.4 }}>{opt.desc}</div>):null}</div></div>)}
-    />
-  </div>);
 }
 
 function AvailabilityTab({ form, setForm, t, editPerson, onRefreshWorkspace, tagTheme }) {
@@ -954,7 +931,7 @@ function PersonModal({
       setTab(0);
       setForm(editPerson ? personToForm(editPerson) : {
         name:"",email:"",role:"No role",costRate:"0",billRate:"0",
-        department:"No department",tags:[],type:"Employee",access:"none",
+        department:"No department",tags:[],type:"Employee",
         startDate:"2026-01-01",endDate:"",workType:"Full-time",notes:"",
         publicHolidayCountry:"None",publicHolidayRegion:"None",
         ...AVAIL_DEFAULTS,
@@ -1075,8 +1052,7 @@ function PersonModal({
         {/* Content — scrollable */}
         <div style={{ padding:"22px 32px 10px",overflowY:"auto",flex:1,minHeight:0 }}>
           {tab===0 && <InfoTab form={form} setForm={setFormWrap} roles={roles} setRoles={setRoles} depts={depts} setDepts={setDepts} tagOpts={tagOpts} setTagOpts={setTagOpts} t={t} tagIsDark={tagIsDark} pickerKey={editPerson?.id ?? "new"}/>}
-          {tab===1 && <AccessTab form={form} setForm={setFormWrap} t={t}/>}
-          {tab===2 && (
+          {tab===1 && (
             <AvailabilityTab
               form={form}
               setForm={setFormWrap}
@@ -1086,7 +1062,7 @@ function PersonModal({
               tagTheme={tagTheme}
             />
           )}
-          {tab===3 && (
+          {tab===2 && (
             <TimeOffTab
               form={form}
               setForm={setFormWrap}
@@ -1096,7 +1072,7 @@ function PersonModal({
               onOpenCreateLeave={onOpenCreateLeave}
             />
           )}
-          {tab===4 && (
+          {tab===3 && (
             <ProjectsTab
               t={t}
               editPerson={editPerson}

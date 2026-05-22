@@ -115,8 +115,6 @@ import { buildAllocationsByPerson, getPersonAllocations } from "../utils/allocat
 import { mergeScheduleAllocations } from "../utils/scheduleAllocationsMerge.js";
 import { isSupabaseConfigured } from "../lib/supabase.js";
 import { dismissPublicHolidayForPerson } from "../lib/api/personPublicHolidays.js";
-import { useAuth } from "../context/AuthContext.jsx";
-import { can } from "../constants/permissions.js";
 import {
   normalizeLeaveTypeId,
   leaveTimelineIconKey,
@@ -1510,8 +1508,6 @@ export default function LandingPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme } = useAppTheme();
-  const { currentUser } = useAuth();
-  const role = (currentUser?.access || "").toLowerCase();
   const t = T[theme];
   const setAlloc8FeedbackDock = useAlloc8ActionFeedbackMount();
 
@@ -1721,23 +1717,6 @@ export default function LandingPage() {
     () => visibleDateKeysForHours(scheduleModel),
     [scheduleModel]
   );
-
-  const canInteractSchedulePerson = useCallback((p) => {
-    if (can(role, "schedule", "interactAll")) {
-      return true;
-    }
-    if (can(role, "schedule", "interactTeam")) {
-      const isSelf = p.id === currentUser?.id;
-      const isOnOwnedProject = projects.some(
-        (proj) =>
-          String(proj.owner) === String(currentUser?.id) &&
-          proj.teamIds &&
-          proj.teamIds.includes(p.id)
-      );
-      return isSelf || isOnOwnedProject;
-    }
-    return p.id === currentUser?.id;
-  }, [role, currentUser?.id, projects]);
 
   const { schedulePeople, schedulePeopleHoursInView } = useMemo(() => {
     let list = people.filter((p) => !p.archived);
@@ -2430,15 +2409,8 @@ export default function LandingPage() {
         : selectedAllocation.personId != null
           ? [selectedAllocation.personId]
           : [];
-    if (ids.length === 0) return false;
-    /** Full workspace session (`id` null) still uses RBAC admin — must not require a roster id. */
-    if (can(role, "allocationModal", "editAll")) return true;
-    if (!currentUser?.id) return false;
-    return ids.every((id) => {
-      const person = people.find((p) => String(p.id) === String(id));
-      return person ? canInteractSchedulePerson(person) : false;
-    });
-  }, [selectedAllocation, currentUser?.id, people, canInteractSchedulePerson, role]);
+    return ids.length > 0;
+  }, [selectedAllocation]);
 
   const openEdit = useCallback((person) => {
     setEditingPerson(person);
@@ -2861,8 +2833,7 @@ export default function LandingPage() {
                 <Share size={18} />
               </button>
 
-              {(can(role, 'schedule', 'createProject')) && (
-                <div className="lp-dropdown-wrap" ref={addWrapRef}>
+              <div className="lp-dropdown-wrap" ref={addWrapRef}>
                   <button
                     type="button"
                     className="lp-sched-add-btn"
@@ -2883,19 +2854,17 @@ export default function LandingPage() {
                   {addMenuOpen && (
                   <div className="lp-popover lp-popover-add" style={{ right: 0, minWidth: "200px", zIndex: 100 }}>
                     <div className="lp-popover-title">Create New</div>
-                    {can((currentUser?.access || "").toLowerCase(), 'schedule', 'createPerson') && (
-                      <button
-                        type="button"
-                        className="lp-popover-item"
-                        onClick={() => {
-                          setAddMenuOpen(false);
-                          openAdd();
-                        }}
-                      >
-                        <UserPlus size={16} strokeWidth={1.8} className="lp-popover-icon" />
-                        Person
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className="lp-popover-item"
+                      onClick={() => {
+                        setAddMenuOpen(false);
+                        openAdd();
+                      }}
+                    >
+                      <UserPlus size={16} strokeWidth={1.8} className="lp-popover-icon" />
+                      Person
+                    </button>
                     <button
                       type="button"
                       className="lp-popover-item"
@@ -2922,7 +2891,6 @@ export default function LandingPage() {
                   </div>
                 )}
               </div>
-              )}
             </div>
           </div>
 
@@ -2934,7 +2902,6 @@ export default function LandingPage() {
 
           <div className="lp-subbar">
             <div className="lp-subbar-people">
-              {can(role, 'schedule', 'createPerson') && (
               <div className="lp-subbar-people-icons">
                 <button
                   type="button"
@@ -2945,7 +2912,6 @@ export default function LandingPage() {
                   <UserPlus size={20} strokeWidth={2} />
                 </button>
               </div>
-              )}
               <div className="lp-dropdown-wrap" ref={sortWrapRef}>
                 <button
                   type="button"
@@ -3250,8 +3216,8 @@ export default function LandingPage() {
                       <TimelineRow
                         p={p}
                         i={i}
-                        canInteract={canInteractSchedulePerson(p)}
-                        canOpenPersonModal={can(role, "schedule", "interactAll")}
+                        canInteract
+                        canOpenPersonModal={true}
                         personAllocations={getPersonAllocations(allocationsByPerson, p.id)}
                         projects={projects}
                         scheduleModel={scheduleModel}
