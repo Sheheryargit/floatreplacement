@@ -9,14 +9,54 @@ import {
 /** All workspace members have full access; persisted for reporting compatibility. */
 const WORKSPACE_ACCESS = "Admin";
 
+/** @typedef {'legacy' | 'region' | 'full'} PeopleWriteShape */
+
+/** @type {PeopleWriteShape | null} */
+let cachedPeopleWriteShape = null;
+
 function normalizeAccessStored() {
   return WORKSPACE_ACCESS;
 }
 
-function personToRow(p) {
+/**
+ * Detect which holiday columns exist on hosted `people` (migrations may lag the app).
+ * @returns {Promise<PeopleWriteShape>}
+ */
+export async function getPeopleWriteShape() {
+  if (!isSupabaseConfigured) return "legacy";
+  if (cachedPeopleWriteShape) return cachedPeopleWriteShape;
+
+  const probe = async (column) => {
+    const { error } = await supabase.from("people").select(column).limit(0);
+    return !error;
+  };
+
+  if (await probe("public_holiday_country")) {
+    cachedPeopleWriteShape = "full";
+  } else if (await probe("public_holiday_region")) {
+    cachedPeopleWriteShape = "region";
+  } else {
+    cachedPeopleWriteShape = "legacy";
+  }
+  return cachedPeopleWriteShape;
+}
+
+/** Call after applying DB migrations so the next write uses new columns. */
+export function resetPeopleWriteShapeCache() {
+  cachedPeopleWriteShape = null;
+}
+
+/**
+ * @param {object} p
+ * @param {PeopleWriteShape} shape
+ */
+function buildPersonRow(p, shape) {
   const country = inferHolidayCountry(p);
-  const region = normalizeHolidayRegion(p.publicHolidayRegion ?? legacyHolidaysToRegion(p.holidays), country);
-  return {
+  const region = normalizeHolidayRegion(
+    p.publicHolidayRegion ?? legacyHolidaysToRegion(p.holidays),
+    country
+  );
+  const row = {
     name: p.name,
     email: p.email ?? "",
     role: p.role ?? "—",
@@ -30,12 +70,17 @@ function personToRow(p) {
     end_date: p.endDate ?? "",
     work_type: p.workType ?? "Full-time",
     notes: p.notes ?? "",
-    public_holiday_country: country,
-    public_holiday_region: region,
     holidays: regionToLegacyHolidays(region),
     archived: !!p.archived,
     updated_at: new Date().toISOString(),
   };
+  if (shape === "region" || shape === "full") {
+    row.public_holiday_region = region;
+  }
+  if (shape === "full") {
+    row.public_holiday_country = country;
+  }
+  return row;
 }
 
 function rowToPerson(row) {
@@ -81,16 +126,22 @@ export async function fetchPeople() {
 
 export async function createPerson(person) {
   if (!isSupabaseConfigured) return;
-  const { data, error } = await supabase.from("people").insert(personToRow(person)).select("*").single();
+  const shape = await getPeopleWriteShape();
+  const { data, error } = await supabase
+    .from("people")
+    .insert(buildPersonRow(person, shape))
+    .select("*")
+    .single();
   if (error) throw error;
   return rowToPerson(data);
 }
 
 export async function updatePerson(person) {
   if (!isSupabaseConfigured) return;
+  const shape = await getPeopleWriteShape();
   const { data, error } = await supabase
     .from("people")
-    .update(personToRow(person))
+    .update(buildPersonRow(person, shape))
     .eq("id", String(person.id))
     .select("*")
     .single();
