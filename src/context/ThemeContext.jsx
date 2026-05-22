@@ -8,6 +8,7 @@ import {
   useCallback,
 } from "react";
 
+/** Personal appearance only — browser localStorage, never written to workspace_settings or Supabase. */
 const STORAGE_KEY = "float-replacement-theme";
 const PALETTE_STORAGE_KEY = "alloc8-palette";
 const CANVAS_TINT_STORAGE_KEY = "alloc8-custom-canvas-hex";
@@ -19,7 +20,7 @@ function getSystemTheme() {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-/** @returns {"system" | "dark" | "light"} */
+/** @returns {"system" | "dark" | "light"} First visit: explicit dark (not system). */
 function readStoredPreference() {
   try {
     const s = localStorage.getItem(STORAGE_KEY);
@@ -27,7 +28,7 @@ function readStoredPreference() {
   } catch {
     /* ignore */
   }
-  return "system";
+  return "dark";
 }
 
 function resolveTheme(preference) {
@@ -35,10 +36,11 @@ function resolveTheme(preference) {
   return preference;
 }
 
-/** @returns {"default" | "studio"} */
+/** @returns {"default" | "studio"} First visit: Studio typography / palette. */
 function readStoredPalette() {
   try {
     const s = localStorage.getItem(PALETTE_STORAGE_KEY);
+    if (s === null || s === "") return "studio";
     if (s === "studio") return "studio";
   } catch {
     /* ignore */

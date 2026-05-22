@@ -65,16 +65,21 @@ async function rpcSaveAllocation(payload) {
 
 function rowToAllocation(row) {
   if (!row) return null;
-  const personIds = Array.isArray(row.allocation_people)
-    ? row.allocation_people.map((r) => String(r.person_id)).filter(Boolean)
-    : Array.isArray(row.person_ids)
-      ? row.person_ids.map(String)
+  // Join rows (`allocation_people`) can legitimately embed as [] if RLS blocks the child view or
+  // links are missing — always fall back to `person_ids` on `allocations` so the Schedule can index bars.
+  let personIds =
+    Array.isArray(row.allocation_people) && row.allocation_people.length > 0
+      ? row.allocation_people.map((r) => String(r.person_id)).filter(Boolean)
       : [];
+  if (personIds.length === 0 && Array.isArray(row.person_ids)) {
+    personIds = row.person_ids.map(String).filter(Boolean);
+  }
   return {
     id: row.id,
     personIds,
-    startDate: row.start_date,
-    endDate: row.end_date,
+    /** Force YYYY-MM-DD — timestamps from Postgres break Schedule string compare (`k >= sk`). */
+    startDate: String(row.start_date ?? "").trim().slice(0, 10),
+    endDate: String(row.end_date ?? "").trim().slice(0, 10),
     hoursPerDay: Number(row.hours_per_day) || 0,
     totalHours: Number(row.total_hours) || 0,
     workingDays: row.working_days != null ? Number(row.working_days) : undefined,

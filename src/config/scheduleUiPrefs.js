@@ -1,3 +1,8 @@
+/**
+ * Schedule display preferences (tiles, animations, peak labels).
+ * Persisted via localStorage only — not synced to workspace_settings or teammates.
+ */
+
 /** localStorage: show Underallocated / On target / Overallocated on schedule person rows. */
 export const PEAK_LOAD_LABELS_LS_KEY = "float.showPeakLoadStatus.v1";
 
@@ -58,15 +63,17 @@ export const ALLOCATION_BOX_STYLE_LABELS = {
   rail: "Rail",
 };
 
-/** @returns {AllocationBoxStyleId} */
+/** @returns {AllocationBoxStyleId} First visit defaults to Pill. */
 export function readAllocationBoxStyle() {
   try {
-    if (typeof window === "undefined") return "classic";
+    if (typeof window === "undefined") return "pill";
     const v = window.localStorage.getItem(ALLOCATION_BOX_STYLE_LS_KEY);
-    if (v == null || v === "") return "classic";
-    return ALLOCATION_BOX_STYLE_IDS.includes(/** @type {any} */ (v)) ? /** @type {AllocationBoxStyleId} */ (v) : "classic";
+    if (v == null || v === "") return "pill";
+    return ALLOCATION_BOX_STYLE_IDS.includes(/** @type {any} */ (v))
+      ? /** @type {AllocationBoxStyleId} */ (v)
+      : "pill";
   } catch {
-    return "classic";
+    return "pill";
   }
 }
 
@@ -74,7 +81,7 @@ export function readAllocationBoxStyle() {
 export function writeAllocationBoxStyle(styleId) {
   const id = ALLOCATION_BOX_STYLE_IDS.includes(/** @type {any} */ (styleId))
     ? /** @type {AllocationBoxStyleId} */ (styleId)
-    : "classic";
+    : "pill";
   try {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(ALLOCATION_BOX_STYLE_LS_KEY, id);

@@ -192,8 +192,11 @@ export default function SettingsPage() {
           <h2 id="settings-appearance" className="settings-h2">
             Appearance
           </h2>
-          <p className="settings-section-desc">
-            Theme follows your device by default. Your choice is saved on this browser.
+          <p className="settings-section-desc settings-appearance-lede">
+            New sign-ins default to dark mode and Studio typography; you can match your OS, swap palette, light/dark, or tint the canvas—all personal tweaks.
+          </p>
+          <p className="settings-local-privacy-note" role="note">
+            Stored only on this browser—nothing here is synced to teammates or uploaded as workspace preferences.
           </p>
           {!reduceMotion ? (
             <div className="settings-appearance-orbit" aria-hidden>
@@ -232,7 +235,7 @@ export default function SettingsPage() {
             </SettingsItem>
             <SettingsItem
               label="Canvas tint"
-              subtext="Blends into the slide nav, schedule calendar, grids, reporting shell, and page backgrounds. Saved on this browser only."
+              subtext="Tint behind nav, grids, reporting shell, and page backgrounds—not shared with teammates."
               showChevron={false}
             >
               <CanvasTintPreferenceControl
@@ -272,8 +275,9 @@ export default function SettingsPage() {
             Schedule
           </h2>
           <p className="settings-section-desc">
-            Saved in this browser only. Controls how project hours appear on the timeline and whether peak-load
-            bands show under each person.
+            Saved on this browser only. Timeline defaults start at the Pill preset for colored project blocks until
+            you pick another; peak-load bands and animations are yours to tune. Teammates don’t inherit these
+            display choices—they keep their own.
           </p>
           <div className="settings-card settings-card--glow">
             <SettingsItem
@@ -489,7 +493,7 @@ export default function SettingsPage() {
             <SettingsItem
               icon={LogOut}
               label="Logout"
-              subtext="End this session on this device"
+              subtext="Ends this workspace session here. Signing in stays on this browser only—you don’t share a login with teammates."
               showChevron
               onClick={onLogout}
             />

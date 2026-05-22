@@ -281,10 +281,16 @@ const MIN_WEEK_MONTH_SPAN_COLS = 1;
  * Map allocation date range to visible column start + span.
  * `start` / `span` are in column index units.
  */
+function allocationDateKeyYmd(raw) {
+  return String(raw ?? "").trim().slice(0, 10);
+}
+
 function layoutAllocation(alloc, scheduleModel) {
-  const keys = scheduleModel.slots.map((s) => s.dateKey);
-  const sk = alloc.startDate;
-  const ek = alloc.endDate;
+  /** DB / PostgREST may return timestamps; slots use plain YYYY-MM-DD — compare normalized keys only. */
+  const keys = scheduleModel.slots.map((s) => allocationDateKeyYmd(s.dateKey));
+  const sk = allocationDateKeyYmd(alloc.startDate);
+  const ek = allocationDateKeyYmd(alloc.endDate);
+  if (!sk || !ek) return null;
 
   let i0 = keys.findIndex((k) => k >= sk);
   if (i0 < 0) return null;
@@ -306,7 +312,7 @@ function layoutAllocation(alloc, scheduleModel) {
  * appear as two bars instead of one continuous bar across the Fri↔Mon week boundary.
  */
 function splitLayoutByWorkWeek(lay, scheduleModel) {
-  const keys = scheduleModel.slots.map((s) => s.dateKey);
+  const keys = scheduleModel.slots.map((s) => allocationDateKeyYmd(s.dateKey));
   const i0 = lay.start;
   const i1 = lay.start + lay.span - 1;
   if (i0 < 0 || i1 >= keys.length || i1 < i0) return [lay];
@@ -332,15 +338,15 @@ function splitLayoutByWorkWeek(lay, scheduleModel) {
 /** Visible timeline segments for an allocation (includes recurring occurrences). */
 function layoutsForAllocation(alloc, scheduleModel) {
   const out = [];
-  let start = alloc.startDate;
-  let end = alloc.endDate;
+  let start = allocationDateKeyYmd(alloc.startDate);
+  let end = allocationDateKeyYmd(alloc.endDate);
   const repeatId = alloc.repeatId ?? "none";
 
   // Fast-forward a recurring series whose anchor is far before the visible window
   // (e.g. availability `avail_off:` rows anchored at 2024-01-02) straight into range,
   // so we don't burn iteration budget walking the gap.
   if (repeatId !== "none" && scheduleModel?.slots?.length) {
-    const firstKey = scheduleModel.slots[0].dateKey;
+    const firstKey = allocationDateKeyYmd(scheduleModel.slots[0].dateKey);
     let guard = 0;
     while (end < firstKey && guard++ < 2600) {
       const next = advanceRepeatWindow(start, end, repeatId);
@@ -1428,8 +1434,8 @@ const TimelineRow = memo(function TimelineRow({
             {publicHolidaySegments.length > 0 && (
               <div
                 className="lp-public-holiday-overlay"
-                style={{ 
-                  gridColumn: "1 / -1", 
+                style={{
+                  gridColumn: "1 / -1",
                   display: "grid",
                   gridTemplateColumns: gridTemplate,
                   position: "absolute",
@@ -1439,13 +1445,21 @@ const TimelineRow = memo(function TimelineRow({
                   right: 0,
                   width: "100%",
                   gap: 0,
+                  alignContent: "start",
+                  // Match `.lp-grid-leave-layer`: grid placement tracks real columns (`fr` sizing +
+                  // week-band borders); avoid %/absolute bars that drift at week boundaries.
                   padding: 0,
-                  pointerEvents: "none"
+                  pointerEvents: "none",
+                  zIndex: 2000,
+                  minWidth: 0,
+                  boxSizing: "border-box",
                 }}
               >
                 {publicHolidaySegments.map((seg) => {
-                  const geo = clampedSegmentGeometry(seg.lay, nCols);
-                  const phBrPx = allocationBarBorderRadiusPx(geo.widthPct, allocationBoxStyle);
+                  const colStart = Math.max(1, Math.round(seg.lay.start) + 1);
+                  const colSpan = Math.max(1, Math.round(seg.lay.span));
+                  const phWidthPct = (colSpan / Math.max(1, nCols)) * 100;
+                  const phBrPx = allocationBarBorderRadiusPx(phWidthPct, allocationBoxStyle);
                   const phBarH = allocationBarHeightPx(seg.a);
                   const holidayLabel = seg.a.notes || "Public holiday";
                   const holidayHours = Math.max(0, parseFloat(seg.a.hoursPerDay) || 0);
@@ -1457,15 +1471,16 @@ const TimelineRow = memo(function TimelineRow({
                       type="button"
                       className="lp-leave-block lp-leave-block--public_holiday lp-leave-block--icon-only"
                       style={{
-                        position: "absolute",
-                        left: `${geo.leftPct}%`,
-                        width: `${geo.widthPct}%`,
-                        top: 0,
+                        gridColumn: `${colStart} / span ${colSpan}`,
+                        gridRow: 1,
+                        alignSelf: "start",
                         height: `${phBarH}px`,
                         minHeight: `${phBarH}px`,
                         maxHeight: `${phBarH}px`,
+                        width: "100%",
+                        minWidth: 0,
+                        justifySelf: "stretch",
                         pointerEvents: "auto",
-                        zIndex: 999,
                         margin: 0,
                         borderRadius: `${phBrPx}px`,
                         overflow: "hidden",
