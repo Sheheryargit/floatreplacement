@@ -8,7 +8,6 @@ import {
   useLayoutEffect,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useVirtualizer, measureElement as virtualMeasureElement } from "@tanstack/react-virtual";
 import {
   ArrowDownUp,
   Baby,
@@ -33,8 +32,6 @@ import {
   Plus,
   Repeat2,
   Rows3,
-  Send,
-  Share,
   SlidersHorizontal,
   Star,
   StickyNote,
@@ -42,6 +39,7 @@ import {
   User,
   UserPlus,
   Wallet,
+  X,
 } from "lucide-react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
@@ -55,12 +53,13 @@ import {
 import { ScheduleAllocationFilterMenu } from "../components/ScheduleAllocationFilterMenu.jsx";
 import { useSchedulePageData } from "../hooks/useSchedulePageData.js";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
-import { InviteMemberDialog } from "../components/InviteMemberDialog.jsx";
 import {
   showCenterActionFeedback,
   useAlloc8ActionFeedbackMount,
 } from "../context/CenterActionFeedbackContext.jsx";
 import { useTimelineScrollController } from "../schedule/useTimelineScrollController.js";
+import { estimateScheduleRowHeightPx } from "../schedule/estimateScheduleRowHeight.js";
+import { ScheduleVirtualizedRows } from "../schedule/ScheduleVirtualizedRows.jsx";
 import { ProjectModal } from "./ProjectsPage.jsx";
 import { syncPersonAvailabilityFromForm } from "../lib/api/personAvailability.js";
 import { previewAvailabilityHours } from "../utils/availabilityPreview.js";
@@ -1519,9 +1518,12 @@ export default function LandingPage() {
     addAllocationProjectLabel,
     getNextPersonId,
     getNextProjectId,
-    starredPeopleTags,
+    starredScheduleFilters,
     scheduleFilterRules,
-    setStarredPeopleTags,
+    toggleStarredPersonTagPreset,
+    saveCurrentFilterAsStarred,
+    removeStarredFilterPreset,
+    applyStarredFilterPreset,
     setScheduleFilterRules,
     syncPersonCreate,
     syncPersonUpdate,
@@ -1640,6 +1642,12 @@ export default function LandingPage() {
   const prevOffsets = useRef(timelineOffsets);
   const prevColCount = useRef(0);
   const scheduleViewportRef = useRef(null);
+  const resetScheduleVerticalScrollRef = useRef(false);
+  const scheduleRowVirtualizerRef = useRef(null);
+  const prevTimelineOffsetsRef = useRef({ prev: 1, next: 2 });
+  const scheduleHeaderRef = useRef(null);
+  /** Fallback until header is measured — avoids a blank band on first paint. */
+  const [scheduleScrollMargin, setScheduleScrollMargin] = useState(96);
   const lastAnchorKey = useRef(null);
 
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
@@ -1664,8 +1672,6 @@ export default function LandingPage() {
 
   const [scheduleFilterOpen, setScheduleFilterOpen] = useState(false);
   const [starredPopoverOpen, setStarredPopoverOpen] = useState(false);
-  const [inviteOpen, setInviteOpen] = useState(false);
-
   useEffect(() => {
     function onDoc(e) {
       if (viewWrapRef.current && !viewWrapRef.current.contains(e.target)) setViewMenuOpen(false);
@@ -1736,6 +1742,12 @@ export default function LandingPage() {
     scheduleModel,
   ]);
 
+  /** Stable identity for virtualizer remeasure + scroll reset when filter/sort changes. */
+  const schedulePeopleKey = useMemo(
+    () => schedulePeople.map((p) => p.id).join("|"),
+    [schedulePeople]
+  );
+
   const projectByLabel = useMemo(() => {
     const m = new Map();
     for (const p of projects) {
@@ -1746,13 +1758,12 @@ export default function LandingPage() {
 
   const scheduleFilterActiveCount = countActiveFilterRules(scheduleFilterRules);
 
-  const toggleStarredPeopleTag = useCallback(
-    (tag) => {
-      setStarredPeopleTags((prev) =>
-        prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag].sort((a, b) => a.localeCompare(b))
-      );
+  const applySavedStarredFilter = useCallback(
+    (presetId) => {
+      applyStarredFilterPreset(presetId);
+      setStarredPopoverOpen(false);
     },
-    [setStarredPeopleTags]
+    [applyStarredFilterPreset]
   );
 
   const visibleCapacityDays = useMemo(
@@ -1801,6 +1812,11 @@ export default function LandingPage() {
     if (viewMode === "week") return `w-${weekMondayKey(anchorDate)}`;
     return `m-${anchorDate.getFullYear()}-${anchorDate.getMonth() + 1}`;
   }, [viewMode, anchorDate, customRange]);
+
+  const [scheduleCanvasEntered, setScheduleCanvasEntered] = useState(false);
+  useEffect(() => {
+    setScheduleCanvasEntered(true);
+  }, []);
 
   useEffect(() => {
     if (!premiumV2Enabled) return undefined;
@@ -1866,7 +1882,12 @@ export default function LandingPage() {
     setTimeRangePreset(null);
     setAnchorDate(new Date());
     setTimelineOffsets({ prev: 1, next: 2 });
+    resetScheduleVerticalScrollRef.current = true;
     lastAnchorKey.current = null;
+  }, []);
+
+  const registerScheduleRowVirtualizer = useCallback((instance) => {
+    scheduleRowVirtualizerRef.current = instance;
   }, []);
 
   const applyTimeRangePreset = useCallback((presetId) => {
@@ -2499,30 +2520,128 @@ export default function LandingPage() {
     lastAnchorKeyRef: lastAnchorKey,
   });
 
-  const scheduleFirefox =
-    typeof navigator !== "undefined" && /firefox/i.test(navigator.userAgent || "");
-
   const scheduleRowEstimatePx = useMemo(() => {
     if (density === "compact") return 100;
     if (density === "spacious") return 162;
     return 124;
   }, [density]);
 
-  // scrollMargin must stay 0: the calendar header is a sibling above .lp-sched-virtual-rows in the
-  // scroll flow. Non-zero scrollMargin would add the same offset again as empty space above row 0.
-  const scheduleRowVirtualizer = useVirtualizer({
-    count: schedulePeople.length,
-    getScrollElement: () => scheduleViewportRef.current,
-    estimateSize: () => scheduleRowEstimatePx,
-    overscan: 4,
-    measureElement: scheduleFirefox ? undefined : virtualMeasureElement,
-  });
+  const estimateScheduleRowSize = useCallback(
+    (index) => {
+      const p = schedulePeople[index];
+      if (!p) return scheduleRowEstimatePx;
+      return estimateScheduleRowHeightPx({
+        personAllocations: getPersonAllocations(allocationsByPerson, p.id),
+        density,
+      });
+    },
+    [schedulePeople, allocationsByPerson, density, scheduleRowEstimatePx]
+  );
 
-  const scheduleRowVirtualizerRef = useRef(scheduleRowVirtualizer);
-  scheduleRowVirtualizerRef.current = scheduleRowVirtualizer;
+  const timelineRowProps = useMemo(
+    () => ({
+      projects,
+      scheduleModel,
+      viewMode,
+      anchorDate,
+      utilizationMode,
+      density,
+      gridTemplate,
+      nCols: scheduleModel.columnCount,
+      openEdit,
+      openCreateAllocation,
+      openAllocationDetail,
+      handleTimelineClick,
+      todayDateKey,
+      dismissedAvailOffKeys,
+      showPeakLoadStatus,
+      allocationBoxStyle,
+      allocationEnterAnim,
+      freshEnteredAllocationKey,
+      premiumV2Enabled,
+    }),
+    [
+      projects,
+      scheduleModel,
+      viewMode,
+      anchorDate,
+      utilizationMode,
+      density,
+      gridTemplate,
+      openEdit,
+      openCreateAllocation,
+      openAllocationDetail,
+      handleTimelineClick,
+      todayDateKey,
+      dismissedAvailOffKeys,
+      showPeakLoadStatus,
+      allocationBoxStyle,
+      allocationEnterAnim,
+      freshEnteredAllocationKey,
+      premiumV2Enabled,
+    ]
+  );
+
   useLayoutEffect(() => {
-    scheduleRowVirtualizerRef.current.measure();
-  }, [scheduleModel, viewMode, customRange, colMinPx, schedulePeople.length, density, scheduleRowEstimatePx]);
+    const header = scheduleHeaderRef.current;
+    if (!header) return;
+    const syncMargin = () => setScheduleScrollMargin(header.offsetHeight || 0);
+    syncMargin();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(syncMargin) : null;
+    ro?.observe(header);
+    return () => ro?.disconnect();
+  }, [scheduleModel, viewMode, customRange, colMinPx, density]);
+
+  const scheduleAnchorJumpKey = useMemo(
+    () =>
+      `${scheduleModel.anchorDateKey}|${scheduleModel.columnCount}|${timelineOffsets.prev}|${timelineOffsets.next}|${customRange?.start ?? ""}|${customRange?.end ?? ""}`,
+    [
+      scheduleModel.anchorDateKey,
+      scheduleModel.columnCount,
+      timelineOffsets.prev,
+      timelineOffsets.next,
+      customRange,
+    ]
+  );
+
+  useLayoutEffect(() => {
+    const el = scheduleViewportRef.current;
+    if (el) el.scrollTop = 0;
+  }, [schedulePeopleKey]);
+
+  useLayoutEffect(() => {
+    const el = scheduleViewportRef.current;
+    const prevOffsets = prevTimelineOffsetsRef.current;
+    const timelineWindowShrunk =
+      timelineOffsets.next < prevOffsets.next || timelineOffsets.prev < prevOffsets.prev;
+    prevTimelineOffsetsRef.current = timelineOffsets;
+
+    const hardReset = resetScheduleVerticalScrollRef.current || timelineWindowShrunk;
+    if (resetScheduleVerticalScrollRef.current) resetScheduleVerticalScrollRef.current = false;
+
+    if (hardReset && el) el.scrollTop = 0;
+
+    const v = scheduleRowVirtualizerRef.current;
+    if (!v) return;
+
+    if (hardReset) {
+      v.measure();
+      v.scrollToOffset(0, { align: "start" });
+      return;
+    }
+
+    v.measure();
+  }, [
+    scheduleAnchorJumpKey,
+    timelineOffsets.prev,
+    timelineOffsets.next,
+    scheduleScrollMargin,
+    density,
+    scheduleRowEstimatePx,
+    scheduleAllocations,
+    allocationsByPerson,
+    dismissedAvailOffKeys,
+  ]);
 
   return (
     <div
@@ -2581,8 +2700,9 @@ export default function LandingPage() {
                     peopleTagOpts={peopleTagOpts}
                     projectTagOpts={projectTagOpts}
                     allocationProjectOptions={allocationProjectOptions}
-                    starredPeopleTags={starredPeopleTags}
-                    toggleStarredPeopleTag={toggleStarredPeopleTag}
+                    starredScheduleFilters={starredScheduleFilters}
+                    toggleStarredPersonTagPreset={toggleStarredPersonTagPreset}
+                    saveCurrentFilterAsStarred={saveCurrentFilterAsStarred}
                   />
                 </div>
 
@@ -2591,11 +2711,11 @@ export default function LandingPage() {
                     type="button"
                     className={
                       "lp-pill lp-pill-btn lp-tag-dd-trigger" +
-                      (starredPeopleTags.length > 0 ? " lp-tag-dd-trigger-star" : "")
+                      (starredScheduleFilters.length > 0 ? " lp-tag-dd-trigger-star" : "")
                     }
                     aria-expanded={starredPopoverOpen}
                     aria-haspopup="listbox"
-                    aria-label="Star tags for quick filtering"
+                    aria-label="Starred filters — apply saved schedule filters"
                     onClick={() => {
                       setStarredPopoverOpen((o) => !o);
                       setScheduleFilterOpen(false);
@@ -2607,37 +2727,50 @@ export default function LandingPage() {
                     <Star
                       size={14}
                       strokeWidth={2}
-                      className={starredPeopleTags.length > 0 ? "lp-star-filled" : ""}
-                      fill={starredPeopleTags.length > 0 ? "currentColor" : "none"}
+                      className={starredScheduleFilters.length > 0 ? "lp-star-filled" : ""}
+                      fill={starredScheduleFilters.length > 0 ? "currentColor" : "none"}
                     />
-                    Starred tags
-                    {starredPeopleTags.length > 0 ? ` (${starredPeopleTags.length})` : ""}
+                    Starred filters
+                    {starredScheduleFilters.length > 0 ? ` (${starredScheduleFilters.length})` : ""}
                     <ChevronDown size={14} />
                   </button>
                   {starredPopoverOpen && (
                     <div className="lp-popover lp-popover-tags" role="listbox">
-                      <div className="lp-popover-title">Starred tags</div>
+                      <div className="lp-popover-title">Starred filters</div>
                       <p className="lp-tag-dd-hint">
-                        Tags you ★ under Filter → Person tag appear here. Click a row to remove from starred.
+                        Save filters with ★ in the Filter menu (or on a person tag). Click a row to apply; use
+                        Remove to unstar.
                       </p>
                       <div className="lp-tag-check-scroll">
-                        {starredPeopleTags.length === 0 ? (
+                        {starredScheduleFilters.length === 0 ? (
                           <p className="lp-tag-dd-empty">
-                            No starred tags yet. Open Filter, choose Person tag, then click ★ on any tag.
+                            No starred filters yet. Set filters, click “Save to starred”, or ★ a person tag in
+                            Filter → Person tag.
                           </p>
                         ) : (
-                          [...starredPeopleTags].sort((a, b) => a.localeCompare(b)).map((tag) => (
-                            <button
-                              key={tag}
-                              type="button"
-                              className="lp-star-tag-row lp-star-tag-row-on"
-                              onClick={() => toggleStarredPeopleTag(tag)}
-                            >
-                              <Star size={16} className="lp-star-tag-icon" fill="currentColor" strokeWidth={2} />
-                              <span className="lp-star-tag-label">{tag}</span>
-                              <span className="lp-star-tag-remove-hint">Remove</span>
-                            </button>
-                          ))
+                          [...starredScheduleFilters]
+                            .sort((a, b) => a.label.localeCompare(b.label))
+                            .map((preset) => (
+                              <div key={preset.id} className="lp-star-tag-row lp-star-tag-row-on">
+                                <button
+                                  type="button"
+                                  className="lp-star-tag-row-main"
+                                  onClick={() => applySavedStarredFilter(preset.id)}
+                                >
+                                  <Star size={16} className="lp-star-tag-icon" fill="currentColor" strokeWidth={2} />
+                                  <span className="lp-star-tag-label">{preset.label}</span>
+                                  <span className="lp-star-tag-remove-hint">Apply</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="lp-star-tag-row-unstar"
+                                  aria-label={`Remove starred filter ${preset.label}`}
+                                  onClick={() => removeStarredFilterPreset(preset.id)}
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ))
                         )}
                       </div>
                     </div>
@@ -2789,29 +2922,6 @@ export default function LandingPage() {
                   </div>
                 )}
               </div>
-
-              <motion.button
-                type="button"
-                className="lp-icon-btn lp-invite-toolbar-btn"
-                aria-label="Invite team member"
-                onClick={() => {
-                  setInviteOpen(true);
-                  setViewMenuOpen(false);
-                  setDensityOpen(false);
-                  setAddMenuOpen(false);
-                  setScheduleFilterOpen(false);
-                  setStarredPopoverOpen(false);
-                }}
-                whileHover={{ scale: 1.07 }}
-                whileTap={{ scale: 0.93 }}
-                transition={{ type: "spring", stiffness: 520, damping: 28 }}
-              >
-                <Send size={18} strokeWidth={2.25} className="lp-invite-tray-ico" />
-              </motion.button>
-
-              <button type="button" className="lp-icon-btn" aria-label="Share">
-                <Share size={18} />
-              </button>
 
               <div className="lp-dropdown-wrap" ref={addWrapRef}>
                   <button
@@ -3099,11 +3209,15 @@ export default function LandingPage() {
             <motion.div
               key={scheduleMotionKey}
               className="lp-schedule-canvas lp-timeline-enter"
-              initial={{ opacity: 0.88, scale: 0.993, filter: "brightness(0.94)" }}
+              initial={
+                scheduleCanvasEntered
+                  ? false
+                  : { opacity: 0.88, scale: 0.993, filter: "brightness(0.94)" }
+              }
               animate={{ opacity: 1, scale: 1, filter: "brightness(1)" }}
               transition={{ type: "spring", stiffness: 420, damping: 32, mass: 0.88 }}
             >
-              <div className="lp-sched-row lp-sched-row-head">
+              <div ref={scheduleHeaderRef} className="lp-sched-row lp-sched-row-head">
                 <div className="lp-sched-corner lp-sched-corner--empty" aria-hidden />
                 <div className="lp-sched-timeline lp-sched-sticky-top">
                   <div className="lp-cal-head">
@@ -3166,61 +3280,18 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              <div
-                className="lp-sched-virtual-rows"
-                style={{
-                  height: scheduleRowVirtualizer.getTotalSize(),
-                  width: "100%",
-                  minWidth: "max(100%, calc(var(--lp-people-w) + var(--lp-timeline-min)))",
-                  position: "relative",
-                }}
-              >
-                {scheduleRowVirtualizer.getVirtualItems().map((virtualRow) => {
-                  const p = schedulePeople[virtualRow.index];
-                  const i = virtualRow.index;
-                  return (
-                    <div
-                      key={virtualRow.key}
-                      data-index={virtualRow.index}
-                      ref={scheduleRowVirtualizer.measureElement}
-                      className="lp-sched-virtual-anchor"
-                      style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        width: "100%",
-                        minWidth: "max(100%, calc(var(--lp-people-w) + var(--lp-timeline-min)))",
-                        transform: `translateY(${virtualRow.start}px)`,
-                      }}
-                    >
-                      <TimelineRow
-                        p={p}
-                        i={i}
-                        personAllocations={getPersonAllocations(allocationsByPerson, p.id)}
-                        projects={projects}
-                        scheduleModel={scheduleModel}
-                        viewMode={viewMode}
-                        anchorDate={anchorDate}
-                        utilizationMode={utilizationMode}
-                        density={density}
-                        gridTemplate={gridTemplate}
-                        nCols={scheduleModel.columnCount}
-                        openEdit={openEdit}
-                        openCreateAllocation={openCreateAllocation}
-                        openAllocationDetail={openAllocationDetail}
-                        handleTimelineClick={handleTimelineClick}
-                        todayDateKey={todayDateKey}
-                        dismissedAvailOffKeys={dismissedAvailOffKeys}
-                        showPeakLoadStatus={showPeakLoadStatus}
-                        allocationBoxStyle={allocationBoxStyle}
-                        allocationEnterAnim={allocationEnterAnim}
-                        freshEnteredAllocationKey={freshEnteredAllocationKey}
-                        premiumV2Enabled={premiumV2Enabled}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
+              <ScheduleVirtualizedRows
+                key={schedulePeopleKey}
+                schedulePeople={schedulePeople}
+                schedulePeopleKey={schedulePeopleKey}
+                scheduleViewportRef={scheduleViewportRef}
+                scheduleScrollMargin={scheduleScrollMargin}
+                estimateScheduleRowSize={estimateScheduleRowSize}
+                onVirtualizer={registerScheduleRowVirtualizer}
+                allocationsByPerson={allocationsByPerson}
+                TimelineRow={TimelineRow}
+                timelineRowProps={timelineRowProps}
+              />
             </motion.div>
           </div>
         </div>
@@ -3301,8 +3372,6 @@ export default function LandingPage() {
         }
         t={t}
       />
-
-      <InviteMemberDialog open={inviteOpen} onOpenChange={setInviteOpen} />
 
       <ProjectModal
         open={projectCreateOpen}

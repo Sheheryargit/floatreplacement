@@ -38,8 +38,11 @@ export function useSchedulePageData() {
   const addAllocationProjectLabel = useAppStore((s) => s.addAllocationProjectLabel);
   const getNextPersonId = useAppStore((s) => s.getNextPersonId);
   const getNextProjectId = useAppStore((s) => s.getNextProjectId);
-  const starredPeopleTags = useAppStore((s) => s.starredPeopleTags);
-  const setStarredPeopleTags = useAppStore((s) => s.setStarredPeopleTags);
+  const starredScheduleFilters = useAppStore((s) => s.starredScheduleFilters);
+  const toggleStarredPersonTagPreset = useAppStore((s) => s.toggleStarredPersonTagPreset);
+  const saveCurrentFilterAsStarred = useAppStore((s) => s.saveCurrentFilterAsStarred);
+  const removeStarredFilterPreset = useAppStore((s) => s.removeStarredFilterPreset);
+  const applyStarredFilterPreset = useAppStore((s) => s.applyStarredFilterPreset);
   const scheduleFilterRules = useAppStore((s) => s.scheduleFilterRules);
   const setScheduleFilterRules = useAppStore((s) => s.setScheduleFilterRules);
 
@@ -71,9 +74,12 @@ export function useSchedulePageData() {
     addAllocationProjectLabel,
     getNextPersonId,
     getNextProjectId,
-    starredPeopleTags,
+    starredScheduleFilters,
     scheduleFilterRules,
-    setStarredPeopleTags,
+    toggleStarredPersonTagPreset,
+    saveCurrentFilterAsStarred,
+    removeStarredFilterPreset,
+    applyStarredFilterPreset,
     setScheduleFilterRules,
     syncPersonCreate,
     syncPersonUpdate,

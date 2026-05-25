@@ -1222,14 +1222,35 @@
   box-sizing: border-box;
 }
 
+/* Typical workspace size: all rows in document flow (no absolute positioning). */
+.lp-sched-virtual-rows--static {
+  position: relative;
+  height: auto;
+  width: 100%;
+  min-width: max(100%, calc(var(--lp-people-w) + var(--lp-timeline-min)));
+}
+
+.lp-sched-virtual-rows--static .lp-sched-virtual-anchor {
+  position: relative;
+  top: auto;
+  left: auto;
+  width: 100%;
+}
+
 /* One continuous line between people (virtual rows); avoids split borders on sticky panel vs timeline */
 .lp-sched-virtual-rows .lp-sched-virtual-anchor {
   border-bottom: 1px solid var(--border);
+  isolation: isolate;
 }
 
 .lp-sched-virtual-rows .lp-sched-virtual-anchor .lp-sched-person,
 .lp-sched-virtual-rows .lp-sched-virtual-anchor .lp-sched-timeline {
   border-bottom: none;
+}
+
+/* Clip allocation overflow only — not the people column (names/avatars must stay visible). */
+.lp-sched-virtual-rows .lp-sched-virtual-anchor .lp-sched-timeline {
+  overflow: hidden;
 }
 
 .lp-sched-row {
@@ -1245,8 +1266,16 @@
   animation-delay: calc(var(--animation-order, 0) * 0.04s);
 }
 
+/* After .lp-sched-row so opacity/animation win — virtual rows must not stay at opacity:0 */
+.lp-sched-virtual-rows .lp-sched-virtual-anchor .lp-sched-row {
+  opacity: 1;
+  animation: none;
+}
+
 .lp-sched-row-head {
   min-height: 0;
+  opacity: 1;
+  animation: none;
 }
 
 .lp-sched-corner {
@@ -3384,24 +3413,59 @@ button.lp-block.lp-block-leave:hover {
 
 .lp-star-tag-row {
   display: flex;
+  align-items: stretch;
+  gap: 4px;
+  width: 100%;
+  border-radius: 8px;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.lp-star-tag-row-main {
+  display: flex;
   align-items: center;
   gap: 10px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 8px 10px;
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: var(--text-soft);
-  font-size: 13px;
-  cursor: pointer;
+  color: inherit;
+  font-size: inherit;
   font-family: inherit;
   text-align: left;
+  cursor: pointer;
   transition: background 0.12s, color 0.12s;
 }
 
-.lp-star-tag-row:hover {
+.lp-star-tag-row-main:hover {
   background: var(--row-hov, rgba(255, 255, 255, 0.04));
   color: var(--text);
+}
+
+.lp-star-tag-row-unstar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  margin: 4px 4px 4px 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.lp-star-tag-row-unstar:hover {
+  background: var(--row-hov, rgba(255, 255, 255, 0.06));
+  color: var(--text);
+}
+
+.lp-star-tag-row:hover .lp-star-tag-remove-hint {
+  opacity: 1;
 }
 
 .lp-star-tag-row-on {

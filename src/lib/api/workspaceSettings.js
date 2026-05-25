@@ -1,5 +1,7 @@
 import { supabase, isSupabaseConfigured } from "../supabase.js";
 
+/** Schedule allocation filters are stored in localStorage (see scheduleFilterPrefs.js), not here. */
+
 function defaults() {
   return { starredPeopleTags: [], schedulePeopleTagFilter: [], scheduleAllocationFilter: [] };
 }

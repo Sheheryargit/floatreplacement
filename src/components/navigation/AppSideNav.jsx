@@ -7,7 +7,6 @@ import {
   BarChart3,
   Settings,
   HelpCircle,
-  Bell,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -75,12 +74,6 @@ function AppSideNav() {
     slapThenDialog({
       title: "Need help?",
       message: "Contact Sheher on Slack.",
-    });
-
-  const onNotifications = () =>
-    slapThenDialog({
-      title: "Notifications",
-      message: "Notifications are planned for a future release.",
     });
 
   return (
@@ -201,17 +194,6 @@ function AppSideNav() {
         >
           <HelpCircle size={18} strokeWidth={1.9} aria-hidden />
           {!collapsed && <span className="app-sidenav-foot-label">Help</span>}
-        </motion.button>
-        <motion.button
-          type="button"
-          className="app-sidenav-foot-btn app-sidenav-foot-btn--muted"
-          title="Notifications — coming later"
-          onClick={onNotifications}
-          whileHover={{ scale: 1.06 }}
-          whileTap={{ scale: 0.94 }}
-        >
-          <Bell size={18} strokeWidth={1.9} aria-hidden />
-          {!collapsed && <span className="app-sidenav-foot-label">Alerts</span>}
         </motion.button>
         <motion.button
           type="button"

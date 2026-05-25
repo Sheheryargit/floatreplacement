@@ -11,9 +11,14 @@ import { DEFAULT_DEPARTMENTS } from "../constants/departments.js";
 import {
   SEED_CLIENTS,
   SEED_PROJECT_TAGS,
+  PROJECTS_SEED,
 } from "../data/projectsSeed.js";
 import { buildAllocationProjectOptionStrings } from "../utils/projectColors.js";
-import { loadWorkspaceFromSupabase } from "../lib/api/loadWorkspace.js";
+import {
+  loadWorkspaceFromSupabase,
+  loadWorkspaceCriticalFromSupabase,
+  enrichWorkspaceFromSupabase,
+} from "../lib/api/loadWorkspace.js";
 import {
   defaultWorkspaceAllocationWindow,
   mapProjectsWithResolvedColors,
@@ -28,13 +33,25 @@ import * as projectsApi from "../lib/api/projects.js";
 import * as allocationsApi from "../lib/api/allocations.js";
 import * as lookupsApi from "../lib/api/lookups.js";
 import { isSupabaseConfigured, supabase } from "../lib/supabase.js";
-import * as workspaceSettingsApi from "../lib/api/workspaceSettings.js";
 import { recalculatePersonAvailability } from "../lib/api/personAvailability.js";
 import {
-  migrateFilterRulesFromLegacyTags,
   normalizeFilterRules,
   deriveLegacyTagFilterFromRules,
 } from "../utils/scheduleAllocationFilter.js";
+import {
+  readScheduleFilterRules,
+  writeScheduleFilterRules,
+  migrateScheduleFilterFromWorkspace,
+} from "../config/scheduleFilterPrefs.js";
+import {
+  readStarredScheduleFilters,
+  writeStarredScheduleFilters,
+  migrateStarredFiltersFromWorkspace,
+  findPersonTagStarredPreset,
+  personTagStarredPreset,
+  labelFromFilterRules,
+  newStarredFilterId,
+} from "../config/starredScheduleFilterPrefs.js";
 import { toast } from "sonner";
 
 const LEGACY_STORAGE_KEY = "float-workspace-v1";
@@ -43,7 +60,10 @@ const LEGACY_STORAGE_KEY = "float-workspace-v1";
 const WORKSPACE_REALTIME_DEBOUNCE_MS = 900;
 
 /** If Supabase hangs, still leave the animated loader instead of trapping the user indefinitely. */
-const WORKSPACE_READY_FALLBACK_MS = 25_000;
+/** Unblock UI if Supabase is slow — schedule may backfill allocations shortly after. */
+const WORKSPACE_READY_FALLBACK_MS = 12_000;
+/** Only refetch entire workspace after tab was hidden this long (avoids tab-switch “hang”). */
+const VISIBILITY_FULL_RELOAD_MS = 3 * 60 * 1000;
 
 function notifyWorkspaceLoadIssue(message, description) {
   toast.error(message, {
@@ -69,8 +89,57 @@ function clonePeople() {
   return PEOPLE_SEED.map((p) => ({ ...p, tags: [...p.tags] }));
 }
 
+function cloneProjectsSeed() {
+  return PROJECTS_SEED.map((p) => ({
+    ...p,
+    tags: [...p.tags],
+    teamIds: [...p.teamIds],
+  }));
+}
+
+/** Dev-only: Supabase configured but DB empty or load failed — show roster seed instead of blank UI. */
+function applyDevWorkspaceSeedIfEmpty(reason) {
+  if (!import.meta.env.DEV) return false;
+  const { people, projects } = useAppStore.getState();
+  if (people.length > 0 || projects.length > 0) return false;
+
+  mergeRemoteWorkspace({
+    people: clonePeople(),
+    projects: cloneProjectsSeed(),
+    allocations: [],
+    publicHolidayAllocations: [],
+    roles: [...SEED_ROLES],
+    depts: [...DEFAULT_DEPARTMENTS],
+    clients: [...SEED_CLIENTS],
+    peopleTagOpts: [...SEED_TAGS],
+    projectTagOpts: [...SEED_PROJECT_TAGS],
+    extraAllocationLabels: [...ALLOCATION_PROJECT_SEED],
+    starredPeopleTags: [],
+    schedulePeopleTagFilter: [],
+    scheduleAllocationFilter: [],
+  });
+  migrateStarredFiltersFromWorkspace({ starredPeopleTags: [] });
+
+  notifyWorkspaceLoadIssue(
+    "Showing demo data",
+    reason ||
+      "Supabase returned no people or projects. Check migrations and seed scripts, or verify .env.local points at the right project."
+  );
+  return true;
+}
+
+function initialScheduleFilterState() {
+  const scheduleFilterRules = readScheduleFilterRules();
+  return {
+    scheduleFilterRules,
+    schedulePeopleTagFilter: deriveLegacyTagFilterFromRules(scheduleFilterRules),
+    starredScheduleFilters: readStarredScheduleFilters(),
+  };
+}
+
 /** Offline / no env: full in-memory seed. Supabase: empty core until fetch completes. */
 function buildInitialSlices() {
+  const scheduleFilter = initialScheduleFilterState();
   if (!isSupabaseConfigured) {
     return {
       people: clonePeople(),
@@ -83,9 +152,7 @@ function buildInitialSlices() {
       clients: [...SEED_CLIENTS],
       projectTagOpts: [...SEED_PROJECT_TAGS],
       extraAllocationLabels: [...ALLOCATION_PROJECT_SEED],
-      starredPeopleTags: [],
-      schedulePeopleTagFilter: [],
-      scheduleFilterRules: [],
+      ...scheduleFilter,
     };
   }
 
@@ -100,9 +167,7 @@ function buildInitialSlices() {
     clients: [...SEED_CLIENTS],
     projectTagOpts: [...SEED_PROJECT_TAGS],
     extraAllocationLabels: [...ALLOCATION_PROJECT_SEED],
-    starredPeopleTags: [],
-    schedulePeopleTagFilter: [],
-    scheduleFilterRules: [],
+    ...scheduleFilter,
   };
 }
 
@@ -116,14 +181,11 @@ const seedFallbacks = {
 };
 
 function mergeRemoteWorkspace(remote) {
-  const fromJson = normalizeFilterRules(remote.scheduleAllocationFilter);
-  const scheduleFilterRules =
-    fromJson.length > 0
-      ? fromJson
-      : migrateFilterRulesFromLegacyTags(
-          Array.isArray(remote.schedulePeopleTagFilter) ? remote.schedulePeopleTagFilter : []
-        );
+  migrateScheduleFilterFromWorkspace(remote);
+  migrateStarredFiltersFromWorkspace(remote);
+  const scheduleFilterRules = readScheduleFilterRules();
   const schedulePeopleTagFilter = deriveLegacyTagFilterFromRules(scheduleFilterRules);
+  const starredScheduleFilters = readStarredScheduleFilters();
 
   useAppStore.setState({
     people: remote.people,
@@ -140,7 +202,7 @@ function mergeRemoteWorkspace(remote) {
     extraAllocationLabels: [
       ...new Set([...seedFallbacks.extraAllocationLabels, ...remote.extraAllocationLabels]),
     ],
-    starredPeopleTags: Array.isArray(remote.starredPeopleTags) ? [...remote.starredPeopleTags] : [],
+    starredScheduleFilters,
     schedulePeopleTagFilter,
     scheduleFilterRules,
   });
@@ -239,17 +301,59 @@ export const useAppStore = create((set, get) => ({
     });
   },
 
-  setStarredPeopleTags: (val) =>
+  setStarredScheduleFilters: (val) =>
     set((state) => {
-      const next = typeof val === "function" ? val(state.starredPeopleTags) : val;
-      dbSync(() =>
-        workspaceSettingsApi.upsertWorkspaceSettings({
-          starredPeopleTags: next,
-          schedulePeopleTagFilter: state.schedulePeopleTagFilter,
-          scheduleAllocationFilter: normalizeFilterRules(state.scheduleFilterRules),
-        })
-      );
-      return { starredPeopleTags: next };
+      const next = typeof val === "function" ? val(state.starredScheduleFilters) : val;
+      writeStarredScheduleFilters(next);
+      return { starredScheduleFilters: next };
+    }),
+
+  toggleStarredPersonTagPreset: (tag) =>
+    set((state) => {
+      const presets = [...state.starredScheduleFilters];
+      const found = findPersonTagStarredPreset(presets, tag);
+      const next = found
+        ? presets.filter((p) => p.id !== found.id)
+        : [...presets, personTagStarredPreset(tag)];
+      writeStarredScheduleFilters(next);
+      return { starredScheduleFilters: next };
+    }),
+
+  saveCurrentFilterAsStarred: () =>
+    set((state) => {
+      const rules = normalizeFilterRules(state.scheduleFilterRules);
+      if (rules.length === 0) return state;
+      const fingerprint = JSON.stringify(rules);
+      const presets = [...state.starredScheduleFilters];
+      if (presets.some((p) => JSON.stringify(normalizeFilterRules(p.rules)) === fingerprint)) {
+        return state;
+      }
+      const next = [
+        ...presets,
+        { id: newStarredFilterId(), label: labelFromFilterRules(rules), rules },
+      ];
+      writeStarredScheduleFilters(next);
+      return { starredScheduleFilters: next };
+    }),
+
+  removeStarredFilterPreset: (id) =>
+    set((state) => {
+      const next = state.starredScheduleFilters.filter((p) => p.id !== id);
+      writeStarredScheduleFilters(next);
+      return { starredScheduleFilters: next };
+    }),
+
+  applyStarredFilterPreset: (id) =>
+    set((state) => {
+      const preset = state.starredScheduleFilters.find((p) => p.id === id);
+      if (!preset) return state;
+      const norm = normalizeFilterRules(preset.rules);
+      const legacyTags = deriveLegacyTagFilterFromRules(norm);
+      writeScheduleFilterRules(norm);
+      return {
+        scheduleFilterRules: norm,
+        schedulePeopleTagFilter: legacyTags,
+      };
     }),
 
   setScheduleFilterRules: (val) =>
@@ -257,13 +361,7 @@ export const useAppStore = create((set, get) => ({
       const next = typeof val === "function" ? val(state.scheduleFilterRules) : val;
       const norm = normalizeFilterRules(next);
       const legacyTags = deriveLegacyTagFilterFromRules(norm);
-      dbSync(() =>
-        workspaceSettingsApi.upsertWorkspaceSettings({
-          starredPeopleTags: state.starredPeopleTags,
-          schedulePeopleTagFilter: legacyTags,
-          scheduleAllocationFilter: norm,
-        })
-      );
+      writeScheduleFilterRules(norm);
       return { scheduleFilterRules: norm, schedulePeopleTagFilter: legacyTags };
     }),
 
@@ -283,14 +381,12 @@ export const useAppStore = create((set, get) => ({
               },
             ]
           : base;
-      dbSync(() =>
-        workspaceSettingsApi.upsertWorkspaceSettings({
-          starredPeopleTags: state.starredPeopleTags,
-          schedulePeopleTagFilter: tagNext,
-          scheduleAllocationFilter: merged,
-        })
-      );
-      return { schedulePeopleTagFilter: tagNext, scheduleFilterRules: merged };
+      const norm = normalizeFilterRules(merged);
+      writeScheduleFilterRules(norm);
+      return {
+        schedulePeopleTagFilter: tagNext,
+        scheduleFilterRules: norm,
+      };
     }),
 }));
 
@@ -377,10 +473,14 @@ export function useAppData() {
       setProjectTagOpts: s.setProjectTagOpts,
       extraAllocationLabels: s.extraAllocationLabels,
       setExtraAllocationLabels: s.setExtraAllocationLabels,
-      starredPeopleTags: s.starredPeopleTags,
+      starredScheduleFilters: s.starredScheduleFilters,
       schedulePeopleTagFilter: s.schedulePeopleTagFilter,
       scheduleFilterRules: s.scheduleFilterRules,
-      setStarredPeopleTags: s.setStarredPeopleTags,
+      setStarredScheduleFilters: s.setStarredScheduleFilters,
+      toggleStarredPersonTagPreset: s.toggleStarredPersonTagPreset,
+      saveCurrentFilterAsStarred: s.saveCurrentFilterAsStarred,
+      removeStarredFilterPreset: s.removeStarredFilterPreset,
+      applyStarredFilterPreset: s.applyStarredFilterPreset,
       setSchedulePeopleTagFilter: s.setSchedulePeopleTagFilter,
       setScheduleFilterRules: s.setScheduleFilterRules,
       getNextPersonId: s.getNextPersonId,
@@ -433,7 +533,7 @@ export function AppDataProvider({ children }) {
         .then((data) => {
           if (cancelled) return;
           if (!data) {
-            if (opts.notify) {
+            if (opts.notify && !applyDevWorkspaceSeedIfEmpty()) {
               notifyWorkspaceLoadIssue(
                 "Workspace data unavailable",
                 "The server returned no data. Check your connection and try reloading."
@@ -442,6 +542,11 @@ export function AppDataProvider({ children }) {
             return;
           }
           mergeRemoteWorkspace(data);
+          if (opts.notify) {
+            applyDevWorkspaceSeedIfEmpty(
+              "Connected to Supabase but people and projects tables are empty."
+            );
+          }
         })
         .catch((e) => {
           console.warn("[float] Supabase reload:", e?.message || e);
@@ -502,8 +607,15 @@ export function AppDataProvider({ children }) {
       timer = setTimeout(flushRealtimeDirty, WORKSPACE_REALTIME_DEBOUNCE_MS);
     };
 
+    let tabHiddenAt = 0;
     const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") scheduleFullReload();
+      if (document.visibilityState === "hidden") {
+        tabHiddenAt = Date.now();
+        return;
+      }
+      if (tabHiddenAt && Date.now() - tabHiddenAt >= VISIBILITY_FULL_RELOAD_MS) {
+        scheduleFullReload();
+      }
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
 
@@ -534,31 +646,64 @@ export function AppDataProvider({ children }) {
       if (!cancelled) useAppStore.setState({ workspaceReady: true });
     }, WORKSPACE_READY_FALLBACK_MS);
 
-    loadWorkspaceFromSupabase()
+    const markWorkspaceReady = () => {
+      if (readyFallbackTimer != null) {
+        window.clearTimeout(readyFallbackTimer);
+        readyFallbackTimer = null;
+      }
+      if (!cancelled) useAppStore.setState({ workspaceReady: true });
+    };
+
+    const runBackgroundEnrichment = () => {
+      const { people } = useAppStore.getState();
+      if (!people?.length) return;
+      void enrichWorkspaceFromSupabase(people)
+        .then((extra) => {
+          if (cancelled || !extra) return;
+          useAppStore.setState({
+            allocations: extra.allocations,
+            publicHolidayAllocations: extra.publicHolidayAllocations,
+          });
+        })
+        .catch((e) => {
+          console.warn("[float] Supabase enrichment:", e?.message || e);
+        });
+    };
+
+    loadWorkspaceCriticalFromSupabase()
       .then((data) => {
         if (cancelled) return;
         if (!data) {
-          notifyWorkspaceLoadIssue(
-            "Workspace data unavailable",
-            "The server returned no data. You may be offline or Supabase is misconfigured."
-          );
+          if (!applyDevWorkspaceSeedIfEmpty()) {
+            notifyWorkspaceLoadIssue(
+              "Workspace data unavailable",
+              "The server returned no data. You may be offline or Supabase is misconfigured."
+            );
+          }
           return;
         }
         mergeRemoteWorkspace(data);
+        applyDevWorkspaceSeedIfEmpty(
+          "Connected to Supabase but people and projects tables are empty."
+        );
+        markWorkspaceReady();
+        runBackgroundEnrichment();
       })
       .catch((e) => {
         console.warn("[float] Supabase load:", e?.message || e);
-        notifyWorkspaceLoadIssue(
-          "Could not load workspace",
-          e?.message || String(e)
-        );
+        if (
+          !applyDevWorkspaceSeedIfEmpty(
+            `Could not load workspace: ${e?.message || String(e)}`
+          )
+        ) {
+          notifyWorkspaceLoadIssue(
+            "Could not load workspace",
+            e?.message || String(e)
+          );
+        }
       })
       .finally(() => {
-        if (readyFallbackTimer != null) {
-          window.clearTimeout(readyFallbackTimer);
-          readyFallbackTimer = null;
-        }
-        if (!cancelled) useAppStore.setState({ workspaceReady: true });
+        markWorkspaceReady();
       });
 
     return () => {

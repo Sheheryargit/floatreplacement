@@ -58,11 +58,19 @@ export async function recalculatePersonAvailability(personId) {
  */
 export async function fetchAllAvailability() {
   if (!isSupabaseConfigured) return [];
-  const { data, error } = await supabase
-    .from("user_availability")
-    .select("person_id, employment_type, weekly_hours, hours_per_day, mon, tue, wed, thu, fri");
-  if (error) throw error;
-  return data || [];
+  try {
+    const { data, error } = await supabase
+      .from("user_availability")
+      .select("person_id, employment_type, weekly_hours, hours_per_day, mon, tue, wed, thu, fri");
+    if (error) {
+      console.warn("[float] user_availability:", error.message);
+      return [];
+    }
+    return data || [];
+  } catch (e) {
+    console.warn("[float] user_availability:", e?.message || e);
+    return [];
+  }
 }
 
 /** Map profile form → server PUT (after person exists). */

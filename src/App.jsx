@@ -11,10 +11,10 @@ import { SlapAnimationProvider } from "./context/SlapAnimationContext.jsx";
 import { AppDataProvider, useAppStore } from "./context/AppDataContext.jsx";
 import AnimatedAppLoader from "./components/ui/AnimatedAppLoader.jsx";
 import RouteSkeleton from "./components/ui/RouteSkeleton.jsx";
+import { isStaticUi } from "./config/uiMode.js";
 import LoginPage from "./pages/LoginPage.jsx";
 import GlobalBackground from "./components/ui/GlobalBackground.jsx";
 import { Toaster } from "sonner";
-import { isStaticUi } from "./config/uiMode.js";
 import "./styles/premium-overlays.css";
 
 /** Opaque toast shell — detailed fills live in index.css (.alloc8-toast). */
@@ -46,7 +46,9 @@ const workspaceRoutes = [
 
 function WorkspaceReady({ children }) {
   const ready = useAppStore((s) => s.workspaceReady);
-  if (!ready) return <AnimatedAppLoader />;
+  if (!ready) {
+    return isStaticUi() ? <RouteSkeleton /> : <AnimatedAppLoader />;
+  }
   return children;
 }
 

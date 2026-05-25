@@ -34,6 +34,16 @@ export function defaultWorkspaceAllocationWindow() {
   return { start, end };
 }
 
+/** Smaller range for first paint — full window loads in the background after UI is ready. */
+export function initialWorkspaceAllocationWindow() {
+  const now = new Date();
+  const start = new Date(now);
+  start.setDate(start.getDate() - 42);
+  const end = new Date(now);
+  end.setDate(end.getDate() + 168);
+  return { start, end };
+}
+
 export function mapProjectsWithResolvedColors(projectsRaw) {
   return projectsRaw.map((p) => {
     const label = projectToAllocationLabel({ ...p, id: p.id });
@@ -46,44 +56,9 @@ export function mapProjectsWithResolvedColors(projectsRaw) {
   });
 }
 
-export async function loadWorkspaceFromSupabaseOnce() {
-  if (!isSupabaseConfigured) return null;
-
-  const { start, end } = defaultWorkspaceAllocationWindow();
-
-  const [
-    rawPeople,
-    projectsRaw,
-    allocations,
-    phResult,
-    dismissResult,
-    roles,
-    depts,
-    clients,
-    peopleTagOpts,
-    projectTagOpts,
-    extraAllocationLabels,
-    workspaceSettings,
-    availabilityRows,
-  ] = await Promise.all([
-    fetchPeople(),
-    fetchProjects(),
-    fetchAllocations({ startDate: start, endDate: end }),
-    fetchPersonPublicHolidaysSafe(),
-    fetchPersonPublicHolidayDismissalsSafe(),
-    fetchRoles(),
-    fetchDepts(),
-    fetchClients(),
-    fetchPeopleTags(),
-    fetchProjectTags(),
-    fetchAllocationLabels(),
-    fetchWorkspaceSettings(),
-    fetchAllAvailability(),
-  ]);
-
-  // Merge availability into people so capacity calcs are per-person
+function mergeAvailabilityIntoPeople(rawPeople, availabilityRows) {
   const availMap = new Map(availabilityRows.map((a) => [a.person_id, a]));
-  const people = rawPeople.map((p) => {
+  return rawPeople.map((p) => {
     const a = availMap.get(p.id);
     return {
       ...p,
@@ -96,18 +71,62 @@ export async function loadWorkspaceFromSupabaseOnce() {
       availFri: a ? !!a.fri : true,
     };
   });
+}
 
-  const publicHolidayAllocations = await resolvePublicHolidayAllocations(
-    people,
+function workspaceSettingsSlice(workspaceSettings) {
+  return {
+    starredPeopleTags: workspaceSettings.starredPeopleTags,
+    schedulePeopleTagFilter: workspaceSettings.schedulePeopleTagFilter,
+    scheduleAllocationFilter: Array.isArray(workspaceSettings.scheduleAllocationFilter)
+      ? workspaceSettings.scheduleAllocationFilter
+      : [],
+  };
+}
+
+async function fetchWorkspaceCoreBundle({ start, end, includePublicHolidays }) {
+  const [
+    rawPeople,
+    projectsRaw,
+    allocations,
+    roles,
+    depts,
+    clients,
+    peopleTagOpts,
+    projectTagOpts,
+    extraAllocationLabels,
+    workspaceSettings,
+    availabilityRows,
     phResult,
-    dismissResult.rows
-  );
+    dismissResult,
+  ] = await Promise.all([
+    fetchPeople(),
+    fetchProjects(),
+    fetchAllocations({ startDate: start, endDate: end }),
+    fetchRoles(),
+    fetchDepts(),
+    fetchClients(),
+    fetchPeopleTags(),
+    fetchProjectTags(),
+    fetchAllocationLabels(),
+    fetchWorkspaceSettings(),
+    fetchAllAvailability(),
+    includePublicHolidays ? fetchPersonPublicHolidaysSafe() : Promise.resolve(null),
+    includePublicHolidays ? fetchPersonPublicHolidayDismissalsSafe() : Promise.resolve(null),
+  ]);
 
-  const projects = mapProjectsWithResolvedColors(projectsRaw);
+  const people = mergeAvailabilityIntoPeople(rawPeople, availabilityRows);
+  let publicHolidayAllocations = [];
+  if (includePublicHolidays && phResult && dismissResult) {
+    publicHolidayAllocations = await resolvePublicHolidayAllocations(
+      people,
+      phResult,
+      dismissResult.rows
+    );
+  }
 
   return {
     people,
-    projects,
+    projects: mapProjectsWithResolvedColors(projectsRaw),
     allocations,
     publicHolidayAllocations,
     roles,
@@ -116,10 +135,36 @@ export async function loadWorkspaceFromSupabaseOnce() {
     peopleTagOpts,
     projectTagOpts,
     extraAllocationLabels,
-    starredPeopleTags: workspaceSettings.starredPeopleTags,
-    schedulePeopleTagFilter: workspaceSettings.schedulePeopleTagFilter,
-    scheduleAllocationFilter: Array.isArray(workspaceSettings.scheduleAllocationFilter)
-      ? workspaceSettings.scheduleAllocationFilter
-      : [],
+    ...workspaceSettingsSlice(workspaceSettings),
   };
+}
+
+/** Fast first paint: smaller allocation window, public holidays deferred. */
+export async function loadWorkspaceCriticalFromSupabaseOnce() {
+  if (!isSupabaseConfigured) return null;
+  const { start, end } = initialWorkspaceAllocationWindow();
+  return fetchWorkspaceCoreBundle({ start, end, includePublicHolidays: false });
+}
+
+/** Background pass after UI is interactive: full allocation horizon + public holidays. */
+export async function loadWorkspaceEnrichmentFromSupabaseOnce(people) {
+  if (!isSupabaseConfigured) return null;
+  const { start, end } = defaultWorkspaceAllocationWindow();
+  const [allocations, phResult, dismissResult] = await Promise.all([
+    fetchAllocations({ startDate: start, endDate: end }),
+    fetchPersonPublicHolidaysSafe(),
+    fetchPersonPublicHolidayDismissalsSafe(),
+  ]);
+  const publicHolidayAllocations = await resolvePublicHolidayAllocations(
+    people,
+    phResult,
+    dismissResult.rows
+  );
+  return { allocations, publicHolidayAllocations };
+}
+
+export async function loadWorkspaceFromSupabaseOnce() {
+  if (!isSupabaseConfigured) return null;
+  const { start, end } = defaultWorkspaceAllocationWindow();
+  return fetchWorkspaceCoreBundle({ start, end, includePublicHolidays: true });
 }

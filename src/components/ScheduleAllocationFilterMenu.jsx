@@ -28,6 +28,7 @@ import {
   removeFilterRuleForField,
   countActiveFilterRules,
 } from "../utils/scheduleAllocationFilter.js";
+import { findPersonTagStarredPreset } from "../config/starredScheduleFilterPrefs.js";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import "../pages/ScheduleAllocationFilterMenu.css";
 
@@ -82,8 +83,9 @@ export function ScheduleAllocationFilterMenu({
   peopleTagOpts,
   projectTagOpts,
   allocationProjectOptions,
-  starredPeopleTags,
-  toggleStarredPeopleTag,
+  starredScheduleFilters,
+  toggleStarredPersonTagPreset,
+  saveCurrentFilterAsStarred,
 }) {
   const { theme } = useAppTheme();
   const isLight = theme === "light";
@@ -269,12 +271,6 @@ export function ScheduleAllocationFilterMenu({
     resetDrill();
   };
 
-  const applyStarred = () => {
-    const sorted = [...starredPeopleTags].sort((a, b) => a.localeCompare(b));
-    setRules((r) => upsertFilterRule(r, "person_tag", "in", sorted));
-    onRequestClose();
-  };
-
   const rootItems = useMemo(() => {
     const items = [];
     for (const g of Object.values(SCHEDULE_FILTER_FIELD_GROUPS)) {
@@ -360,10 +356,13 @@ export function ScheduleAllocationFilterMenu({
             <button
               type="button"
               className="lp-schedule-filter-link lp-schedule-filter-link-accent"
-              disabled={starredPeopleTags.length === 0}
-              onClick={applyStarred}
+              disabled={activeCount === 0}
+              onClick={() => {
+                saveCurrentFilterAsStarred();
+                onRequestClose();
+              }}
             >
-              <Star size={14} /> Use starred tags
+              <Star size={14} /> Save to starred
             </button>
           </div>
         </>
@@ -422,7 +421,7 @@ export function ScheduleAllocationFilterMenu({
           <div className="lp-schedule-filter-drill-list">
             {drillField === "person_tag" && (
               <p className="lp-schedule-filter-hint">
-                Star a tag from the list below for quick access under Starred tags.
+                ★ saves that tag as a starred filter (local to your browser). Apply it from Starred filters.
               </p>
             )}
             {filteredDrillOptions.length === 0 ? (
@@ -455,15 +454,24 @@ export function ScheduleAllocationFilterMenu({
                         type="button"
                         className={
                           "lp-schedule-filter-row-star" +
-                          (starredPeopleTags.includes(v) ? " on" : "")
+                          (findPersonTagStarredPreset(starredScheduleFilters, v) ? " on" : "")
                         }
-                        aria-label={starredPeopleTags.includes(v) ? "Remove from starred" : "Star tag"}
+                        aria-label={
+                          findPersonTagStarredPreset(starredScheduleFilters, v)
+                            ? "Remove starred filter"
+                            : "Save tag as starred filter"
+                        }
                         onClick={(e) => {
                           e.preventDefault();
-                          toggleStarredPeopleTag(v);
+                          toggleStarredPersonTagPreset(v);
                         }}
                       >
-                        <Star size={14} fill={starredPeopleTags.includes(v) ? "currentColor" : "none"} />
+                        <Star
+                          size={14}
+                          fill={
+                            findPersonTagStarredPreset(starredScheduleFilters, v) ? "currentColor" : "none"
+                          }
+                        />
                       </button>
                     )}
                     <input
