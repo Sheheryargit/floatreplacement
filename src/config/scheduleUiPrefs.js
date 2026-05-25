@@ -125,14 +125,14 @@ export const ALLOCATION_ENTER_ANIM_LABELS = {
 /** @returns {AllocationEnterAnimId} */
 export function readAllocationEnterAnimation() {
   try {
-    if (typeof window === "undefined") return "spring";
+    if (typeof window === "undefined") return "instant";
     const v = window.localStorage.getItem(ALLOCATION_ENTER_ANIM_LS_KEY);
-    if (v == null || v === "") return "spring";
+    if (v == null || v === "") return "instant";
     return ALLOCATION_ENTER_ANIM_IDS.includes(/** @type {any} */ (v))
       ? /** @type {AllocationEnterAnimId} */ (v)
       : "spring";
   } catch {
-    return "spring";
+    return "instant";
   }
 }
 
@@ -140,7 +140,7 @@ export function readAllocationEnterAnimation() {
 export function writeAllocationEnterAnimation(id) {
   const next = ALLOCATION_ENTER_ANIM_IDS.includes(/** @type {any} */ (id))
     ? /** @type {AllocationEnterAnimId} */ (id)
-    : "spring";
+    : "instant";
   try {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(ALLOCATION_ENTER_ANIM_LS_KEY, next);

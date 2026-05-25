@@ -2,8 +2,11 @@ import { useLayoutEffect } from "react";
 import { useVirtualizer, measureElement as virtualMeasureElement } from "@tanstack/react-virtual";
 import { getPersonAllocations } from "../utils/allocationsByPerson.js";
 
-/** Below this count, render all rows in-flow (no virtual scroll — avoids filter/Today layout bugs). */
-export const SCHEDULE_STATIC_ROW_CAP = 200;
+/**
+ * In-flow rows only for tiny lists. Above this, virtualize — rendering 50+ full timeline
+ * rows blocks clicks, scrolling, and create-allocation (regression vs virtual mode).
+ */
+export const SCHEDULE_STATIC_ROW_CAP = 24;
 
 function ScheduleRow({
   p,

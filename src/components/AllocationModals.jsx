@@ -1282,7 +1282,14 @@ export function CreateAllocationModal({
   );
 }
 
-export function AllocationDetailModal({
+/** Mount only when open — avoids heavy hooks while the schedule is idle. */
+export function AllocationDetailModal(props) {
+  const { open, allocation } = props;
+  if (!open || !allocation) return null;
+  return <AllocationDetailModalInner {...props} />;
+}
+
+function AllocationDetailModalInner({
   open,
   allocation,
   assigneeNames,
@@ -1365,8 +1372,6 @@ export function AllocationDetailModal({
     () => allocationTotalHoursRounded(previewExtendWorkingDays, allocation?.hoursPerDay),
     [previewExtendWorkingDays, allocation?.hoursPerDay]
   );
-
-  if (!open || !allocation) return null;
 
   const isLeave = !!allocation.isLeave;
   const detailLeaveAccent = isLeave ? leaveAccentTheme(allocation.leaveType) : null;

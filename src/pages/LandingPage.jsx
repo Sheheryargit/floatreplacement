@@ -6,6 +6,7 @@ import {
   useCallback,
   memo,
   useLayoutEffect,
+  startTransition,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -95,7 +96,9 @@ import {
 import {
   countAllocationWorkingDaysExcludingOffDays,
   allocationTotalHoursRounded,
+  allocationHasPerson,
 } from "../utils/allocationWorkMetrics.js";
+import { isStaticUi } from "../config/uiMode.js";
 import { tagChromaProps } from "../utils/tagChroma.js";
 import {
   SCHEDULE_SORT_OPTIONS,
@@ -738,6 +741,7 @@ const TimelineRow = memo(function TimelineRow({
   const { theme } = useAppTheme();
   const t = T[theme];
   const reduceMotion = useReducedMotion();
+  const lightInteraction = reduceMotion || isStaticUi();
 
   const enteredFreshSet = useMemo(
     () => new Set((freshEnteredAllocationKey || "").split("|").filter(Boolean)),
@@ -1145,6 +1149,66 @@ const TimelineRow = memo(function TimelineRow({
                 padding: `${SCHED_GRID_ROW_PAD_Y}px 0`,
               }}
             >
+              {lightInteraction ? (
+                leaveSegments.map((seg) => {
+                  const colStart = Math.max(1, Math.round(seg.lay.start) + 1);
+                  const colSpan = Math.max(1, Math.round(seg.lay.span));
+                  const leaveBrPx = allocationBarBorderRadiusPx(
+                    (colSpan / Math.max(1, nCols)) * 100,
+                    allocationBoxStyle
+                  );
+                  const isDayOff = isAvailabilityDayOffAlloc(seg.a);
+                  const occStart = seg?.lay?.occStart ?? seg.a.startDate;
+                  const occEnd = seg?.lay?.occEnd ?? seg.a.endDate;
+                  const allocUi = isDayOff ? { ...seg.a, startDate: occStart, endDate: occEnd } : seg.a;
+                  const dismissKey = isDayOff ? `${allocUi.personIds?.[0] ?? ""}|${allocUi.startDate}` : "";
+                  if (isDayOff && dismissedAvailOffKeys && dismissedAvailOffKeys.has(dismissKey)) return null;
+
+                  const typeId = isDayOff ? "day_off" : normalizeLeaveTypeId(allocUi.leaveType);
+                  const onToday = leaveSpansToday(allocUi, todayDateKey);
+                  const hoverTitle = buildLeaveHoverTitle(allocUi, leaveLabel);
+                  const leaveBarH = allocationBarHeightPx(allocUi);
+
+                  return (
+                    <button
+                      key={`${seg.a.id}-occ-${seg.occIdx}`}
+                      type="button"
+                      className={
+                        "lp-leave-block lp-leave-block--" +
+                        typeId +
+                        (onToday ? " lp-leave-block--today" : "") +
+                        (!isDayOff ? " lp-leave-block--icon-only" : "")
+                      }
+                      style={{
+                        gridColumn: `${colStart} / span ${colSpan}`,
+                        gridRow: 1,
+                        alignSelf: "start",
+                        height: `${leaveBarH}px`,
+                        minHeight: `${leaveBarH}px`,
+                        maxHeight: `${leaveBarH}px`,
+                        margin: 0,
+                        borderRadius: `${leaveBrPx}px`,
+                        overflow: "hidden",
+                        pointerEvents: "auto",
+                      }}
+                      aria-label={allocationAriaLabel(allocUi)}
+                      title={hoverTitle}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openAllocationDetail(allocUi);
+                      }}
+                    >
+                      {isDayOff ? (
+                        <span className="lp-leave-block__label">
+                          <span>Off</span>
+                        </span>
+                      ) : (
+                        <LeaveTimelineGlyph leaveTypeId={allocUi.leaveType} className="lp-leave-block__icon" />
+                      )}
+                    </button>
+                  );
+                })
+              ) : (
               <AnimatePresence initial={false}>
                 {leaveSegments.map((seg, segIdx) => {
                   const colStart = Math.max(1, Math.round(seg.lay.start) + 1);
@@ -1230,6 +1294,7 @@ const TimelineRow = memo(function TimelineRow({
                   );
                 })}
               </AnimatePresence>
+              )}
             </div>
           )}
 
@@ -1813,11 +1878,6 @@ export default function LandingPage() {
     return `m-${anchorDate.getFullYear()}-${anchorDate.getMonth() + 1}`;
   }, [viewMode, anchorDate, customRange]);
 
-  const [scheduleCanvasEntered, setScheduleCanvasEntered] = useState(false);
-  useEffect(() => {
-    setScheduleCanvasEntered(true);
-  }, []);
-
   useEffect(() => {
     if (!premiumV2Enabled) return undefined;
     const onKeyDown = (e) => {
@@ -1965,34 +2025,40 @@ export default function LandingPage() {
   };
 
   const openCreateAllocation = useCallback((person, date) => {
-    setAllocEditing(null);
-    setAllocDefaultTab("allocation");
-    setAllocPreselectPerson(person ?? null);
-    setAllocPreselectDate(date ?? null);
-    setAllocPreselectProject(null);
-    setAllocCreateOpen(true);
+    startTransition(() => {
+      setAllocEditing(null);
+      setAllocDefaultTab("allocation");
+      setAllocPreselectPerson(person ?? null);
+      setAllocPreselectDate(date ?? null);
+      setAllocPreselectProject(null);
+      setAllocCreateOpen(true);
+    });
   }, []);
 
   const openCreateAllocationForPersonProject = useCallback((person, projectLabel) => {
-    setAllocEditing(null);
-    setAllocDefaultTab("allocation");
-    setAllocPreselectPerson(person ?? null);
-    setAllocPreselectDate(null);
-    setAllocPreselectProject(projectLabel != null ? String(projectLabel).trim() || null : null);
-    setAllocCreateOpen(true);
+    startTransition(() => {
+      setAllocEditing(null);
+      setAllocDefaultTab("allocation");
+      setAllocPreselectPerson(person ?? null);
+      setAllocPreselectDate(null);
+      setAllocPreselectProject(projectLabel != null ? String(projectLabel).trim() || null : null);
+      setAllocCreateOpen(true);
+    });
   }, []);
 
   const openCreateLeaveForPerson = useCallback((person) => {
-    setAllocEditing(null);
-    setAllocDefaultTab("leave");
-    setAllocPreselectPerson(person ?? null);
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    setAllocPreselectDate(`${y}-${m}-${day}`);
-    setAllocPreselectProject(null);
-    setAllocCreateOpen(true);
+    startTransition(() => {
+      setAllocEditing(null);
+      setAllocDefaultTab("leave");
+      setAllocPreselectPerson(person ?? null);
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      setAllocPreselectDate(`${y}-${m}-${day}`);
+      setAllocPreselectProject(null);
+      setAllocCreateOpen(true);
+    });
   }, []);
 
   useEffect(() => {
@@ -2379,8 +2445,10 @@ export default function LandingPage() {
   );
 
   const openAllocationDetail = useCallback((alloc) => {
-    setSelectedAllocation(alloc);
-    setAllocDetailOpen(true);
+    startTransition(() => {
+      setSelectedAllocation(alloc);
+      setAllocDetailOpen(true);
+    });
   }, []);
 
   const closeAllocationDetail = useCallback(() => {
@@ -2412,6 +2480,51 @@ export default function LandingPage() {
           : [];
     return ids.length > 0;
   }, [selectedAllocation]);
+
+  /** Scope extend/off-day math to assignees — not the full workspace allocation list. */
+  /** Smaller list for create/edit modal conflict checks when one person is preselected. */
+  const createModalAllocations = useMemo(() => {
+    if (!allocCreateOpen && !allocEditing) return [];
+    const person = allocPreselectPerson ?? (allocEditing ? people.find((x) => {
+      const ids =
+        allocEditing.personIds?.length > 0
+          ? allocEditing.personIds
+          : allocEditing.personId != null
+            ? [allocEditing.personId]
+            : [];
+      return ids.length ? x.id === ids[0] : false;
+    }) : null);
+    if (person?.id != null) {
+      return getPersonAllocations(allocationsByPerson, person.id);
+    }
+    return scheduleAllocations;
+  }, [
+    allocCreateOpen,
+    allocEditing,
+    allocPreselectPerson,
+    allocationsByPerson,
+    scheduleAllocations,
+    people,
+  ]);
+
+  const detailModalAllocations = useMemo(() => {
+    if (!selectedAllocation) return [];
+    const ids =
+      selectedAllocation.personIds?.length > 0
+        ? selectedAllocation.personIds.map(String)
+        : selectedAllocation.personId != null
+          ? [String(selectedAllocation.personId)]
+          : [];
+    if (ids.length === 0) return scheduleAllocations;
+    return scheduleAllocations.filter((a) => ids.some((id) => allocationHasPerson(a, id)));
+  }, [selectedAllocation, scheduleAllocations]);
+
+  const handleDetailEditClick = useCallback(() => {
+    if (!canManageSelectedAllocation || !selectedAllocation) return;
+    setAllocEditing(selectedAllocation);
+    setAllocDetailOpen(false);
+    setAllocCreateOpen(true);
+  }, [canManageSelectedAllocation, selectedAllocation]);
 
   const openEdit = useCallback((person) => {
     setEditingPerson(person);
@@ -3206,17 +3319,7 @@ export default function LandingPage() {
               "--lp-timeline-min": `${timelineMinWidthPx}px`,
             }}
           >
-            <motion.div
-              key={scheduleMotionKey}
-              className="lp-schedule-canvas lp-timeline-enter"
-              initial={
-                scheduleCanvasEntered
-                  ? false
-                  : { opacity: 0.88, scale: 0.993, filter: "brightness(0.94)" }
-              }
-              animate={{ opacity: 1, scale: 1, filter: "brightness(1)" }}
-              transition={{ type: "spring", stiffness: 420, damping: 32, mass: 0.88 }}
-            >
+            <div key={scheduleMotionKey} className="lp-schedule-canvas">
               <div ref={scheduleHeaderRef} className="lp-sched-row lp-sched-row-head">
                 <div className="lp-sched-corner lp-sched-corner--empty" aria-hidden />
                 <div className="lp-sched-timeline lp-sched-sticky-top">
@@ -3292,7 +3395,7 @@ export default function LandingPage() {
                 TimelineRow={TimelineRow}
                 timelineRowProps={timelineRowProps}
               />
-            </motion.div>
+            </div>
           </div>
         </div>
       </main>
@@ -3330,48 +3433,44 @@ export default function LandingPage() {
         tagTheme={theme}
       />
 
-      <CreateAllocationModal
-        open={allocCreateOpen}
-        onClose={closeCreateAllocation}
-        onCreate={handleCreateAllocation}
-        onCreateLeave={handleCreateAllocation}
-        allocations={scheduleAllocations}
-        people={schedulePeople}
-        preselectPerson={allocPreselectPerson}
-        preselectDate={allocPreselectDate}
-        preselectProject={allocPreselectProject}
-        defaultTab={allocDefaultTab}
-        editAllocation={allocEditing}
-        onEditAllocation={handleEditAllocation}
-        projects={allocationProjectOptions}
-        projectRegistry={projects}
-        onAddProject={addAllocationProjectLabel}
-        publicHolidayAllocations={publicHolidayAllocations}
-        t={t}
-        premiumV2Enabled={premiumV2Enabled}
-        premiumV2Templates={premiumV2Templates}
-      />
+      {allocCreateOpen ? (
+        <CreateAllocationModal
+          open
+          onClose={closeCreateAllocation}
+          onCreate={handleCreateAllocation}
+          onCreateLeave={handleCreateAllocation}
+          allocations={createModalAllocations}
+          people={schedulePeople}
+          preselectPerson={allocPreselectPerson}
+          preselectDate={allocPreselectDate}
+          preselectProject={allocPreselectProject}
+          defaultTab={allocDefaultTab}
+          editAllocation={allocEditing}
+          onEditAllocation={handleEditAllocation}
+          projects={allocationProjectOptions}
+          projectRegistry={projects}
+          onAddProject={addAllocationProjectLabel}
+          publicHolidayAllocations={publicHolidayAllocations}
+          t={t}
+          premiumV2Enabled={premiumV2Enabled}
+          premiumV2Templates={premiumV2Templates}
+        />
+      ) : null}
 
-      <AllocationDetailModal
-        open={allocDetailOpen}
-        allocation={selectedAllocation}
-        assigneeNames={selectedAssigneeNames}
-        onClose={closeAllocationDetail}
-        onDelete={canManageSelectedAllocation ? handleDeleteAllocation : undefined}
-        onExtendAllocation={handleExtendAllocation}
-        allocations={scheduleAllocations}
-        publicHolidayAllocations={publicHolidayAllocations}
-        onEditClick={
-          canManageSelectedAllocation && selectedAllocation
-            ? () => {
-                setAllocEditing(selectedAllocation);
-                setAllocDetailOpen(false);
-                setAllocCreateOpen(true);
-              }
-            : undefined
-        }
-        t={t}
-      />
+      {allocDetailOpen && selectedAllocation ? (
+        <AllocationDetailModal
+          open
+          allocation={selectedAllocation}
+          assigneeNames={selectedAssigneeNames}
+          onClose={closeAllocationDetail}
+          onDelete={canManageSelectedAllocation ? handleDeleteAllocation : undefined}
+          onExtendAllocation={handleExtendAllocation}
+          allocations={detailModalAllocations}
+          publicHolidayAllocations={publicHolidayAllocations}
+          onEditClick={canManageSelectedAllocation ? handleDetailEditClick : undefined}
+          t={t}
+        />
+      ) : null}
 
       <ProjectModal
         open={projectCreateOpen}

@@ -655,19 +655,26 @@ export function AppDataProvider({ children }) {
     };
 
     const runBackgroundEnrichment = () => {
-      const { people } = useAppStore.getState();
-      if (!people?.length) return;
-      void enrichWorkspaceFromSupabase(people)
-        .then((extra) => {
-          if (cancelled || !extra) return;
-          useAppStore.setState({
-            allocations: extra.allocations,
-            publicHolidayAllocations: extra.publicHolidayAllocations,
+      const run = () => {
+        const { people } = useAppStore.getState();
+        if (!people?.length || cancelled) return;
+        void enrichWorkspaceFromSupabase(people)
+          .then((extra) => {
+            if (cancelled || !extra) return;
+            useAppStore.setState({
+              allocations: extra.allocations,
+              publicHolidayAllocations: extra.publicHolidayAllocations,
+            });
+          })
+          .catch((e) => {
+            console.warn("[float] Supabase enrichment:", e?.message || e);
           });
-        })
-        .catch((e) => {
-          console.warn("[float] Supabase enrichment:", e?.message || e);
-        });
+      };
+      if (typeof requestIdleCallback === "function") {
+        requestIdleCallback(run, { timeout: 4000 });
+      } else {
+        window.setTimeout(run, 800);
+      }
     };
 
     loadWorkspaceCriticalFromSupabase()
