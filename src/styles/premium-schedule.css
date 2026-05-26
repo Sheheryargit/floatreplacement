@@ -6,19 +6,12 @@
 /* ── Mega schedule card ─────────────────────────────────────── */
 .lp-root .lp-schedule {
   border-radius: 22px;
-  border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--border));
-  background:
-    linear-gradient(
-      165deg,
-      color-mix(in srgb, var(--surface) 92%, transparent) 0%,
-      color-mix(in srgb, var(--surface) 100%, transparent) 40%,
-      color-mix(in srgb, var(--accent) 4%, var(--surface)) 100%
-    );
+  border: 1px solid var(--border);
+  background: var(--surface);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent) inset,
+    0 0 0 1px rgba(0, 0, 0, 0.04) inset,
     0 4px 24px rgba(0, 0, 0, 0.22),
-    0 18px 56px rgba(0, 0, 0, 0.28),
-    0 0 100px color-mix(in srgb, var(--accent) 14%, transparent);
+    0 18px 56px rgba(0, 0, 0, 0.28);
   position: relative;
   overflow: hidden;
 }
@@ -29,26 +22,21 @@
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  background: radial-gradient(
-    120% 60% at 10% -20%,
-    color-mix(in srgb, var(--accent) 22%, transparent),
-    transparent 55%
-  );
-  opacity: 0.35;
+  background: none;
+  opacity: 0;
 }
 
 .lp-root[data-theme="light"] .lp-schedule {
-  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--border));
-  background: linear-gradient(180deg, #ffffff 0%, color-mix(in srgb, var(--accent) 5%, #f8fafc) 100%);
+  border: 1px solid var(--border);
+  background: #ffffff;
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.9) inset,
     0 4px 22px rgba(15, 23, 42, 0.07),
-    0 22px 64px rgba(15, 23, 42, 0.08),
-    0 0 80px color-mix(in srgb, var(--accent) 12%, transparent);
+    0 22px 64px rgba(15, 23, 42, 0.08);
 }
 
 .lp-root[data-theme="light"] .lp-schedule::before {
-  opacity: 0.28;
+  opacity: 0;
 }
 
 /* ── Calendar header runway ───────────────────────────────── */
@@ -154,7 +142,7 @@
 }
 
 .lp-root .lp-grid-row:hover {
-  background: color-mix(in srgb, var(--accent) 8%, transparent) !important;
+  background: rgba(0, 0, 0, 0.02) !important;
 }
 
 /* ── Allocation chips — luminous lift ──────────────────────── */
@@ -177,32 +165,19 @@
 
 /* ── FAB micro-orbit ──────────────────────────────────────── */
 :root:not([data-static-ui="1"]) .lp-root[data-theme="dark"] .lp-fab {
-  background: radial-gradient(
-    circle at 30% 20%,
-    color-mix(in srgb, var(--ui-today) 52%, transparent),
-    color-mix(in srgb, var(--accent) 88%, #0a1628) 100%
-  );
-  border: 1px solid color-mix(in srgb, var(--ui-today) 42%, var(--accent));
-  color: var(--accent-txt, #fff);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.12) inset,
-    0 10px 28px rgba(0, 0, 0, 0.32),
-    0 0 36px color-mix(in srgb, var(--accent) 42%, transparent),
-    0 0 0 1px rgba(0, 0, 0, 0.2);
+    0 10px 28px rgba(0, 0, 0, 0.32);
 }
 
 :root:not([data-static-ui="1"]) .lp-root[data-theme="light"] .lp-fab {
-  background: radial-gradient(
-    circle at 28% 18%,
-    color-mix(in srgb, var(--accent) 26%, #ffffff),
-    color-mix(in srgb, var(--accent) 10%, #f8fafc) 100%
-  );
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, #cbd5e1);
-  color: color-mix(in srgb, var(--accent) 88%, #0f172a);
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #475569;
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.95) inset,
-    0 10px 32px rgba(15, 23, 42, 0.1),
-    0 0 44px color-mix(in srgb, var(--accent) 22%, transparent);
+    0 10px 32px rgba(15, 23, 42, 0.1);
 }
 
 @media (prefers-reduced-motion: reduce) {

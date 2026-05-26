@@ -952,8 +952,8 @@ const TimelineRow = memo(function TimelineRow({
     return workTileHeightPxForDensity(density) + LEAVE_CLICK_GAP_PX;
   }, [leaveSegments, density]);
 
-  const allocLaneCount = workEnvelopeSegments.length
-    ? Math.max(...workEnvelopeSegments.map((s) => s.stack)) + 1
+  const allocLaneCount = workSegments.length
+    ? Math.max(...workSegments.map((s) => s.stack)) + 1
     : 1;
   const leaveTileH = workTileHeightPxForDensity(density);
   const maxWorkBlockH = workSegments.length
