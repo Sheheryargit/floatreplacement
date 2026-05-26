@@ -17,4 +17,5 @@ export {
 } from "./sizing.js";
 export { clampedSegmentGeometry } from "./geometry.js";
 export { splitLayoutByOffDays } from "./splitting.js";
+export { allocationDateKeyYmd, layoutAllocation, layoutsForAllocation } from "./allocationLayouts.js";
 

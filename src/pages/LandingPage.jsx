@@ -59,22 +59,24 @@ import {
   useAlloc8ActionFeedbackMount,
 } from "../context/CenterActionFeedbackContext.jsx";
 import { useTimelineScrollController } from "../schedule/useTimelineScrollController.js";
-import { estimateScheduleRowHeightPx } from "../schedule/estimateScheduleRowHeight.js";
+import { computeScheduleRowHeightPx } from "../schedule/scheduleRowHeight.js";
+import {
+  buildTimelineRowLayout,
+  leaveMinHeightPx,
+  ROW_ALLOC_PAD,
+} from "../schedule/timelineRowLayout.js";
 import { ScheduleVirtualizedRows } from "../schedule/ScheduleVirtualizedRows.jsx";
 import { ProjectModal } from "./ProjectsPage.jsx";
 import { syncPersonAvailabilityFromForm } from "../lib/api/personAvailability.js";
 import { previewAvailabilityHours } from "../utils/availabilityPreview.js";
-import { advanceRepeatWindow } from "../utils/allocationRepeatWindow.js";
 import { WORKSPACE_THEME as T } from "../theme/workspacePalette.js";
 import {
-  assignAllocationStackLevelsByWorkWeek,
   BAR_H_BASE_PX,
   BAR_H_NORM,
   PX_PER_HOUR,
   allocationBarHeightPx,
   workTileHeightPxForDensity,
   clampedSegmentGeometry,
-  splitLayoutByOffDays,
 } from "../schedule/renderModel/index.js";
 import {
   allocationBarBorderRadiusPx,
@@ -274,111 +276,6 @@ function dateKeyLocal(dt) {
 
 /** Standard workday for width scaling in week/month view. */
 const STANDARD_DAY_HOURS = 7.5;
-/** Minimum span in column units (integer columns). */
-const MIN_WEEK_MONTH_SPAN_COLS = 1;
-
-/**
- * Map allocation date range to visible column start + span.
- * `start` / `span` are in column index units.
- */
-function allocationDateKeyYmd(raw) {
-  return String(raw ?? "").trim().slice(0, 10);
-}
-
-function layoutAllocation(alloc, scheduleModel) {
-  /** DB / PostgREST may return timestamps; slots use plain YYYY-MM-DD — compare normalized keys only. */
-  const keys = scheduleModel.slots.map((s) => allocationDateKeyYmd(s.dateKey));
-  const sk = allocationDateKeyYmd(alloc.startDate);
-  const ek = allocationDateKeyYmd(alloc.endDate);
-  if (!sk || !ek) return null;
-
-  let i0 = keys.findIndex((k) => k >= sk);
-  if (i0 < 0) return null;
-  let i1 = -1;
-  for (let i = keys.length - 1; i >= 0; i--) {
-    if (keys[i] <= ek) {
-      i1 = i;
-      break;
-    }
-  }
-  if (i1 < i0) return null;
-  let span = i1 - i0 + 1;
-  span = Math.max(span, MIN_WEEK_MONTH_SPAN_COLS);
-  return { start: i0, span };
-}
-/**
- * Split a week/month layout that spans multiple ISO weeks into one segment per week.
- * Each segment shows the same allocation (project, hours, etc.) — e.g. Wed–Fri then Mon–Fri
- * appear as two bars instead of one continuous bar across the Fri↔Mon week boundary.
- */
-function splitLayoutByWorkWeek(lay, scheduleModel) {
-  const keys = scheduleModel.slots.map((s) => allocationDateKeyYmd(s.dateKey));
-  const i0 = lay.start;
-  const i1 = lay.start + lay.span - 1;
-  if (i0 < 0 || i1 >= keys.length || i1 < i0) return [lay];
-  const segments = [];
-  let segStart = i0;
-  let curMonday = weekMondayKey(dateFromKey(keys[i0]));
-  for (let idx = i0 + 1; idx <= i1; idx++) {
-    const km = weekMondayKey(dateFromKey(keys[idx]));
-    if (km !== curMonday) {
-      const segSpan = Math.max(MIN_WEEK_MONTH_SPAN_COLS, idx - segStart);
-      segments.push({ start: segStart, span: segSpan });
-      segStart = idx;
-      curMonday = km;
-    }
-  }
-  segments.push({
-    start: segStart,
-    span: Math.max(MIN_WEEK_MONTH_SPAN_COLS, i1 - segStart + 1),
-  });
-  return segments.length > 0 ? segments : [lay];
-}
-
-/** Visible timeline segments for an allocation (includes recurring occurrences). */
-function layoutsForAllocation(alloc, scheduleModel) {
-  const out = [];
-  let start = allocationDateKeyYmd(alloc.startDate);
-  let end = allocationDateKeyYmd(alloc.endDate);
-  const repeatId = alloc.repeatId ?? "none";
-
-  // Fast-forward a recurring series whose anchor is far before the visible window
-  // (e.g. availability `avail_off:` rows anchored at 2024-01-02) straight into range,
-  // so we don't burn iteration budget walking the gap.
-  if (repeatId !== "none" && scheduleModel?.slots?.length) {
-    const firstKey = allocationDateKeyYmd(scheduleModel.slots[0].dateKey);
-    let guard = 0;
-    while (end < firstKey && guard++ < 2600) {
-      const next = advanceRepeatWindow(start, end, repeatId);
-      if (!next) break;
-      start = next.start;
-      end = next.end;
-    }
-  }
-
-  const originMs = new Date(`${start}T12:00:00`).getTime();
-  const maxMs = originMs + 800 * 864e5;
-  let occ = 0;
-
-  for (let i = 0; i < 80; i++) {
-    const lay = layoutAllocation({ ...alloc, startDate: start, endDate: end }, scheduleModel);
-    if (lay) {
-      const splits = splitLayoutByWorkWeek(lay, scheduleModel);
-      const weekSplitCount = splits.length;
-      splits.forEach((sli, partIdx) => {
-        out.push({ ...sli, occ, weekPart: partIdx, weekSplitCount, occStart: start, occEnd: end });
-      });
-    }
-    occ += 1;
-    if (repeatId === "none") break;
-    const next = advanceRepeatWindow(start, end, repeatId);
-    if (!next) break;
-    ({ start, end } = next);
-    if (new Date(`${start}T12:00:00`).getTime() > maxMs) break;
-  }
-  return out;
-}
-
 function shortenAllocLabel(s, maxLen) {
   if (!s) return "";
   return s.length > maxLen ? `${s.slice(0, maxLen - 1)}…` : s;
@@ -800,123 +697,29 @@ const TimelineRow = memo(function TimelineRow({
 
   const overAllocated = peakLoadBand === "over";
 
-  // Build leave + public holiday segments first (they render as-is and define off-day gaps).
-  const baseLeaveAndHolidaySegments = personAllocations.flatMap((a) => {
-    const lays = layoutsForAllocation(a, scheduleModel);
-    if (!lays.length) return [];
-    if (!a.isLeave && !a.syntheticPublicHoliday) return [];
-    return lays.map((lay) => ({
-      a,
-      lay,
-      occIdx: lay.occ,
-      segKey: `${a.id}-o${lay.occ}-wk${lay.weekPart ?? 0}-s${lay.start}-sp${lay.span}`,
-      start: lay.start,
-      span: lay.span,
-    }));
-  });
-
-  const blockingLeaveAndHolidaySegments = useMemo(() => {
-    if (!dismissedAvailOffKeys || dismissedAvailOffKeys.size === 0) {
-      return baseLeaveAndHolidaySegments;
-    }
-    return baseLeaveAndHolidaySegments.filter((seg) => {
-      if (!isAvailabilityDayOffAlloc(seg?.a)) return true;
-      const pid = String(seg?.a?.personIds?.[0] ?? "");
-      const dk = String(seg?.lay?.occStart ?? seg?.a?.startDate ?? "").slice(0, 10);
-      if (!pid || !dk) return true;
-      return !dismissedAvailOffKeys.has(`${pid}|${dk}`);
-    });
-  }, [baseLeaveAndHolidaySegments, dismissedAvailOffKeys]);
-
-  const publicHolidaySegments = blockingLeaveAndHolidaySegments.filter(
-    (s) => s.a.syntheticPublicHoliday || String(s.a.leaveType || "") === "public_holiday"
+  const rowLayout = useMemo(
+    () =>
+      buildTimelineRowLayout({
+        personAllocations,
+        scheduleModel,
+        dismissedAvailOffKeys,
+      }),
+    [personAllocations, scheduleModel, dismissedAvailOffKeys]
   );
 
-  const publicHolidayColSet = useMemo(() => {
-    const set = new Set();
-    for (const seg of publicHolidaySegments) {
-      const start = Math.max(0, Math.floor(seg?.lay?.start ?? seg?.start ?? 0));
-      const span = Math.max(0, Math.floor(seg?.lay?.span ?? seg?.span ?? 0));
-      const end = Math.min(scheduleModel?.slots?.length ? scheduleModel.slots.length - 1 : -1, start + span - 1);
-      if (end < start) continue;
-      for (let idx = start; idx <= end; idx++) set.add(idx);
-    }
-    return set;
-  }, [publicHolidaySegments, scheduleModel]);
+  const {
+    blockingLeaveAndHolidaySegments,
+    publicHolidaySegments,
+    leaveSegments,
+    offDayColSet,
+    workEnvelopeSegments,
+    workSegments,
+    segTopMap,
+    schedAllocContentH,
+    allocLaneCount,
+  } = rowLayout;
 
-  const leaveSegments = useMemo(() => {
-    const rawLeave = baseLeaveAndHolidaySegments.filter(
-      (s) => s.a.isLeave && String(s.a.leaveType || "") !== "public_holiday"
-    );
-    // Public holiday takes precedence: cut leave into non-holiday pieces per day.
-    return rawLeave.flatMap((seg) => {
-      const pieces = splitLayoutByOffDays(seg.lay, scheduleModel, publicHolidayColSet);
-      return pieces.map((piece, pieceIdx) => ({
-        ...seg,
-        lay: { ...seg.lay, start: piece.start, span: piece.span },
-        start: piece.start,
-        span: piece.span,
-        segKey: `${seg.segKey}-nh${pieceIdx}-s${piece.start}-sp${piece.span}`,
-      }));
-    });
-  }, [baseLeaveAndHolidaySegments, publicHolidayColSet, scheduleModel]);
-
-  const offDayColSet = useMemo(() => {
-    const set = new Set();
-    for (const seg of blockingLeaveAndHolidaySegments) {
-      const start = Math.max(0, Math.floor(seg?.lay?.start ?? seg?.start ?? 0));
-      const span = Math.max(0, Math.floor(seg?.lay?.span ?? seg?.span ?? 0));
-      const end = Math.min(scheduleModel?.slots?.length ? scheduleModel.slots.length - 1 : -1, start + span - 1);
-      if (end < start) continue;
-      for (let idx = start; idx <= end; idx++) set.add(idx);
-    }
-    return set;
-  }, [blockingLeaveAndHolidaySegments, scheduleModel]);
-
-  // Compute stacks on the *unsplit* work envelopes, then split by off days while preserving stack.
-  const workEnvelopeSegments = personAllocations.flatMap((a) => {
-    const lays = layoutsForAllocation(a, scheduleModel);
-    if (!lays.length) return [];
-    if (a.isLeave || a.syntheticPublicHoliday) return [];
-    return lays.map((lay) => ({
-      a,
-      lay,
-      occIdx: lay.occ,
-      segKeyBase: `${a.id}-o${lay.occ}-wk${lay.weekPart ?? 0}`,
-      start: lay.start,
-      span: lay.span,
-    }));
-  });
-
-  assignAllocationStackLevelsByWorkWeek(workEnvelopeSegments, scheduleModel);
-
-  const workSegments = workEnvelopeSegments.flatMap((env) => {
-    const pieces = splitLayoutByOffDays(env.lay, scheduleModel, offDayColSet);
-    return pieces.map((piece, pieceIdx) => {
-      const lay2 = { ...env.lay, start: piece.start, span: piece.span };
-      return {
-        a: env.a,
-        lay: lay2,
-        occIdx: env.occIdx,
-        segKey: `${env.segKeyBase}-p${pieceIdx}-s${piece.start}-sp${piece.span}`,
-        start: piece.start,
-        span: piece.span,
-        stack: env.stack,
-      };
-    });
-  }).filter((seg) => {
-    const segStart = Math.max(0, Math.floor(seg?.lay?.start ?? seg?.start ?? 0));
-    const segSpan = Math.max(0, Math.floor(seg?.lay?.span ?? seg?.span ?? 0));
-    const segEnd = segStart + segSpan - 1;
-    if (segEnd < segStart) return false;
-    return !blockingLeaveAndHolidaySegments.some((offSeg) => {
-      const offStart = Math.max(0, Math.floor(offSeg?.lay?.start ?? offSeg?.start ?? 0));
-      const offSpan = Math.max(0, Math.floor(offSeg?.lay?.span ?? offSeg?.span ?? 0));
-      const offEnd = offStart + offSpan - 1;
-      if (offEnd < offStart) return false;
-      return segStart <= offEnd && segEnd >= offStart;
-    });
-  });
+  const leaveMinH = leaveMinHeightPx(rowLayout, density);
 
   // Dev-only invariants to catch geometry/stack bugs early (prevents "silent" canvas breakage).
   if (import.meta.env.DEV) {
@@ -937,7 +740,6 @@ const TimelineRow = memo(function TimelineRow({
     for (const s of leaveSegments) assertLayOk(s, "leave");
     for (const s of publicHolidaySegments) assertLayOk(s, "holiday");
 
-    // Lanes should be compact 0..N-1.
     const stacks = workEnvelopeSegments.map((s) => s.stack).filter((n) => Number.isFinite(n));
     const maxStack = stacks.length ? Math.max(...stacks) : -1;
     for (const st of stacks) {
@@ -946,44 +748,6 @@ const TimelineRow = memo(function TimelineRow({
       }
     }
   }
-
-  const leaveMinH = useMemo(() => {
-    if (!leaveSegments.length) return 0;
-    return workTileHeightPxForDensity(density) + LEAVE_CLICK_GAP_PX;
-  }, [leaveSegments, density]);
-
-  const allocLaneCount = workSegments.length
-    ? Math.max(...workSegments.map((s) => s.stack)) + 1
-    : 1;
-  const leaveTileH = workTileHeightPxForDensity(density);
-  const maxWorkBlockH = workSegments.length
-    ? Math.max(...workSegments.map((s) => allocationBarHeightPx(s.a)))
-    : leaveTileH;
-
-  const LANE_STACK_GAP = 4;
-  const ROW_ALLOC_PAD = 8;
-
-  // Compute per-segment top offset based on which lower-stacked lanes actually
-  // have content overlapping the same columns. This eliminates phantom empty
-  // vertical space when a lane has no bars in the currently visible date range.
-  const segTopMap = new Map();
-  for (const seg of workSegments) {
-    const segStart = seg.lay.start;
-    const segEnd = seg.lay.start + seg.lay.span;
-    let top = ROW_ALLOC_PAD / 2;
-    for (let lane = 0; lane < seg.stack; lane++) {
-      const overlapping = workSegments.filter(
-        (o) => o.stack === lane && o.lay.start < segEnd && (o.lay.start + o.lay.span) > segStart
-      );
-      if (overlapping.length > 0) {
-        top += Math.max(...overlapping.map((o) => allocationBarHeightPx(o.a))) + LANE_STACK_GAP;
-      }
-    }
-    segTopMap.set(seg.segKey, top);
-  }
-  const schedAllocContentH = workSegments.length > 0
-    ? Math.max(...workSegments.map((s) => (segTopMap.get(s.segKey) ?? 0) + allocationBarHeightPx(s.a))) + ROW_ALLOC_PAD / 2
-    : ROW_ALLOC_PAD;
 
 
   return (
@@ -2643,13 +2407,46 @@ export default function LandingPage() {
     (index) => {
       const p = schedulePeople[index];
       if (!p) return scheduleRowEstimatePx;
-      return estimateScheduleRowHeightPx({
+      return computeScheduleRowHeightPx({
         personAllocations: getPersonAllocations(allocationsByPerson, p.id),
+        scheduleModel,
         density,
+        dismissedAvailOffKeys,
       });
     },
-    [schedulePeople, allocationsByPerson, density, scheduleRowEstimatePx]
+    [
+      schedulePeople,
+      allocationsByPerson,
+      scheduleModel,
+      density,
+      scheduleRowEstimatePx,
+      dismissedAvailOffKeys,
+    ]
   );
+
+  const remeasureScheduleRows = useCallback(() => {
+    const v = scheduleRowVirtualizerRef.current;
+    if (!v) return;
+    for (let i = 0; i < schedulePeople.length; i++) {
+      const p = schedulePeople[i];
+      if (!p) continue;
+      v.resizeItem(
+        i,
+        computeScheduleRowHeightPx({
+          personAllocations: getPersonAllocations(allocationsByPerson, p.id),
+          scheduleModel,
+          density,
+          dismissedAvailOffKeys,
+        })
+      );
+    }
+  }, [
+    schedulePeople,
+    allocationsByPerson,
+    scheduleModel,
+    density,
+    dismissedAvailOffKeys,
+  ]);
 
   const timelineRowProps = useMemo(
     () => ({
@@ -2743,7 +2540,7 @@ export default function LandingPage() {
       return;
     }
 
-    v.measure();
+    remeasureScheduleRows();
   }, [
     scheduleAnchorJumpKey,
     timelineOffsets.prev,
@@ -2751,10 +2548,12 @@ export default function LandingPage() {
     scheduleScrollMargin,
     density,
     scheduleRowEstimatePx,
-    scheduleAllocations,
-    allocationsByPerson,
-    dismissedAvailOffKeys,
+    remeasureScheduleRows,
   ]);
+
+  useLayoutEffect(() => {
+    remeasureScheduleRows();
+  }, [remeasureScheduleRows, scheduleAllocations, publicHolidayAllocations, dismissedAvailOffKeys]);
 
   return (
     <div
