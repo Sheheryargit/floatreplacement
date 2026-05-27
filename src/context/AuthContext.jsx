@@ -5,15 +5,18 @@ import {
   useCallback,
   useMemo,
   useEffect,
+  useRef,
 } from "react";
+import { toast } from "sonner";
 import { isSupabaseConfigured, supabase } from "../lib/supabase.js";
+import { isSessionExpired, withSessionExpiry } from "../lib/auth/sessionPolicy.js";
 
 /** Browser gate flag (localStorage survives restarts — sessionStorage did not). */
 const STORAGE_KEY = "float_auth_session";
 
 /**
- * Display label + optionally Supabase `user.id` so mirrors never apply to someone else after account switch.
- * JSON: { displayName: string; userSub?: string | null } — omit userSub legacy (treated unknown).
+ * Display label + Supabase `user.id` + session expiry.
+ * JSON: { displayName, userSub?, sessionExpiresAt? }
  */
 const PROFILE_KEY = "float_auth_profile";
 
@@ -23,6 +26,8 @@ const LEGACY_PROFILE = "float_auth_profile";
 
 /** When `true` in `.env.local`, skip the login gate (useful while SSO is UI-only). */
 const loginSkipAuth = import.meta.env.VITE_LOGIN_SKIP_AUTH === "true";
+
+const SESSION_CHECK_MS = 30_000;
 
 function migrateLegacySessionStorageMirrorsOnce() {
   if (typeof window === "undefined" || typeof localStorage === "undefined") return;
@@ -58,7 +63,7 @@ function migrateLegacySessionStorageMirrorsOnce() {
   }
 }
 
-/** @typedef {{ displayName: string; userSub: string | null | undefined }} SessionProfileMirror */
+/** @typedef {{ displayName: string; userSub: string | null | undefined; sessionExpiresAt?: number }} SessionProfileMirror */
 
 /** @returns {SessionProfileMirror} */
 function readSessionProfileMirror() {
@@ -78,9 +83,21 @@ function readSessionProfileMirror() {
             ? o.userSub.trim()
             : undefined;
     }
-    return { displayName, userSub };
+    const sessionExpiresAt =
+      typeof o?.sessionExpiresAt === "number" && o.sessionExpiresAt > 0
+        ? o.sessionExpiresAt
+        : undefined;
+    return { displayName, userSub, sessionExpiresAt };
   } catch {
     return { displayName: "", userSub: undefined };
+  }
+}
+
+function writeSessionProfileMirror(profile) {
+  try {
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  } catch {
+    /* ignore */
   }
 }
 
@@ -142,6 +159,7 @@ const AuthContext = createContext(null);
 migrateLegacySessionStorageMirrorsOnce();
 
 export function AuthProvider({ children }) {
+  const expiryToastShownRef = useRef(false);
 
   const [sessionProfile, setSessionProfileState] = useState(() => {
     if (typeof window === "undefined" || typeof localStorage === "undefined") {
@@ -150,6 +168,7 @@ export function AuthProvider({ children }) {
     try {
       if (loginSkipAuth || localStorage.getItem(STORAGE_KEY) === "1") {
         const r = readSessionProfileMirror();
+        if (isSessionExpired(r)) return { displayName: "" };
         return { displayName: r.displayName };
       }
     } catch {
@@ -161,37 +180,14 @@ export function AuthProvider({ children }) {
   const [ok, setOk] = useState(() => {
     if (loginSkipAuth) return true;
     try {
-      return localStorage.getItem(STORAGE_KEY) === "1";
+      if (localStorage.getItem(STORAGE_KEY) !== "1") return false;
+      return !isSessionExpired(readSessionProfileMirror());
     } catch {
       return false;
     }
   });
 
-  const unlock = useCallback((opts) => {
-    const displayNameRaw =
-      typeof opts?.displayName === "string" ? opts.displayName.trim() : "";
-
-    /** @type {SessionProfileMirror} */
-    let next = readSessionProfileMirror();
-    if (displayNameRaw) next = { ...next, displayName: displayNameRaw };
-    if (Object.prototype.hasOwnProperty.call(opts ?? {}, "userSub")) {
-      /** @type {string | null} */
-      const us = opts.userSub == null ? null : String(opts.userSub);
-      next = { ...next, userSub: us };
-    }
-    const nextProfile = { displayName: next.displayName, userSub: next.userSub };
-
-    try {
-      localStorage.setItem(STORAGE_KEY, "1");
-      localStorage.setItem(PROFILE_KEY, JSON.stringify(nextProfile));
-    } catch {
-      /* ignore */
-    }
-    setSessionProfileState({ displayName: nextProfile.displayName });
-    setOk(true);
-  }, []);
-
-  const lock = useCallback(() => {
+  const lock = useCallback((reason) => {
     void (async () => {
       try {
         if (isSupabaseConfigured && supabase) {
@@ -203,14 +199,78 @@ export function AuthProvider({ children }) {
       clearStoredGate();
       setSessionProfileState({ displayName: "" });
       setOk(false);
+      if (reason === "expired" && !expiryToastShownRef.current) {
+        expiryToastShownRef.current = true;
+        toast.info("Session expired", {
+          description: "Sign in again to continue. Your filters and preferences are still saved.",
+          className: "alloc8-toast",
+        });
+      }
     })();
   }, []);
+
+  const unlock = useCallback((opts) => {
+    const displayNameRaw =
+      typeof opts?.displayName === "string" ? opts.displayName.trim() : "";
+    const refreshExpiry = opts?.refreshExpiry !== false;
+
+    /** @type {SessionProfileMirror} */
+    let next = readSessionProfileMirror();
+    if (displayNameRaw) next = { ...next, displayName: displayNameRaw };
+    if (Object.prototype.hasOwnProperty.call(opts ?? {}, "userSub")) {
+      /** @type {string | null} */
+      const us = opts.userSub == null ? null : String(opts.userSub);
+      next = { ...next, userSub: us };
+    }
+    const nextProfile = withSessionExpiry(
+      { displayName: next.displayName, userSub: next.userSub, sessionExpiresAt: next.sessionExpiresAt },
+      refreshExpiry
+    );
+
+    try {
+      localStorage.setItem(STORAGE_KEY, "1");
+      writeSessionProfileMirror(nextProfile);
+    } catch {
+      /* ignore */
+    }
+    expiryToastShownRef.current = false;
+    setSessionProfileState({ displayName: nextProfile.displayName });
+    setOk(true);
+  }, []);
+
+  /** Drop stale gate flag when session TTL passed (filters in other keys are kept). */
+  useEffect(() => {
+    if (loginSkipAuth) return;
+    try {
+      if (localStorage.getItem(STORAGE_KEY) === "1" && isSessionExpired(readSessionProfileMirror())) {
+        clearStoredGate();
+        setOk(false);
+        setSessionProfileState({ displayName: "" });
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const enforceSessionExpiry = useCallback(() => {
+    if (loginSkipAuth) return false;
+    try {
+      if (localStorage.getItem(STORAGE_KEY) !== "1") return false;
+    } catch {
+      return false;
+    }
+    if (!isSessionExpired(readSessionProfileMirror())) return false;
+    lock("expired");
+    return true;
+  }, [lock]);
 
   /** Restore SSO session when returning from OAuth and keep gate in sync. */
   useEffect(() => {
     if (loginSkipAuth || !isSupabaseConfigured || !supabase) return undefined;
 
-    const hydrateFromSession = (session) => {
+    const hydrateFromSession = (session, { refreshExpiry = false } = {}) => {
+      if (enforceSessionExpiry()) return;
+
       const u = session?.user ?? null;
 
       /** No Supabase user: keep password workspace gate; only clear SSO-bound sessions. */
@@ -244,22 +304,29 @@ export function AuthProvider({ children }) {
         clearStoredGate();
       }
 
-      unlock({ displayName: displayNameFromSupabaseUser(u), userSub: id });
+      unlock({
+        displayName: displayNameFromSupabaseUser(u),
+        userSub: id,
+        refreshExpiry,
+      });
     };
 
     let unsub;
     try {
       const result = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === "SIGNED_IN") {
+          hydrateFromSession(session ?? null, { refreshExpiry: true });
+          return;
+        }
         if (
           event === "INITIAL_SESSION" ||
-          event === "SIGNED_IN" ||
           event === "TOKEN_REFRESHED"
         ) {
-          hydrateFromSession(session ?? null);
+          hydrateFromSession(session ?? null, { refreshExpiry: false });
           return;
         }
         if (event === "PASSWORD_RECOVERY") {
-          hydrateFromSession(session ?? null);
+          hydrateFromSession(session ?? null, { refreshExpiry: false });
           return;
         }
         if (event === "SIGNED_OUT") {
@@ -277,7 +344,7 @@ export function AuthProvider({ children }) {
     let canceled = false;
     void supabase.auth.getSession().then(({ data }) => {
       if (canceled) return;
-      hydrateFromSession(data.session ?? null);
+      hydrateFromSession(data.session ?? null, { refreshExpiry: false });
     });
 
     return () => {
@@ -288,7 +355,26 @@ export function AuthProvider({ children }) {
         /* ignore */
       }
     };
-  }, [loginSkipAuth, unlock]);
+  }, [loginSkipAuth, unlock, enforceSessionExpiry]);
+
+  /** Poll + tab focus: force logout after 1h (does not clear filter prefs). */
+  useEffect(() => {
+    if (loginSkipAuth || !ok) return undefined;
+
+    const tick = () => {
+      enforceSessionExpiry();
+    };
+    tick();
+    const id = window.setInterval(tick, SESSION_CHECK_MS);
+    const onVis = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [loginSkipAuth, ok, enforceSessionExpiry]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;

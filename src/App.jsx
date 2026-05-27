@@ -13,6 +13,7 @@ import AnimatedAppLoader from "./components/ui/AnimatedAppLoader.jsx";
 import RouteSkeleton from "./components/ui/RouteSkeleton.jsx";
 import { isStaticUi } from "./config/uiMode.js";
 import LoginPage from "./pages/LoginPage.jsx";
+import { SsoPersonProfileSync } from "./components/auth/SsoPersonProfileSync.jsx";
 import GlobalBackground from "./components/ui/GlobalBackground.jsx";
 import { Toaster } from "sonner";
 import "./styles/premium-overlays.css";
@@ -122,6 +123,7 @@ function AuthGate() {
       <SkipToMainLink />
       <AppErrorBoundary>
         <WorkspaceReady>
+          <SsoPersonProfileSync />
           <PremiumV2Provider>
             <SlapAnimationProvider>
               <Suspense fallback={null}>
