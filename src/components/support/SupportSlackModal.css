@@ -1,0 +1,198 @@
+.support-slack-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+}
+
+:root[data-theme="light"] .support-slack-backdrop {
+  background: rgba(15, 17, 23, 0.42);
+}
+
+.support-slack-center {
+  position: fixed;
+  inset: 0;
+  z-index: 501;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  pointer-events: none;
+}
+
+.support-slack-panel {
+  position: relative;
+  width: min(520px, 100%);
+  max-height: min(640px, 92vh);
+  overflow: auto;
+  padding: var(--space-6);
+  border-radius: calc(var(--radius-modal) + 2px);
+  pointer-events: auto;
+  outline: none;
+  background:
+    radial-gradient(1200px 420px at 10% -10%, color-mix(in srgb, var(--color-brand, #0088ff) 30%, transparent), transparent 55%),
+    radial-gradient(900px 360px at 110% 0%, color-mix(in srgb, var(--color-accent, #7c6af7) 26%, transparent), transparent 55%),
+    color-mix(in srgb, var(--color-surface, #181c26) 96%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--color-brand, #0088ff) 28%, var(--color-border, #2a2f45));
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 28px 74px rgba(0, 0, 0, 0.52),
+    0 12px 36px color-mix(in srgb, var(--color-brand, #0088ff) 16%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--color-accent, #7c6af7) 18%, transparent);
+}
+
+:root[data-theme="light"] .support-slack-panel {
+  background:
+    radial-gradient(900px 380px at 10% -10%, rgba(0, 136, 255, 0.18), transparent 55%),
+    radial-gradient(880px 360px at 110% 0%, rgba(124, 106, 247, 0.14), transparent 55%),
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border: 1.5px solid color-mix(in srgb, var(--color-brand, #0088ff) 38%, #cbd5e1);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 1) inset,
+    0 0 0 1px color-mix(in srgb, var(--color-brand, #0088ff) 30%, rgba(148, 163, 184, 0.55)),
+    0 28px 64px rgba(15, 23, 42, 0.14),
+    0 10px 32px rgba(0, 136, 255, 0.1);
+}
+
+.support-slack-glow {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 180deg,
+    rgba(0, 136, 255, 0.0),
+    rgba(0, 136, 255, 0.28),
+    rgba(124, 106, 247, 0.28),
+    rgba(0, 136, 255, 0.0)
+  );
+  filter: blur(18px);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+:root[data-theme="light"] .support-slack-glow {
+  opacity: 0.32;
+}
+
+.support-slack-close {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-button);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-muted, #7b82a0);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-spring);
+}
+
+.support-slack-close:hover {
+  background: color-mix(in srgb, var(--color-brand) 12%, transparent);
+  color: var(--color-text);
+}
+
+:root[data-theme="light"] .support-slack-close:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #0f172a;
+}
+
+.support-slack-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-right: 44px;
+}
+
+.support-slack-ic {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-brand-light, #4dadff), var(--color-brand, #0088ff));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-brand) 25%, transparent) inset,
+    0 10px 28px rgba(0, 136, 255, 0.18);
+}
+
+.support-slack-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 760;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--color-text);
+}
+
+.support-slack-subtitle {
+  margin: 6px 0 0;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+.support-slack-actions {
+  margin-top: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.support-slack-primary {
+  width: 100%;
+}
+
+.support-slack-secondary-row {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.support-slack-copy {
+  flex: 1 1 180px;
+}
+
+.support-slack-close-btn {
+  flex: 0 0 auto;
+}
+
+.support-slack-footnote {
+  margin: var(--space-5) 0 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--color-muted);
+}
+
+.support-slack-url {
+  display: block;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 75%, transparent);
+  background: color-mix(in srgb, var(--color-surface-2, #1e2235) 70%, transparent);
+  color: var(--color-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  word-break: break-all;
+  user-select: all;
+}
+
+:root[data-theme="light"] .support-slack-url {
+  background: rgba(248, 250, 252, 0.8);
+}
+

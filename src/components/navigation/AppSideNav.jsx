@@ -15,6 +15,7 @@ import { useAppDialog } from "../../context/AppDialogContext.jsx";
 import { useSlapAnimation } from "../../context/SlapAnimationContext.jsx";
 import { useAppTheme } from "../../context/ThemeContext.jsx";
 import { useAuth, initialsFromDisplayName } from "../../context/AuthContext.jsx";
+import { SupportSlackModal } from "../support/SupportSlackModal.jsx";
 import "./AppSideNav.css";
 
 const COLLAPSE_KEY = "alloc8-sidenav-collapsed";
@@ -48,6 +49,7 @@ function AppSideNav() {
       return false;
     }
   });
+  const [supportOpen, setSupportOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -70,11 +72,12 @@ function AppSideNav() {
 
   const onSoon = () => slapThenDialog(V2_MODAL);
 
-  const onHelp = () =>
-    slapThenDialog({
-      title: "Need help?",
-      message: "Contact Sheher on Slack.",
-    });
+  const onHelp = () => {
+    void (async () => {
+      await triggerSlap();
+      setSupportOpen(true);
+    })();
+  };
 
   return (
     <aside
@@ -86,6 +89,13 @@ function AppSideNav() {
       aria-label="Primary navigation"
     >
       <div className="app-sidenav-noise" aria-hidden />
+      <SupportSlackModal
+        open={supportOpen}
+        onOpenChange={setSupportOpen}
+        slackUrl="https://app.slack.com/client/T02879QRU/C0B68PYE3EZ"
+        title="Need help?"
+        subtitle="Open Slack support and drop your question — include a screenshot if you can."
+      />
 
       <div className="app-sidenav-head">
         <motion.div

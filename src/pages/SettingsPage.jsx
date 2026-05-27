@@ -50,6 +50,7 @@ import { PalettePreferenceControl } from "../components/ui/PalettePreferenceCont
 import { CanvasTintPreferenceControl } from "../components/ui/CanvasTintPreferenceControl.jsx";
 import { InviteMemberDialog } from "../components/InviteMemberDialog.jsx";
 import { SettingsSchedulePreview } from "../components/settings/SettingsSchedulePreview.jsx";
+import { SupportSlackModal } from "../components/support/SupportSlackModal.jsx";
 import "./SettingsPage.css";
 
 const APPEARANCE_ICONS = [
@@ -81,6 +82,7 @@ export default function SettingsPage() {
   const [allocationEnterAnim, setAllocationEnterAnim] = useState(() => readAllocationEnterAnimation());
   const [inviteOpen, setInviteOpen] = useState(false);
   const [premiumV2, setPremiumV2] = useState(() => readPremiumV2Enabled());
+  const [supportOpen, setSupportOpen] = useState(false);
 
   const setPremiumV2Preference = useCallback((next) => {
     setPremiumV2(next);
@@ -141,13 +143,8 @@ export default function SettingsPage() {
   );
 
   const onHelp = useCallback(() => {
-    void slapThen(() =>
-      openDialog({
-        title: "😂 Need help?",
-        message: "Contact Sheher on Slack.",
-      })
-    );
-  }, [slapThen, openDialog]);
+    void slapThen(() => setSupportOpen(true));
+  }, [slapThen]);
 
   const onNotifications = useCallback(() => {
     void slapThen(() =>
@@ -170,6 +167,13 @@ export default function SettingsPage() {
   return (
     <div className="settings-root" data-theme={theme === "light" ? "light" : "dark"}>
       <AppSideNav />
+      <SupportSlackModal
+        open={supportOpen}
+        onOpenChange={setSupportOpen}
+        slackUrl="https://app.slack.com/client/T02879QRU/C0B68PYE3EZ"
+        title="Need help?"
+        subtitle="Jump into Slack support and drop a message — we’ll take it from there."
+      />
 
       <div className="settings-body">
       <main id="main-content" className="settings-main">
