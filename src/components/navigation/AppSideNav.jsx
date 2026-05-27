@@ -93,7 +93,7 @@ function AppSideNav() {
         open={supportOpen}
         onOpenChange={setSupportOpen}
         slackUrl="https://app.slack.com/client/T02879QRU/C0B68PYE3EZ"
-        title="Need help?"
+        title="Contact Alloc8 Support"
         subtitle="Open Slack support and drop your question — include a screenshot if you can."
       />
 

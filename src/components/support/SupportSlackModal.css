@@ -122,7 +122,9 @@
   align-items: center;
   justify-content: center;
   color: #fff;
-  background: linear-gradient(135deg, var(--color-brand-light, #4dadff), var(--color-brand, #0088ff));
+  background:
+    radial-gradient(24px 24px at 30% 25%, rgba(255, 255, 255, 0.25), transparent 60%),
+    linear-gradient(135deg, var(--color-brand-light, #4dadff), var(--color-brand, #0088ff));
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--color-brand) 25%, transparent) inset,
     0 10px 28px rgba(0, 136, 255, 0.18);
@@ -143,6 +145,17 @@
   font-size: 0.98rem;
   line-height: 1.5;
   color: var(--color-muted);
+}
+
+.support-slack-title {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-text) 82%, var(--color-brand) 18%),
+    color-mix(in srgb, var(--color-text) 70%, var(--color-accent, #7c6af7) 30%)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .support-slack-actions {

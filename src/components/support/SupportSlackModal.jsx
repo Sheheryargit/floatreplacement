@@ -1,7 +1,7 @@
 import { useCallback, useId, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion, useReducedMotion } from "framer-motion";
-import { Copy, ExternalLink, HelpCircle, X } from "lucide-react";
+import { Copy, ExternalLink, LifeBuoy, X } from "lucide-react";
 import { Button } from "../ui/Button.jsx";
 import { isStaticUi } from "../../config/uiMode.js";
 import "./SupportSlackModal.css";
@@ -10,8 +10,8 @@ export function SupportSlackModal({
   open,
   onOpenChange,
   slackUrl,
-  title = "Need help?",
-  subtitle = "Open Slack support — fastest way to get unstuck.",
+  title = "Contact Alloc8 Support",
+  subtitle = "Open our Slack support channel and drop a message. Include a screenshot if you can.",
 }) {
   const reduceMotion = useReducedMotion();
   const skipEntranceFade = reduceMotion || isStaticUi();
@@ -69,7 +69,7 @@ export function SupportSlackModal({
 
               <div className="support-slack-head">
                 <span className="support-slack-ic" aria-hidden>
-                  <HelpCircle size={18} strokeWidth={2.15} />
+                  <LifeBuoy size={18} strokeWidth={2.15} />
                 </span>
                 <div className="support-slack-head-copy">
                   <Dialog.Title asChild>
@@ -98,7 +98,7 @@ export function SupportSlackModal({
                   }}
                 >
                   <ExternalLink size={16} strokeWidth={2.1} aria-hidden />
-                  Open Slack support
+                  Open Alloc8 Support (Slack)
                 </Button>
 
                 <div className="support-slack-secondary-row">
@@ -110,7 +110,7 @@ export function SupportSlackModal({
                     onClick={onCopy}
                   >
                     <Copy size={15} strokeWidth={2.1} aria-hidden />
-                    {copied ? "Copied link" : "Copy link"}
+                    {copied ? "Copied" : "Copy Slack link"}
                   </Button>
                   <Button
                     variant="ghost"
@@ -118,7 +118,7 @@ export function SupportSlackModal({
                     className="support-slack-close-btn"
                     onClick={() => onOpenChange?.(false)}
                   >
-                    Close
+                    Not now
                   </Button>
                 </div>
               </div>

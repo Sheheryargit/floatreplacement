@@ -171,8 +171,8 @@ export default function SettingsPage() {
         open={supportOpen}
         onOpenChange={setSupportOpen}
         slackUrl="https://app.slack.com/client/T02879QRU/C0B68PYE3EZ"
-        title="Need help?"
-        subtitle="Jump into Slack support and drop a message — we’ll take it from there."
+        title="Contact Alloc8 Support"
+        subtitle="Open Slack support and drop a message — we’ll take it from there."
       />
 
       <div className="settings-body">
