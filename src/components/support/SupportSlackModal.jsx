@@ -12,6 +12,7 @@ export function SupportSlackModal({
   slackUrl,
   title = "Contact Alloc8 Support",
   subtitle = "Open our Slack support channel and drop a message. Include a screenshot if you can.",
+  variant = "default",
 }) {
   const reduceMotion = useReducedMotion();
   const skipEntranceFade = reduceMotion || isStaticUi();
@@ -22,6 +23,13 @@ export function SupportSlackModal({
 
   const safeSlackUrl = useMemo(() => String(slackUrl || "").trim(), [slackUrl]);
   const canOpen = Boolean(safeSlackUrl);
+  const isLoginVariant = variant === "login";
+  const panelClass = isLoginVariant
+    ? "support-slack-panel support-slack-panel--login"
+    : "support-slack-panel";
+  const backdropClass = isLoginVariant
+    ? "support-slack-backdrop support-slack-backdrop--login"
+    : "support-slack-backdrop";
 
   const onCopy = useCallback(async () => {
     if (!safeSlackUrl) return;
@@ -39,7 +47,7 @@ export function SupportSlackModal({
       <Dialog.Portal>
         <Dialog.Overlay asChild>
           <motion.div
-            className="support-slack-backdrop"
+            className={backdropClass}
             initial={skipEntranceFade ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={skipEntranceFade ? { duration: 0 } : { duration: 0.18 }}
@@ -49,7 +57,7 @@ export function SupportSlackModal({
         <div className="support-slack-center">
           <Dialog.Content asChild>
             <motion.div
-              className="support-slack-panel"
+              className={panelClass}
               initial={skipEntranceFade ? false : { opacity: 0, scale: 0.92, y: 26 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               transition={

@@ -14,6 +14,7 @@ import RouteSkeleton from "./components/ui/RouteSkeleton.jsx";
 import { isStaticUi } from "./config/uiMode.js";
 import LoginPage from "./pages/LoginPage.jsx";
 import { SsoPersonProfileSync } from "./components/auth/SsoPersonProfileSync.jsx";
+import { VercelAnalytics } from "./components/analytics/VercelAnalytics.jsx";
 import GlobalBackground from "./components/ui/GlobalBackground.jsx";
 import { Toaster } from "sonner";
 import "./styles/premium-overlays.css";
@@ -178,6 +179,7 @@ export default function App() {
             <AppDataProvider>
               <GlobalBackground />
               <BrowserRouter>
+                <VercelAnalytics />
                 <CenterActionFeedbackProvider>
                   <AuthGate />
                 </CenterActionFeedbackProvider>

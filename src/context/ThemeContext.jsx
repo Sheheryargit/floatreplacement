@@ -74,9 +74,9 @@ export function computeShellBackground(resolvedTheme, hex) {
   const n = normalizeCanvasTintHex(hex);
   if (!n) return null;
   if (resolvedTheme === "light") {
-    return `color-mix(in srgb, ${n} 16%, #f4f6fa)`;
+    return `color-mix(in srgb, ${n} 16%, #f8fafc)`;
   }
-  return `color-mix(in srgb, ${n} 38%, #0f1117)`;
+  return `color-mix(in srgb, ${n} 38%, #0b0e14)`;
 }
 
 function syncAppearanceDom(resolvedTheme, palette, canvasTintHex) {
@@ -104,8 +104,8 @@ function syncAppearanceDom(resolvedTheme, palette, canvasTintHex) {
     if (normalized) {
       meta.setAttribute("content", normalized);
     } else {
-      const darkBg = palette === "studio" ? "#07080c" : "#0F1117";
-      const lightBg = palette === "studio" ? "#fafafa" : "#F4F6FA";
+      const darkBg = palette === "studio" ? "#0b0e14" : "#0b0e14";
+      const lightBg = "#f8fafc";
       meta.setAttribute("content", resolvedTheme === "dark" ? darkBg : lightBg);
     }
   }

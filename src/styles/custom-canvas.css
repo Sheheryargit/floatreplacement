@@ -13,9 +13,9 @@ html[data-custom-canvas="on"][data-theme="dark"] {
 }
 
 html[data-custom-canvas="on"][data-theme="light"] {
-  --color-bg: color-mix(in srgb, var(--alloc8-canvas-tint) 18%, #f2f5fa);
+  --color-bg: color-mix(in srgb, var(--alloc8-canvas-tint) 18%, #f8fafc);
   --color-surface: color-mix(in srgb, var(--alloc8-canvas-tint) 10%, #ffffff);
-  --color-surface-2: color-mix(in srgb, var(--alloc8-canvas-tint) 12%, #e8ebf4);
+  --color-surface-2: color-mix(in srgb, var(--alloc8-canvas-tint) 12%, #eef2f6);
   --color-border: color-mix(in srgb, var(--alloc8-canvas-tint) 10%, #e0e4ef);
 }
 
@@ -28,10 +28,10 @@ html[data-custom-canvas="on"][data-palette="studio"][data-theme="dark"] {
 }
 
 html[data-custom-canvas="on"][data-palette="studio"][data-theme="light"] {
-  --color-bg: color-mix(in srgb, var(--alloc8-canvas-tint) 14%, #fafafa);
+  --color-bg: color-mix(in srgb, var(--alloc8-canvas-tint) 14%, #f8fafc);
   --color-surface: color-mix(in srgb, var(--alloc8-canvas-tint) 8%, #ffffff);
-  --color-surface-2: color-mix(in srgb, var(--alloc8-canvas-tint) 10%, #f4f4f4);
-  --color-border: color-mix(in srgb, var(--alloc8-canvas-tint) 8%, #dbdbdb);
+  --color-surface-2: color-mix(in srgb, var(--alloc8-canvas-tint) 10%, #eef2f6);
+  --color-border: color-mix(in srgb, var(--alloc8-canvas-tint) 8%, #e0e4ef);
 }
 
 /* ── Global cinematic backdrop ─────────────────────────────────────────── */
