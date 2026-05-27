@@ -16,6 +16,7 @@ import LoginPage from "./pages/LoginPage.jsx";
 import { SsoPersonProfileSync } from "./components/auth/SsoPersonProfileSync.jsx";
 import GlobalBackground from "./components/ui/GlobalBackground.jsx";
 import { Toaster } from "sonner";
+import { Analytics } from "@vercel/analytics/react";
 import "./styles/premium-overlays.css";
 
 /** Opaque toast shell — detailed fills live in index.css (.alloc8-toast). */
@@ -182,6 +183,7 @@ export default function App() {
                   <AuthGate />
                 </CenterActionFeedbackProvider>
               </BrowserRouter>
+              <Analytics />
             </AppDataProvider>
           </AppDialogProvider>
         </AuthProvider>
