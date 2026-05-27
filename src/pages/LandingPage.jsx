@@ -26,6 +26,7 @@ import {
   HeartPulse,
   Landmark,
   LayoutGrid,
+  LayoutDashboard,
   Maximize2,
   MousePointer2,
   Palmtree,
@@ -109,6 +110,7 @@ import {
 import {
   personMatchesScheduleFilter,
   countActiveFilterRules,
+  normalizeFilterRules,
 } from "../utils/scheduleAllocationFilter.js";
 import {
   findLeaveOverlapWithWorkRange,
@@ -118,7 +120,10 @@ import { workAllocationCoversDateKey } from "../utils/allocationOccurrence.js";
 import { buildAllocationsByPerson, getPersonAllocations } from "../utils/allocationsByPerson.js";
 import { mergeScheduleAllocations } from "../utils/scheduleAllocationsMerge.js";
 import { isSupabaseConfigured } from "../lib/supabase.js";
-import { dismissPublicHolidayForPerson } from "../lib/api/personPublicHolidays.js";
+import {
+  dismissPublicHolidayForPerson,
+  publicHolidayDismissKeyFromAlloc,
+} from "../lib/api/personPublicHolidays.js";
 import {
   normalizeLeaveTypeId,
   leaveTimelineIconKey,
@@ -1319,8 +1324,8 @@ const TimelineRow = memo(function TimelineRow({
 }, timelineRowEqual);
 
 export default function LandingPage() {
-  const location = useLocation();
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme } = useAppTheme();
   const t = T[theme];
   const setAlloc8FeedbackDock = useAlloc8ActionFeedbackMount();
@@ -1367,20 +1372,21 @@ export default function LandingPage() {
   const { premiumV2Enabled, premiumV2Templates } = usePremiumV2();
   const { openDialog } = useAppDialog();
 
-  const scheduleAllocations = useMemo(
-    () => mergeScheduleAllocations(allocations, publicHolidayAllocations),
-    [allocations, publicHolidayAllocations]
-  );
-
-  const allocationsByPerson = useMemo(
-    () => buildAllocationsByPerson(scheduleAllocations),
-    [scheduleAllocations]
-  );
-
   const [dismissedAvailOffKeys, setDismissedAvailOffKeys] = useState(() => {
     try {
       if (typeof window === "undefined") return new Set();
       const raw = window.localStorage.getItem("float.dismissedAvailOff.v1");
+      const arr = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(arr) ? arr.map(String) : []);
+    } catch {
+      return new Set();
+    }
+  });
+
+  const [dismissedPublicHolidayKeys, setDismissedPublicHolidayKeys] = useState(() => {
+    try {
+      if (typeof window === "undefined") return new Set();
+      const raw = window.localStorage.getItem("float.dismissedPublicHoliday.v1");
       const arr = raw ? JSON.parse(raw) : [];
       return new Set(Array.isArray(arr) ? arr.map(String) : []);
     } catch {
@@ -1399,6 +1405,36 @@ export default function LandingPage() {
       // ignore storage failures (private mode, quota, etc.)
     }
   }, [dismissedAvailOffKeys]);
+
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      window.localStorage.setItem(
+        "float.dismissedPublicHoliday.v1",
+        JSON.stringify([...dismissedPublicHolidayKeys])
+      );
+    } catch {
+      // ignore storage failures (private mode, quota, etc.)
+    }
+  }, [dismissedPublicHolidayKeys]);
+
+  const visiblePublicHolidayAllocations = useMemo(() => {
+    if (!dismissedPublicHolidayKeys.size) return publicHolidayAllocations;
+    return publicHolidayAllocations.filter((a) => {
+      const key = publicHolidayDismissKeyFromAlloc(a);
+      return key && !dismissedPublicHolidayKeys.has(key);
+    });
+  }, [publicHolidayAllocations, dismissedPublicHolidayKeys]);
+
+  const scheduleAllocations = useMemo(
+    () => mergeScheduleAllocations(allocations, visiblePublicHolidayAllocations),
+    [allocations, visiblePublicHolidayAllocations]
+  );
+
+  const allocationsByPerson = useMemo(
+    () => buildAllocationsByPerson(scheduleAllocations),
+    [scheduleAllocations]
+  );
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState(null);
@@ -1586,6 +1622,10 @@ export default function LandingPage() {
   }, [projects]);
 
   const scheduleFilterActiveCount = countActiveFilterRules(scheduleFilterRules);
+  const deptDashboardEnabled = useMemo(() => {
+    const norm = normalizeFilterRules(scheduleFilterRules);
+    return norm.some((r) => r.field === "department");
+  }, [scheduleFilterRules]);
 
   const applySavedStarredFilter = useCallback(
     (presetId) => {
@@ -2098,7 +2138,7 @@ export default function LandingPage() {
         isoEnd,
         personIds,
         scheduleAllocations,
-        publicHolidayAllocations
+        visiblePublicHolidayAllocations
       );
       const hoursPerDay = Number(alloc.hoursPerDay) || 0;
       const totalHours = allocationTotalHoursRounded(workingDays, hoursPerDay);
@@ -2121,7 +2161,7 @@ export default function LandingPage() {
       };
       return handleEditAllocation(payload, alloc.id);
     },
-    [handleEditAllocation, projects, scheduleAllocations, publicHolidayAllocations]
+    [handleEditAllocation, projects, scheduleAllocations, visiblePublicHolidayAllocations]
   );
 
   const handleDeleteAllocation = useCallback(
@@ -2149,7 +2189,15 @@ export default function LandingPage() {
       if (alloc?.syntheticPublicHoliday) {
         const pid = alloc.personIds?.[0];
         if (!pid) return;
+        const dismissKey = publicHolidayDismissKeyFromAlloc(alloc);
         let removedHoliday = null;
+        if (dismissKey) {
+          setDismissedPublicHolidayKeys((prev) => {
+            const next = new Set(prev);
+            next.add(dismissKey);
+            return next;
+          });
+        }
         setPublicHolidayAllocations((cur) => {
           removedHoliday = cur.find((a) => a.id === alloc.id) || null;
           return cur.filter((a) => a.id !== alloc.id);
@@ -2158,7 +2206,7 @@ export default function LandingPage() {
           showCenterActionFeedback({
             action: "remove",
             title: "Removed",
-            subtitle: "Public holiday removed from this schedule.",
+            subtitle: "This public holiday is hidden for this person only. Other holidays are unchanged.",
           });
           return;
         }
@@ -2172,9 +2220,16 @@ export default function LandingPage() {
           showCenterActionFeedback({
             action: "remove",
             title: "Removed",
-            subtitle: "Public holiday removed from this schedule.",
+            subtitle: "This public holiday is hidden for this person only. Other holidays are unchanged.",
           });
         } catch (e) {
+          if (dismissKey) {
+            setDismissedPublicHolidayKeys((prev) => {
+              const next = new Set(prev);
+              next.delete(dismissKey);
+              return next;
+            });
+          }
           if (removedHoliday) {
             setPublicHolidayAllocations((cur) => {
               if (cur.some((a) => a.id === removedHoliday.id)) return cur;
@@ -2205,6 +2260,7 @@ export default function LandingPage() {
       syncAllocationDelete,
       refreshWorkspaceFromSupabase,
       setDismissedAvailOffKeys,
+      setDismissedPublicHolidayKeys,
     ]
   );
 
@@ -2244,6 +2300,14 @@ export default function LandingPage() {
           : [];
     return ids.length > 0;
   }, [selectedAllocation]);
+
+  const canDeleteSelectedAllocation = useMemo(() => {
+    if (!selectedAllocation) return false;
+    if (selectedAllocation.syntheticPublicHoliday) {
+      return (selectedAllocation.personIds?.length ?? 0) > 0;
+    }
+    return canManageSelectedAllocation;
+  }, [selectedAllocation, canManageSelectedAllocation]);
 
   /** Scope extend/off-day math to assignees — not the full workspace allocation list. */
   /** Smaller list for create/edit modal conflict checks when one person is preselected. */
@@ -2553,7 +2617,7 @@ export default function LandingPage() {
 
   useLayoutEffect(() => {
     remeasureScheduleRows();
-  }, [remeasureScheduleRows, scheduleAllocations, publicHolidayAllocations, dismissedAvailOffKeys]);
+  }, [remeasureScheduleRows, scheduleAllocations, visiblePublicHolidayAllocations, dismissedAvailOffKeys]);
 
   return (
     <div
@@ -2617,6 +2681,35 @@ export default function LandingPage() {
                     saveCurrentFilterAsStarred={saveCurrentFilterAsStarred}
                   />
                 </div>
+
+                {deptDashboardEnabled ? (
+                  <div className="lp-dropdown-wrap">
+                    <button
+                      type="button"
+                      className="lp-pill lp-pill-btn lp-tag-dd-trigger lp-tag-dd-trigger-active"
+                      aria-label="Open department overview dashboard"
+                      title="Department dashboard"
+                      onClick={() => {
+                        const norm = normalizeFilterRules(scheduleFilterRules);
+                        const keys = visibleDateKeysForHours(scheduleModel);
+                        const startDate = keys.length ? String(keys[0]).slice(0, 10) : "";
+                        const endDate = keys.length ? String(keys[keys.length - 1]).slice(0, 10) : "";
+                        navigate("/dept-dashboard", {
+                          state: {
+                            rules: norm,
+                            startDate,
+                            endDate,
+                            viewMode,
+                            customRange,
+                          },
+                        });
+                      }}
+                    >
+                      <LayoutDashboard size={14} strokeWidth={2.15} />
+                      Dashboard
+                    </button>
+                  </div>
+                ) : null}
 
                 <div className="lp-dropdown-wrap" ref={starredWrapRef}>
                   <button
@@ -3249,7 +3342,7 @@ export default function LandingPage() {
           projects={allocationProjectOptions}
           projectRegistry={projects}
           onAddProject={addAllocationProjectLabel}
-          publicHolidayAllocations={publicHolidayAllocations}
+          publicHolidayAllocations={visiblePublicHolidayAllocations}
           t={t}
           premiumV2Enabled={premiumV2Enabled}
           premiumV2Templates={premiumV2Templates}
@@ -3262,10 +3355,10 @@ export default function LandingPage() {
           allocation={selectedAllocation}
           assigneeNames={selectedAssigneeNames}
           onClose={closeAllocationDetail}
-          onDelete={canManageSelectedAllocation ? handleDeleteAllocation : undefined}
+          onDelete={canDeleteSelectedAllocation ? handleDeleteAllocation : undefined}
           onExtendAllocation={handleExtendAllocation}
           allocations={detailModalAllocations}
-          publicHolidayAllocations={publicHolidayAllocations}
+          publicHolidayAllocations={visiblePublicHolidayAllocations}
           onEditClick={canManageSelectedAllocation ? handleDetailEditClick : undefined}
           t={t}
         />

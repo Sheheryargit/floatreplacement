@@ -1413,7 +1413,8 @@ function AllocationDetailModalInner({
     if (!onDelete) return;
     let msg;
     if (allocation.syntheticPublicHoliday) {
-      msg = "Remove this public holiday from the schedule for this person?";
+      msg =
+        "Hide this public holiday for this person on this day only? Other holidays for them (and for everyone else) stay unchanged. You can still add work on that day.";
     } else {
       msg = isLeave ? "Delete this leave entry? This cannot be undone." : "Delete this allocation? This cannot be undone.";
     }

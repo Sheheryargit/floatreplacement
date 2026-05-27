@@ -1,0 +1,132 @@
+.dd-kpi-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 525;
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+}
+
+.dd-kpi-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: min(520px, 92vw);
+  z-index: 526;
+  padding: 18px 18px 22px;
+  border-left: 1px solid var(--dd-border-accent);
+  background:
+    radial-gradient(900px 360px at 0% -10%, var(--dd-glow-accent), transparent 58%),
+    radial-gradient(820px 320px at 100% 0%, var(--dd-glow-accent-2), transparent 58%),
+    color-mix(in srgb, var(--color-surface) 96%, transparent);
+  box-shadow: -26px 0 80px rgba(0, 0, 0, 0.5);
+  overflow: auto;
+}
+
+.dd-kpi-drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dd-kpi-drawer-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 820;
+  letter-spacing: -0.02em;
+  color: var(--dd-text);
+}
+
+.dd-kpi-drawer-sub {
+  margin: 8px 0 0;
+  color: var(--dd-text-muted);
+  font-weight: 650;
+}
+
+.dd-kpi-drawer-close {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--dd-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dd-kpi-drawer-close:hover {
+  background: color-mix(in srgb, var(--dd-accent) 10%, transparent);
+  color: var(--dd-text);
+}
+
+.dd-kpi-drawer-body {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dd-kpi-row {
+  width: 100%;
+  border: 1px solid var(--dd-border-accent);
+  background: var(--dd-surface-card);
+  border-radius: 14px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: minmax(140px, 1.1fr) 2fr 76px;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-spring), box-shadow var(--duration-fast) ease, border-color var(--duration-fast) ease;
+}
+
+.dd-kpi-row:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--dd-shadow-2);
+  border-color: var(--dd-border-accent-strong);
+}
+
+.dd-kpi-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 760;
+  color: var(--dd-text);
+}
+
+.dd-kpi-row-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dd-border) 55%, transparent);
+  overflow: hidden;
+}
+
+.dd-kpi-row-fill {
+  height: 100%;
+  display: block;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--dd-accent), var(--dd-accent-2));
+}
+
+.dd-kpi-row--over .dd-kpi-row-fill {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--dd-danger) 70%, #fff), var(--dd-danger));
+}
+.dd-kpi-row--near .dd-kpi-row-fill {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--dd-warning) 70%, #fff), var(--dd-warning));
+}
+.dd-kpi-row--low .dd-kpi-row-fill {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--dd-success) 70%, #fff), var(--dd-success));
+}
+
+.dd-kpi-row-val {
+  text-align: right;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: var(--dd-text);
+}
+

@@ -1,0 +1,166 @@
+.dd-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 520;
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+}
+
+.dd-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: min(520px, 92vw);
+  z-index: 521;
+  padding: 18px 18px 22px;
+  border-left: 1px solid color-mix(in srgb, var(--color-brand) 16%, var(--color-border));
+  background:
+    radial-gradient(900px 360px at 0% -10%, rgba(0, 136, 255, 0.18), transparent 58%),
+    radial-gradient(820px 320px at 100% 0%, rgba(124, 106, 247, 0.14), transparent 58%),
+    color-mix(in srgb, var(--color-surface, #181c26) 96%, transparent);
+  box-shadow: -26px 0 80px rgba(0, 0, 0, 0.5);
+  overflow: auto;
+}
+
+:root[data-theme="light"] .dd-drawer {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: -18px 0 60px rgba(15, 23, 42, 0.14);
+}
+
+.dd-drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dd-drawer-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.dd-drawer-sub {
+  margin: 8px 0 0;
+  color: var(--color-muted);
+  font-weight: 650;
+}
+
+.dd-drawer-close {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--duration-fast) ease, color var(--duration-fast) ease;
+}
+
+.dd-drawer-close:hover {
+  background: color-mix(in srgb, var(--color-brand) 10%, transparent);
+  color: var(--color-text);
+}
+
+.dd-drawer-kpis {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dd-mini {
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--color-brand) 16%, var(--color-border));
+  background: color-mix(in srgb, var(--color-surface-2, #1e2235) 74%, transparent);
+  padding: 12px 12px;
+}
+
+.dd-mini-label {
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.dd-mini-value {
+  margin-top: 6px;
+  font-family: var(--font-display);
+  font-weight: 820;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+  font-size: 1.05rem;
+}
+
+.dd-drawer-body {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dd-drawer-section {
+  border-radius: 18px;
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface-2, #1e2235) 68%, transparent);
+  padding: 14px 14px;
+}
+
+.dd-drawer-h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.dd-drawer-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dd-drawer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  background: color-mix(in srgb, var(--color-surface, #181c26) 74%, transparent);
+}
+
+.dd-drawer-row-key {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+  font-weight: 750;
+}
+
+.dd-drawer-row-val {
+  color: var(--color-muted);
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+
+.dd-drawer-empty {
+  margin: 12px 0 0;
+  color: var(--color-muted);
+}
+

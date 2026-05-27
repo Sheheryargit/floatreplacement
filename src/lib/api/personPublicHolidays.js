@@ -7,6 +7,19 @@ function isoFromHolidayDate(d) {
 }
 
 /** Stable negative id (FNV-1a) so refetches keep the same keys. */
+/** Key for per-person dismissals (matches DB `person_public_holiday_dismissals`). */
+export function publicHolidayDismissKey(personId, holidayDate, name) {
+  const dk = typeof holidayDate === "string" ? holidayDate.slice(0, 10) : String(holidayDate || "").slice(0, 10);
+  const nm = (name || "Public holiday").trim() || "Public holiday";
+  return `${String(personId)}|${dk}|${nm}`;
+}
+
+export function publicHolidayDismissKeyFromAlloc(alloc) {
+  const pid = alloc?.personIds?.[0] ?? "";
+  if (!pid) return "";
+  return publicHolidayDismissKey(pid, alloc.startDate, alloc.notes);
+}
+
 function syntheticPublicHolidayId(personId, holidayDateIso, name) {
   const s = `${personId}\0${holidayDateIso}\0${name}`;
   let h = 2166136261 >>> 0;

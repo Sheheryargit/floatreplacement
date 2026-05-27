@@ -34,12 +34,14 @@ const PeoplePage = lazy(() => import("./pages/PeoplePage.jsx"));
 const ProjectsPage = lazy(() => import("./pages/ProjectsPage.jsx"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage.jsx"));
 const ReportingPage = lazy(() => import("./pages/ReportingPage.jsx"));
+const DepartmentDashboardPage = lazy(() => import("./pages/DepartmentDashboardPage.jsx"));
 
 const workspaceRoutes = [
   { path: "/", element: <LandingPage /> },
   { path: "/people", element: <PeoplePage /> },
   { path: "/projects", element: <ProjectsPage /> },
   { path: "/report", element: <ReportingPage /> },
+  { path: "/dept-dashboard", element: <DepartmentDashboardPage /> },
   { path: "/settings", element: <SettingsPage /> },
   { path: "*", element: <Navigate to="/" replace /> },
 ];

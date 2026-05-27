@@ -1,0 +1,122 @@
+.dd-strip {
+  border-radius: 18px;
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface, #181c26) 86%, transparent);
+  overflow: hidden;
+}
+
+.dd-strip-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  font-weight: 800;
+  color: var(--color-text);
+  background:
+    radial-gradient(900px 240px at 10% -20%, rgba(0, 136, 255, 0.12), transparent 55%),
+    color-mix(in srgb, var(--color-surface-2, #1e2235) 62%, transparent);
+}
+
+.dd-strip-count {
+  margin-left: auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-brand) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-brand) 18%, var(--color-border));
+}
+
+.dd-strip-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 520px;
+  overflow: auto;
+}
+
+.dd-strip-row {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--color-brand) 14%, var(--color-border));
+  background: color-mix(in srgb, var(--color-surface-2, #1e2235) 72%, transparent);
+  border-radius: 14px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: minmax(120px, 1.3fr) 2fr 52px;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition:
+    transform var(--duration-fast) var(--ease-spring),
+    border-color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease;
+}
+
+.dd-strip-row:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--color-brand) 30%, var(--color-border));
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
+}
+
+.dd-strip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 760;
+  color: var(--color-text);
+}
+
+.dd-strip-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-border) 55%, transparent);
+  overflow: hidden;
+  position: relative;
+}
+
+.dd-strip-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-brand-light, #4dadff), var(--color-brand, #0088ff));
+  box-shadow: 0 0 18px rgba(0, 136, 255, 0.26);
+}
+
+.dd-strip-row--over .dd-strip-bar-fill {
+  background: linear-gradient(90deg, #fb7185, #f43f5e);
+  box-shadow: 0 0 18px rgba(244, 63, 94, 0.26);
+}
+
+.dd-strip-row--near .dd-strip-bar-fill {
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.22);
+}
+
+.dd-strip-row--low .dd-strip-bar-fill {
+  background: linear-gradient(90deg, #34d399, #10b981);
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.18);
+}
+
+.dd-strip-meta {
+  text-align: right;
+  font-weight: 850;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+
+@media (max-width: 640px) {
+  .dd-strip-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .dd-strip-meta {
+    text-align: left;
+    color: var(--color-muted);
+    font-weight: 750;
+  }
+}
+

@@ -47,6 +47,7 @@ import {
   UserCheck,
   UserMinus,
   Layers,
+  Star,
 } from "lucide-react";
 
 /* ═══════════════════ DATA ═══════════════════ */
@@ -91,6 +92,29 @@ function Confirm({open,onYes,onNo,title,desc,yesLabel,yesIcon:YI,yesDanger,t}){
 }
 
 const CLIENT_NONE = "__client_none__";
+const OWNER_NONE = "__owner_none__";
+const OWNER_STAR_STORAGE_KEY = "alloc8:projects:starredOwners";
+
+function readStarredOwnerIds() {
+  if (typeof localStorage === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(OWNER_STAR_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStarredOwnerIds(ids) {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(OWNER_STAR_STORAGE_KEY, JSON.stringify((ids || []).map(String)));
+  } catch {
+    // ignore
+  }
+}
+
 const coerceOwnerId = (value) => {
   if (value === null || value === undefined || value === "") return "";
   const asNum = Number(value);
@@ -423,22 +447,82 @@ export default function ProjectsPage(){
   }=useAppData();
   const[selected,setSelected]=useState(new Set());
   const[search,setSearch]=useState("");
+  const[ownerFilter,setOwnerFilter]=useState("");
+  const[viewMode,setViewMode]=useState("table"); // table | owners
   const[viewTab,setViewTab]=useState("active");
   const[modalOpen,setModalOpen]=useState(false);
   const[editingProject,setEditingProject]=useState(null);
   const[confirmDel,setConfirmDel]=useState(false);
   const[mounted,setMounted]=useState(false);
+  const[starredOwners,setStarredOwners]=useState(()=>new Set(readStarredOwnerIds()));
+  const[ownerOpen,setOwnerOpen]=useState(()=>({}));
   const setAlloc8FeedbackDock = useAlloc8ActionFeedbackMount();
 
   useEffect(()=>{setMounted(true);},[]);
 
-  const filtered=useMemo(()=>{const isArch=viewTab==="archived";return projects.filter(p=>{if(p.archived!==isArch)return false;
+  const ownerFilterOptions = useMemo(() => {
+    const opts =
+      [...people]
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
+        .map((p) => ({ label: p.name, value: String(p.id), raw: p }));
+    return [
+      { label: "Any owner", value: "" },
+      { label: "Unassigned", value: OWNER_NONE },
+      ...opts,
+    ];
+  }, [people]);
 
+  const baseFiltered=useMemo(()=>{const isArch=viewTab==="archived";return projects.filter(p=>{if(p.archived!==isArch)return false;
       if(!search)return true;const s=search.toLowerCase();return p.name.toLowerCase().includes(s)||p.client.toLowerCase().includes(s)||p.code.toLowerCase().includes(s)||p.tags.some(tg=>tg.toLowerCase().includes(s));});},[projects,search,viewTab]);
+
+  const filtered=useMemo(()=>{return baseFiltered.filter((p)=>{if(!ownerFilter)return true;
+      if(ownerFilter===OWNER_NONE){
+        return p.owner===null||p.owner===undefined||String(p.owner)==="";
+      }
+      return String(p.owner||"")===String(ownerFilter);
+    });},[baseFiltered,ownerFilter]);
+
   const activeCount=projects.filter(p=>!p.archived).length;
   const archivedCount=projects.filter(p=>p.archived).length;
   const toggleSel=id=>setSelected(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
   const toggleAll=()=>setSelected(selected.size===filtered.length?new Set():new Set(filtered.map(p=>p.id)));
+
+  const toggleStarOwner = useCallback((id)=>{
+    const key = String(id);
+    setStarredOwners((prev)=>{
+      const next = new Set(prev);
+      if(next.has(key)) next.delete(key);
+      else next.add(key);
+      writeStarredOwnerIds([...next]);
+      return next;
+    });
+  },[]);
+
+  const ownerGroups = useMemo(() => {
+    // group from baseFiltered so Owners view shows all owners in scope
+    const by = new Map();
+    for (const p of baseFiltered) {
+      const k =
+        p.owner === null || p.owner === undefined || String(p.owner) === ""
+          ? OWNER_NONE
+          : String(p.owner);
+      if (!by.has(k)) by.set(k, []);
+      by.get(k).push(p);
+    }
+    const rows = [...by.entries()].map(([k, list]) => {
+      const person = k === OWNER_NONE ? null : people.find((x) => String(x.id) === String(k)) || null;
+      const name = person?.name || (k === OWNER_NONE ? "Unassigned" : "Unknown owner");
+      list.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+      return { ownerId: k, name, person, projects: list, starred: starredOwners.has(String(k)) };
+    });
+    rows.sort((a, b) => {
+      const sa = a.starred ? 1 : 0;
+      const sb = b.starred ? 1 : 0;
+      if (sa !== sb) return sb - sa;
+      return String(a.name || "").localeCompare(String(b.name || ""));
+    });
+    return rows;
+  }, [baseFiltered, people, starredOwners]);
   const doDelete = async () => {
     const c = selected.size;
     const ids = [...selected];
@@ -538,6 +622,78 @@ export default function ProjectsPage(){
           <h1 className="projects-page-title">Projects</h1>
           <div className="projects-page-toolbar">
             <div style={{position:"relative"}}><Search size={15} style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:t.textMuted}}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search projects…" style={{width:search?240:180,background:t.surface,border:`1.5px solid ${t.borderIn}`,borderRadius:8,padding:"8px 12px 8px 34px",color:t.text,fontSize:13,outline:"none",transition:"all 0.25s"}} onFocus={e=>{e.target.style.width="240px";e.target.style.borderColor=t.focus;e.target.style.boxShadow=`0 0 0 3px ${t.accentGlow}`;}} onBlur={e=>{if(!search)e.target.style.width="180px";e.target.style.borderColor=t.borderIn;e.target.style.boxShadow="none";}}/>{search&&<X size={14} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",color:t.textMuted,cursor:"pointer"}} onClick={()=>setSearch("")}/>}</div>
+            <div style={{ width: 220 }}>
+              <FloatSelect
+                t={t}
+                value={ownerFilter}
+                onChange={(v) => {
+                  setOwnerFilter(String(v || ""));
+                  setSelected(new Set());
+                }}
+                options={ownerFilterOptions}
+                placeholder="Owner"
+                creatable={false}
+                searchPlaceholder="Filter by owner…"
+                renderOption={(o, th) => {
+                  if (!o) return null;
+                  if (o.value === "" || o.value === OWNER_NONE) {
+                    return <span style={{ fontWeight: 650, color: th.text }}>{o.label}</span>;
+                  }
+                  const nm = o.label || "";
+                  return (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div
+                        style={{
+                          width: 26,
+                          height: 26,
+                          borderRadius: 7,
+                          background: avGrad(nm),
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 10,
+                          fontWeight: 800,
+                          color: "#fff",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {ini(nm)}
+                      </div>
+                      <span style={{ fontWeight: 650, color: th.text, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {nm}
+                      </span>
+                    </div>
+                  );
+                }}
+                renderSelected={(o) => {
+                  const label = o?.label || "";
+                  if (!label) return null;
+                  if (o?.value === "" || o?.value === OWNER_NONE) return <span>{label}</span>;
+                  return (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                      <div
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: 6,
+                          background: avGrad(label),
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 9,
+                          fontWeight: 800,
+                          color: "#fff",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {ini(label)}
+                      </div>
+                      <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+                    </div>
+                  );
+                }}
+              />
+            </div>
             <Button type="button" variant="primary" size="md" onClick={openAdd} style={{ display: "flex", alignItems: "center", gap: 7 }}><Plus size={14}/> Add project</Button>
           </div>
         </header>
@@ -553,74 +709,296 @@ export default function ProjectsPage(){
           <div style={{display:"flex",gap:2,background:t.surfAlt,borderRadius:10,padding:3,border:`1px solid ${t.border}`}}>
             {[{key:"active",label:"Active",count:activeCount,icon:FolderOpen},{key:"archived",label:"Archived",count:archivedCount,icon:Archive}].map(vt=>{const Icon=vt.icon;const active=viewTab===vt.key;return(<button key={vt.key} onClick={()=>{setViewTab(vt.key);setSelected(new Set());}} style={{padding:"8px 18px",fontSize:13,fontWeight:active?700:500,cursor:"pointer",background:active?t.surface:"transparent",border:active?`1px solid ${t.border}`:"1px solid transparent",color:active?t.text:t.textMuted,borderRadius:8,display:"flex",alignItems:"center",gap:7,transition:"all 0.2s",boxShadow:active?"0 1px 3px rgba(0,0,0,0.06)":"none"}} onMouseEnter={e=>{if(!active)e.currentTarget.style.color=t.textSoft;}} onMouseLeave={e=>{if(!active)e.currentTarget.style.color=t.textMuted;}}><Icon size={14}/> {vt.label}<span style={{background:active?t.accentGlow:t.surfAlt,color:active?t.accent:t.textDim,borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700,marginLeft:2}}>{vt.count}</span></button>);})}
           </div>
-          {selected.size>0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{display:"flex",gap:2,background:t.surfAlt,borderRadius:10,padding:3,border:`1px solid ${t.border}`}}>
+              {[
+                { key: "table", label: "Table" },
+                { key: "owners", label: "Owners" },
+              ].map((m) => {
+                const active = viewMode === m.key;
+                return (
+                  <button
+                    key={m.key}
+                    onClick={() => {
+                      setViewMode(m.key);
+                      setSelected(new Set());
+                    }}
+                    style={{
+                      padding:"8px 14px",
+                      fontSize:13,
+                      fontWeight:active?750:600,
+                      cursor:"pointer",
+                      background:active?t.surface:"transparent",
+                      border:active?`1px solid ${t.border}`:"1px solid transparent",
+                      color:active?t.text:t.textMuted,
+                      borderRadius:8,
+                      transition:"all 0.2s",
+                      boxShadow:active?"0 1px 3px rgba(0,0,0,0.06)":"none"
+                    }}
+                    onMouseEnter={e=>{if(!active)e.currentTarget.style.color=t.textSoft;}}
+                    onMouseLeave={e=>{if(!active)e.currentTarget.style.color=t.textMuted;}}
+                  >
+                    {m.label}
+                  </button>
+                );
+              })}
+            </div>
+            {viewMode==="table" && selected.size>0 && (
             <Button type="button" variant="destructive" size="md" onClick={()=>setConfirmDel(true)} className="alloc8-btn-enter" style={{ display: "flex", alignItems: "center", gap: 7 }}>
               <Trash2 size={14}/> Delete {selected.size} selected
             </Button>
-          )}
-        </div>
-
-        {/* Table — class hooks custom-canvas tint over inline surface/border */}
-        <div
-          className="projects-page-table-card"
-          data-theme={mode === "light" ? "light" : "dark"}
-          style={{
-            background: t.surface,
-            borderRadius: 12,
-            border: `1px solid ${t.border}`,
-            overflow: "hidden",
-            transition: "background 0.35s",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-          }}
-        >
-          <div className="projects-page-table-scroll">
-          <table style={{width:"100%",borderCollapse:"collapse",minWidth:900}}>
-            <thead><tr style={{borderBottom:`2px solid ${t.border}`}}>
-              <th style={{width:48,padding:"14px 14px"}}><input type="checkbox" checked={selected.size===filtered.length&&filtered.length>0} onChange={toggleAll} style={{accentColor:t.chk,cursor:"pointer",width:16,height:16}}/></th>
-              {["Project","Code","Client","Tags","Stage","Team","Start","End","Owner",""].map((h,i)=>(<th key={i} style={{textAlign:"left",padding:"14px 12px",fontSize:11,fontWeight:700,color:t.textMuted,textTransform:"uppercase",letterSpacing:0.8,whiteSpace:"nowrap",width:i===9?48:undefined}}>{h}</th>))}
-            </tr></thead>
-            <tbody>
-              {filtered.map((p,idx)=>{const sel=selected.has(p.id);const stg=STAGES.find(s=>s.value===p.stage)||STAGES[0];const owner=people.find(o=>String(o.id)===String(p.owner));const teamPeople=p.teamIds.map(id=>people.find(x=>x.id===id)).filter(Boolean);return(
-                <tr key={p.id} onClick={()=> openEdit(p)} style={{borderBottom:`1px solid ${t.border}`,background:sel?t.selRow:"transparent",cursor:"pointer",transition:"background 0.12s",animation:mounted&&idx<TABLE_ROW_ENTER_ANIM_MAX?`rowIn 0.35s ease-out ${idx*0.025}s both`:"none"}} onMouseEnter={e=>{if(!sel)e.currentTarget.style.background=t.rowHov;}} onMouseLeave={e=>{if(!sel)e.currentTarget.style.background=sel?t.selRow:"transparent";}}>
-                  <td style={{padding:"12px 14px"}} onClick={e=>e.stopPropagation()}><input type="checkbox" checked={sel} onChange={()=>toggleSel(p.id)} style={{accentColor:t.chk,cursor:"pointer",width:16,height:16}}/></td>
-                  <td style={{padding:"12px 12px"}}><div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:4,height:28,borderRadius:2,background:p.color,flexShrink:0}}/><span style={{fontWeight:600,color:p.archived?t.textMuted:t.text,fontSize:14}}>{p.name}</span></div></td>
-                  <td style={{padding:"12px 12px",color:p.code?t.textSoft:t.textDim,fontFamily:"'DM Mono', monospace",fontSize:12}}>{p.code||"—"}</td>
-                  <td style={{padding:"12px 12px",color:t.textSoft,fontSize:13}}>{p.client||"—"}</td>
-                  <td style={{padding:"12px 12px"}}><div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>{p.tags.slice(0,2).map((tag,j)=>{const tp=tagChromaProps(tag,mode==="dark");return <span key={j} className={tp.className} style={{...tp.style,fontSize:11}}>{tag}</span>;})}{p.tags.length>2&&<span style={{color:t.textMuted,fontSize:11,fontWeight:650}}>+{p.tags.length-2}</span>}</div></td>
-                  <td style={{padding:"12px 12px"}}><div style={{display:"inline-flex",alignItems:"center",gap:6,background:t.tabActiveBg,borderRadius:6,padding:"4px 10px"}}><Circle size={8} fill={stg.color} stroke={stg.color}/><span style={{color:t.textSoft,fontSize:12,fontWeight:600}}>{stg.label}</span></div></td>
-                  <td style={{padding:"12px 12px"}}>{teamPeople.length>0?(<div style={{display:"flex",alignItems:"center"}}>{teamPeople.slice(0,3).map((tp,j)=>(<div key={tp.id} style={{width:26,height:26,borderRadius:7,background:avGrad(tp.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:"#fff",marginLeft:j>0?-6:0,border:`2px solid ${t.surface}`,position:"relative",zIndex:3-j}} title={tp.name}>{ini(tp.name)}</div>))}{teamPeople.length>3&&<span style={{fontSize:11,color:t.textMuted,marginLeft:4,fontWeight:600}}>+{teamPeople.length-3}</span>}</div>):<span style={{color:t.textDim,fontSize:12}}>—</span>}</td>
-                  <td style={{padding:"12px 12px",color:t.textSoft,fontSize:12,whiteSpace:"nowrap"}}>{fmtDate(p.startDate)}</td>
-                  <td style={{padding:"12px 12px",color:t.textSoft,fontSize:12,whiteSpace:"nowrap"}}>{fmtDate(p.endDate)}</td>
-                  <td style={{padding:"12px 12px"}}>{owner&&<div style={{width:28,height:28,borderRadius:8,background:avGrad(owner.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff"}} title={owner.name}>{ini(owner.name)}</div>}</td>
-                  <td style={{padding:"12px 8px"}} onClick={e=>e.stopPropagation()}><RowActions project={p} t={t} onEdit={()=> openEdit(p)} onArchive={()=> archiveProject(p.id)} onDelete={()=>{ setSelected(new Set([p.id]));setConfirmDel(true); }}/></td>
-                </tr>);})}
-              {filtered.length===0&&(
-                <tr>
-                  <td colSpan={11} style={{ padding: 0, borderBottom: "none" }}>
-                    <div style={{ padding: "56px 20px" }}>
-                      {viewTab==="archived" ? (
-                        <EmptyState
-                          icon={Archive}
-                          title="No archived projects"
-                          description="Archived projects will appear here."
-                        />
-                      ) : (
-                        <EmptyState
-                          icon={Search}
-                          title={search ? "No projects match your search" : "No projects yet"}
-                          description={
-                            search ? "Try a different search term." : "Click “Add project” to get started."
-                          }
-                        />
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+            )}
           </div>
         </div>
+
+        {viewMode==="owners" ? (
+          <div
+            className="projects-page-table-card"
+            data-theme={mode === "light" ? "light" : "dark"}
+            style={{
+              background: t.surface,
+              borderRadius: 12,
+              border: `1px solid ${t.border}`,
+              overflow: "hidden",
+              transition: "background 0.35s",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+              flex: 1,
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div className="projects-page-table-scroll" style={{ padding: 14 }}>
+              {ownerGroups.length===0 ? (
+                <div style={{ padding: "56px 20px" }}>
+                  <EmptyState
+                    icon={Search}
+                    title={search ? "No projects match your search" : "No projects yet"}
+                    description={search ? "Try a different search term." : "Click “Add project” to get started."}
+                  />
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: 10 }}>
+                  {ownerGroups.map((g) => {
+                    const isOpen = ownerOpen?.[g.ownerId] ?? (ownerFilter ? String(ownerFilter)===String(g.ownerId) : g.starred);
+                    const active = ownerFilter && String(ownerFilter)===String(g.ownerId);
+                    return (
+                      <div
+                        key={g.ownerId}
+                        style={{
+                          border: `1px solid ${t.border}`,
+                          borderRadius: 12,
+                          overflow: "hidden",
+                          background: active ? t.tabActiveBg : t.surfAlt,
+                          boxShadow: active ? `0 0 0 3px ${t.accentGlow}` : "none",
+                          transition: "box-shadow 0.2s, background 0.2s",
+                        }}
+                      >
+                        <div
+                          style={{
+                            padding: "12px 14px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            cursor: "pointer",
+                            borderBottom: isOpen ? `1px solid ${t.borderSub}` : "none",
+                            gap: 12,
+                          }}
+                          onClick={() => {
+                            setOwnerOpen((p)=>({ ...p, [g.ownerId]: !isOpen }));
+                            setOwnerFilter(String(g.ownerId));
+                            setSelected(new Set());
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                            <div
+                              style={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: 10,
+                                background: g.person ? avGrad(g.name) : t.tabActiveBg,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: 11,
+                                fontWeight: 850,
+                                color: g.person ? "#fff" : t.textMuted,
+                                flexShrink: 0,
+                                border: `1px solid ${t.border}`,
+                              }}
+                              title={g.name}
+                            >
+                              {g.person ? ini(g.name) : "—"}
+                            </div>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                                <div style={{ fontWeight: 800, color: t.text, letterSpacing: -0.2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                                  {g.name}
+                                </div>
+                                <span style={{ background: t.accentGlow, color: t.accent, borderRadius: 999, padding: "2px 8px", fontSize: 11, fontWeight: 800 }}>
+                                  {g.projects.length}
+                                </span>
+                              </div>
+                              <div style={{ color: t.textMuted, fontSize: 12, marginTop: 1 }}>
+                                Click to view projects
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleStarOwner(g.ownerId);
+                              }}
+                              aria-label={g.starred ? "Unstar owner" : "Star owner"}
+                              style={{
+                                width: 34,
+                                height: 34,
+                                borderRadius: 10,
+                                border: `1px solid ${t.border}`,
+                                background: g.starred ? t.accentGlow : "transparent",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                cursor: "pointer",
+                                color: g.starred ? t.accent : t.textMuted,
+                                transition: "transform 0.15s, background 0.15s, color 0.15s",
+                              }}
+                              onMouseEnter={(e)=>{e.currentTarget.style.transform="translateY(-1px)";}}
+                              onMouseLeave={(e)=>{e.currentTarget.style.transform="translateY(0px)";}}
+                            >
+                              <Star size={16} fill={g.starred ? "currentColor" : "none"} />
+                            </button>
+                            {isOpen ? <ChevronUp size={18} style={{ color: t.textMuted }} /> : <ChevronDown size={18} style={{ color: t.textMuted }} />}
+                          </div>
+                        </div>
+
+                        {isOpen && (
+                          <div style={{ padding: 10, display: "grid", gap: 8 }}>
+                            {g.projects.map((p) => {
+                              const stg=STAGES.find(s=>s.value===p.stage)||STAGES[0];
+                              return (
+                                <div
+                                  key={p.id}
+                                  onClick={() => openEdit(p)}
+                                  style={{
+                                    padding: "10px 10px",
+                                    borderRadius: 10,
+                                    border: `1px solid ${t.borderSub}`,
+                                    background: t.surface,
+                                    cursor: "pointer",
+                                    display: "grid",
+                                    gridTemplateColumns: "1fr auto",
+                                    gap: 10,
+                                    alignItems: "center",
+                                    transition: "transform 0.15s, box-shadow 0.15s, border-color 0.15s",
+                                  }}
+                                  onMouseEnter={(e)=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.borderColor=t.focus; e.currentTarget.style.boxShadow="0 12px 30px rgba(0,0,0,0.12)";}}
+                                  onMouseLeave={(e)=>{e.currentTarget.style.transform="translateY(0px)";e.currentTarget.style.borderColor=t.borderSub; e.currentTarget.style.boxShadow="none";}}
+                                >
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                                      <div style={{ width: 4, height: 22, borderRadius: 3, background: p.color, flexShrink: 0 }} />
+                                      <div style={{ fontWeight: 750, color: t.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.name}</div>
+                                      <div style={{ display:"inline-flex", alignItems:"center", gap:6, background:t.tabActiveBg, borderRadius:999, padding:"3px 10px", flexShrink:0 }}>
+                                        <Circle size={8} fill={stg.color} stroke={stg.color}/>
+                                        <span style={{ color:t.textSoft, fontSize:12, fontWeight:700 }}>{stg.label}</span>
+                                      </div>
+                                    </div>
+                                    <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginTop:6, color:t.textMuted, fontSize:12 }}>
+                                      <span style={{ fontFamily:"'DM Mono', monospace", color: p.code ? t.textSoft : t.textDim }}>{p.code||"—"}</span>
+                                      <span>·</span>
+                                      <span>{p.client||"—"}</span>
+                                      <span>·</span>
+                                      <span>{fmtDate(p.startDate)} → {fmtDate(p.endDate)}</span>
+                                    </div>
+                                  </div>
+                                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                                    <RowActions
+                                      project={p}
+                                      t={t}
+                                      onEdit={()=> openEdit(p)}
+                                      onArchive={()=> archiveProject(p.id)}
+                                      onDelete={()=>{ setSelected(new Set([p.id])); setConfirmDel(true); }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Table — class hooks custom-canvas tint over inline surface/border */
+          <div
+            className="projects-page-table-card"
+            data-theme={mode === "light" ? "light" : "dark"}
+            style={{
+              background: t.surface,
+              borderRadius: 12,
+              border: `1px solid ${t.border}`,
+              overflow: "hidden",
+              transition: "background 0.35s",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+            }}
+          >
+            <div className="projects-page-table-scroll">
+            <table style={{width:"100%",borderCollapse:"collapse",minWidth:900}}>
+              <thead><tr style={{borderBottom:`2px solid ${t.border}`}}>
+                <th style={{width:48,padding:"14px 14px"}}><input type="checkbox" checked={selected.size===filtered.length&&filtered.length>0} onChange={toggleAll} style={{accentColor:t.chk,cursor:"pointer",width:16,height:16}}/></th>
+                {["Project","Code","Client","Tags","Stage","Team","Start","End","Owner",""].map((h,i)=>(<th key={i} style={{textAlign:"left",padding:"14px 12px",fontSize:11,fontWeight:700,color:t.textMuted,textTransform:"uppercase",letterSpacing:0.8,whiteSpace:"nowrap",width:i===9?48:undefined}}>{h}</th>))}
+              </tr></thead>
+              <tbody>
+                {filtered.map((p,idx)=>{const sel=selected.has(p.id);const stg=STAGES.find(s=>s.value===p.stage)||STAGES[0];const owner=people.find(o=>String(o.id)===String(p.owner));const teamPeople=p.teamIds.map(id=>people.find(x=>x.id===id)).filter(Boolean);return(
+                  <tr key={p.id} onClick={()=> openEdit(p)} style={{borderBottom:`1px solid ${t.border}`,background:sel?t.selRow:"transparent",cursor:"pointer",transition:"background 0.12s",animation:mounted&&idx<TABLE_ROW_ENTER_ANIM_MAX?`rowIn 0.35s ease-out ${idx*0.025}s both`:"none"}} onMouseEnter={e=>{if(!sel)e.currentTarget.style.background=t.rowHov;}} onMouseLeave={e=>{if(!sel)e.currentTarget.style.background=sel?t.selRow:"transparent";}}>
+                    <td style={{padding:"12px 14px"}} onClick={e=>e.stopPropagation()}><input type="checkbox" checked={sel} onChange={()=>toggleSel(p.id)} style={{accentColor:t.chk,cursor:"pointer",width:16,height:16}}/></td>
+                    <td style={{padding:"12px 12px"}}><div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:4,height:28,borderRadius:2,background:p.color,flexShrink:0}}/><span style={{fontWeight:600,color:p.archived?t.textMuted:t.text,fontSize:14}}>{p.name}</span></div></td>
+                    <td style={{padding:"12px 12px",color:p.code?t.textSoft:t.textDim,fontFamily:"'DM Mono', monospace",fontSize:12}}>{p.code||"—"}</td>
+                    <td style={{padding:"12px 12px",color:t.textSoft,fontSize:13}}>{p.client||"—"}</td>
+                    <td style={{padding:"12px 12px"}}><div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>{p.tags.slice(0,2).map((tag,j)=>{const tp=tagChromaProps(tag,mode==="dark");return <span key={j} className={tp.className} style={{...tp.style,fontSize:11}}>{tag}</span>;})}{p.tags.length>2&&<span style={{color:t.textMuted,fontSize:11,fontWeight:650}}>+{p.tags.length-2}</span>}</div></td>
+                    <td style={{padding:"12px 12px"}}><div style={{display:"inline-flex",alignItems:"center",gap:6,background:t.tabActiveBg,borderRadius:6,padding:"4px 10px"}}><Circle size={8} fill={stg.color} stroke={stg.color}/><span style={{color:t.textSoft,fontSize:12,fontWeight:600}}>{stg.label}</span></div></td>
+                    <td style={{padding:"12px 12px"}}>{teamPeople.length>0?(<div style={{display:"flex",alignItems:"center"}}>{teamPeople.slice(0,3).map((tp,j)=>(<div key={tp.id} style={{width:26,height:26,borderRadius:7,background:avGrad(tp.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:"#fff",marginLeft:j>0?-6:0,border:`2px solid ${t.surface}`,position:"relative",zIndex:3-j}} title={tp.name}>{ini(tp.name)}</div>))}{teamPeople.length>3&&<span style={{fontSize:11,color:t.textMuted,marginLeft:4,fontWeight:600}}>+{teamPeople.length-3}</span>}</div>):<span style={{color:t.textDim,fontSize:12}}>—</span>}</td>
+                    <td style={{padding:"12px 12px",color:t.textSoft,fontSize:12,whiteSpace:"nowrap"}}>{fmtDate(p.startDate)}</td>
+                    <td style={{padding:"12px 12px",color:t.textSoft,fontSize:12,whiteSpace:"nowrap"}}>{fmtDate(p.endDate)}</td>
+                    <td style={{padding:"12px 12px"}}>{owner&&<div style={{width:28,height:28,borderRadius:8,background:avGrad(owner.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff"}} title={owner.name}>{ini(owner.name)}</div>}</td>
+                    <td style={{padding:"12px 8px"}} onClick={e=>e.stopPropagation()}><RowActions project={p} t={t} onEdit={()=> openEdit(p)} onArchive={()=> archiveProject(p.id)} onDelete={()=>{ setSelected(new Set([p.id]));setConfirmDel(true); }}/></td>
+                  </tr>);})}
+                {filtered.length===0&&(
+                  <tr>
+                    <td colSpan={11} style={{ padding: 0, borderBottom: "none" }}>
+                      <div style={{ padding: "56px 20px" }}>
+                        {viewTab==="archived" ? (
+                          <EmptyState
+                            icon={Archive}
+                            title="No archived projects"
+                            description="Archived projects will appear here."
+                          />
+                        ) : (
+                          <EmptyState
+                            icon={Search}
+                            title={search ? "No projects match your search" : "No projects yet"}
+                            description={
+                              search ? "Try a different search term." : "Click “Add project” to get started."
+                            }
+                          />
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            </div>
+          </div>
+        )}
       </main>
 
       <ProjectModal open={modalOpen} onClose={()=>{setModalOpen(false);setEditingProject(null);}} onSave={handleSave} onArchive={handleModalArchive} editProject={editingProject} people={people} clients={clients} setClients={setClients} tagOpts={projectTagOpts} setTagOpts={setProjectTagOpts} t={t} tagIsDark={mode==="dark"}/>
