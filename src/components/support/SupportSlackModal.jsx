@@ -1,7 +1,7 @@
 import { useCallback, useId, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion, useReducedMotion } from "framer-motion";
-import { Copy, ExternalLink, LifeBuoy, X } from "lucide-react";
+import { ChevronDown, Copy, ExternalLink, LifeBuoy, X } from "lucide-react";
 import { Button } from "../ui/Button.jsx";
 import { isStaticUi } from "../../config/uiMode.js";
 import "./SupportSlackModal.css";
@@ -18,6 +18,7 @@ export function SupportSlackModal({
   const titleId = useId();
   const descId = useId();
   const [copied, setCopied] = useState(false);
+  const [showFallback, setShowFallback] = useState(false);
 
   const safeSlackUrl = useMemo(() => String(slackUrl || "").trim(), [slackUrl]);
   const canOpen = Boolean(safeSlackUrl);
@@ -124,14 +125,37 @@ export function SupportSlackModal({
               </div>
 
               {canOpen ? (
-                <p className="support-slack-footnote">
-                  If Slack doesn’t open, paste this into your browser:
-                  <span className="support-slack-url">{safeSlackUrl}</span>
-                </p>
+                <div className="support-slack-fallback">
+                  <button
+                    type="button"
+                    className="support-slack-fallback-toggle"
+                    onClick={() => setShowFallback((s) => !s)}
+                    aria-expanded={showFallback}
+                  >
+                    Trouble opening Slack?
+                    <ChevronDown
+                      size={16}
+                      strokeWidth={2.25}
+                      className={"support-slack-fallback-chevron" + (showFallback ? " is-open" : "")}
+                      aria-hidden
+                    />
+                  </button>
+                  <motion.div
+                    className="support-slack-fallback-body"
+                    initial={false}
+                    animate={{ height: showFallback ? "auto" : 0, opacity: showFallback ? 1 : 0 }}
+                    transition={reduceMotion ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    <div className="support-slack-fallback-inner">
+                      <p className="support-slack-footnote">
+                        Copy/paste this link into your browser:
+                      </p>
+                      <span className="support-slack-url">{safeSlackUrl}</span>
+                    </div>
+                  </motion.div>
+                </div>
               ) : (
-                <p className="support-slack-footnote">
-                  Slack link isn’t configured.
-                </p>
+                <p className="support-slack-footnote">Slack link isn’t configured.</p>
               )}
             </motion.div>
           </Dialog.Content>

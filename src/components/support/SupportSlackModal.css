@@ -185,10 +185,62 @@
 }
 
 .support-slack-footnote {
-  margin: var(--space-5) 0 0;
   font-size: 0.9rem;
   line-height: 1.45;
   color: var(--color-muted);
+}
+
+.support-slack-fallback {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 65%, transparent);
+}
+
+.support-slack-fallback-toggle {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  background: color-mix(in srgb, var(--color-surface-2, #1e2235) 54%, transparent);
+  color: var(--color-text);
+  cursor: pointer;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  transition:
+    border-color var(--duration-fast) ease,
+    background var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-spring);
+}
+
+.support-slack-fallback-toggle:hover {
+  border-color: color-mix(in srgb, var(--color-brand) 38%, var(--color-border));
+  background: color-mix(in srgb, var(--color-surface-2, #1e2235) 68%, transparent);
+}
+
+:root[data-theme="light"] .support-slack-fallback-toggle {
+  background: rgba(248, 250, 252, 0.75);
+}
+
+.support-slack-fallback-chevron {
+  opacity: 0.8;
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+
+.support-slack-fallback-chevron.is-open {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+
+.support-slack-fallback-body {
+  overflow: hidden;
+}
+
+.support-slack-fallback-inner {
+  padding: 10px 2px 0;
 }
 
 .support-slack-url {
