@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Loader2, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "../ui/Button.jsx";
 import {
   deleteWorkspaceAccess,
   fetchWorkspaceAccessList,
@@ -12,6 +12,30 @@ import "./WorkspaceAccessManager.css";
 
 function normEmail(v) {
   return String(v || "").trim().toLowerCase();
+}
+
+function emailInitial(email) {
+  const local = normEmail(email).split("@")[0] || "";
+  return (local[0] || "?").toUpperCase();
+}
+
+function AccessSwitch({ checked, labelOn, labelOff, onChange, disabled, ariaLabel }) {
+  return (
+    <button
+      type="button"
+      className={"ws-switch" + (checked ? " ws-switch--on" : "")}
+      role="switch"
+      aria-checked={checked}
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onClick={onChange}
+    >
+      <span className="ws-switch-track" aria-hidden>
+        <span className="ws-switch-thumb" />
+      </span>
+      <span className="ws-switch-text">{checked ? labelOn : labelOff}</span>
+    </button>
+  );
 }
 
 export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }) {
@@ -44,10 +68,12 @@ export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }
     void refresh();
   }, [refresh]);
 
-  const adminsCount = useMemo(
-    () => rows.reduce((n, r) => n + (r.isWorkspaceAdmin ? 1 : 0), 0),
-    [rows]
-  );
+  const stats = useMemo(() => {
+    const total = rows.length;
+    const admins = rows.filter((r) => r.isWorkspaceAdmin).length;
+    const blocked = rows.filter((r) => !r.accessEnabled).length;
+    return { total, admins, blocked, active: total - blocked };
+  }, [rows]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -56,9 +82,7 @@ export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }
   }, [rows, query]);
 
   const setRow = useCallback((email, patch) => {
-    setRows((prev) =>
-      prev.map((r) => (r.email === email ? { ...r, ...patch } : r))
-    );
+    setRows((prev) => prev.map((r) => (r.email === email ? { ...r, ...patch } : r)));
   }, []);
 
   const save = useCallback(
@@ -71,13 +95,12 @@ export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }
         const next = {
           email: em,
           accessEnabled: patch.accessEnabled ?? existing?.accessEnabled ?? true,
-          isWorkspaceAdmin:
-            patch.isWorkspaceAdmin ?? existing?.isWorkspaceAdmin ?? false,
+          isWorkspaceAdmin: patch.isWorkspaceAdmin ?? existing?.isWorkspaceAdmin ?? false,
         };
         const saved = await upsertWorkspaceAccess(next);
         setRow(em, saved);
       } catch (e) {
-        toast.error("Could not save access", {
+        toast.error("Could not save", {
           description: formatWorkspaceAccessError(e),
           className: "alloc8-toast",
         });
@@ -98,23 +121,23 @@ export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }
 
   const onToggleAdmin = useCallback(
     async (r) => {
-      if (r.isWorkspaceAdmin && adminsCount <= 1) {
+      if (r.isWorkspaceAdmin && stats.admins <= 1) {
         toast.error("At least one admin required", {
-          description: "You can’t remove the last Workspace Admin.",
+          description: "You can’t remove the last workspace admin.",
           className: "alloc8-toast",
         });
         return;
       }
       await save(r.email, { isWorkspaceAdmin: !r.isWorkspaceAdmin });
     },
-    [save, adminsCount]
+    [save, stats.admins]
   );
 
   const onDelete = useCallback(
     async (r) => {
-      if (r.isWorkspaceAdmin && adminsCount <= 1) {
+      if (r.isWorkspaceAdmin && stats.admins <= 1) {
         toast.error("At least one admin required", {
-          description: "You can’t delete the last Workspace Admin.",
+          description: "You can’t remove the last workspace admin.",
           className: "alloc8-toast",
         });
         return;
@@ -124,9 +147,9 @@ export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }
       try {
         await deleteWorkspaceAccess(em);
         setRows((prev) => prev.filter((x) => x.email !== em));
-        toast.success("Removed", { description: em, className: "alloc8-toast" });
+        toast.success("Removed", { className: "alloc8-toast" });
       } catch (e) {
-        toast.error("Could not remove user", {
+        toast.error("Could not remove", {
           description: formatWorkspaceAccessError(e),
           className: "alloc8-toast",
         });
@@ -134,22 +157,19 @@ export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }
         setSavingEmail("");
       }
     },
-    [adminsCount]
+    [stats.admins]
   );
 
   const addDisabled = useMemo(() => {
     const em = normEmail(addEmail);
-    if (!em) return true;
-    if (!isAllowedDeloitteEmail(em)) return true;
-    if (rows.some((r) => r.email === em)) return true;
-    return false;
+    if (!em || !isAllowedDeloitteEmail(em)) return true;
+    return rows.some((r) => r.email === em);
   }, [addEmail, rows]);
 
   const onAdd = useCallback(async () => {
     const em = normEmail(addEmail);
-    if (!em) return;
-    if (!isAllowedDeloitteEmail(em)) {
-      toast.error("Only Deloitte emails allowed", {
+    if (!em || !isAllowedDeloitteEmail(em)) {
+      toast.error("Deloitte email required", {
         description: "Use @deloitte.com or @deloitte.com.au",
         className: "alloc8-toast",
       });
@@ -164,7 +184,7 @@ export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }
       });
       setRows((prev) => [...prev, saved].sort((a, b) => a.email.localeCompare(b.email)));
       setAddEmail("");
-      toast.success("Added", { description: saved.email, className: "alloc8-toast" });
+      toast.success("User added", { className: "alloc8-toast" });
     } catch (e) {
       toast.error("Could not add user", {
         description: formatWorkspaceAccessError(e),
@@ -178,112 +198,183 @@ export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }
 
   if (!isWorkspaceAdmin) return null;
 
+  const isPage = layout === "page";
+  const busy = loading && !loadedOnceRef.current;
+
   return (
-    <div className={"ws-access" + (layout === "page" ? " ws-access--page" : "")}>
-      <div className="ws-access-head">
-        <div className="ws-access-head-left">
-          <p className="ws-access-note">
-            Workspace access is enforced at SSO sign-in. Turn <strong>Access</strong> off to block entry.
-          </p>
-          <p className="ws-access-subnote">
-            Only <strong>@deloitte.com</strong> and <strong>@deloitte.com.au</strong> emails are permitted.
-          </p>
-        </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => void refresh()}
-          disabled={loading}
-        >
-          Refresh
-        </Button>
-      </div>
+    <section
+      className={"ws-access" + (isPage ? " ws-access--page" : "")}
+      aria-label="Workspace access management"
+    >
+      {layout === "embedded" ? (
+        <p className="ws-access-embedded-note">
+          Only Deloitte domains. Access is enforced at SSO sign-in.
+        </p>
+      ) : null}
 
       <div className="ws-access-toolbar">
-        <input
-          className="ws-access-input"
-          placeholder="Search email…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <div className="ws-access-add">
+        <div className="ws-access-search">
+          <Search className="ws-access-search-icon" size={16} strokeWidth={2} aria-hidden />
           <input
             className="ws-access-input"
-            placeholder="Add Deloitte email…"
+            type="search"
+            placeholder="Search by email"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Search users"
+          />
+        </div>
+
+        <form
+          className="ws-access-add"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!addDisabled && !loading) void onAdd();
+          }}
+        >
+          <input
+            className="ws-access-input"
+            type="email"
+            placeholder="name@deloitte.com.au"
             value={addEmail}
             onChange={(e) => setAddEmail(e.target.value)}
-            inputMode="email"
-            autoComplete="email"
+            autoComplete="off"
+            aria-label="Add Deloitte email"
           />
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => void onAdd()}
+          <button
+            type="submit"
+            className="ws-access-btn ws-access-btn--primary"
             disabled={addDisabled || savingEmail !== "" || loading}
           >
+            <Plus size={16} strokeWidth={2.25} aria-hidden />
             Add
-          </Button>
-        </div>
+          </button>
+        </form>
+
+        <button
+          type="button"
+          className="ws-access-btn ws-access-btn--icon"
+          onClick={() => void refresh()}
+          disabled={loading}
+          aria-label="Refresh list"
+          title="Refresh"
+        >
+          <RefreshCw size={16} strokeWidth={2} className={loading ? "ws-spin" : ""} aria-hidden />
+        </button>
       </div>
 
-      <div className="ws-access-meta">
-        <span>
-          {loading && !loadedOnceRef.current ? "Loading…" : `${filtered.length} shown / ${rows.length} total`}
+      <div className="ws-access-stats" aria-label="Summary">
+        <span className="ws-stat">
+          <span className="ws-stat-value">{busy ? "—" : stats.total}</span>
+          <span className="ws-stat-label">Total</span>
         </span>
-        <span>{`${adminsCount} admin${adminsCount === 1 ? "" : "s"}`}</span>
+        <span className="ws-stat">
+          <span className="ws-stat-value">{busy ? "—" : stats.active}</span>
+          <span className="ws-stat-label">Allowed</span>
+        </span>
+        <span className="ws-stat">
+          <span className="ws-stat-value">{busy ? "—" : stats.blocked}</span>
+          <span className="ws-stat-label">Blocked</span>
+        </span>
+        <span className="ws-stat">
+          <span className="ws-stat-value">{busy ? "—" : stats.admins}</span>
+          <span className="ws-stat-label">Admins</span>
+        </span>
       </div>
 
-      <div className="ws-access-list" role="list" aria-label="Workspace access list">
-        {filtered.map((r) => {
-          const busy = savingEmail === r.email;
-          const accessLabel = r.accessEnabled ? "Yes" : "No";
-          const adminLabel = r.isWorkspaceAdmin ? "Yes" : "No";
-          return (
-            <div key={r.email} className="ws-access-row" role="listitem">
-              <div className="ws-access-email">{r.email}</div>
-              <div className="ws-access-actions">
-                <div className="ws-access-toggle" role="group" aria-label={`Access for ${r.email}`}>
-                  <button
-                    type="button"
-                    className={"ws-access-toggle-btn" + (!r.accessEnabled ? " ws-access-toggle-btn--active" : "")}
-                    aria-pressed={!r.accessEnabled}
-                    onClick={() => void onToggleAccess(r)}
-                    disabled={busy || loading}
-                  >
-                    Access: {accessLabel}
-                  </button>
-                </div>
-                <div className="ws-access-toggle" role="group" aria-label={`Admin for ${r.email}`}>
-                  <button
-                    type="button"
-                    className={"ws-access-toggle-btn" + (r.isWorkspaceAdmin ? " ws-access-toggle-btn--active" : "")}
-                    aria-pressed={r.isWorkspaceAdmin}
-                    onClick={() => void onToggleAdmin(r)}
-                    disabled={busy || loading}
-                  >
-                    Admin: {adminLabel}
-                  </button>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void onDelete(r)}
-                  disabled={busy || loading}
-                  className="ws-access-remove"
-                >
-                  Remove
-                </Button>
-              </div>
+      <div className="ws-access-card">
+        <div className="ws-access-table-wrap">
+          <table className="ws-access-table">
+            <thead>
+              <tr>
+                <th scope="col">User</th>
+                <th scope="col">Access</th>
+                <th scope="col">Admin</th>
+                <th scope="col" className="ws-access-th-actions">
+                  <span className="visually-hidden">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {busy ? (
+                <tr>
+                  <td colSpan={4} className="ws-access-loading">
+                    <Loader2 size={20} strokeWidth={2} className="ws-spin" aria-hidden />
+                    Loading users…
+                  </td>
+                </tr>
+              ) : null}
+
+              {!busy &&
+                filtered.map((r) => {
+                  const rowBusy = savingEmail === r.email;
+                  return (
+                    <tr key={r.email} className={rowBusy ? "ws-access-tr--busy" : ""}>
+                      <td>
+                        <div className="ws-user-cell">
+                          <span className="ws-user-avatar" aria-hidden>
+                            {emailInitial(r.email)}
+                          </span>
+                          <div className="ws-user-meta">
+                            <span className="ws-user-email">{r.email}</span>
+                            {r.isWorkspaceAdmin ? (
+                              <span className="ws-user-badge">Workspace admin</span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <AccessSwitch
+                          checked={r.accessEnabled}
+                          labelOn="Allowed"
+                          labelOff="Blocked"
+                          ariaLabel={`Access for ${r.email}`}
+                          disabled={rowBusy || loading}
+                          onChange={() => void onToggleAccess(r)}
+                        />
+                      </td>
+                      <td>
+                        <AccessSwitch
+                          checked={r.isWorkspaceAdmin}
+                          labelOn="Admin"
+                          labelOff="Member"
+                          ariaLabel={`Admin role for ${r.email}`}
+                          disabled={rowBusy || loading}
+                          onChange={() => void onToggleAdmin(r)}
+                        />
+                      </td>
+                      <td className="ws-access-td-actions">
+                        <button
+                          type="button"
+                          className="ws-access-btn ws-access-btn--ghost ws-access-btn--icon"
+                          onClick={() => void onDelete(r)}
+                          disabled={rowBusy || loading}
+                          aria-label={`Remove ${r.email}`}
+                          title="Remove"
+                        >
+                          <Trash2 size={15} strokeWidth={2} aria-hidden />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+
+          {!busy && filtered.length === 0 ? (
+            <div className="ws-access-empty">
+              <p>No users match your search.</p>
+              <p className="ws-access-empty-hint">Add a Deloitte email above to allow sign-in.</p>
             </div>
-          );
-        })}
-        {!loading && filtered.length === 0 ? (
-          <div className="ws-access-empty">
-            No matches. Try clearing search or adding a user.
-          </div>
+          ) : null}
+        </div>
+
+        {!busy && filtered.length > 0 ? (
+          <footer className="ws-access-footer">
+            Showing {filtered.length} of {rows.length}
+          </footer>
         ) : null}
       </div>
-    </div>
+    </section>
   );
 }
-
