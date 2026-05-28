@@ -10,6 +10,7 @@ import {
 import { toast } from "sonner";
 import { isSupabaseConfigured, supabase } from "../lib/supabase.js";
 import { isSessionExpired, withSessionExpiry } from "../lib/auth/sessionPolicy.js";
+import { logSsoSignInEvent } from "../lib/auth/authEventLog.js";
 
 /** Browser gate flag (localStorage survives restarts — sessionStorage did not). */
 const STORAGE_KEY = "float_auth_session";
@@ -28,6 +29,29 @@ const LEGACY_PROFILE = "float_auth_profile";
 const loginSkipAuth = import.meta.env.VITE_LOGIN_SKIP_AUTH === "true";
 
 const SESSION_CHECK_MS = 30_000;
+
+function normalizeEmail(v) {
+  return String(v || "").trim().toLowerCase();
+}
+
+async function fetchWorkspaceAccessByEmail(email) {
+  try {
+    if (!isSupabaseConfigured || !supabase) return { ok: true, isWorkspaceAdmin: false };
+    const em = normalizeEmail(email);
+    if (!em) return { ok: false, reason: "missing-email", isWorkspaceAdmin: false };
+    const { data, error } = await supabase
+      .from("workspace_access")
+      .select("access_enabled,is_workspace_admin")
+      .eq("email", em)
+      .maybeSingle();
+    if (error) return { ok: false, reason: "query-failed", isWorkspaceAdmin: false };
+    if (!data) return { ok: false, reason: "not-allowlisted", isWorkspaceAdmin: false };
+    if (data.access_enabled !== true) return { ok: false, reason: "disabled", isWorkspaceAdmin: false };
+    return { ok: true, isWorkspaceAdmin: data.is_workspace_admin === true };
+  } catch {
+    return { ok: false, reason: "query-failed", isWorkspaceAdmin: false };
+  }
+}
 
 function migrateLegacySessionStorageMirrorsOnce() {
   if (typeof window === "undefined" || typeof localStorage === "undefined") return;
@@ -177,6 +201,14 @@ export function AuthProvider({ children }) {
     return { displayName: "" };
   });
 
+  const [workspaceAccess, setWorkspaceAccess] = useState(() => ({
+    email: "",
+    isWorkspaceAdmin: false,
+  }));
+
+  /** Set when SSO succeeds but workspace allowlist denies entry. */
+  const [accessDenied, setAccessDenied] = useState(null);
+
   const [ok, setOk] = useState(() => {
     if (loginSkipAuth) return true;
     try {
@@ -197,6 +229,8 @@ export function AuthProvider({ children }) {
         /* ignore */
       }
       clearStoredGate();
+      setAccessDenied(null);
+      setWorkspaceAccess({ email: "", isWorkspaceAdmin: false });
       setSessionProfileState({ displayName: "" });
       setOk(false);
       if (reason === "expired" && !expiryToastShownRef.current) {
@@ -213,6 +247,11 @@ export function AuthProvider({ children }) {
     const displayNameRaw =
       typeof opts?.displayName === "string" ? opts.displayName.trim() : "";
     const refreshExpiry = opts?.refreshExpiry !== false;
+
+    // Password gate: treat as Workspace Admin locally (no Supabase user).
+    if (Object.prototype.hasOwnProperty.call(opts ?? {}, "userSub") && opts.userSub === null) {
+      setWorkspaceAccess({ email: "", isWorkspaceAdmin: true });
+    }
 
     /** @type {SessionProfileMirror} */
     let next = readSessionProfileMirror();
@@ -234,8 +273,33 @@ export function AuthProvider({ children }) {
       /* ignore */
     }
     expiryToastShownRef.current = false;
+    setAccessDenied(null);
     setSessionProfileState({ displayName: nextProfile.displayName });
     setOk(true);
+  }, []);
+
+  const clearAccessDenied = useCallback(() => {
+    setAccessDenied(null);
+  }, []);
+
+  const denySsoAccess = useCallback((reason, email) => {
+    void (async () => {
+      try {
+        if (isSupabaseConfigured && supabase) {
+          await supabase.auth.signOut();
+        }
+      } catch {
+        /* ignore */
+      }
+      clearStoredGate();
+      setWorkspaceAccess({ email: "", isWorkspaceAdmin: false });
+      setSessionProfileState({ displayName: "" });
+      setOk(false);
+      setAccessDenied({
+        reason: reason || "query-failed",
+        email: normalizeEmail(email),
+      });
+    })();
   }, []);
 
   /** Drop stale gate flag when session TTL passed (filters in other keys are kept). */
@@ -278,10 +342,12 @@ export function AuthProvider({ children }) {
         if (isPasswordWorkspaceGate()) {
           const mirror = readSessionProfileMirror();
           setSessionProfileState({ displayName: mirror.displayName });
+          setWorkspaceAccess({ email: "", isWorkspaceAdmin: false });
           setOk(true);
           return;
         }
         clearStoredGate();
+        setWorkspaceAccess({ email: "", isWorkspaceAdmin: false });
         setSessionProfileState({ displayName: "" });
         setOk(false);
         return;
@@ -290,10 +356,13 @@ export function AuthProvider({ children }) {
       const id = typeof u.id === "string" && u.id.trim() ? u.id.trim() : null;
       if (!id) {
         clearStoredGate();
+        setWorkspaceAccess({ email: "", isWorkspaceAdmin: false });
         setSessionProfileState({ displayName: "" });
         setOk(false);
         return;
       }
+
+      const email = typeof u.email === "string" ? u.email : "";
 
       const stale = readSessionProfileMirror();
       if (
@@ -304,17 +373,30 @@ export function AuthProvider({ children }) {
         clearStoredGate();
       }
 
-      unlock({
-        displayName: displayNameFromSupabaseUser(u),
-        userSub: id,
-        refreshExpiry,
-      });
+      void (async () => {
+        const access = await fetchWorkspaceAccessByEmail(email);
+        if (!access.ok) {
+          denySsoAccess(access.reason, email);
+          return;
+        }
+        setWorkspaceAccess({ email: normalizeEmail(email), isWorkspaceAdmin: access.isWorkspaceAdmin });
+        unlock({
+          displayName: displayNameFromSupabaseUser(u),
+          userSub: id,
+          refreshExpiry,
+        });
+      })();
     };
 
     let unsub;
     try {
       const result = supabase.auth.onAuthStateChange((event, session) => {
         if (event === "SIGNED_IN") {
+          try {
+            void logSsoSignInEvent(session?.user ?? null);
+          } catch {
+            /* ignore */
+          }
           hydrateFromSession(session ?? null, { refreshExpiry: true });
           return;
         }
@@ -331,6 +413,8 @@ export function AuthProvider({ children }) {
         }
         if (event === "SIGNED_OUT") {
           clearStoredGate();
+          setAccessDenied(null);
+          setWorkspaceAccess({ email: "", isWorkspaceAdmin: false });
           setSessionProfileState({ displayName: "" });
           setOk(false);
           return;
@@ -390,8 +474,21 @@ export function AuthProvider({ children }) {
       unlock,
       lock,
       sessionDisplayName: sessionProfile.displayName,
+      workspaceEmail: workspaceAccess.email,
+      isWorkspaceAdmin: workspaceAccess.isWorkspaceAdmin,
+      accessDenied,
+      clearAccessDenied,
     }),
-    [ok, unlock, lock, sessionProfile.displayName]
+    [
+      ok,
+      unlock,
+      lock,
+      sessionProfile.displayName,
+      workspaceAccess.email,
+      workspaceAccess.isWorkspaceAdmin,
+      accessDenied,
+      clearAccessDenied,
+    ]
   );
 
   return (

@@ -1,0 +1,221 @@
+.ws-access {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ws-access--page .ws-access-list {
+  max-height: min(62vh, 640px);
+  overflow: auto;
+}
+
+.ws-access--page .ws-access-head-note-compact {
+  display: none;
+}
+
+.ws-access-head {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.ws-access-note {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: #cbd5e1;
+  max-width: 70ch;
+}
+
+:root[data-theme="light"] .ws-access-note {
+  color: #334155;
+}
+
+.ws-access-subnote {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #94a3b8;
+}
+
+:root[data-theme="light"] .ws-access-subnote {
+  color: #64748b;
+}
+
+.ws-access-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ws-access-add {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.ws-access-input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+:root[data-theme="light"] .ws-access-input {
+  border-color: rgba(15, 23, 42, 0.14);
+  background: #eef2f7;
+}
+
+.ws-access-input:focus {
+  border-color: color-mix(in srgb, var(--color-brand, #4f46e5) 45%, rgba(255, 255, 255, 0.16));
+  background: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="light"] .ws-access-input:focus {
+  background: #fff;
+}
+
+.ws-access-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: #94a3b8;
+}
+
+:root[data-theme="light"] .ws-access-meta {
+  color: #64748b;
+}
+
+.ws-access-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+:root[data-theme="light"] .ws-access-list {
+  border-color: rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.ws-access-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: 10px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+:root[data-theme="light"] .ws-access-row {
+  border-color: rgba(15, 23, 42, 0.08);
+  background: #f8fafc;
+}
+
+.ws-access-email {
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  color: #e2e8f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+:root[data-theme="light"] .ws-access-email {
+  color: #0f172a;
+}
+
+.ws-access-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.ws-access-toggle-btn {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+:root[data-theme="light"] .ws-access-toggle-btn {
+  border-color: rgba(15, 23, 42, 0.14);
+  background: #eef2f7;
+  color: #475569;
+}
+
+.ws-access-toggle-btn:hover {
+  color: #e2e8f0;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+:root[data-theme="light"] .ws-access-toggle-btn:hover {
+  color: #0f172a;
+}
+
+.ws-access-toggle-btn--active {
+  color: #f8fafc !important;
+  background: rgba(99, 102, 241, 0.45) !important;
+  border-color: rgba(129, 140, 248, 0.35) !important;
+}
+
+:root[data-theme="light"] .ws-access-toggle-btn--active {
+  background: linear-gradient(165deg, #4f46e5 0%, #4338ca 100%) !important;
+  color: #fff !important;
+  border-color: rgba(67, 56, 202, 0.25) !important;
+}
+
+.ws-access-remove {
+  opacity: 0.9;
+}
+
+.ws-access-empty {
+  padding: 14px 12px;
+  font-size: 13px;
+  font-weight: 650;
+  color: #94a3b8;
+}
+
+:root[data-theme="light"] .ws-access-empty {
+  color: #64748b;
+}
+
+@media (max-width: 720px) {
+  .ws-access-row {
+    grid-template-columns: 1fr;
+  }
+  .ws-access-actions {
+    justify-content: flex-start;
+  }
+}
+

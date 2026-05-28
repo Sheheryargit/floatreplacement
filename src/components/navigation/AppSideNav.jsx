@@ -5,6 +5,7 @@ import {
   Users,
   FolderOpen,
   BarChart3,
+  KeyRound,
   Settings,
   HelpCircle,
   ChevronLeft,
@@ -38,7 +39,7 @@ function AppSideNav() {
   const { openDialog } = useAppDialog();
   const { triggerSlap } = useSlapAnimation();
   const { theme } = useAppTheme();
-  const { sessionDisplayName } = useAuth();
+  const { sessionDisplayName, isWorkspaceAdmin } = useAuth();
   const avatarLetter =
     initialsFromDisplayName(sessionDisplayName) || "?";
 
@@ -184,6 +185,18 @@ function AppSideNav() {
       <div className="app-sidenav-spacer" />
 
       <div className="app-sidenav-footer" role="group" aria-label="Account and help">
+        {isWorkspaceAdmin ? (
+          <NavLink
+            to="/access"
+            className={({ isActive }) =>
+              "app-sidenav-foot-btn" + (isActive ? " app-sidenav-foot-btn--active" : "")
+            }
+            title="Workspace access"
+          >
+            <KeyRound size={18} strokeWidth={1.9} aria-hidden />
+            {!collapsed && <span className="app-sidenav-foot-label">Access</span>}
+          </NavLink>
+        ) : null}
         <NavLink
           to="/settings"
           className={({ isActive }) =>

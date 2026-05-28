@@ -13,6 +13,7 @@ import AnimatedAppLoader from "./components/ui/AnimatedAppLoader.jsx";
 import RouteSkeleton from "./components/ui/RouteSkeleton.jsx";
 import { isStaticUi } from "./config/uiMode.js";
 import LoginPage from "./pages/LoginPage.jsx";
+import AccessDeniedPage from "./pages/AccessDeniedPage.jsx";
 import { SsoPersonProfileSync } from "./components/auth/SsoPersonProfileSync.jsx";
 import { VercelAnalytics } from "./components/analytics/VercelAnalytics.jsx";
 import GlobalBackground from "./components/ui/GlobalBackground.jsx";
@@ -37,6 +38,7 @@ const ProjectsPage = lazy(() => import("./pages/ProjectsPage.jsx"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage.jsx"));
 const ReportingPage = lazy(() => import("./pages/ReportingPage.jsx"));
 const DepartmentDashboardPage = lazy(() => import("./pages/DepartmentDashboardPage.jsx"));
+const AccessPage = lazy(() => import("./pages/AccessPage.jsx"));
 
 const workspaceRoutes = [
   { path: "/", element: <LandingPage /> },
@@ -44,6 +46,7 @@ const workspaceRoutes = [
   { path: "/projects", element: <ProjectsPage /> },
   { path: "/report", element: <ReportingPage /> },
   { path: "/dept-dashboard", element: <DepartmentDashboardPage /> },
+  { path: "/access", element: <AccessPage /> },
   { path: "/settings", element: <SettingsPage /> },
   { path: "*", element: <Navigate to="/" replace /> },
 ];
@@ -109,7 +112,16 @@ function SkipToMainLink() {
 }
 
 function AuthGate() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, accessDenied } = useAuth();
+  if (accessDenied) {
+    return (
+      <>
+        <SkipToMainLink />
+        <AccessDeniedPage />
+        <ThemedToaster />
+      </>
+    );
+  }
   if (!isAuthenticated) {
     return (
       <>

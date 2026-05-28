@@ -1,0 +1,308 @@
+/* Access denied — matches LoginPage Deloitte / Alloc8 shell */
+
+.access-denied-page {
+  --ad-green: #86bc25;
+  --ad-green-soft: rgba(134, 188, 37, 0.14);
+  --ad-amber: #f59e0b;
+  --ad-amber-soft: rgba(245, 158, 11, 0.14);
+  --ad-glass: rgba(255, 255, 255, 0.66);
+  --ad-glass-dark: rgba(17, 24, 39, 0.62);
+  --ad-border: color-mix(in srgb, var(--color-border) 88%, #cbd5e1);
+  --ad-surface: var(--color-surface);
+  --ad-text: var(--color-text);
+  --ad-muted: var(--color-muted);
+
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding:
+    max(20px, env(safe-area-inset-top, 0px))
+    max(24px, env(safe-area-inset-right, 0px))
+    max(20px, env(safe-area-inset-bottom, 0px))
+    max(24px, env(safe-area-inset-left, 0px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  font-family: var(--font-body);
+  color: var(--ad-text);
+}
+
+.access-denied-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--ad-surface);
+}
+
+.access-denied-page[data-theme="light"] .access-denied-bg {
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 48%, #eef2f6 100%);
+}
+
+.access-denied-page[data-theme="dark"] .access-denied-bg {
+  background: linear-gradient(180deg, #0b0e14 0%, #0f131c 50%, #0b0e14 100%);
+}
+
+.access-denied-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 520px at 18% 18%, rgba(245, 158, 11, 0.14), transparent 55%),
+    radial-gradient(840px 520px at 92% 12%, rgba(134, 188, 37, 0.1), transparent 55%),
+    radial-gradient(720px 520px at 55% 96%, rgba(239, 68, 68, 0.08), transparent 55%);
+  opacity: 0.9;
+  animation: adGlowFloat 18s ease-in-out infinite;
+}
+
+@keyframes adGlowFloat {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translate3d(0, -1%, 0) scale(1.02);
+    opacity: 1;
+  }
+}
+
+.access-denied-page[data-theme="light"] .access-denied-bg::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--ad-amber) 0%, var(--ad-green) 100%);
+}
+
+.access-denied-header {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: 1120px;
+  width: 100%;
+  margin: 0 auto 32px;
+}
+
+.access-denied-deloitte-logo {
+  display: block;
+  height: 28px;
+  width: auto;
+  object-fit: contain;
+}
+
+.access-denied-deloitte-wordmark {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.access-denied-deloitte-dot {
+  color: var(--ad-green);
+}
+
+.access-denied-header-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--ad-border);
+}
+
+.access-denied-header-product {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.access-denied-eight {
+  color: var(--ad-green);
+}
+
+.access-denied-main {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 12px 0 40px;
+}
+
+.access-denied-card {
+  width: min(100%, 520px);
+  padding: clamp(28px, 4vw, 40px);
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--ad-border) 75%, transparent);
+  background: color-mix(in srgb, var(--ad-glass) 72%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 24px 64px rgba(15, 23, 42, 0.14);
+  text-align: center;
+}
+
+.access-denied-page[data-theme="dark"] .access-denied-card {
+  background: color-mix(in srgb, var(--ad-glass-dark) 78%, transparent);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 28px 72px rgba(0, 0, 0, 0.45);
+}
+
+.access-denied-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 18px;
+  border-radius: 20px;
+  color: #fbbf24;
+  background: var(--ad-amber-soft);
+  border: 1px solid color-mix(in srgb, #f59e0b 35%, transparent);
+  box-shadow: 0 0 40px rgba(245, 158, 11, 0.12);
+}
+
+.access-denied-eyebrow {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ad-muted);
+}
+
+.access-denied-title {
+  margin: 0 0 12px;
+  font-size: clamp(1.55rem, 3.5vw, 1.85rem);
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.access-denied-lead {
+  margin: 0 0 10px;
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: var(--ad-muted);
+}
+
+.access-denied-detail {
+  margin: 0 0 22px;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--ad-muted) 92%, var(--ad-text));
+  max-width: 42ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.access-denied-email-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 auto 24px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: var(--ad-text);
+  background: color-mix(in srgb, var(--ad-green-soft) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ad-green) 28%, transparent);
+}
+
+.access-denied-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.access-denied-primary,
+.access-denied-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 18px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.access-denied-primary {
+  border: none;
+  color: #0f172a;
+  background: linear-gradient(165deg, #9ed63a 0%, var(--ad-green) 55%, #6b961e 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.35) inset,
+    0 10px 28px rgba(134, 188, 37, 0.28);
+}
+
+.access-denied-primary:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.4) inset,
+    0 14px 32px rgba(134, 188, 37, 0.34);
+}
+
+.access-denied-secondary {
+  border: 1px solid var(--ad-border);
+  color: var(--ad-text);
+  background: color-mix(in srgb, var(--ad-glass) 40%, transparent);
+}
+
+.access-denied-page[data-theme="dark"] .access-denied-secondary {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.access-denied-secondary:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--ad-green) 35%, var(--ad-border));
+}
+
+.access-denied-footer {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  max-width: 1120px;
+  width: 100%;
+  margin: 24px auto 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ad-muted);
+}
+
+.access-denied-footer-muted {
+  opacity: 0.85;
+}
+
+@media (max-width: 520px) {
+  .access-denied-header {
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+}
