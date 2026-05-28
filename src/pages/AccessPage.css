@@ -14,8 +14,11 @@
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  background: none;
-  opacity: 0;
+  background:
+    radial-gradient(900px 520px at 12% -10%, color-mix(in srgb, #86bc25 10%, transparent), transparent 56%),
+    radial-gradient(780px 520px at 92% 0%, color-mix(in srgb, #3b82f6 7%, transparent), transparent 54%),
+    radial-gradient(720px 520px at 55% 105%, color-mix(in srgb, #86bc25 6%, transparent), transparent 58%);
+  opacity: 0.95;
 }
 
 .access-page-body {

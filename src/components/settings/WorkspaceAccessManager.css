@@ -5,7 +5,7 @@
   --ws-admin: #3b82f6;
   --ws-admin-soft: color-mix(in srgb, #3b82f6 12%, transparent);
   --ws-admin-border: color-mix(in srgb, #3b82f6 35%, var(--color-border, #1e293b));
-  --ws-surface: color-mix(in srgb, var(--color-surface-2, #111827) 88%, #000);
+  --ws-surface: var(--color-surface-2, #111827);
   --ws-row-hover: color-mix(in srgb, var(--color-text, #fff) 4%, transparent);
   --ws-divider: color-mix(in srgb, var(--color-border, #334155) 70%, transparent);
   display: flex;
@@ -122,13 +122,15 @@
 }
 
 .ws-btn--primary {
-  background: var(--ws-accent);
+  background: linear-gradient(165deg, #9ed63a 0%, var(--ws-accent) 55%, #6b961e 100%);
   color: #0f1419;
-  border-color: color-mix(in srgb, var(--ws-accent) 80%, #000);
+  border-color: color-mix(in srgb, var(--ws-accent) 75%, #000);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--ws-accent) 22%, transparent);
 }
 
 .ws-btn--primary:hover:not(:disabled) {
-  filter: brightness(1.06);
+  filter: brightness(1.02);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--ws-accent) 28%, transparent);
 }
 
 .ws-btn--ghost {
@@ -159,7 +161,7 @@
 .ws-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 
 .ws-metric {
@@ -168,23 +170,51 @@
   align-items: flex-start;
   gap: 2px;
   padding: 14px 16px;
-  border-radius: 10px;
-  border: 1px solid var(--ws-divider);
-  background: transparent;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--ws-divider) 82%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ws-surface) 92%, transparent),
+      color-mix(in srgb, var(--ws-surface) 72%, transparent)
+    );
   color: var(--color-muted);
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  box-shadow:
+    0 1px 0 color-mix(in srgb, #fff 7%, transparent) inset,
+    0 10px 24px rgba(0, 0, 0, 0.08);
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .ws-metric:hover {
-  background: var(--ws-row-hover);
+  transform: translateY(-1px);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ws-surface) 96%, transparent),
+      color-mix(in srgb, var(--ws-surface) 76%, transparent)
+    );
   color: var(--color-text);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, #fff 9%, transparent) inset,
+    0 14px 34px rgba(0, 0, 0, 0.12);
 }
 
 .ws-metric--on {
-  border-color: color-mix(in srgb, var(--ws-accent) 40%, var(--ws-divider));
-  background: color-mix(in srgb, var(--ws-accent) 8%, var(--ws-surface));
+  border-color: color-mix(in srgb, var(--ws-accent) 45%, var(--ws-divider));
+  background:
+    radial-gradient(420px 140px at 16% 0%, color-mix(in srgb, var(--ws-accent) 18%, transparent), transparent 68%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ws-surface) 94%, transparent),
+      color-mix(in srgb, var(--ws-surface) 72%, transparent)
+    );
   color: var(--color-text);
 }
 
@@ -218,6 +248,14 @@
   margin-bottom: 12px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--ws-divider);
+}
+
+.ws-section--admin .ws-table-surface {
+  border-left: 3px solid color-mix(in srgb, var(--ws-admin) 60%, transparent);
+}
+
+.ws-section--member .ws-table-surface {
+  border-left: 3px solid color-mix(in srgb, var(--ws-accent) 45%, transparent);
 }
 
 .ws-section-title-wrap {
