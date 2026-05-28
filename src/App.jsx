@@ -12,6 +12,7 @@ import { AppDataProvider, useAppStore } from "./context/AppDataContext.jsx";
 import AnimatedAppLoader from "./components/ui/AnimatedAppLoader.jsx";
 import RouteSkeleton from "./components/ui/RouteSkeleton.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
+import PendingApprovalPage from "./pages/PendingApprovalPage.jsx";
 import GlobalBackground from "./components/ui/GlobalBackground.jsx";
 import { Toaster } from "sonner";
 import { isStaticUi } from "./config/uiMode.js";
@@ -103,7 +104,7 @@ function SkipToMainLink() {
 }
 
 function AuthGate() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isApproved, rbacProfile, rbacLoading } = useAuth();
   if (!isAuthenticated) {
     return (
       <>
@@ -113,6 +114,25 @@ function AuthGate() {
       </>
     );
   }
+
+  // Still loading RBAC profile from Supabase — show loader, never the workspace
+  if (rbacLoading) {
+    return <AnimatedAppLoader />;
+  }
+
+  // SSO user authenticated but not yet approved by an admin.
+  // rbacProfile: undefined = loading (handled above), null = no SSO session (password gate), object = profile loaded.
+  // Block only when we have an actual profile that isn't approved.
+  if (rbacProfile && !isApproved) {
+    return (
+      <>
+        <SkipToMainLink />
+        <PendingApprovalPage />
+        <ThemedToaster />
+      </>
+    );
+  }
+
   return (
     <>
       <SkipToMainLink />

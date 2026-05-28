@@ -50,6 +50,7 @@ import { PalettePreferenceControl } from "../components/ui/PalettePreferenceCont
 import { CanvasTintPreferenceControl } from "../components/ui/CanvasTintPreferenceControl.jsx";
 import { InviteMemberDialog } from "../components/InviteMemberDialog.jsx";
 import { SettingsSchedulePreview } from "../components/settings/SettingsSchedulePreview.jsx";
+import { AdminPanel } from "../components/settings/AdminPanel.jsx";
 import "./SettingsPage.css";
 
 const APPEARANCE_ICONS = [
@@ -413,6 +414,10 @@ export default function SettingsPage() {
               </button>
             </SettingsItem>
           </div>
+        </section>
+
+        <section className="settings-section" aria-labelledby="settings-admin">
+          <AdminPanel />
         </section>
 
         <section className="settings-section" aria-labelledby="settings-team">

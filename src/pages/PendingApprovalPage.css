@@ -1,0 +1,99 @@
+.pending-approval-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 24px;
+  background: var(--surf, #0c0e14);
+  color: var(--text, #e2e6ef);
+  font-family: "DM Sans", "Segoe UI", system-ui, sans-serif;
+}
+
+.pending-approval-page[data-theme="light"] {
+  background: var(--surf, #f5f6fa);
+  color: var(--text, #1a1d27);
+}
+
+.pending-approval-card {
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+  padding: 48px 36px;
+  border-radius: 20px;
+  background: var(--surf-alt, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.pending-approval-page[data-theme="light"] .pending-approval-card {
+  background: var(--surf-alt, #fff);
+  border-color: var(--border, rgba(0, 0, 0, 0.08));
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+}
+
+.pending-approval-icon {
+  margin: 0 auto 20px;
+  color: var(--text-muted, rgba(255, 255, 255, 0.4));
+}
+
+.pending-approval-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 12px;
+  letter-spacing: -0.02em;
+}
+
+.pending-approval-message {
+  font-size: 14.5px;
+  line-height: 1.6;
+  margin: 0 0 8px;
+  color: var(--text, inherit);
+}
+
+.pending-approval-sub {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0 0 28px;
+  color: var(--text-muted, rgba(255, 255, 255, 0.5));
+}
+
+.pending-approval-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.pending-approval-btn {
+  padding: 10px 24px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  transition: background 0.15s, transform 0.1s;
+}
+
+.pending-approval-btn:active {
+  transform: scale(0.97);
+}
+
+.pending-approval-btn--refresh {
+  background: var(--accent, #4f6ae6);
+  color: #fff;
+  border-color: transparent;
+}
+
+.pending-approval-btn--refresh:hover {
+  background: var(--accent-hover, #5d78f0);
+}
+
+.pending-approval-btn--signout {
+  background: transparent;
+  color: var(--text-muted, rgba(255, 255, 255, 0.5));
+}
+
+.pending-approval-btn--signout:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text, inherit);
+}

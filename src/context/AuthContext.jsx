@@ -7,6 +7,7 @@ import {
   useEffect,
 } from "react";
 import { isSupabaseConfigured, supabase } from "../lib/supabase.js";
+import { fetchMyProfile } from "../lib/api/profiles.js";
 
 /** Browser gate flag (localStorage survives restarts — sessionStorage did not). */
 const STORAGE_KEY = "float_auth_session";
@@ -156,6 +157,12 @@ export function AuthProvider({ children }) {
     }
   });
 
+  // RBAC profile state: undefined = not yet loaded, null = fetch failed / no profile, object = loaded
+  const [rbacProfile, setRbacProfile] = useState(undefined);
+  const isApproved = rbacProfile?.approved === true;
+  const appRole = rbacProfile?.app_role ?? null; // 'admin' | 'manager' | 'team_lead' | 'member' | null
+  const rbacLoading = ok && isSupabaseConfigured && rbacProfile === undefined;
+
   const unlock = useCallback((opts) => {
     const displayNameRaw =
       typeof opts?.displayName === "string" ? opts.displayName.trim() : "";
@@ -191,6 +198,7 @@ export function AuthProvider({ children }) {
       }
       clearStoredGate();
       setSessionProfileState({ displayName: "" });
+      setRbacProfile(undefined);
       setOk(false);
     })();
   }, []);
@@ -202,11 +210,21 @@ export function AuthProvider({ children }) {
     const hydrateFromSession = (session) => {
       const u = session?.user ?? null;
 
-      /** Logged out → clear gate mirror (JWT may already be absent). */
+      /**
+       * No Supabase session.
+       * Only clear the gate if the stored profile has a userSub (SSO user).
+       * Password-gate users (userSub === null) should stay authenticated.
+       */
       if (!u) {
-        clearStoredGate();
-        setSessionProfileState({ displayName: "" });
-        setOk(false);
+        const stored = readSessionProfileMirror();
+        if (stored.userSub) {
+          // SSO user whose session expired / was revoked — kick to login
+          clearStoredGate();
+          setSessionProfileState({ displayName: "" });
+          setOk(false);
+        }
+        // Either way, mark RBAC as resolved (no profile to load)
+        setRbacProfile(null);
         return;
       }
 
@@ -214,6 +232,7 @@ export function AuthProvider({ children }) {
       if (!id) {
         clearStoredGate();
         setSessionProfileState({ displayName: "" });
+        setRbacProfile(null);
         setOk(false);
         return;
       }
@@ -228,6 +247,9 @@ export function AuthProvider({ children }) {
       }
 
       unlock({ displayName: displayNameFromSupabaseUser(u), userSub: id });
+
+      // Fetch RBAC profile now that session is confirmed
+      fetchMyProfile().then((p) => setRbacProfile(p ?? null));
     };
 
     let unsub;
@@ -248,6 +270,7 @@ export function AuthProvider({ children }) {
         if (event === "SIGNED_OUT") {
           clearStoredGate();
           setSessionProfileState({ displayName: "" });
+          setRbacProfile(undefined);
           setOk(false);
           return;
         }
@@ -273,6 +296,31 @@ export function AuthProvider({ children }) {
     };
   }, [loginSkipAuth, unlock]);
 
+  /**
+   * Fallback: resolve rbacProfile for password-gate users.
+   * The main profile fetch lives inside hydrateFromSession (SSO path).
+   * Password logins never trigger an auth event, so rbacProfile stays undefined.
+   * This effect detects that case and sets rbacProfile = null (skip RBAC).
+   */
+  useEffect(() => {
+    if (!ok || !isSupabaseConfigured || rbacProfile !== undefined) return;
+    let canceled = false;
+    supabase.auth.getSession().then(({ data }) => {
+      if (canceled) return;
+      if (data.session) {
+        // Unexpected: SSO session exists but hydrateFromSession didn't fire yet.
+        // Fetch profile as a safety net.
+        fetchMyProfile().then((p) => {
+          if (!canceled) setRbacProfile(p ?? null);
+        });
+      } else {
+        // No SSO session → password-gate login → skip RBAC
+        setRbacProfile(null);
+      }
+    });
+    return () => { canceled = true; };
+  }, [ok, rbacProfile]);
+
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     const params = new URLSearchParams(window.location.search);
@@ -287,8 +335,13 @@ export function AuthProvider({ children }) {
       unlock,
       lock,
       sessionDisplayName: sessionProfile.displayName,
+      // RBAC
+      rbacProfile,
+      rbacLoading,
+      isApproved,
+      appRole,
     }),
-    [ok, unlock, lock, sessionProfile.displayName]
+    [ok, unlock, lock, sessionProfile.displayName, rbacProfile, rbacLoading, isApproved, appRole]
   );
 
   return (
