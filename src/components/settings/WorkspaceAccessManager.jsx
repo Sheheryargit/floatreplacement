@@ -1,5 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import {
+  Crown,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Search,
+  ShieldOff,
+  Trash2,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   deleteWorkspaceAccess,
@@ -19,31 +31,203 @@ function emailInitial(email) {
   return (local[0] || "?").toUpperCase();
 }
 
-function AccessSwitch({ checked, labelOn, labelOff, onChange, disabled, ariaLabel }) {
+function AccessSwitch({ checked, labelOn, labelOff, onChange, disabled, ariaLabel, tone = "default" }) {
   return (
-    <button
+    <motion.button
       type="button"
-      className={"ws-switch" + (checked ? " ws-switch--on" : "")}
+      className={
+        "ws-switch" +
+        (checked ? " ws-switch--on" : "") +
+        (tone === "admin" ? " ws-switch--admin" : "")
+      }
       role="switch"
       aria-checked={checked}
       aria-label={ariaLabel}
       disabled={disabled}
       onClick={onChange}
+      whileTap={disabled ? undefined : { scale: 0.97 }}
     >
       <span className="ws-switch-track" aria-hidden>
         <span className="ws-switch-thumb" />
       </span>
       <span className="ws-switch-text">{checked ? labelOn : labelOff}</span>
-    </button>
+    </motion.button>
   );
 }
 
+function AccessRow({
+  row,
+  rowBusy,
+  loading,
+  reduceMotion,
+  index,
+  variant,
+  onToggleAccess,
+  onToggleAdmin,
+  onDelete,
+}) {
+  return (
+    <motion.tr
+      layout={!reduceMotion}
+      initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+      animate={{ opacity: rowBusy ? 0.5 : 1, y: 0 }}
+      exit={reduceMotion ? undefined : { opacity: 0 }}
+      transition={{ duration: 0.2, delay: reduceMotion ? 0 : Math.min(index * 0.015, 0.12) }}
+      className={
+        "ws-row" +
+        (variant === "admin" ? " ws-row--admin" : " ws-row--member") +
+        (rowBusy ? " ws-row--busy" : "") +
+        (!row.accessEnabled ? " ws-row--blocked" : "")
+      }
+    >
+      <td className="ws-col-user">
+        <div className="ws-user">
+          <span className={"ws-avatar" + (variant === "admin" ? " ws-avatar--admin" : "")} aria-hidden>
+            {emailInitial(row.email)}
+          </span>
+          <div className="ws-user-text">
+            <span className="ws-email">{row.email}</span>
+            <span className="ws-user-sub">
+              {variant === "admin" ? "Workspace administrator" : "Workspace member"}
+            </span>
+          </div>
+        </div>
+      </td>
+      <td className="ws-col-status">
+        <span className={"ws-status" + (row.accessEnabled ? " ws-status--on" : " ws-status--off")}>
+          {row.accessEnabled ? "Allowed" : "Blocked"}
+        </span>
+      </td>
+      <td className="ws-col-access">
+        <AccessSwitch
+          checked={row.accessEnabled}
+          labelOn="Allowed"
+          labelOff="Blocked"
+          ariaLabel={`Access for ${row.email}`}
+          disabled={rowBusy || loading}
+          onChange={() => onToggleAccess(row)}
+        />
+      </td>
+      <td className="ws-col-admin">
+        <AccessSwitch
+          checked={row.isWorkspaceAdmin}
+          labelOn="Admin"
+          labelOff="Standard"
+          tone="admin"
+          ariaLabel={`Administrator for ${row.email}`}
+          disabled={rowBusy || loading}
+          onChange={() => onToggleAdmin(row)}
+        />
+      </td>
+      <td className="ws-col-action">
+        <button
+          type="button"
+          className="ws-icon-btn"
+          onClick={() => onDelete(row)}
+          disabled={rowBusy || loading}
+          aria-label={`Remove ${row.email}`}
+          title="Remove user"
+        >
+          <Trash2 size={16} strokeWidth={1.85} />
+        </button>
+      </td>
+    </motion.tr>
+  );
+}
+
+function AccessSection({
+  variant,
+  title,
+  subtitle,
+  icon: Icon,
+  rows,
+  busy,
+  loading,
+  savingEmail,
+  reduceMotion,
+  onToggleAccess,
+  onToggleAdmin,
+  onDelete,
+}) {
+  if (!busy && rows.length === 0) return null;
+
+  return (
+    <section className={"ws-section ws-section--" + variant} aria-label={title}>
+      <header className="ws-section-head">
+        <div className="ws-section-title-wrap">
+          <span className={"ws-section-icon ws-section-icon--" + variant} aria-hidden>
+            <Icon size={18} strokeWidth={2} />
+          </span>
+          <div>
+            <h2 className="ws-section-title">{title}</h2>
+            <p className="ws-section-sub">{subtitle}</p>
+          </div>
+        </div>
+        <span className="ws-section-count">{busy ? "—" : rows.length}</span>
+      </header>
+
+      <div className="ws-table-surface">
+        <table className="ws-table">
+          <thead>
+            <tr>
+              <th scope="col">User</th>
+              <th scope="col">Status</th>
+              <th scope="col">Access</th>
+              <th scope="col">Administrator</th>
+              <th scope="col" className="ws-th-action">
+                <span className="visually-hidden">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {busy
+              ? Array.from({ length: variant === "admin" ? 2 : 4 }, (_, i) => (
+                  <tr key={`sk-${variant}-${i}`} className="ws-row--skel" aria-hidden>
+                    <td colSpan={5}>
+                      <div className="ws-skel" />
+                    </td>
+                  </tr>
+                ))
+              : null}
+            <AnimatePresence mode="popLayout">
+              {!busy &&
+                rows.map((r, index) => (
+                  <AccessRow
+                    key={r.email}
+                    row={r}
+                    rowBusy={savingEmail === r.email}
+                    loading={loading}
+                    reduceMotion={reduceMotion}
+                    index={index}
+                    variant={variant}
+                    onToggleAccess={onToggleAccess}
+                    onToggleAdmin={onToggleAdmin}
+                    onDelete={onDelete}
+                  />
+                ))}
+            </AnimatePresence>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+const METRICS = [
+  { id: "all", label: "Directory" },
+  { id: "active", label: "Allowed" },
+  { id: "blocked", label: "Blocked" },
+  { id: "admin", label: "Administrators" },
+];
+
 export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }) {
+  const reduceMotion = useReducedMotion();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [savingEmail, setSavingEmail] = useState("");
   const [query, setQuery] = useState("");
   const [addEmail, setAddEmail] = useState("");
+  const [metric, setMetric] = useState("all");
   const loadedOnceRef = useRef(false);
 
   const refresh = useCallback(async () => {
@@ -54,7 +238,7 @@ export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }
       setRows(list);
       loadedOnceRef.current = true;
     } catch (e) {
-      toast.error("Could not load access list", {
+      toast.error("Could not load directory", {
         description: formatWorkspaceAccessError(e),
         className: "alloc8-toast",
         duration: 9000,
@@ -69,17 +253,37 @@ export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }
   }, [refresh]);
 
   const stats = useMemo(() => {
-    const total = rows.length;
-    const admins = rows.filter((r) => r.isWorkspaceAdmin).length;
+    const admins = rows.filter((r) => r.isWorkspaceAdmin);
+    const members = rows.filter((r) => !r.isWorkspaceAdmin);
     const blocked = rows.filter((r) => !r.accessEnabled).length;
-    return { total, admins, blocked, active: total - blocked };
+    return {
+      total: rows.length,
+      admins: admins.length,
+      members: members.length,
+      blocked,
+      active: rows.length - blocked,
+    };
   }, [rows]);
 
   const filtered = useMemo(() => {
+    let list = rows;
+    if (metric === "active") list = list.filter((r) => r.accessEnabled);
+    if (metric === "blocked") list = list.filter((r) => !r.accessEnabled);
+    if (metric === "admin") list = list.filter((r) => r.isWorkspaceAdmin);
     const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => r.email.toLowerCase().includes(q));
-  }, [rows, query]);
+    if (q) list = list.filter((r) => r.email.toLowerCase().includes(q));
+    return list;
+  }, [rows, query, metric]);
+
+  const adminRows = useMemo(
+    () => filtered.filter((r) => r.isWorkspaceAdmin).sort((a, b) => a.email.localeCompare(b.email)),
+    [filtered]
+  );
+
+  const memberRows = useMemo(
+    () => filtered.filter((r) => !r.isWorkspaceAdmin).sort((a, b) => a.email.localeCompare(b.email)),
+    [filtered]
+  );
 
   const setRow = useCallback((email, patch) => {
     setRows((prev) => prev.map((r) => (r.email === email ? { ...r, ...patch } : r)));
@@ -92,15 +296,14 @@ export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }
       setSavingEmail(em);
       try {
         const existing = rows.find((r) => r.email === em);
-        const next = {
+        const saved = await upsertWorkspaceAccess({
           email: em,
           accessEnabled: patch.accessEnabled ?? existing?.accessEnabled ?? true,
           isWorkspaceAdmin: patch.isWorkspaceAdmin ?? existing?.isWorkspaceAdmin ?? false,
-        };
-        const saved = await upsertWorkspaceAccess(next);
+        });
         setRow(em, saved);
       } catch (e) {
-        toast.error("Could not save", {
+        toast.error("Could not save changes", {
           description: formatWorkspaceAccessError(e),
           className: "alloc8-toast",
         });
@@ -112,20 +315,12 @@ export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }
     [rows, refresh, setRow]
   );
 
-  const onToggleAccess = useCallback(
-    async (r) => {
-      await save(r.email, { accessEnabled: !r.accessEnabled });
-    },
-    [save]
-  );
+  const onToggleAccess = useCallback((r) => save(r.email, { accessEnabled: !r.accessEnabled }), [save]);
 
   const onToggleAdmin = useCallback(
     async (r) => {
       if (r.isWorkspaceAdmin && stats.admins <= 1) {
-        toast.error("At least one admin required", {
-          description: "You can’t remove the last workspace admin.",
-          className: "alloc8-toast",
-        });
+        toast.error("At least one administrator is required", { className: "alloc8-toast" });
         return;
       }
       await save(r.email, { isWorkspaceAdmin: !r.isWorkspaceAdmin });
@@ -136,10 +331,7 @@ export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }
   const onDelete = useCallback(
     async (r) => {
       if (r.isWorkspaceAdmin && stats.admins <= 1) {
-        toast.error("At least one admin required", {
-          description: "You can’t remove the last workspace admin.",
-          className: "alloc8-toast",
-        });
+        toast.error("At least one administrator is required", { className: "alloc8-toast" });
         return;
       }
       const em = normEmail(r.email);
@@ -147,9 +339,9 @@ export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }
       try {
         await deleteWorkspaceAccess(em);
         setRows((prev) => prev.filter((x) => x.email !== em));
-        toast.success("Removed", { className: "alloc8-toast" });
+        toast.success("User removed", { className: "alloc8-toast" });
       } catch (e) {
-        toast.error("Could not remove", {
+        toast.error("Could not remove user", {
           description: formatWorkspaceAccessError(e),
           className: "alloc8-toast",
         });
@@ -169,10 +361,7 @@ export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }
   const onAdd = useCallback(async () => {
     const em = normEmail(addEmail);
     if (!em || !isAllowedDeloitteEmail(em)) {
-      toast.error("Deloitte email required", {
-        description: "Use @deloitte.com or @deloitte.com.au",
-        className: "alloc8-toast",
-      });
+      toast.error("Deloitte email required", { className: "alloc8-toast" });
       return;
     }
     setSavingEmail(em);
@@ -184,7 +373,7 @@ export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }
       });
       setRows((prev) => [...prev, saved].sort((a, b) => a.email.localeCompare(b.email)));
       setAddEmail("");
-      toast.success("User added", { className: "alloc8-toast" });
+      toast.success("User added to directory", { className: "alloc8-toast" });
     } catch (e) {
       toast.error("Could not add user", {
         description: formatWorkspaceAccessError(e),
@@ -198,183 +387,151 @@ export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }
 
   if (!isWorkspaceAdmin) return null;
 
-  const isPage = layout === "page";
   const busy = loading && !loadedOnceRef.current;
+  const isPage = layout === "page";
+  const showAdmins = metric !== "admin" || adminRows.length > 0;
+  const showMembers = metric !== "admin";
+  const empty = !busy && filtered.length === 0;
+
+  const metricCounts = {
+    all: stats.total,
+    active: stats.active,
+    blocked: stats.blocked,
+    admin: stats.admins,
+  };
 
   return (
-    <section
-      className={"ws-access" + (isPage ? " ws-access--page" : "")}
-      aria-label="Workspace access management"
-    >
-      {layout === "embedded" ? (
-        <p className="ws-access-embedded-note">
-          Only Deloitte domains. Access is enforced at SSO sign-in.
-        </p>
-      ) : null}
-
-      <div className="ws-access-toolbar">
-        <div className="ws-access-search">
-          <Search className="ws-access-search-icon" size={16} strokeWidth={2} aria-hidden />
+    <div className={"ws-access" + (isPage ? " ws-access--page" : "")}>
+      <div className="ws-command-bar">
+        <div className="ws-command-search">
+          <Search size={17} strokeWidth={2} aria-hidden />
           <input
-            className="ws-access-input"
             type="search"
-            placeholder="Search by email"
+            placeholder="Search directory…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             aria-label="Search users"
           />
+          {query ? (
+            <button type="button" className="ws-clear" onClick={() => setQuery("")} aria-label="Clear search">
+              <X size={14} />
+            </button>
+          ) : null}
         </div>
-
         <form
-          className="ws-access-add"
+          className="ws-command-add"
           onSubmit={(e) => {
             e.preventDefault();
             if (!addDisabled && !loading) void onAdd();
           }}
         >
           <input
-            className="ws-access-input"
             type="email"
-            placeholder="name@deloitte.com.au"
+            placeholder="Add Deloitte email"
             value={addEmail}
             onChange={(e) => setAddEmail(e.target.value)}
-            autoComplete="off"
-            aria-label="Add Deloitte email"
+            aria-label="Add user email"
           />
-          <button
-            type="submit"
-            className="ws-access-btn ws-access-btn--primary"
-            disabled={addDisabled || savingEmail !== "" || loading}
-          >
-            <Plus size={16} strokeWidth={2.25} aria-hidden />
-            Add
+          <button type="submit" className="ws-btn ws-btn--primary" disabled={addDisabled || loading}>
+            <Plus size={16} strokeWidth={2.25} />
+            Add user
           </button>
         </form>
-
         <button
           type="button"
-          className="ws-access-btn ws-access-btn--icon"
+          className="ws-btn ws-btn--ghost"
           onClick={() => void refresh()}
           disabled={loading}
-          aria-label="Refresh list"
-          title="Refresh"
+          aria-label="Refresh"
         >
-          <RefreshCw size={16} strokeWidth={2} className={loading ? "ws-spin" : ""} aria-hidden />
+          <RefreshCw size={16} className={loading ? "ws-spin" : ""} />
         </button>
       </div>
 
-      <div className="ws-access-stats" aria-label="Summary">
-        <span className="ws-stat">
-          <span className="ws-stat-value">{busy ? "—" : stats.total}</span>
-          <span className="ws-stat-label">Total</span>
-        </span>
-        <span className="ws-stat">
-          <span className="ws-stat-value">{busy ? "—" : stats.active}</span>
-          <span className="ws-stat-label">Allowed</span>
-        </span>
-        <span className="ws-stat">
-          <span className="ws-stat-value">{busy ? "—" : stats.blocked}</span>
-          <span className="ws-stat-label">Blocked</span>
-        </span>
-        <span className="ws-stat">
-          <span className="ws-stat-value">{busy ? "—" : stats.admins}</span>
-          <span className="ws-stat-label">Admins</span>
-        </span>
+      <div className="ws-metrics" role="tablist" aria-label="Directory filters">
+        {METRICS.map(({ id, label }) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={metric === id}
+            className={"ws-metric" + (metric === id ? " ws-metric--on" : "")}
+            onClick={() => setMetric(id)}
+          >
+            <span className="ws-metric-num">{busy ? "—" : metricCounts[id]}</span>
+            <span className="ws-metric-label">{label}</span>
+          </button>
+        ))}
       </div>
 
-      <div className="ws-access-card">
-        <div className="ws-access-table-wrap">
-          <table className="ws-access-table">
-            <thead>
-              <tr>
-                <th scope="col">User</th>
-                <th scope="col">Access</th>
-                <th scope="col">Admin</th>
-                <th scope="col" className="ws-access-th-actions">
-                  <span className="visually-hidden">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {busy ? (
-                <tr>
-                  <td colSpan={4} className="ws-access-loading">
-                    <Loader2 size={20} strokeWidth={2} className="ws-spin" aria-hidden />
-                    Loading users…
-                  </td>
-                </tr>
-              ) : null}
+      <div className="ws-directory">
+        {showAdmins ? (
+          <AccessSection
+            variant="admin"
+            title="Workspace administrators"
+            subtitle="Full control over access policy and user directory"
+            icon={Crown}
+            rows={adminRows}
+            busy={busy}
+            loading={loading}
+            savingEmail={savingEmail}
+            reduceMotion={reduceMotion}
+            onToggleAccess={onToggleAccess}
+            onToggleAdmin={onToggleAdmin}
+            onDelete={onDelete}
+          />
+        ) : null}
 
-              {!busy &&
-                filtered.map((r) => {
-                  const rowBusy = savingEmail === r.email;
-                  return (
-                    <tr key={r.email} className={rowBusy ? "ws-access-tr--busy" : ""}>
-                      <td>
-                        <div className="ws-user-cell">
-                          <span className="ws-user-avatar" aria-hidden>
-                            {emailInitial(r.email)}
-                          </span>
-                          <div className="ws-user-meta">
-                            <span className="ws-user-email">{r.email}</span>
-                            {r.isWorkspaceAdmin ? (
-                              <span className="ws-user-badge">Workspace admin</span>
-                            ) : null}
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <AccessSwitch
-                          checked={r.accessEnabled}
-                          labelOn="Allowed"
-                          labelOff="Blocked"
-                          ariaLabel={`Access for ${r.email}`}
-                          disabled={rowBusy || loading}
-                          onChange={() => void onToggleAccess(r)}
-                        />
-                      </td>
-                      <td>
-                        <AccessSwitch
-                          checked={r.isWorkspaceAdmin}
-                          labelOn="Admin"
-                          labelOff="Member"
-                          ariaLabel={`Admin role for ${r.email}`}
-                          disabled={rowBusy || loading}
-                          onChange={() => void onToggleAdmin(r)}
-                        />
-                      </td>
-                      <td className="ws-access-td-actions">
-                        <button
-                          type="button"
-                          className="ws-access-btn ws-access-btn--ghost ws-access-btn--icon"
-                          onClick={() => void onDelete(r)}
-                          disabled={rowBusy || loading}
-                          aria-label={`Remove ${r.email}`}
-                          title="Remove"
-                        >
-                          <Trash2 size={15} strokeWidth={2} aria-hidden />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-            </tbody>
-          </table>
+        {showMembers ? (
+          <AccessSection
+            variant="member"
+            title="Members"
+            subtitle="Standard users with SSO access to the workspace"
+            icon={Users}
+            rows={memberRows}
+            busy={busy}
+            loading={loading}
+            savingEmail={savingEmail}
+            reduceMotion={reduceMotion}
+            onToggleAccess={onToggleAccess}
+            onToggleAdmin={onToggleAdmin}
+            onDelete={onDelete}
+          />
+        ) : null}
 
-          {!busy && filtered.length === 0 ? (
-            <div className="ws-access-empty">
-              <p>No users match your search.</p>
-              <p className="ws-access-empty-hint">Add a Deloitte email above to allow sign-in.</p>
+        {empty ? (
+          <div className="ws-empty">
+            <div className="ws-empty-icon">
+              {metric === "blocked" ? <ShieldOff size={26} /> : <UserPlus size={26} />}
             </div>
-          ) : null}
-        </div>
-
-        {!busy && filtered.length > 0 ? (
-          <footer className="ws-access-footer">
-            Showing {filtered.length} of {rows.length}
-          </footer>
+            <p>No users match your criteria</p>
+            <button
+              type="button"
+              className="ws-btn ws-btn--outline"
+              onClick={() => {
+                setQuery("");
+                setMetric("all");
+              }}
+            >
+              Reset filters
+            </button>
+          </div>
         ) : null}
       </div>
-    </section>
+
+      {!busy && filtered.length > 0 ? (
+        <footer className="ws-footer">
+          <span>
+            {adminRows.length} administrators · {memberRows.length} members · {stats.total} total
+          </span>
+          {savingEmail ? (
+            <span className="ws-footer-save">
+              <Loader2 size={14} className="ws-spin" />
+              Saving changes
+            </span>
+          ) : null}
+        </footer>
+      ) : null}
+    </div>
   );
 }
