@@ -40,6 +40,7 @@ import {
   workTypeToEmployment,
 } from "../utils/availabilityPreview.js";
 import { WORKSPACE_THEME as T } from "../theme/workspacePalette.js";
+import { BulkExtendAllocationsPanel } from "./BulkExtendAllocationsPanel.jsx";
 import "../styles/premium-person-modal.css";
 
 /* ═══════════════════ DATA ═══════════════════ */
@@ -680,6 +681,8 @@ function ProjectsTab({
   editPerson,
   projects = [],
   allocations = [],
+  contextAllocations,
+  publicHolidayAllocations = [],
   setAllocations,
   syncAllocationDelete,
   syncAllocationUpdate,
@@ -824,6 +827,17 @@ function ProjectsTab({
       </div>
       <div>
         <label style={Lbl(t)}>On schedule for this person</label>
+        <BulkExtendAllocationsPanel
+          person={editPerson}
+          allocations={allocations}
+          contextAllocations={contextAllocations}
+          publicHolidayAllocations={publicHolidayAllocations}
+          projects={projects}
+          setAllocations={setAllocations}
+          syncAllocationUpdate={syncAllocationUpdate}
+          onRefreshWorkspace={onRefreshWorkspace}
+          t={t}
+        />
         {assignedRows.length === 0 ? (
           <div style={{ fontSize:13,color:t.textDim,padding:"10px 0" }}>No project allocations yet.</div>
         ) : (
@@ -902,6 +916,8 @@ function PersonModal({
   t,
   projects = [],
   allocations = [],
+  contextAllocations,
+  publicHolidayAllocations = [],
   setAllocations,
   syncAllocationDelete,
   syncAllocationUpdate,
@@ -1079,6 +1095,8 @@ function PersonModal({
               editPerson={editPerson}
               projects={projects}
               allocations={allocations}
+              contextAllocations={contextAllocations}
+              publicHolidayAllocations={publicHolidayAllocations}
               setAllocations={setAllocations}
               syncAllocationDelete={syncAllocationDelete}
               syncAllocationUpdate={syncAllocationUpdate}

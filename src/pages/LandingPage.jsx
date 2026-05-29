@@ -15,6 +15,7 @@ import {
   Calendar,
   CalendarOff,
   CalendarPlus,
+  ArrowRightToLine,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -94,13 +95,14 @@ import {
   projectCodeChipStyles,
   resolveColorForProjectLabel,
   projectToAllocationLabel,
-  registryProjectIdForPickerLabel,
 } from "../utils/projectColors.js";
+import { allocationHasPerson } from "../utils/allocationWorkMetrics.js";
 import {
-  countAllocationWorkingDaysExcludingOffDays,
-  allocationTotalHoursRounded,
-  allocationHasPerson,
-} from "../utils/allocationWorkMetrics.js";
+  buildExtendedAllocationPayload,
+  listLatestEndBulkExtendCandidates,
+} from "../utils/allocationBulkExtend.js";
+import { BulkExtendAllocationsDialog } from "../components/BulkExtendAllocationsDialog.jsx";
+import "../components/BulkExtendAllocationsPanel.css";
 import { isStaticUi } from "../config/uiMode.js";
 import { tagChromaProps } from "../utils/tagChroma.js";
 import {
@@ -630,6 +632,7 @@ const TimelineRow = memo(function TimelineRow({
   nCols,
   openEdit,
   openCreateAllocation,
+  openBulkExtend,
   openAllocationDetail,
   handleTimelineClick,
   todayDateKey,
@@ -676,6 +679,11 @@ const TimelineRow = memo(function TimelineRow({
       ? `${maxDailyBookedHours.toFixed(maxDailyBookedHours % 1 ? 1 : 0)}h/d`
       : `${pct}%`;
   const noWorkingDaysInView = hoursKeys.length > 0 && rawCap < 1e-6;
+
+  const showBulkExtendBtn = useMemo(
+    () => listLatestEndBulkExtendCandidates(p.id, personAllocations).length >= 2,
+    [p.id, personAllocations]
+  );
 
   const peakLoadBand = useMemo(() => {
     if (noWorkingDaysInView || !hoursKeys.length) return "none";
@@ -846,6 +854,20 @@ const TimelineRow = memo(function TimelineRow({
                   </span>
                 </button>
                 <div className="lp-person-add-banner">
+                  {showBulkExtendBtn && openBulkExtend ? (
+                    <button
+                      type="button"
+                      className="lp-sched-add-btn lp-sched-add-btn--inline lp-sched-bulk-extend-btn"
+                      title={`Extend all project allocations for ${p.name}`}
+                      aria-label={`Extend all allocations for ${p.name}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openBulkExtend(p);
+                      }}
+                    >
+                      <ArrowRightToLine size={14} strokeWidth={2.25} />
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="lp-sched-add-btn lp-sched-add-btn--inline"
@@ -1438,6 +1460,7 @@ export default function LandingPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState(null);
+  const [bulkExtendPerson, setBulkExtendPerson] = useState(null);
 
   const [viewMode, setViewMode] = useState("month");
   const [anchorDate, setAnchorDate] = useState(() => new Date());
@@ -2123,45 +2146,23 @@ export default function LandingPage() {
     ]
   );
 
+  const bulkExtendCtx = useMemo(
+    () => ({
+      allocations: scheduleAllocations,
+      publicHolidayAllocations: visiblePublicHolidayAllocations,
+      projects,
+    }),
+    [scheduleAllocations, visiblePublicHolidayAllocations, projects]
+  );
+
   const handleExtendAllocation = useCallback(
     async (alloc, newEndDateKey) => {
       const isoEnd = String(newEndDateKey || "").slice(0, 10);
       if (!isoEnd) return false;
-      const personIds =
-        alloc.personIds?.length > 0
-          ? alloc.personIds.map(String)
-          : alloc.personId != null
-            ? [String(alloc.personId)]
-            : [];
-      const workingDays = countAllocationWorkingDaysExcludingOffDays(
-        alloc.startDate,
-        isoEnd,
-        personIds,
-        scheduleAllocations,
-        visiblePublicHolidayAllocations
-      );
-      const hoursPerDay = Number(alloc.hoursPerDay) || 0;
-      const totalHours = allocationTotalHoursRounded(workingDays, hoursPerDay);
-      const label = String(alloc.project || "").trim();
-      const projectIdRaw =
-        alloc.projectId != null && String(alloc.projectId).trim() !== ""
-          ? String(alloc.projectId).trim()
-          : registryProjectIdForPickerLabel(label, projects);
-      const payload = {
-        personIds,
-        startDate: alloc.startDate,
-        endDate: isoEnd,
-        hoursPerDay,
-        totalHours,
-        workingDays,
-        project: label,
-        projectId: projectIdRaw,
-        notes: String(alloc.notes ?? "").trim(),
-        repeatId: alloc.repeatId ?? "none",
-      };
+      const payload = buildExtendedAllocationPayload(alloc, isoEnd, bulkExtendCtx);
       return handleEditAllocation(payload, alloc.id);
     },
-    [handleEditAllocation, projects, scheduleAllocations, visiblePublicHolidayAllocations]
+    [handleEditAllocation, bulkExtendCtx]
   );
 
   const handleDeleteAllocation = useCallback(
@@ -2359,6 +2360,14 @@ export default function LandingPage() {
     setModalOpen(true);
   }, []);
 
+  const openBulkExtend = useCallback((person) => {
+    setBulkExtendPerson(person);
+  }, []);
+
+  const closeBulkExtend = useCallback(() => {
+    setBulkExtendPerson(null);
+  }, []);
+
   const handleModalSave = async (form) => {
     const syncAvailAfterSave = async (saved) => {
       if (!isSupabaseConfigured || !saved?.id) return;
@@ -2524,6 +2533,7 @@ export default function LandingPage() {
       nCols: scheduleModel.columnCount,
       openEdit,
       openCreateAllocation,
+      openBulkExtend,
       openAllocationDetail,
       handleTimelineClick,
       todayDateKey,
@@ -2544,6 +2554,7 @@ export default function LandingPage() {
       gridTemplate,
       openEdit,
       openCreateAllocation,
+      openBulkExtend,
       openAllocationDetail,
       handleTimelineClick,
       todayDateKey,
@@ -3314,6 +3325,8 @@ export default function LandingPage() {
         t={t}
         projects={projects}
         allocations={allocations}
+        contextAllocations={scheduleAllocations}
+        publicHolidayAllocations={visiblePublicHolidayAllocations}
         setAllocations={setAllocations}
         syncAllocationDelete={syncAllocationDelete}
         syncAllocationUpdate={syncAllocationUpdate}
@@ -3323,6 +3336,21 @@ export default function LandingPage() {
         onOpenCreateLeave={(person) => openCreateLeaveForPerson(person)}
         onRefreshWorkspace={refreshWorkspaceFromSupabase}
         tagTheme={theme}
+      />
+
+      <BulkExtendAllocationsDialog
+        open={!!bulkExtendPerson}
+        person={bulkExtendPerson}
+        onClose={closeBulkExtend}
+        accent={t.accent}
+        allocations={allocations}
+        contextAllocations={scheduleAllocations}
+        publicHolidayAllocations={visiblePublicHolidayAllocations}
+        projects={projects}
+        setAllocations={setAllocations}
+        syncAllocationUpdate={syncAllocationUpdate}
+        onRefreshWorkspace={refreshWorkspaceFromSupabase}
+        t={t}
       />
 
       {allocCreateOpen ? (

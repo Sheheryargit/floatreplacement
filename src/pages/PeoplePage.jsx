@@ -1058,6 +1058,8 @@ export default function PeoplePage() {
         roles={roles} setRoles={setRoles} depts={depts} setDepts={setDepts} tagOpts={peopleTagOpts} setTagOpts={setPeopleTagOpts} t={t}
         projects={projects}
         allocations={allocations}
+        contextAllocations={scheduleAllocations}
+        publicHolidayAllocations={publicHolidayAllocations}
         setAllocations={setAllocations}
         syncAllocationDelete={syncAllocationDelete}
         syncAllocationUpdate={syncAllocationUpdate}
