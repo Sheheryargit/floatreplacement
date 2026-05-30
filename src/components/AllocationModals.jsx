@@ -12,6 +12,7 @@ import {
 } from "../utils/projectColors.js";
 import { normalizeLeaveTypeId, leaveAccentTheme, leavePanelStyleVars } from "../utils/leaveVisuals.js";
 import { isStaticUi } from "../config/uiMode.js";
+import { ALLOC8_ASSISTANT_SUBMIT_ALLOCATION_MODAL_EVENT } from "../config/appKeyboardEvents.js";
 import "./AllocationModals.css";
 import "../styles/premium-overlays.css";
 import { ALLOCATION_PROJECT_SEED } from "../data/workspaceSeedConstants.js";
@@ -157,6 +158,7 @@ export function CreateAllocationModal({
   t,
   premiumV2Enabled = false,
   premiumV2Templates,
+  externalPrefill = null,
 }) {
   const reduceMotion = useReducedMotion();
   const tplList = premiumV2Templates ?? [];
@@ -301,6 +303,29 @@ export function CreateAllocationModal({
     allocations,
     premiumV2Enabled,
   ]);
+
+  useEffect(() => {
+    if (!open || !externalPrefill || editAllocation) return;
+    if (externalPrefill.startDate) setStartDate(externalPrefill.startDate);
+    if (externalPrefill.endDate) setEndDate(externalPrefill.endDate);
+    if (externalPrefill.hoursPerDay != null) setHoursPerDay(String(externalPrefill.hoursPerDay));
+    if (externalPrefill.project) {
+      setProject(externalPrefill.project);
+      setAllocationProjectId(
+        resolveProjectIdForCanonicalLabel(externalPrefill.project, projectRegistry)
+      );
+    }
+    if (externalPrefill.personId) setAssignedIds([externalPrefill.personId]);
+  }, [open, externalPrefill, editAllocation, projectRegistry]);
+
+  useEffect(() => {
+    const onAssistantSubmit = () => {
+      document.querySelector('[data-alloc8-guide="alloc-modal-save"]')?.click();
+    };
+    window.addEventListener(ALLOC8_ASSISTANT_SUBMIT_ALLOCATION_MODAL_EVENT, onAssistantSubmit);
+    return () =>
+      window.removeEventListener(ALLOC8_ASSISTANT_SUBMIT_ALLOCATION_MODAL_EVENT, onAssistantSubmit);
+  }, []);
 
   useEffect(() => {
     function onDoc(e) {
@@ -667,13 +692,14 @@ export function CreateAllocationModal({
             <div className="lpam-field lpam-grow">
               <label className="lpam-label">Per day</label>
               <div className="lpam-inline">
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  value={hoursPerDay}
-                  onChange={(e) => setHoursPerDay(e.target.value)}
-                  className="lpam-input lpam-input-sm"
+            <input
+              type="number"
+              step="0.5"
+              min="0"
+              value={hoursPerDay}
+              onChange={(e) => setHoursPerDay(e.target.value)}
+              data-alloc8-guide="alloc-modal-hours"
+              className="lpam-input lpam-input-sm"
                   style={{
                     borderColor: t.borderIn || t.border,
                     background: t.bg,
@@ -766,6 +792,7 @@ export function CreateAllocationModal({
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
+              data-alloc8-guide="alloc-modal-start"
               className="lpam-input lpam-date"
               style={{ borderColor: t.borderIn || t.border, background: t.bg, color: t.text }}
             />
@@ -833,6 +860,7 @@ export function CreateAllocationModal({
             <button
               ref={projectTriggerRef}
               type="button"
+              data-alloc8-guide="alloc-modal-project"
               className={
                 "lpam-input lpam-project-trigger" + (projectOpen ? " lpam-project-trigger--open" : "")
               }
@@ -1236,6 +1264,7 @@ export function CreateAllocationModal({
           <div className="lpam-create-actions">
             <motion.button
               type="button"
+              data-alloc8-guide="alloc-modal-save"
               className={"lpam-btn lpam-btn-primary" + (activeTab === "leave" ? " lpam-btn-leave" : "")}
               onClick={handleSave}
               disabled={primarySaveDisabled}

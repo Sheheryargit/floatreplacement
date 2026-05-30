@@ -1,0 +1,109 @@
+.a8a-takeover-bar {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 495;
+  width: min(520px, calc(100vw - 24px));
+  pointer-events: auto;
+}
+
+.a8a-takeover-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--color-surface, #0e1118) 78%, transparent);
+  backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid color-mix(in srgb, var(--color-brand, #0088ff) 38%, rgba(255, 255, 255, 0.06));
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 20px 56px rgba(0, 0, 0, 0.48),
+    0 0 40px color-mix(in srgb, var(--color-brand, #0088ff) 12%, transparent);
+}
+
+.a8a-takeover-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-brand, #0088ff), var(--color-accent, #7c6af7));
+  flex-shrink: 0;
+}
+
+.a8a-takeover-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.a8a-takeover-copy strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text, #e7ecf5);
+}
+
+.a8a-takeover-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.a8a-takeover-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.a8a-takeover-ctrl {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--color-border, #2a2f45) 80%, transparent);
+  cursor: pointer;
+  color: var(--color-text-muted, #93a0b5);
+  background: transparent;
+}
+
+.a8a-takeover-ctrl:hover {
+  color: var(--color-brand, #0088ff);
+  border-color: color-mix(in srgb, var(--color-brand, #0088ff) 45%, transparent);
+}
+
+.a8a-takeover-copy span {
+  font-size: 11.5px;
+  color: var(--color-text-muted, #93a0b5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.a8a-takeover-stop {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, #ff5c7a 50%, transparent);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ff8fa3;
+  background: color-mix(in srgb, #ff5c7a 12%, transparent);
+  flex-shrink: 0;
+}
+
+.a8a-takeover-stop:hover {
+  background: color-mix(in srgb, #ff5c7a 22%, transparent);
+}

@@ -1,0 +1,99 @@
+.a8a-takeover-dim {
+  position: fixed;
+  inset: 0;
+  z-index: 460;
+  pointer-events: none;
+  background: rgba(4, 7, 16, 0.28);
+}
+
+.a8a-spotlight {
+  position: fixed;
+  z-index: 461;
+  pointer-events: none;
+  border-radius: 12px;
+  border: 2px solid var(--color-brand, #0088ff);
+  box-shadow:
+    0 0 0 9999px rgba(4, 7, 16, 0.35),
+    0 0 24px color-mix(in srgb, var(--color-brand, #0088ff) 50%, transparent);
+  animation: a8a-spot-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes a8a-spot-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 9999px rgba(4, 7, 16, 0.35),
+      0 0 16px color-mix(in srgb, var(--color-brand, #0088ff) 40%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 9999px rgba(4, 7, 16, 0.35),
+      0 0 28px color-mix(in srgb, var(--color-brand, #0088ff) 65%, transparent);
+  }
+}
+
+.a8a-ghost-wrap {
+  position: fixed;
+  z-index: 465;
+  pointer-events: none;
+}
+
+.a8a-ghost-agent {
+  filter: drop-shadow(0 6px 16px rgba(0, 136, 255, 0.45));
+}
+
+.a8a-ghost-step {
+  position: absolute;
+  left: 30px;
+  top: 28px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--color-brand, #0088ff);
+  background: rgba(255, 255, 255, 0.92);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.a8a-ghost-label {
+  position: absolute;
+  left: 26px;
+  top: 0;
+  white-space: nowrap;
+  padding: 6px 11px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-brand, #0088ff), var(--color-accent, #7c6af7));
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+}
+
+.a8a-ghost-ripple {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 36px;
+  height: 36px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  border: 2px solid var(--color-brand, #0088ff);
+  animation: a8a-ripple 0.45s ease-out forwards;
+}
+
+@keyframes a8a-ripple {
+  from {
+    transform: scale(0.4);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .a8a-spotlight,
+  .a8a-ghost-ripple {
+    animation: none;
+  }
+}

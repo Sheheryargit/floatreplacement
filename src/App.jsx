@@ -8,6 +8,8 @@ import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { AppDialogProvider } from "./context/AppDialogContext.jsx";
 import { PremiumV2Provider } from "./context/PremiumV2Context.jsx";
 import { SlapAnimationProvider } from "./context/SlapAnimationContext.jsx";
+import { AssistantProvider } from "./context/AssistantContext.jsx";
+import { AssistantWorkflowProvider } from "./context/AssistantWorkflowContext.jsx";
 import { AppDataProvider, useAppStore } from "./context/AppDataContext.jsx";
 import AnimatedAppLoader from "./components/ui/AnimatedAppLoader.jsx";
 import RouteSkeleton from "./components/ui/RouteSkeleton.jsx";
@@ -32,6 +34,11 @@ const toastShellStyle = {
 };
 
 const CommandPalette = lazy(() => import("./components/command/CommandPalette.jsx"));
+const AssistantAccessGate = lazy(() => import("./components/assistant/AssistantAccessGate.jsx"));
+const Alloc8Assistant = lazy(() => import("./components/assistant/Alloc8Assistant.jsx"));
+const AssistantHighlightLayer = lazy(() => import("./components/assistant/AssistantHighlightLayer.jsx"));
+const AssistantGhostCursor = lazy(() => import("./components/assistant/AssistantGhostCursor.jsx"));
+const AssistantTakeoverBar = lazy(() => import("./components/assistant/AssistantTakeoverBar.jsx"));
 const LandingPage = lazy(() => import("./pages/LandingPage.jsx"));
 const PeoplePage = lazy(() => import("./pages/PeoplePage.jsx"));
 const ProjectsPage = lazy(() => import("./pages/ProjectsPage.jsx"));
@@ -111,6 +118,27 @@ function SkipToMainLink() {
   );
 }
 
+function WorkspaceAssistant() {
+  const { isWorkspaceAdmin } = useAuth();
+
+  if (!isWorkspaceAdmin) {
+    return <AssistantAccessGate />;
+  }
+
+  return (
+    <AssistantProvider>
+      <AssistantWorkflowProvider>
+        <Suspense fallback={null}>
+          <Alloc8Assistant />
+          <AssistantHighlightLayer />
+          <AssistantGhostCursor />
+          <AssistantTakeoverBar />
+        </Suspense>
+      </AssistantWorkflowProvider>
+    </AssistantProvider>
+  );
+}
+
 function AuthGate() {
   const { isAuthenticated, accessDenied } = useAuth();
   if (accessDenied) {
@@ -145,6 +173,9 @@ function AuthGate() {
               <div className="app-viewport">
                 <AnimatedRoutes />
               </div>
+              <Suspense fallback={null}>
+                <WorkspaceAssistant />
+              </Suspense>
             </SlapAnimationProvider>
           </PremiumV2Provider>
         </WorkspaceReady>

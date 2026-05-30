@@ -22,7 +22,7 @@ import "./AppSideNav.css";
 const COLLAPSE_KEY = "alloc8-sidenav-collapsed";
 
 const NAV = [
-  { to: "/", end: true, icon: CalendarDays, label: "Schedule" },
+  { to: "/", end: true, icon: CalendarDays, label: "Schedule", guide: "nav-schedule" },
   { to: "/people", icon: Users, label: "People" },
   { to: "/projects", icon: FolderOpen, label: "Projects" },
   { to: "/report", icon: BarChart3, label: "Report" },
@@ -160,6 +160,7 @@ function AppSideNav() {
               key={item.label}
               to={item.to}
               end={!!item.end}
+              data-alloc8-guide={item.guide || undefined}
               className={({ isActive }) =>
                 "app-sidenav-item" + (isActive ? " app-sidenav-item--active" : "")
               }

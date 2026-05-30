@@ -51,6 +51,8 @@ import { resolveColorForProjectLabel } from "../utils/projectColors.js";
 import { findLeaveOverlapWithWorkRange } from "../utils/allocationLeaveConflict.js";
 import { mergeScheduleAllocations } from "../utils/scheduleAllocationsMerge.js";
 import { usePremiumV2 } from "../context/PremiumV2Context.jsx";
+import { useAssistantPageContext } from "../lib/assistant/alloc8Context.js";
+import { ALLOC8_APPLY_PEOPLE_FILTERS_EVENT } from "../config/appKeyboardEvents.js";
 import "./PeoplePage.css";
 
 /** Cap staggered row enter animations — large tables stay responsive */
@@ -482,6 +484,41 @@ export default function PeoplePage() {
     setFilterPersonSearch("");
   }, []);
 
+  // Let the Alloc8 assistant drive the People page's local filters.
+  useEffect(() => {
+    const onApply = (e) => {
+      const d = e.detail || {};
+      if (Array.isArray(d.tags)) setAdvTags(d.tags);
+      if (Array.isArray(d.types)) setAdvTypes(d.types);
+      if (Array.isArray(d.workTypes)) setAdvWorkTypes(d.workTypes);
+      if (Array.isArray(d.departments)) setAdvDepartments(d.departments);
+      if (typeof d.search === "string") setSearch(d.search);
+      if (d.tab === "active" || d.tab === "archived") setViewTab(d.tab);
+    };
+    window.addEventListener(ALLOC8_APPLY_PEOPLE_FILTERS_EVENT, onApply);
+    return () => window.removeEventListener(ALLOC8_APPLY_PEOPLE_FILTERS_EVENT, onApply);
+  }, []);
+
+  // Publish live context for the assistant.
+  const totalActivePeople = useMemo(
+    () => people.filter((p) => !p.archived).length,
+    [people]
+  );
+  useAssistantPageContext("people", {
+    visibleCount: filteredSorted.length,
+    totalActive: totalActivePeople,
+    emptyResults: filteredSorted.length === 0 && people.length > 0,
+    activeTab: viewTab,
+    search,
+    filters: {
+      tags: advTags,
+      types: advTypes,
+      workTypes: advWorkTypes,
+      departments: advDepartments,
+      activeFilterCount: advActiveCount,
+    },
+  });
+
   const nestToggle = useCallback((key) => {
     setNestOpen((o) => ({ ...o, [key]: !o[key] }));
   }, []);
@@ -624,6 +661,7 @@ export default function PeoplePage() {
             <div ref={filterWrapRef} className="people-filter-wrap">
               <button
                 type="button"
+                data-alloc8-guide="people-filters"
                 onClick={() => setFilterOpen((o) => !o)}
                 style={{
                   display:"flex",alignItems:"center",gap:8,padding:"8px 14px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:600,

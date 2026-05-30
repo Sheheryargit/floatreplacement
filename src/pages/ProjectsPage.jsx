@@ -16,6 +16,8 @@ import {
 import { useFixedAnchorDropdown } from "../hooks/useFixedAnchorDropdown.js";
 import { WORKSPACE_THEME as T } from "../theme/workspacePalette.js";
 import { EmptyState } from "../components/ui/EmptyState.jsx";
+import { useAssistantPageContext } from "../lib/assistant/alloc8Context.js";
+import { ALLOC8_APPLY_PROJECTS_FILTERS_EVENT } from "../config/appKeyboardEvents.js";
 import "./ProjectsPage.css";
 import "../styles/premium-person-modal.css";
 import {
@@ -484,6 +486,27 @@ export default function ProjectsPage(){
 
   const activeCount=projects.filter(p=>!p.archived).length;
   const archivedCount=projects.filter(p=>p.archived).length;
+
+  // Assistant-driven filters for the Projects page.
+  useEffect(() => {
+    const onApply = (e) => {
+      const d = e.detail || {};
+      if (typeof d.search === "string") setSearch(d.search);
+      if (d.tab === "active" || d.tab === "archived") setViewTab(d.tab);
+    };
+    window.addEventListener(ALLOC8_APPLY_PROJECTS_FILTERS_EVENT, onApply);
+    return () => window.removeEventListener(ALLOC8_APPLY_PROJECTS_FILTERS_EVENT, onApply);
+  }, []);
+
+  useAssistantPageContext("projects", {
+    visibleCount: filtered.length,
+    totalActive: activeCount,
+    totalArchived: archivedCount,
+    emptyResults: filtered.length === 0 && projects.length > 0,
+    activeTab: viewTab,
+    search,
+    ownerFilterActive: Boolean(ownerFilter),
+  });
   const toggleSel=id=>setSelected(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
   const toggleAll=()=>setSelected(selected.size===filtered.length?new Set():new Set(filtered.map(p=>p.id)));
 

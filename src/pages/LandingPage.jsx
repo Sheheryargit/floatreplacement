@@ -144,7 +144,12 @@ import {
   readAllocationEnterAnimation,
   readPeakLoadLabelsVisible,
 } from "../config/scheduleUiPrefs.js";
-import { ALLOC8_OPEN_COMMAND_PALETTE_EVENT } from "../config/appKeyboardEvents.js";
+import {
+  ALLOC8_OPEN_COMMAND_PALETTE_EVENT,
+  ALLOC8_ASSISTANT_OPEN_ALLOCATION_MODAL_EVENT,
+  ALLOC8_ASSISTANT_CREATE_ALLOCATION_EVENT,
+} from "../config/appKeyboardEvents.js";
+import { useAssistantPageContext } from "../lib/assistant/alloc8Context.js";
 import { usePremiumV2 } from "../context/PremiumV2Context.jsx";
 import { useAppDialog } from "../context/AppDialogContext.jsx";
 import "./LandingPage.css";
@@ -1544,6 +1549,7 @@ export default function LandingPage() {
   const [projectCreateOpen, setProjectCreateOpen] = useState(false);
 
   const [allocCreateOpen, setAllocCreateOpen] = useState(false);
+  const [assistantExternalPrefill, setAssistantExternalPrefill] = useState(null);
   const [allocEditing, setAllocEditing] = useState(null);
   const [allocPreselectPerson, setAllocPreselectPerson] = useState(null);
   const [allocPreselectDate, setAllocPreselectDate] = useState(null);
@@ -1645,6 +1651,14 @@ export default function LandingPage() {
   }, [projects]);
 
   const scheduleFilterActiveCount = countActiveFilterRules(scheduleFilterRules);
+
+  useAssistantPageContext("schedule", {
+    visibleCount: schedulePeople.length,
+    totalPeople: people.length,
+    emptyResults: schedulePeople.length === 0 && people.length > 0,
+    activeFilterCount: scheduleFilterActiveCount,
+  });
+
   const deptDashboardEnabled = useMemo(() => {
     const norm = normalizeFilterRules(scheduleFilterRules);
     return norm.some((r) => r.field === "department");
@@ -1908,6 +1922,7 @@ export default function LandingPage() {
     setAllocPreselectDate(null);
     setAllocPreselectProject(null);
     setAllocDefaultTab("allocation");
+    setAssistantExternalPrefill(null);
   }, []);
 
   const pulseFreshAllocationTile = useCallback(
@@ -2062,6 +2077,43 @@ export default function LandingPage() {
       syncAllocationDelete,
     ]
   );
+
+  useEffect(() => {
+    const onOpenModal = (e) => {
+      const d = e.detail || {};
+      const person = people.find((p) => String(p.id) === String(d.personId));
+      setAssistantExternalPrefill(d);
+      startTransition(() => {
+        setAllocEditing(null);
+        setAllocDefaultTab("allocation");
+        setAllocPreselectPerson(person ?? null);
+        setAllocPreselectDate(d.startDate ?? null);
+        setAllocPreselectProject(d.project ?? null);
+        setAllocCreateOpen(true);
+      });
+    };
+
+    const onCreateDirect = (e) => {
+      const d = e.detail || {};
+      if (!d.personId || !d.startDate || !d.endDate) return;
+      void handleCreateAllocation({
+        personIds: [d.personId],
+        startDate: d.startDate,
+        endDate: d.endDate,
+        hoursPerDay: Number(d.hoursPerDay) || 7.5,
+        project: d.project || "Work",
+        repeatId: "none",
+        notes: "",
+      });
+    };
+
+    window.addEventListener(ALLOC8_ASSISTANT_OPEN_ALLOCATION_MODAL_EVENT, onOpenModal);
+    window.addEventListener(ALLOC8_ASSISTANT_CREATE_ALLOCATION_EVENT, onCreateDirect);
+    return () => {
+      window.removeEventListener(ALLOC8_ASSISTANT_OPEN_ALLOCATION_MODAL_EVENT, onOpenModal);
+      window.removeEventListener(ALLOC8_ASSISTANT_CREATE_ALLOCATION_EVENT, onCreateDirect);
+    };
+  }, [people, handleCreateAllocation]);
 
   const handleEditAllocation = useCallback(
     async (payload, id) => {
@@ -2652,6 +2704,7 @@ export default function LandingPage() {
                 <div className="lp-dropdown-wrap" ref={scheduleFilterWrapRef}>
                   <button
                     type="button"
+                    data-alloc8-guide="schedule-filter"
                     className={
                       "lp-pill lp-pill-btn lp-tag-dd-trigger" +
                       (scheduleFilterActiveCount > 0 ? " lp-tag-dd-trigger-active" : "")
@@ -3374,6 +3427,7 @@ export default function LandingPage() {
           t={t}
           premiumV2Enabled={premiumV2Enabled}
           premiumV2Templates={premiumV2Templates}
+          externalPrefill={assistantExternalPrefill}
         />
       ) : null}
 

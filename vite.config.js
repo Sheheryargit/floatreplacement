@@ -2,11 +2,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { assistantDevApiPlugin } from "./scripts/assistant-dev-api-plugin.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), assistantDevApiPlugin()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
@@ -17,9 +18,9 @@ export default defineConfig({
     headers: {
       "Cache-Control": "no-store",
     },
-    // Prefer a stable port; Vite will fall back if it's taken.
+    // Prefer a stable port; fail loudly if taken so /api plugin isn't on a different port.
     port: 5173,
-    strictPort: false,
+    strictPort: true,
   },
   build: {
     // Keep all CSS in a single stylesheet so lazy route/component updates
