@@ -146,8 +146,7 @@ function displayNameFromSupabaseUser(user) {
   return metaName || metaNameAzure || fromEmail || localPart || "Workspace member";
 }
 
-/** Password gate (no Supabase JWT): `userSub` is null or omitted in the profile mirror. */
-function isPasswordWorkspaceGate() {
+export function isPasswordWorkspaceGate() {
   try {
     if (localStorage.getItem(STORAGE_KEY) !== "1") return false;
     const { userSub } = readSessionProfileMirror();
@@ -248,9 +247,9 @@ export function AuthProvider({ children }) {
       typeof opts?.displayName === "string" ? opts.displayName.trim() : "";
     const refreshExpiry = opts?.refreshExpiry !== false;
 
-    // Password gate: treat as Workspace Admin locally (no Supabase user).
+    // Password gate: app access only — not workspace admin (agent / Access require SSO + allowlist).
     if (Object.prototype.hasOwnProperty.call(opts ?? {}, "userSub") && opts.userSub === null) {
-      setWorkspaceAccess({ email: "", isWorkspaceAdmin: true });
+      setWorkspaceAccess({ email: "", isWorkspaceAdmin: false });
     }
 
     /** @type {SessionProfileMirror} */

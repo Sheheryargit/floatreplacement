@@ -23,10 +23,12 @@ import {
   Navigation,
   Calendar,
   CheckCircle2,
+  Shield,
 } from "lucide-react";
 import { useAssistant } from "../../context/AssistantContext.jsx";
 import { useAssistantWorkflow } from "../../context/AssistantWorkflowContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { ASSISTANT_ADMIN_ONLY_MESSAGE } from "../../lib/assistant/assistantAccess.js";
 import { pageIdFromPathname, PAGE_LABELS } from "../../lib/assistant/alloc8Context.js";
 import { isStaticUi } from "../../config/uiMode.js";
 import AgentAvatar, { AgentBetaBadge } from "./AgentAvatar.jsx";
@@ -206,6 +208,23 @@ function ProposalCard({ proposal, onConfirm, onDismiss, skipAnim }) {
   );
 }
 
+function AdminOnlyScreen({ skipAnim }) {
+  return (
+    <motion.div
+      className="a8a-welcome a8a-admin-only"
+      initial={skipAnim ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
+      <div className="a8a-admin-only-icon" aria-hidden>
+        <Shield size={22} strokeWidth={2} />
+      </div>
+      <p className="a8a-welcome-eyebrow">Alloc8 Agent</p>
+      <p className="a8a-admin-only-message">{ASSISTANT_ADMIN_ONLY_MESSAGE}</p>
+    </motion.div>
+  );
+}
+
 function WelcomeScreen({ onPick, displayName, skipAnim }) {
   return (
     <motion.div
@@ -378,9 +397,9 @@ function ClarificationCard({ items, onPick, skipAnim }) {
 
 export default function Alloc8Assistant() {
   const location = useLocation();
-  const { sessionDisplayName, isWorkspaceAdmin } = useAuth();
-  if (!isWorkspaceAdmin) return null;
+  const { sessionDisplayName } = useAuth();
   const {
+    assistantEnabled,
     open,
     openAssistant,
     closeAssistant,
@@ -425,11 +444,13 @@ export default function Alloc8Assistant() {
     [location.pathname]
   );
 
-  const statusLabel = workflowRunning
-    ? "Guiding…"
-    : busy
-      ? "Thinking…"
-      : "Ready";
+  const statusLabel = !assistantEnabled
+    ? "Admin only"
+    : workflowRunning
+      ? "Guiding…"
+      : busy
+        ? "Thinking…"
+        : "Ready";
 
   const [clickTeaserSeen, setClickTeaserSeen] = useState(() => {
     try {
@@ -674,7 +695,9 @@ export default function Alloc8Assistant() {
             </header>
 
             <div className="a8a-body" ref={listRef} onScroll={onScroll}>
-              {messages.length === 0 ? (
+              {!assistantEnabled ? (
+                <AdminOnlyScreen skipAnim={skipAnim} />
+              ) : messages.length === 0 ? (
                 <WelcomeScreen
                   onPick={submit}
                   displayName={sessionDisplayName}
@@ -688,7 +711,7 @@ export default function Alloc8Assistant() {
                 </div>
               )}
 
-              {pendingProposal && (
+              {assistantEnabled && pendingProposal && (
                 <ProposalCard
                   proposal={pendingProposal}
                   onConfirm={confirmProposal}
@@ -697,7 +720,7 @@ export default function Alloc8Assistant() {
                 />
               )}
 
-              {(pendingPlan || (workflowRunning && activePlan)) && (
+              {assistantEnabled && (pendingPlan || (workflowRunning && activePlan)) && (
                 <WorkflowPlanCard
                   plan={pendingPlan || activePlan}
                   onApproveGuided={() => runPlan("guided")}
@@ -711,7 +734,7 @@ export default function Alloc8Assistant() {
                 />
               )}
 
-              {clarifications?.length > 0 && !pendingPlan && (
+              {assistantEnabled && clarifications?.length > 0 && !pendingPlan && (
                 <ClarificationCard
                   items={clarifications}
                   onPick={(opt) => submit(`Use ${opt} for the previous request`)}
@@ -719,7 +742,7 @@ export default function Alloc8Assistant() {
                 />
               )}
 
-              {pendingStepConfirm && (
+              {assistantEnabled && pendingStepConfirm && (
                 <div className="a8a-step-confirm" role="group">
                   <p>Confirm: {pendingStepConfirm.label}</p>
                   <div className="a8a-proposal-actions">
@@ -750,6 +773,7 @@ export default function Alloc8Assistant() {
               )}
             </AnimatePresence>
 
+            {assistantEnabled && (
             <footer className="a8a-composer">
               {messages.length === 0 && !busy && (
                 <div className="a8a-composer-suggestions">
@@ -810,6 +834,7 @@ export default function Alloc8Assistant() {
                 </div>
               </div>
             </footer>
+            )}
           </motion.section>
         )}
       </AnimatePresence>

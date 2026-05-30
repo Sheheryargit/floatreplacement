@@ -43,7 +43,7 @@ export async function authorizeAssistantRequest(req, context = {}) {
     }
     const isAdmin = await isWorkspaceAdminEmail(admin, email);
     if (!isAdmin) {
-      return { ok: false, status: 403, error: "Alloc8 Agent is limited to workspace administrators." };
+      return { ok: false, status: 403, error: "Alloc8 Agent is only available to admins." };
     }
     return { ok: true, mode: "sso", email: normalizeEmail(email) };
   }
@@ -52,7 +52,7 @@ export async function authorizeAssistantRequest(req, context = {}) {
     if (context?.user?.role === "workspace_admin") {
       return { ok: true, mode: "dev" };
     }
-    return { ok: false, status: 403, error: "Alloc8 Agent is limited to workspace administrators." };
+    return { ok: false, status: 403, error: "Alloc8 Agent is only available to admins." };
   }
 
   return { ok: false, status: 401, error: "Unauthorized" };

@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "./AuthContext.jsx";
+import { useAuth, isPasswordWorkspaceGate } from "./AuthContext.jsx";
 import { supabase } from "../lib/supabase.js";
 import {
   ALLOC8_OPEN_ASSISTANT_EVENT,
@@ -94,7 +94,7 @@ export function AssistantProvider({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const auth = useAuth();
-  const assistantEnabled = auth.isWorkspaceAdmin;
+  const assistantEnabled = auth.isWorkspaceAdmin && !isPasswordWorkspaceGate();
 
   const stored = useRef(loadSession()).current;
 
@@ -141,25 +141,13 @@ export function AssistantProvider({ children }) {
   }, []);
 
   const openAssistant = useCallback(() => {
-    if (!assistantEnabled) return;
     setSuggestion(null);
     setOpen(true);
-  }, [assistantEnabled]);
+  }, []);
   const closeAssistant = useCallback(() => setOpen(false), []);
   const toggleAssistant = useCallback(() => {
-    if (!assistantEnabled) return;
     setOpen((o) => !o);
-  }, [assistantEnabled]);
-
-  useEffect(() => {
-    if (!assistantEnabled) {
-      setOpen(false);
-      setSuggestion(null);
-      setPendingProposal(null);
-      abortRef.current?.abort();
-      setBusy(false);
-    }
-  }, [assistantEnabled]);
+  }, []);
 
   const appendMessage = useCallback((msg) => {
     setMessages((prev) => [...prev, { id: newId(), createdAt: Date.now(), ...msg }]);
@@ -339,7 +327,6 @@ export function AssistantProvider({ children }) {
 
   // Global open hooks: custom event + Cmd/Ctrl+Shift+K.
   useEffect(() => {
-    if (!assistantEnabled) return undefined;
     const onOpenEvt = () => openAssistant();
     const onKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "k" || e.key === "K")) {
@@ -353,7 +340,7 @@ export function AssistantProvider({ children }) {
       window.removeEventListener(ALLOC8_OPEN_ASSISTANT_EVENT, onOpenEvt);
       window.removeEventListener("keydown", onKey);
     };
-  }, [assistantEnabled, openAssistant, toggleAssistant]);
+  }, [openAssistant, toggleAssistant]);
 
   // Periodically evaluate confusion signals while the panel is closed.
   useEffect(() => {

@@ -4,7 +4,7 @@ import { BrowserRouter, useLocation, useRoutes, Navigate } from "react-router-do
 import { MotionConfig } from "framer-motion";
 import { ThemeProvider, useAppTheme } from "./context/ThemeContext.jsx";
 import { CenterActionFeedbackProvider } from "./context/CenterActionFeedbackContext.jsx";
-import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
+import { AuthProvider, useAuth, isPasswordWorkspaceGate } from "./context/AuthContext.jsx";
 import { AppDialogProvider } from "./context/AppDialogContext.jsx";
 import { PremiumV2Provider } from "./context/PremiumV2Context.jsx";
 import { SlapAnimationProvider } from "./context/SlapAnimationContext.jsx";
@@ -34,7 +34,6 @@ const toastShellStyle = {
 };
 
 const CommandPalette = lazy(() => import("./components/command/CommandPalette.jsx"));
-const AssistantAccessGate = lazy(() => import("./components/assistant/AssistantAccessGate.jsx"));
 const Alloc8Assistant = lazy(() => import("./components/assistant/Alloc8Assistant.jsx"));
 const AssistantHighlightLayer = lazy(() => import("./components/assistant/AssistantHighlightLayer.jsx"));
 const AssistantGhostCursor = lazy(() => import("./components/assistant/AssistantGhostCursor.jsx"));
@@ -120,19 +119,20 @@ function SkipToMainLink() {
 
 function WorkspaceAssistant() {
   const { isWorkspaceAdmin } = useAuth();
-
-  if (!isWorkspaceAdmin) {
-    return <AssistantAccessGate />;
-  }
+  const adminAssistant = isWorkspaceAdmin && !isPasswordWorkspaceGate();
 
   return (
     <AssistantProvider>
       <AssistantWorkflowProvider>
         <Suspense fallback={null}>
           <Alloc8Assistant />
-          <AssistantHighlightLayer />
-          <AssistantGhostCursor />
-          <AssistantTakeoverBar />
+          {adminAssistant ? (
+            <>
+              <AssistantHighlightLayer />
+              <AssistantGhostCursor />
+              <AssistantTakeoverBar />
+            </>
+          ) : null}
         </Suspense>
       </AssistantWorkflowProvider>
     </AssistantProvider>

@@ -448,6 +448,33 @@
   color: var(--color-muted);
 }
 
+.a8a-admin-only {
+  align-items: center;
+  text-align: center;
+  padding: 24px 16px;
+}
+
+.a8a-admin-only-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: 0 0 12px;
+  border-radius: 14px;
+  color: var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-brand) 22%, transparent);
+}
+
+.a8a-admin-only-message {
+  margin: 0;
+  max-width: 240px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--color-text);
+}
+
 .a8a-quick-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
