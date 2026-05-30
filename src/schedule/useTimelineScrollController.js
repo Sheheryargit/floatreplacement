@@ -15,6 +15,7 @@ export function useTimelineScrollController({
   prevOffsetsRef,
   prevColCountRef,
   lastAnchorKeyRef,
+  onLayoutRangeSync,
 }) {
   const rafRef = useRef(null);
   const isProgrammaticScrollRef = useRef(false);
@@ -49,6 +50,7 @@ export function useTimelineScrollController({
 
     prevColCountRef.current = scheduleModel.columnCount;
     prevOffsetsRef.current = timelineOffsets;
+    onLayoutRangeSync?.();
   }, [
     scheduleViewportRef,
     scheduleModel,
@@ -57,6 +59,7 @@ export function useTimelineScrollController({
     prevOffsetsRef,
     prevColCountRef,
     lastAnchorKeyRef,
+    onLayoutRangeSync,
   ]);
 
   const onTimelineScroll = useCallback(
@@ -73,9 +76,10 @@ export function useTimelineScrollController({
         if (el.scrollLeft + el.clientWidth > el.scrollWidth - thresholdBase) {
           setTimelineOffsets((o) => (o.next < 36 ? { ...o, next: o.next + 1 } : o));
         }
+        onLayoutRangeSync?.();
       });
     },
-    [setTimelineOffsets]
+    [setTimelineOffsets, onLayoutRangeSync]
   );
 
   useEffect(() => {

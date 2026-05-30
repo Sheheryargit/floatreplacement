@@ -1,4 +1,5 @@
 import { isAvailabilityDayOffAlloc } from "../utils/leaveVisuals.js";
+import { segmentIntersectsColumnRange, isValidColumnRange } from "./scheduleLayoutRange.js";
 import { layoutsForAllocation } from "./renderModel/allocationLayouts.js";
 import {
   allocationBarHeightPx,
@@ -6,10 +7,15 @@ import {
   assignAllocationStackLevelsByWorkWeek,
   splitLayoutByOffDays,
 } from "./renderModel/index.js";
+import {
+  computeOverlapAwareContentHeight,
+  computeOverlapAwareSegmentTopPx,
+  ROW_ALLOC_PAD,
+  LANE_STACK_GAP,
+} from "./segmentStackTops.js";
 
 /** Keep in sync with TimelineRow / virtual row height (`LandingPage.jsx`). */
-export const ROW_ALLOC_PAD = 8;
-export const LANE_STACK_GAP = 4;
+export { ROW_ALLOC_PAD, LANE_STACK_GAP };
 export const LEAVE_CLICK_GAP_PX = 56;
 
 /**
@@ -20,6 +26,7 @@ export function buildTimelineRowLayout({
   personAllocations,
   scheduleModel,
   dismissedAvailOffKeys = null,
+  layoutColumnRange = null,
 }) {
   const allocs = personAllocations || [];
   const slotsLen = scheduleModel?.slots?.length ?? 0;
@@ -100,6 +107,11 @@ export function buildTimelineRowLayout({
 
   assignAllocationStackLevelsByWorkWeek(workEnvelopeSegments, scheduleModel);
 
+  const heightSegmentsFilter = (seg) =>
+    !layoutColumnRange || !isValidColumnRange(layoutColumnRange)
+      ? true
+      : segmentIntersectsColumnRange(seg, layoutColumnRange);
+
   const workSegments = workEnvelopeSegments
     .flatMap((env) => {
       const pieces = splitLayoutByOffDays(env.lay, scheduleModel, offDayColSet);
@@ -130,31 +142,22 @@ export function buildTimelineRowLayout({
       });
     });
 
+  const segmentTopPx = (seg) => computeOverlapAwareSegmentTopPx(seg, workSegments, scheduleModel);
+
   const segTopMap = new Map();
   for (const seg of workSegments) {
-    const segStart = seg.lay.start;
-    const segEnd = seg.lay.start + seg.lay.span;
-    let top = ROW_ALLOC_PAD / 2;
-    for (let lane = 0; lane < seg.stack; lane++) {
-      const overlapping = workSegments.filter(
-        (o) => o.stack === lane && o.lay.start < segEnd && o.lay.start + o.lay.span > segStart
-      );
-      if (overlapping.length > 0) {
-        top += Math.max(...overlapping.map((o) => allocationBarHeightPx(o.a))) + LANE_STACK_GAP;
-      }
-    }
-    segTopMap.set(seg.segKey, top);
+    segTopMap.set(seg.segKey, segmentTopPx(seg));
   }
 
+  const heightSegs = workSegments.filter(heightSegmentsFilter);
+
   const schedAllocContentH =
-    workSegments.length > 0
-      ? Math.max(
-          ...workSegments.map((s) => (segTopMap.get(s.segKey) ?? 0) + allocationBarHeightPx(s.a))
-        ) + ROW_ALLOC_PAD / 2
+    heightSegs.length > 0
+      ? computeOverlapAwareContentHeight(heightSegs, scheduleModel)
       : ROW_ALLOC_PAD;
 
-  const allocLaneCount = workSegments.length
-    ? Math.max(...workSegments.map((s) => s.stack)) + 1
+  const allocLaneCount = heightSegs.length
+    ? Math.max(...heightSegs.map((s) => s.stack ?? 0)) + 1
     : 1;
 
   return {

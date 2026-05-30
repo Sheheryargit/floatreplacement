@@ -56,10 +56,16 @@ function startOfWeekMonday(d) {
   return x;
 }
 
-function weekMondayKeyFromDateKey(dateKey) {
+export function weekMondayKeyFromDateKey(dateKey) {
   const dt = dateFromKey(dateKey);
   if (Number.isNaN(dt.getTime())) return "";
   return dateKeyLocal(startOfWeekMonday(dt));
+}
+
+/** ISO week key for a schedule column index (stack lanes reset each work week). */
+export function weekMondayKeyForScheduleColumn(scheduleModel, colIndex) {
+  const dk = scheduleModel?.slots?.[colIndex]?.dateKey;
+  return dk ? weekMondayKeyFromDateKey(dk) : "";
 }
 
 /**
@@ -118,4 +124,3 @@ export function assignAllocationStackLevelsByWorkWeek(segments, scheduleModel) {
     });
   }
 }
-

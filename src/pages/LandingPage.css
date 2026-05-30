@@ -1241,6 +1241,22 @@
 .lp-sched-virtual-rows .lp-sched-virtual-anchor {
   border-bottom: 1px solid var(--border);
   isolation: isolate;
+  transition: height 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+  /* Do NOT set overflow:hidden here — it breaks position:sticky on .lp-sched-person
+     so the people column scrolls off-screen with the timeline. */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-sched-virtual-rows .lp-sched-virtual-anchor {
+    transition: none;
+  }
+}
+
+.lp-sched-virtual-rows .lp-sched-virtual-anchor .lp-sched-row {
+  height: 100%;
+  min-height: 0;
+  opacity: 1;
+  animation: none;
 }
 
 .lp-sched-virtual-rows .lp-sched-virtual-anchor .lp-sched-person,
@@ -1251,6 +1267,7 @@
 /* Clip allocation overflow only — not the people column (names/avatars must stay visible). */
 .lp-sched-virtual-rows .lp-sched-virtual-anchor .lp-sched-timeline {
   overflow: hidden;
+  min-height: 0;
 }
 
 .lp-sched-row {
@@ -1264,12 +1281,6 @@
   opacity: 0;
   animation: rowSlideUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   animation-delay: calc(var(--animation-order, 0) * 0.04s);
-}
-
-/* After .lp-sched-row so opacity/animation win — virtual rows must not stay at opacity:0 */
-.lp-sched-virtual-rows .lp-sched-virtual-anchor .lp-sched-row {
-  opacity: 1;
-  animation: none;
 }
 
 .lp-sched-row-head {

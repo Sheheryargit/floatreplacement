@@ -1,44 +1,36 @@
-import { workTileHeightPxForDensity, allocationBarHeightPx } from "./renderModel/index.js";
-import { buildTimelineRowLayout, leaveMinHeightPx, ROW_ALLOC_PAD, LEAVE_CLICK_GAP_PX } from "./timelineRowLayout.js";
+import { getCachedScheduleRowHeightPx } from "./scheduleRowHeightRuntime.js";
+import { computeScheduleRowHeightPxLegacy } from "./scheduleRowHeightLegacy.js";
 
-const DENSITY_BASE_ROW_PX = {
-  compact: 72,
-  comfortable: 84,
-  spacious: 120,
-};
+export { computeScheduleRowHeightPxLegacy };
 
 /**
- * Row height for @tanstack/react-virtual — uses the same layout pass as TimelineRow.
+ * Row height for @tanstack/react-virtual — cached fast path when personId is provided.
  */
 export function computeScheduleRowHeightPx({
+  personId,
   personAllocations,
   scheduleModel,
   density = "comfortable",
   dismissedAvailOffKeys = null,
+  layoutColumnRange = null,
+  layoutRevision = "",
 }) {
-  const baseRowH = DENSITY_BASE_ROW_PX[density] ?? DENSITY_BASE_ROW_PX.comfortable;
-  const allocs = personAllocations || [];
-
-  if (!scheduleModel?.slots?.length) {
-    const work = allocs.filter((a) => !a.isLeave && !a.syntheticPublicHoliday);
-    const hasLeave = allocs.some((a) => a.isLeave || a.syntheticPublicHoliday);
-    const leaveMinH = hasLeave ? workTileHeightPxForDensity(density) + LEAVE_CLICK_GAP_PX : 0;
-    if (!work.length) return Math.ceil(Math.max(baseRowH, leaveMinH) + 12);
-    const maxH = Math.max(
-      ...work.map((a) => allocationBarHeightPx(a)),
-      workTileHeightPxForDensity(density)
-    );
-    return Math.ceil(Math.max(baseRowH, leaveMinH, maxH + ROW_ALLOC_PAD) + 12);
+  if (personId != null && String(personId) !== "") {
+    return getCachedScheduleRowHeightPx({
+      personId,
+      personAllocations,
+      scheduleModel,
+      density,
+      dismissedAvailOffKeys,
+      layoutColumnRange,
+      layoutRevision,
+    });
   }
-
-  const layout = buildTimelineRowLayout({
-    personAllocations: allocs,
+  return computeScheduleRowHeightPxLegacy({
+    personAllocations,
     scheduleModel,
+    density,
     dismissedAvailOffKeys,
+    layoutColumnRange,
   });
-
-  const leaveMinH = leaveMinHeightPx(layout, density);
-  const timelineH = Math.max(baseRowH, leaveMinH, layout.schedAllocContentH);
-  const personColMinH = baseRowH + 28;
-  return Math.ceil(Math.max(timelineH, personColMinH) + 12);
 }

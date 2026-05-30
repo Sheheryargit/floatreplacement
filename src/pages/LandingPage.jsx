@@ -61,7 +61,22 @@ import {
   useAlloc8ActionFeedbackMount,
 } from "../context/CenterActionFeedbackContext.jsx";
 import { useTimelineScrollController } from "../schedule/useTimelineScrollController.js";
-import { computeScheduleRowHeightPx } from "../schedule/scheduleRowHeight.js";
+import {
+  getEffectiveLayoutColumnRange,
+  readLayoutColumnRangeFromViewport,
+  columnRangesEqual,
+} from "../schedule/scheduleLayoutRange.js";
+import { attachColumnIndex } from "../schedule/scheduleColumnIndex.js";
+import {
+  collectVirtualRowIndices,
+  setScheduleRowHeightRevision,
+} from "../schedule/scheduleRowHeightRuntime.js";
+import {
+  buildScheduleRowHeightResolver,
+  cancelScheduledRowRemeasure,
+  queueScheduleRowRemeasure,
+  remeasureVisibleScheduleRows,
+} from "../schedule/scheduleRowRemeasure.js";
 import {
   buildTimelineRowLayout,
   leaveMinHeightPx,
@@ -335,24 +350,32 @@ function buildScheduleModel(viewMode, anchorDate, offsets = { prev: 0, next: 0 }
 
   let dates = [];
   let bandTitle = "";
+  let anchorStartCol = 0;
+  let anchorEndCol = -1;
 
   if (viewMode === "week") {
     for (let o = -offsets.prev; o <= offsets.next; o++) {
+      const colStart = dates.length;
       const wStart = addDays(startOfWeekMonday(d), 7 * o);
       const wDates = [0, 1, 2, 3, 4].map((i) => addDays(wStart, i));
       dates.push(...wDates);
       if (o === 0) {
         bandTitle = `${formatDayMonth(wDates[0])} – ${formatDayMonthYear(wDates[4])}`;
+        anchorStartCol = colStart;
+        anchorEndCol = dates.length - 1;
       }
     }
   } else {
     for (let o = -offsets.prev; o <= offsets.next; o++) {
+      const colStart = dates.length;
       const targetMonth = new Date(y, mo + o, 1);
       dates.push(
         ...weekdaysInMonth(targetMonth.getFullYear(), targetMonth.getMonth() + 1)
       );
       if (o === 0) {
         bandTitle = targetMonth.toLocaleDateString("en-AU", { month: "long", year: "numeric" });
+        anchorStartCol = colStart;
+        anchorEndCol = dates.length - 1;
       }
     }
   }
@@ -367,6 +390,7 @@ function buildScheduleModel(viewMode, anchorDate, offsets = { prev: 0, next: 0 }
         { main: "—", sub: "", weekParity: 0, weekBlockStart: true, weekBlockEnd: true, dateKey: fallbackKey },
       ],
       anchorDateKey: fallbackKey,
+      anchorColumnRange: { startCol: 0, endCol: 0 },
     };
   }
 
@@ -411,6 +435,7 @@ function buildScheduleModel(viewMode, anchorDate, offsets = { prev: 0, next: 0 }
     bandSpans,
     slots,
     anchorDateKey: dateKeyLocal(d),
+    anchorColumnRange: { startCol: anchorStartCol, endCol: anchorEndCol },
   };
 }
 
@@ -449,6 +474,7 @@ function buildScheduleModelCustomRange(startKey, endKey) {
       ],
       anchorDateKey: dk,
       aggregateAllSlots: true,
+      anchorColumnRange: { startCol: 0, endCol: 0 },
     };
   }
   let weekStripe = -1;
@@ -491,6 +517,7 @@ function buildScheduleModelCustomRange(startKey, endKey) {
     slots,
     anchorDateKey: dateKeyLocal(dates[0]),
     aggregateAllSlots: true,
+    anchorColumnRange: { startCol: 0, endCol: dates.length - 1 },
   };
 }
 
@@ -1588,6 +1615,11 @@ export default function LandingPage() {
     return buildScheduleModel(viewMode, anchorDate, timelineOffsets);
   }, [customRange, viewMode, anchorDate, timelineOffsets]);
 
+  const scheduleModelForCanvas = useMemo(
+    () => attachColumnIndex(scheduleModel),
+    [scheduleModel]
+  );
+
   const todayDateKey = useMemo(() => dateKeyLocal(new Date()), []);
 
   const peopleOrderMap = useMemo(() => {
@@ -2511,6 +2543,106 @@ export default function LandingPage() {
   const gridTemplate = `repeat(${scheduleModel.columnCount}, minmax(${colMinPx}px, 1fr))`;
   const timelineMinWidthPx = scheduleModel.columnCount * colMinPx;
 
+  const layoutColumnRangeRef = useRef(
+    getEffectiveLayoutColumnRange(scheduleModel, null)
+  );
+  const scheduleRowHeightRevisionRef = useRef("");
+
+  const syncLayoutColumnRange = useCallback(() => {
+    const el = scheduleViewportRef.current;
+    const next = el
+      ? readLayoutColumnRangeFromViewport(el, scheduleModel, colMinPx)
+      : getEffectiveLayoutColumnRange(scheduleModel, null);
+    if (columnRangesEqual(layoutColumnRangeRef.current, next)) return false;
+    layoutColumnRangeRef.current = next;
+    return true;
+  }, [scheduleModel, colMinPx]);
+
+  useLayoutEffect(() => {
+    layoutColumnRangeRef.current = getEffectiveLayoutColumnRange(scheduleModel, null);
+  }, [scheduleModel.anchorDateKey, scheduleModel.columnCount]);
+
+  const scheduleRowEstimatePx = useMemo(() => {
+    if (density === "compact") return 100;
+    if (density === "spacious") return 162;
+    return 124;
+  }, [density]);
+
+  const scheduleAnchorJumpKey = useMemo(
+    () =>
+      `${scheduleModel.anchorDateKey}|${scheduleModel.columnCount}|${timelineOffsets.prev}|${timelineOffsets.next}|${customRange?.start ?? ""}|${customRange?.end ?? ""}`,
+    [
+      scheduleModel.anchorDateKey,
+      scheduleModel.columnCount,
+      timelineOffsets.prev,
+      timelineOffsets.next,
+      customRange,
+    ]
+  );
+
+  const scheduleRowHeightRevision = useMemo(
+    () =>
+      `${scheduleAnchorJumpKey}|${scheduleAllocations.length}|${visiblePublicHolidayAllocations.length}|${dismissedAvailOffKeys?.size ?? 0}`,
+    [
+      scheduleAnchorJumpKey,
+      scheduleAllocations.length,
+      visiblePublicHolidayAllocations.length,
+      dismissedAvailOffKeys,
+    ]
+  );
+
+  useEffect(() => {
+    scheduleRowHeightRevisionRef.current = scheduleRowHeightRevision;
+    setScheduleRowHeightRevision(scheduleRowHeightRevision);
+  }, [scheduleRowHeightRevision]);
+
+  const resolveScheduleRowHeightPx = useMemo(
+    () =>
+      buildScheduleRowHeightResolver({
+        schedulePeople,
+        getPersonAllocations,
+        allocationsByPerson,
+        scheduleModel: scheduleModelForCanvas,
+        density,
+        dismissedAvailOffKeys,
+        layoutColumnRangeRef,
+        layoutRevisionRef: scheduleRowHeightRevisionRef,
+        fallbackPx: scheduleRowEstimatePx,
+      }),
+    [
+      schedulePeople,
+      allocationsByPerson,
+      scheduleModelForCanvas,
+      density,
+      dismissedAvailOffKeys,
+      scheduleRowEstimatePx,
+    ]
+  );
+
+  const estimateScheduleRowSize = useCallback(
+    (index) => resolveScheduleRowHeightPx(index),
+    [resolveScheduleRowHeightPx]
+  );
+
+  const remeasureScheduleRows = useCallback(() => {
+    const v = scheduleRowVirtualizerRef.current;
+    if (!v) return;
+    const sizeByIndex = new Map(v.getVirtualItems().map((item) => [item.index, item.size]));
+    remeasureVisibleScheduleRows(v, {
+      indices: collectVirtualRowIndices(v),
+      sizeByIndex,
+      getRowHeightPx: resolveScheduleRowHeightPx,
+    });
+  }, [resolveScheduleRowHeightPx]);
+
+  const queueRemeasureScheduleRows = useCallback(() => {
+    queueScheduleRowRemeasure(remeasureScheduleRows);
+  }, [remeasureScheduleRows]);
+
+  const syncLayoutColumnRangeAndRemeasure = useCallback(() => {
+    if (syncLayoutColumnRange()) queueRemeasureScheduleRows();
+  }, [syncLayoutColumnRange, queueRemeasureScheduleRows]);
+
   const { onTimelineScroll } = useTimelineScrollController({
     scheduleViewportRef,
     scheduleModel,
@@ -2520,63 +2652,15 @@ export default function LandingPage() {
     prevOffsetsRef: prevOffsets,
     prevColCountRef: prevColCount,
     lastAnchorKeyRef: lastAnchorKey,
+    onLayoutRangeSync: syncLayoutColumnRangeAndRemeasure,
   });
 
-  const scheduleRowEstimatePx = useMemo(() => {
-    if (density === "compact") return 100;
-    if (density === "spacious") return 162;
-    return 124;
-  }, [density]);
-
-  const estimateScheduleRowSize = useCallback(
-    (index) => {
-      const p = schedulePeople[index];
-      if (!p) return scheduleRowEstimatePx;
-      return computeScheduleRowHeightPx({
-        personAllocations: getPersonAllocations(allocationsByPerson, p.id),
-        scheduleModel,
-        density,
-        dismissedAvailOffKeys,
-      });
-    },
-    [
-      schedulePeople,
-      allocationsByPerson,
-      scheduleModel,
-      density,
-      scheduleRowEstimatePx,
-      dismissedAvailOffKeys,
-    ]
-  );
-
-  const remeasureScheduleRows = useCallback(() => {
-    const v = scheduleRowVirtualizerRef.current;
-    if (!v) return;
-    for (let i = 0; i < schedulePeople.length; i++) {
-      const p = schedulePeople[i];
-      if (!p) continue;
-      v.resizeItem(
-        i,
-        computeScheduleRowHeightPx({
-          personAllocations: getPersonAllocations(allocationsByPerson, p.id),
-          scheduleModel,
-          density,
-          dismissedAvailOffKeys,
-        })
-      );
-    }
-  }, [
-    schedulePeople,
-    allocationsByPerson,
-    scheduleModel,
-    density,
-    dismissedAvailOffKeys,
-  ]);
+  useEffect(() => () => cancelScheduledRowRemeasure(), []);
 
   const timelineRowProps = useMemo(
     () => ({
       projects,
-      scheduleModel,
+      scheduleModel: scheduleModelForCanvas,
       viewMode,
       anchorDate,
       utilizationMode,
@@ -2598,7 +2682,8 @@ export default function LandingPage() {
     }),
     [
       projects,
-      scheduleModel,
+      scheduleModelForCanvas,
+      scheduleModel.columnCount,
       viewMode,
       anchorDate,
       utilizationMode,
@@ -2628,18 +2713,6 @@ export default function LandingPage() {
     ro?.observe(header);
     return () => ro?.disconnect();
   }, [scheduleModel, viewMode, customRange, colMinPx, density]);
-
-  const scheduleAnchorJumpKey = useMemo(
-    () =>
-      `${scheduleModel.anchorDateKey}|${scheduleModel.columnCount}|${timelineOffsets.prev}|${timelineOffsets.next}|${customRange?.start ?? ""}|${customRange?.end ?? ""}`,
-    [
-      scheduleModel.anchorDateKey,
-      scheduleModel.columnCount,
-      timelineOffsets.prev,
-      timelineOffsets.next,
-      customRange,
-    ]
-  );
 
   useLayoutEffect(() => {
     const el = scheduleViewportRef.current;
@@ -2679,8 +2752,14 @@ export default function LandingPage() {
   ]);
 
   useLayoutEffect(() => {
-    remeasureScheduleRows();
-  }, [remeasureScheduleRows, scheduleAllocations, visiblePublicHolidayAllocations, dismissedAvailOffKeys]);
+    queueRemeasureScheduleRows();
+  }, [
+    queueRemeasureScheduleRows,
+    scheduleAllocations,
+    visiblePublicHolidayAllocations,
+    dismissedAvailOffKeys,
+    scheduleRowHeightRevision,
+  ]);
 
   return (
     <div

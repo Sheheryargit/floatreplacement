@@ -39,6 +39,9 @@ function weekMondayKey(dt) {
  * `start` / `span` are in column index units.
  */
 export function layoutAllocation(alloc, scheduleModel) {
+  const indexed = scheduleModel?.columnIndex?.layoutRangeForAllocation?.(alloc);
+  if (indexed) return indexed;
+
   const keys = scheduleModel.slots.map((s) => allocationDateKeyYmd(s.dateKey));
   const sk = allocationDateKeyYmd(alloc.startDate);
   const ek = allocationDateKeyYmd(alloc.endDate);
@@ -60,7 +63,9 @@ export function layoutAllocation(alloc, scheduleModel) {
 }
 
 function splitLayoutByWorkWeek(lay, scheduleModel) {
-  const keys = scheduleModel.slots.map((s) => allocationDateKeyYmd(s.dateKey));
+  const keys =
+    scheduleModel?.columnIndex?.keys ??
+    scheduleModel.slots.map((s) => allocationDateKeyYmd(s.dateKey));
   const i0 = lay.start;
   const i1 = lay.start + lay.span - 1;
   if (i0 < 0 || i1 >= keys.length || i1 < i0) return [lay];

@@ -1,5 +1,5 @@
 import { useLayoutEffect } from "react";
-import { useVirtualizer, measureElement as virtualMeasureElement } from "@tanstack/react-virtual";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { getPersonAllocations } from "../utils/allocationsByPerson.js";
 
 /**
@@ -14,13 +14,11 @@ function ScheduleRow({
   allocationsByPerson,
   TimelineRow,
   timelineRowProps,
-  measureRef,
   dataIndex,
   style,
 }) {
   return (
     <div
-      ref={measureRef}
       data-index={dataIndex}
       className="lp-sched-virtual-anchor"
       style={style}
@@ -51,14 +49,14 @@ export function ScheduleVirtualizedRows({
   timelineRowProps,
 }) {
   const useStaticList = schedulePeople.length <= SCHEDULE_STATIC_ROW_CAP;
+  const overscan = schedulePeople.length > 100 ? 4 : 6;
 
   const rowVirtualizer = useVirtualizer({
     count: useStaticList ? 0 : schedulePeople.length,
     getScrollElement: () => scheduleViewportRef.current,
     getItemKey: (index) => String(schedulePeople[index]?.id ?? index),
     estimateSize: estimateScheduleRowSize,
-    overscan: 6,
-    measureElement: virtualMeasureElement,
+    overscan,
     scrollMargin: scheduleScrollMargin,
     enabled: !useStaticList,
   });
@@ -116,13 +114,13 @@ export function ScheduleVirtualizedRows({
             allocationsByPerson={allocationsByPerson}
             TimelineRow={TimelineRow}
             timelineRowProps={timelineRowProps}
-            measureRef={rowVirtualizer.measureElement}
             dataIndex={virtualRow.index}
             style={{
               position: "absolute",
               top: rowTopPx,
               left: 0,
               width: "100%",
+              height: virtualRow.size,
               minWidth: "max(100%, calc(var(--lp-people-w) + var(--lp-timeline-min)))",
             }}
           />

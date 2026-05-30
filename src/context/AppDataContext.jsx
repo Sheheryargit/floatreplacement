@@ -415,7 +415,7 @@ export function syncPersonUpdate(person) {
       return updated;
     });
 }
-function syncPeopleDelete(ids) {
+export function syncPeopleDelete(ids) {
   if (!isSupabaseConfigured) return Promise.resolve();
   return Promise.resolve()
     .then(() => peopleApi.deletePeople(ids))
@@ -425,11 +425,11 @@ export function syncProjectCreate(project) {
   if (!isSupabaseConfigured) return Promise.resolve(project);
   return projectsApi.createProject(project);
 }
-function syncProjectUpdate(project) {
+export function syncProjectUpdate(project) {
   if (!isSupabaseConfigured) return Promise.resolve(project);
   return projectsApi.updateProject(project);
 }
-function syncProjectsDelete(ids) {
+export function syncProjectsDelete(ids) {
   if (!isSupabaseConfigured) return Promise.resolve();
   return projectsApi.deleteProjects(ids);
 }

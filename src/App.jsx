@@ -11,12 +11,15 @@ import { SlapAnimationProvider } from "./context/SlapAnimationContext.jsx";
 import { AssistantProvider } from "./context/AssistantContext.jsx";
 import { AssistantWorkflowProvider } from "./context/AssistantWorkflowContext.jsx";
 import { AppDataProvider, useAppStore } from "./context/AppDataContext.jsx";
+import { useAgentCrudHarnessRegistration } from "./lib/agentCrud/registerAgentCrudHarness.js";
 import AnimatedAppLoader from "./components/ui/AnimatedAppLoader.jsx";
 import RouteSkeleton from "./components/ui/RouteSkeleton.jsx";
 import { isStaticUi } from "./config/uiMode.js";
 import LoginPage from "./pages/LoginPage.jsx";
 import AccessDeniedPage from "./pages/AccessDeniedPage.jsx";
 import { SsoPersonProfileSync } from "./components/auth/SsoPersonProfileSync.jsx";
+import { WorkspacePresenceProvider } from "./context/WorkspacePresenceContext.jsx";
+import WorkspacePresenceAvatars from "./components/presence/WorkspacePresenceAvatars.jsx";
 import { VercelAnalytics } from "./components/analytics/VercelAnalytics.jsx";
 import GlobalBackground from "./components/ui/GlobalBackground.jsx";
 import { Toaster } from "sonner";
@@ -63,6 +66,12 @@ function WorkspaceReady({ children }) {
     return isStaticUi() ? <RouteSkeleton /> : <AnimatedAppLoader />;
   }
   return children;
+}
+
+/** Dev-only: registers agent CRUD smoke harness when VITE_AGENT_CRUD_TEST=true. */
+function AgentCrudHarnessHost() {
+  useAgentCrudHarnessRegistration();
+  return null;
 }
 
 function AppErrorBoundaryShell({ error }) {
@@ -164,20 +173,26 @@ function AuthGate() {
       <SkipToMainLink />
       <AppErrorBoundary>
         <WorkspaceReady>
+          <AgentCrudHarnessHost />
           <SsoPersonProfileSync />
-          <PremiumV2Provider>
-            <SlapAnimationProvider>
-              <Suspense fallback={null}>
-                <CommandPalette />
-              </Suspense>
-              <div className="app-viewport">
-                <AnimatedRoutes />
-              </div>
-              <Suspense fallback={null}>
-                <WorkspaceAssistant />
-              </Suspense>
-            </SlapAnimationProvider>
-          </PremiumV2Provider>
+          <WorkspacePresenceProvider>
+            <PremiumV2Provider>
+              <SlapAnimationProvider>
+                <Suspense fallback={null}>
+                  <CommandPalette />
+                </Suspense>
+                <div className="app-viewport">
+                  <div className="app-workspace-presence-strip">
+                    <WorkspacePresenceAvatars />
+                  </div>
+                  <AnimatedRoutes />
+                </div>
+                <Suspense fallback={null}>
+                  <WorkspaceAssistant />
+                </Suspense>
+              </SlapAnimationProvider>
+            </PremiumV2Provider>
+          </WorkspacePresenceProvider>
         </WorkspaceReady>
       </AppErrorBoundary>
       <ThemedToaster />

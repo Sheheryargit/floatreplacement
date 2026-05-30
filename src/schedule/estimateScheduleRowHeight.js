@@ -9,11 +9,13 @@ export function estimateScheduleRowHeightPx({
   scheduleModel = null,
   density = "comfortable",
   dismissedAvailOffKeys = null,
+  layoutColumnRange = null,
 }) {
   return computeScheduleRowHeightPx({
     personAllocations,
     scheduleModel,
     density,
     dismissedAvailOffKeys,
+    layoutColumnRange,
   });
 }
