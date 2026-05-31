@@ -1,11 +1,13 @@
+import {
+  buildTimelineRowLayout,
+  leaveMinHeightPx,
+  resolveScheduleRowHeightPx,
+  PERSON_COL_MIN_PX,
+  ROW_EDGE_PAD_PX,
+  ROW_ALLOC_PAD,
+  LEAVE_CLICK_GAP_PX,
+} from "./timelineRowLayout.js";
 import { workTileHeightPxForDensity, allocationBarHeightPx } from "./renderModel/index.js";
-import { buildTimelineRowLayout, leaveMinHeightPx, ROW_ALLOC_PAD, LEAVE_CLICK_GAP_PX } from "./timelineRowLayout.js";
-
-const DENSITY_BASE_ROW_PX = {
-  compact: 72,
-  comfortable: 84,
-  spacious: 120,
-};
 
 /** Full layout pass — used when scheduleModel has no slots (fallback). */
 export function computeScheduleRowHeightPxLegacy({
@@ -15,19 +17,23 @@ export function computeScheduleRowHeightPxLegacy({
   dismissedAvailOffKeys = null,
   layoutColumnRange = null,
 }) {
-  const baseRowH = DENSITY_BASE_ROW_PX[density] ?? DENSITY_BASE_ROW_PX.comfortable;
   const allocs = personAllocations || [];
 
   if (!scheduleModel?.slots?.length) {
     const work = allocs.filter((a) => !a.isLeave && !a.syntheticPublicHoliday);
     const hasLeave = allocs.some((a) => a.isLeave || a.syntheticPublicHoliday);
     const leaveMinH = hasLeave ? workTileHeightPxForDensity(density) + LEAVE_CLICK_GAP_PX : 0;
-    if (!work.length) return Math.ceil(Math.max(baseRowH, leaveMinH) + 12);
-    const maxH = Math.max(
-      ...work.map((a) => allocationBarHeightPx(a)),
-      workTileHeightPxForDensity(density)
-    );
-    return Math.ceil(Math.max(baseRowH, leaveMinH, maxH + ROW_ALLOC_PAD) + 12);
+    const personMin = PERSON_COL_MIN_PX[density] ?? PERSON_COL_MIN_PX.comfortable;
+    if (!work.length) {
+      return Math.ceil(Math.max(personMin, leaveMinH > 0 ? leaveMinH : 0) + ROW_EDGE_PAD_PX);
+    }
+    const maxH = Math.max(...work.map((a) => allocationBarHeightPx(a)), ROW_ALLOC_PAD);
+    return resolveScheduleRowHeightPx({
+      schedAllocContentH: maxH + ROW_ALLOC_PAD,
+      hasVisibleWorkSegments: true,
+      density,
+      leaveMinH,
+    });
   }
 
   const layout = buildTimelineRowLayout({
@@ -38,7 +44,11 @@ export function computeScheduleRowHeightPxLegacy({
   });
 
   const leaveMinH = leaveMinHeightPx(layout, density);
-  const timelineH = Math.max(baseRowH, leaveMinH, layout.schedAllocContentH);
-  const personColMinH = baseRowH + 28;
-  return Math.ceil(Math.max(timelineH, personColMinH) + 12);
+  const heightSegs = layout.workSegments?.length ?? 0;
+  return resolveScheduleRowHeightPx({
+    schedAllocContentH: layout.schedAllocContentH,
+    hasVisibleWorkSegments: heightSegs > 0,
+    density,
+    leaveMinH,
+  });
 }

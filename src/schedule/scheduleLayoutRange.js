@@ -86,7 +86,7 @@ export function readLayoutColumnRangeFromViewport(scheduleViewportEl, scheduleMo
     scheduleViewportEl.clientWidth,
     colMinPx,
     scheduleModel.columnCount,
-    0
+    1
   );
   return getEffectiveLayoutColumnRange(scheduleModel, viewportRange);
 }

@@ -10,7 +10,7 @@ import {
 import { estimateScheduleRowHeightPx } from "./estimateScheduleRowHeight.js";
 import { computeScheduleRowHeightPx } from "./scheduleRowHeight.js";
 import { allocationBarHeightPx } from "./renderModel/sizing.js";
-import { buildTimelineRowLayout, LANE_STACK_GAP, ROW_ALLOC_PAD } from "./timelineRowLayout.js";
+import { buildTimelineRowLayout, LANE_STACK_GAP, ROW_ALLOC_PAD, leaveOverlayColumnHeightPx, publicHolidayColumnHeightPx } from "./timelineRowLayout.js";
 
 const monthModel = {
   slots: Array.from({ length: 22 }, (_, i) => ({
@@ -72,7 +72,7 @@ describe("scheduleLayoutRange", () => {
 describe("estimateScheduleRowHeightPx", () => {
   it("returns base height for empty work allocations", () => {
     const h = estimateScheduleRowHeightPx({ personAllocations: [], density: "comfortable" });
-    assert.ok(h >= 84 && h < 200);
+    assert.ok(h >= 72 && h < 120, `expected compact empty row, got ${h}`);
   });
 
   it("does not sum every bar height (avoids virtual scroll gaps)", () => {
@@ -92,7 +92,7 @@ describe("estimateScheduleRowHeightPx", () => {
     });
     const naiveSumAllBars = many.reduce((s, a) => s + allocationBarHeightPx(a), 0);
     assert.ok(h < naiveSumAllBars, "stacked lanes should be shorter than naive sum of every bar");
-    assert.ok(h > 120);
+    assert.ok(h > 70, `expected stacked row taller than person min, got ${h}`);
     assert.ok(h < 720, "month view should not reserve one lane per calendar day globally");
   });
 
@@ -156,8 +156,28 @@ describe("estimateScheduleRowHeightPx", () => {
       layoutColumnRange: fullColumnRange(bufferModel.columnCount),
     });
 
-    assert.ok(anchorHeight < fullHeight - 40, "buffer projects should not inflate anchor row height");
-    assert.ok(anchorHeight < 220, "anchor month with one project stays compact");
+    assert.ok(
+      anchorHeight < fullHeight,
+      "anchor-period height should exclude buffer-month stacks"
+    );
+  });
+
+  it("sizes leave overlay columns to full stack height", () => {
+    const stackedH = 120;
+    assert.equal(
+      leaveOverlayColumnHeightPx({ schedAllocContentH: stackedH, hasWorkSegments: true }),
+      stackedH
+    );
+    assert.equal(
+      publicHolidayColumnHeightPx({ schedAllocContentH: stackedH, hasWorkSegments: true }),
+      stackedH
+    );
+    const soloH = leaveOverlayColumnHeightPx({
+      schedAllocContentH: ROW_ALLOC_PAD,
+      hasWorkSegments: false,
+      density: "comfortable",
+    });
+    assert.equal(soloH, 72, "sparse rows fill the comfortable timeline floor");
   });
 
   it("stacks segments tightly when overlapping; solo columns start at top", () => {
@@ -228,6 +248,6 @@ describe("estimateScheduleRowHeightPx", () => {
       density: "comfortable",
       layoutColumnRange: monthModel.anchorColumnRange,
     });
-    assert.ok(h >= 84 && h < 220);
+    assert.ok(h >= 72 && h < 220, `expected PH row height, got ${h}`);
   });
 });

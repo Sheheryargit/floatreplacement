@@ -18,6 +18,23 @@ import {
 export { ROW_ALLOC_PAD, LANE_STACK_GAP };
 export const LEAVE_CLICK_GAP_PX = 56;
 
+/** Matches `--lp-row-h` in LandingPage.css per density. */
+export const TIMELINE_FLOOR_PX = {
+  compact: 64,
+  comfortable: 72,
+  spacious: 96,
+};
+
+/** Minimum people-column card height — keeps avatar + name readable without forcing timeline air. */
+export const PERSON_COL_MIN_PX = {
+  compact: 64,
+  comfortable: 72,
+  spacious: 96,
+};
+
+/** Vertical breathing room inside the virtual row (split top/bottom in CSS). */
+export const ROW_EDGE_PAD_PX = 8;
+
 /**
  * Pure layout pass for one schedule person row — shared by TimelineRow rendering and
  * @tanstack/react-virtual row sizing so estimates cannot drift from the DOM.
@@ -153,7 +170,7 @@ export function buildTimelineRowLayout({
 
   const schedAllocContentH =
     heightSegs.length > 0
-      ? computeOverlapAwareContentHeight(heightSegs, scheduleModel)
+      ? computeOverlapAwareContentHeight(heightSegs, scheduleModel, undefined, heightSegs)
       : ROW_ALLOC_PAD;
 
   const allocLaneCount = heightSegs.length
@@ -173,10 +190,64 @@ export function buildTimelineRowLayout({
     schedAllocContentH,
     allocLaneCount,
     hasLeaveSegments: leaveSegments.length > 0,
+    hasVisibleWorkSegments: heightSegs.length > 0,
   };
 }
 
 export function leaveMinHeightPx(layout, density) {
   if (!layout?.hasLeaveSegments) return 0;
   return workTileHeightPxForDensity(density) + LEAVE_CLICK_GAP_PX;
+}
+
+/** Leave/PH overlay columns span the full work stack (top of first bar → bottom of last). */
+export function leaveOverlayColumnHeightPx({
+  schedAllocContentH,
+  hasWorkSegments,
+  density = "comfortable",
+  leaveMinH = 0,
+}) {
+  const contentH = Math.max(0, Number(schedAllocContentH) || ROW_ALLOC_PAD);
+  if (hasWorkSegments) return contentH;
+  const floor = TIMELINE_FLOOR_PX[density] ?? TIMELINE_FLOOR_PX.comfortable;
+  return Math.max(contentH, floor, leaveMinH > 0 ? leaveMinH : 0);
+}
+
+/** @deprecated Use leaveOverlayColumnHeightPx */
+export function publicHolidayColumnHeightPx(opts) {
+  return leaveOverlayColumnHeightPx(opts);
+}
+
+/** Timeline grid + leave/PH layer height (content only, no row edge pad). */
+export function resolveTimelineRowContentHeight({
+  schedAllocContentH,
+  hasWorkSegments,
+  density = "comfortable",
+  leaveMinH = 0,
+}) {
+  return leaveOverlayColumnHeightPx({
+    schedAllocContentH,
+    hasWorkSegments,
+    density,
+    leaveMinH,
+  });
+}
+
+/**
+ * Total virtual row height — must match TimelineRow grid content + person shell.
+ * Tight to content: no legacy baseRowH + 28px floor.
+ */
+export function resolveScheduleRowHeightPx({
+  schedAllocContentH,
+  hasVisibleWorkSegments,
+  density = "comfortable",
+  leaveMinH = 0,
+}) {
+  const contentH = resolveTimelineRowContentHeight({
+    schedAllocContentH,
+    hasWorkSegments: hasVisibleWorkSegments,
+    density,
+    leaveMinH,
+  });
+  const personMin = PERSON_COL_MIN_PX[density] ?? PERSON_COL_MIN_PX.comfortable;
+  return Math.ceil(Math.max(contentH, personMin) + ROW_EDGE_PAD_PX);
 }

@@ -6,7 +6,7 @@ import {
   useCallback,
   memo,
   useLayoutEffect,
-  startTransition,
+  useSyncExternalStore,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -64,8 +64,14 @@ import { useTimelineScrollController } from "../schedule/useTimelineScrollContro
 import {
   getEffectiveLayoutColumnRange,
   readLayoutColumnRangeFromViewport,
-  columnRangesEqual,
+  segmentIntersectsColumnRange,
+  isValidColumnRange,
 } from "../schedule/scheduleLayoutRange.js";
+import {
+  publishLayoutColumnRange,
+  subscribeLayoutColumnRange,
+  getLayoutColumnRangeSnapshot,
+} from "../schedule/scheduleLayoutColumnRangeStore.js";
 import { attachColumnIndex } from "../schedule/scheduleColumnIndex.js";
 import {
   collectVirtualRowIndices,
@@ -80,6 +86,7 @@ import {
 import {
   buildTimelineRowLayout,
   leaveMinHeightPx,
+  resolveTimelineRowContentHeight,
   ROW_ALLOC_PAD,
 } from "../schedule/timelineRowLayout.js";
 import { ScheduleVirtualizedRows } from "../schedule/ScheduleVirtualizedRows.jsx";
@@ -612,7 +619,6 @@ const LEAVE_PX_PER_HOUR = (WEEK_CELL_FULL_DAY_PX - BAR_H_BASE_PX) / LEAVE_H_NORM
 const LEAVE_FIXED_HEIGHT_PX = 86;
 const LEAVE_CLICK_GAP_PX = 56;
 /** Matches `.lp-grid-row` vertical padding — in-flow work bars start below this; abspos overlays must inset the same. */
-const SCHED_GRID_ROW_PAD_Y = 12;
 
 function leaveBarHeightPx(alloc) {
   // Legacy: leave tiles used variable heights. Schedule now uses consistent tile sizing
@@ -676,6 +682,10 @@ const TimelineRow = memo(function TimelineRow({
   premiumV2Enabled,
 }) {
   const { theme } = useAppTheme();
+  const layoutColumnRange = useSyncExternalStore(
+    subscribeLayoutColumnRange,
+    getLayoutColumnRangeSnapshot
+  );
   const t = T[theme];
   const reduceMotion = useReducedMotion();
   const lightInteraction = reduceMotion || isStaticUi();
@@ -748,8 +758,9 @@ const TimelineRow = memo(function TimelineRow({
         personAllocations,
         scheduleModel,
         dismissedAvailOffKeys,
+        layoutColumnRange,
       }),
-    [personAllocations, scheduleModel, dismissedAvailOffKeys]
+    [personAllocations, scheduleModel, dismissedAvailOffKeys, layoutColumnRange]
   );
 
   const {
@@ -762,9 +773,22 @@ const TimelineRow = memo(function TimelineRow({
     segTopMap,
     schedAllocContentH,
     allocLaneCount,
+    hasVisibleWorkSegments,
   } = rowLayout;
 
   const leaveMinH = leaveMinHeightPx(rowLayout, density);
+  const timelineContentH = resolveTimelineRowContentHeight({
+    schedAllocContentH,
+    hasWorkSegments: hasVisibleWorkSegments,
+    density,
+    leaveMinH,
+  });
+  const isSparseRow = !hasVisibleWorkSegments && maxDailyBookedHours < 0.05;
+
+  const paintWorkSegments = useMemo(() => {
+    if (!isValidColumnRange(layoutColumnRange)) return workSegments;
+    return workSegments.filter((seg) => segmentIntersectsColumnRange(seg, layoutColumnRange));
+  }, [workSegments, layoutColumnRange]);
 
   // Dev-only invariants to catch geometry/stack bugs early (prevents "silent" canvas breakage).
   if (import.meta.env.DEV) {
@@ -798,7 +822,11 @@ const TimelineRow = memo(function TimelineRow({
   return (
     <div
       key={p.id}
-      className={"lp-sched-row" + (overAllocated ? " lp-sched-row-overloaded" : "")}
+      className={
+        "lp-sched-row" +
+        (overAllocated ? " lp-sched-row-overloaded" : "") +
+        (isSparseRow ? " lp-sched-row--sparse" : "")
+      }
       style={{ ["--animation-order"]: Math.min(i, TABLE_ROW_ENTER_ANIM_MAX) }}
     >
       <div className="lp-sched-person">
@@ -938,7 +966,7 @@ const TimelineRow = memo(function TimelineRow({
           style={{
             cursor: "pointer",
             ["--lp-alloc-lane-count"]: allocLaneCount,
-            ["--lp-sched-alloc-content-h"]: `${schedAllocContentH}px`,
+            ["--lp-sched-alloc-content-h"]: `${timelineContentH}px`,
             ["--lp-leave-min-h"]: leaveMinH > 0 ? `${leaveMinH}px` : undefined,
           }}
           onClick={(e) => handleTimelineClick(e, p, nCols, offDayColSet)}
@@ -963,13 +991,22 @@ const TimelineRow = memo(function TimelineRow({
               style={{
                 display: "grid",
                 gridTemplateColumns: gridTemplate,
-                gridColumn: 1,
-                gridRow: 1,
-                alignSelf: "stretch",
+                gridColumn: "1 / -1",
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                height: `${timelineContentH}px`,
+                width: "100%",
+                gap: 0,
+                alignContent: "stretch",
+                alignItems: "stretch",
+                padding: 0,
                 pointerEvents: "none",
                 zIndex: 1,
-                // Match `.lp-grid-row` vertical padding so leave bars line up with work bars.
-                padding: `${SCHED_GRID_ROW_PAD_Y}px 0`,
+                minWidth: 0,
+                boxSizing: "border-box",
+                overflow: "hidden",
               }}
             >
               {lightInteraction ? (
@@ -990,7 +1027,6 @@ const TimelineRow = memo(function TimelineRow({
                   const typeId = isDayOff ? "day_off" : normalizeLeaveTypeId(allocUi.leaveType);
                   const onToday = leaveSpansToday(allocUi, todayDateKey);
                   const hoverTitle = buildLeaveHoverTitle(allocUi, leaveLabel);
-                  const leaveBarH = allocationBarHeightPx(allocUi);
 
                   return (
                     <button
@@ -1005,10 +1041,13 @@ const TimelineRow = memo(function TimelineRow({
                       style={{
                         gridColumn: `${colStart} / span ${colSpan}`,
                         gridRow: 1,
-                        alignSelf: "start",
-                        height: `${leaveBarH}px`,
-                        minHeight: `${leaveBarH}px`,
-                        maxHeight: `${leaveBarH}px`,
+                        alignSelf: "stretch",
+                        height: "100%",
+                        minHeight: 0,
+                        maxHeight: "100%",
+                        width: "100%",
+                        minWidth: 0,
+                        justifySelf: "stretch",
                         margin: 0,
                         borderRadius: `${leaveBrPx}px`,
                         overflow: "hidden",
@@ -1050,7 +1089,6 @@ const TimelineRow = memo(function TimelineRow({
                   const typeId = isDayOff ? "day_off" : normalizeLeaveTypeId(allocUi.leaveType);
                   const onToday = leaveSpansToday(allocUi, todayDateKey);
                   const hoverTitle = buildLeaveHoverTitle(allocUi, leaveLabel);
-                  const leaveBarH = allocationBarHeightPx(allocUi);
 
                   return (
                     <motion.button
@@ -1066,10 +1104,13 @@ const TimelineRow = memo(function TimelineRow({
                       style={{
                         gridColumn: `${colStart} / span ${colSpan}`,
                         gridRow: 1,
-                        alignSelf: "start",
-                        height: `${leaveBarH}px`,
-                        minHeight: `${leaveBarH}px`,
-                        maxHeight: `${leaveBarH}px`,
+                        alignSelf: "stretch",
+                        height: "100%",
+                        minHeight: 0,
+                        maxHeight: "100%",
+                        width: "100%",
+                        minWidth: 0,
+                        justifySelf: "stretch",
                         margin: 0,
                         borderRadius: `${leaveBrPx}px`,
                         overflow: "hidden",
@@ -1133,9 +1174,9 @@ const TimelineRow = memo(function TimelineRow({
           >
             <div
               className="lp-alloc-lanes-root"
-              style={{ gridColumn: "1 / -1", position: "relative", width: "100%", height: `${schedAllocContentH}px` }}
+              style={{ gridColumn: "1 / -1", position: "relative", width: "100%", height: `${timelineContentH}px` }}
             >
-              {workSegments.map((seg, segJ) => {
+              {paintWorkSegments.map((seg, segJ) => {
                     const stackIdx = seg.stack;
                     const topPx = segTopMap.get(seg.segKey) ?? (ROW_ALLOC_PAD / 2);
                     const geo = clampedSegmentGeometry(seg.lay, nCols);
@@ -1310,20 +1351,20 @@ const TimelineRow = memo(function TimelineRow({
                   display: "grid",
                   gridTemplateColumns: gridTemplate,
                   position: "absolute",
-                  top: SCHED_GRID_ROW_PAD_Y,
-                  bottom: SCHED_GRID_ROW_PAD_Y,
+                  top: 0,
                   left: 0,
                   right: 0,
+                  height: `${timelineContentH}px`,
                   width: "100%",
                   gap: 0,
-                  alignContent: "start",
-                  // Match `.lp-grid-leave-layer`: grid placement tracks real columns (`fr` sizing +
-                  // week-band borders); avoid %/absolute bars that drift at week boundaries.
+                  alignContent: "stretch",
+                  alignItems: "stretch",
                   padding: 0,
                   pointerEvents: "none",
                   zIndex: 2000,
                   minWidth: 0,
                   boxSizing: "border-box",
+                  overflow: "hidden",
                 }}
               >
                 {publicHolidaySegments.map((seg) => {
@@ -1331,7 +1372,6 @@ const TimelineRow = memo(function TimelineRow({
                   const colSpan = Math.max(1, Math.round(seg.lay.span));
                   const phWidthPct = (colSpan / Math.max(1, nCols)) * 100;
                   const phBrPx = allocationBarBorderRadiusPx(phWidthPct, allocationBoxStyle);
-                  const phBarH = allocationBarHeightPx(seg.a);
                   const holidayLabel = seg.a.notes || "Public holiday";
                   const holidayHours = Math.max(0, parseFloat(seg.a.hoursPerDay) || 0);
                   const phDetailTitle = `${holidayLabel}${holidayHours > 0 ? ` · ${holidayHours}h` : ""} · Click for details`;
@@ -1344,10 +1384,10 @@ const TimelineRow = memo(function TimelineRow({
                       style={{
                         gridColumn: `${colStart} / span ${colSpan}`,
                         gridRow: 1,
-                        alignSelf: "start",
-                        height: `${phBarH}px`,
-                        minHeight: `${phBarH}px`,
-                        maxHeight: `${phBarH}px`,
+                        alignSelf: "stretch",
+                        height: "100%",
+                        minHeight: 0,
+                        maxHeight: "100%",
                         width: "100%",
                         minWidth: 0,
                         justifySelf: "stretch",
@@ -1898,40 +1938,34 @@ export default function LandingPage() {
   };
 
   const openCreateAllocation = useCallback((person, date) => {
-    startTransition(() => {
-      setAllocEditing(null);
-      setAllocDefaultTab("allocation");
-      setAllocPreselectPerson(person ?? null);
-      setAllocPreselectDate(date ?? null);
-      setAllocPreselectProject(null);
-      setAllocCreateOpen(true);
-    });
+    setAllocEditing(null);
+    setAllocDefaultTab("allocation");
+    setAllocPreselectPerson(person ?? null);
+    setAllocPreselectDate(date ?? null);
+    setAllocPreselectProject(null);
+    setAllocCreateOpen(true);
   }, []);
 
   const openCreateAllocationForPersonProject = useCallback((person, projectLabel) => {
-    startTransition(() => {
-      setAllocEditing(null);
-      setAllocDefaultTab("allocation");
-      setAllocPreselectPerson(person ?? null);
-      setAllocPreselectDate(null);
-      setAllocPreselectProject(projectLabel != null ? String(projectLabel).trim() || null : null);
-      setAllocCreateOpen(true);
-    });
+    setAllocEditing(null);
+    setAllocDefaultTab("allocation");
+    setAllocPreselectPerson(person ?? null);
+    setAllocPreselectDate(null);
+    setAllocPreselectProject(projectLabel != null ? String(projectLabel).trim() || null : null);
+    setAllocCreateOpen(true);
   }, []);
 
   const openCreateLeaveForPerson = useCallback((person) => {
-    startTransition(() => {
-      setAllocEditing(null);
-      setAllocDefaultTab("leave");
-      setAllocPreselectPerson(person ?? null);
-      const d = new Date();
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      setAllocPreselectDate(`${y}-${m}-${day}`);
-      setAllocPreselectProject(null);
-      setAllocCreateOpen(true);
-    });
+    setAllocEditing(null);
+    setAllocDefaultTab("leave");
+    setAllocPreselectPerson(person ?? null);
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    setAllocPreselectDate(`${y}-${m}-${day}`);
+    setAllocPreselectProject(null);
+    setAllocCreateOpen(true);
   }, []);
 
   useEffect(() => {
@@ -2115,14 +2149,12 @@ export default function LandingPage() {
       const d = e.detail || {};
       const person = people.find((p) => String(p.id) === String(d.personId));
       setAssistantExternalPrefill(d);
-      startTransition(() => {
-        setAllocEditing(null);
-        setAllocDefaultTab("allocation");
-        setAllocPreselectPerson(person ?? null);
-        setAllocPreselectDate(d.startDate ?? null);
-        setAllocPreselectProject(d.project ?? null);
-        setAllocCreateOpen(true);
-      });
+      setAllocEditing(null);
+      setAllocDefaultTab("allocation");
+      setAllocPreselectPerson(person ?? null);
+      setAllocPreselectDate(d.startDate ?? null);
+      setAllocPreselectProject(d.project ?? null);
+      setAllocCreateOpen(true);
     };
 
     const onCreateDirect = (e) => {
@@ -2350,10 +2382,8 @@ export default function LandingPage() {
   );
 
   const openAllocationDetail = useCallback((alloc) => {
-    startTransition(() => {
-      setSelectedAllocation(alloc);
-      setAllocDetailOpen(true);
-    });
+    setSelectedAllocation(alloc);
+    setAllocDetailOpen(true);
   }, []);
 
   const closeAllocationDetail = useCallback(() => {
@@ -2553,31 +2583,27 @@ export default function LandingPage() {
     const next = el
       ? readLayoutColumnRangeFromViewport(el, scheduleModel, colMinPx)
       : getEffectiveLayoutColumnRange(scheduleModel, null);
-    if (columnRangesEqual(layoutColumnRangeRef.current, next)) return false;
+    if (!publishLayoutColumnRange(next)) return false;
     layoutColumnRangeRef.current = next;
     return true;
   }, [scheduleModel, colMinPx]);
 
   useLayoutEffect(() => {
-    layoutColumnRangeRef.current = getEffectiveLayoutColumnRange(scheduleModel, null);
+    const next = getEffectiveLayoutColumnRange(scheduleModel, null);
+    layoutColumnRangeRef.current = next;
+    publishLayoutColumnRange(next);
   }, [scheduleModel.anchorDateKey, scheduleModel.columnCount]);
 
   const scheduleRowEstimatePx = useMemo(() => {
-    if (density === "compact") return 100;
-    if (density === "spacious") return 162;
-    return 124;
+    if (density === "compact") return 76;
+    if (density === "spacious") return 108;
+    return 84;
   }, [density]);
 
   const scheduleAnchorJumpKey = useMemo(
     () =>
-      `${scheduleModel.anchorDateKey}|${scheduleModel.columnCount}|${timelineOffsets.prev}|${timelineOffsets.next}|${customRange?.start ?? ""}|${customRange?.end ?? ""}`,
-    [
-      scheduleModel.anchorDateKey,
-      scheduleModel.columnCount,
-      timelineOffsets.prev,
-      timelineOffsets.next,
-      customRange,
-    ]
+      `${scheduleModel.anchorDateKey}|${scheduleModel.columnCount}|${customRange?.start ?? ""}|${customRange?.end ?? ""}`,
+    [scheduleModel.anchorDateKey, scheduleModel.columnCount, customRange]
   );
 
   const scheduleRowHeightRevision = useMemo(

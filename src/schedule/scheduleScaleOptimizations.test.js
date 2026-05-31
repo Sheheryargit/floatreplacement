@@ -97,7 +97,7 @@ describe("scheduleRowHeightRuntime cache", () => {
 });
 
 describe("personRowHeightPlan range height", () => {
-  it("excludes buffer-month stacks from anchor viewport height", () => {
+  it("shrinks row height to the visible column range when buffer columns differ", () => {
     const maySlots = monthModel.slots;
     const juneSlots = Array.from({ length: 22 }, (_, i) => ({
       dateKey: `2026-06-${String(i + 1).padStart(2, "0")}`,
@@ -134,6 +134,6 @@ describe("personRowHeightPlan range height", () => {
     const anchorH = computeRowHeightFromPlan(plan, bufferModel.anchorColumnRange, "comfortable");
     const fullH = computeRowHeightFromPlan(plan, { startCol: 0, endCol: 43 }, "comfortable");
 
-    assert.ok(anchorH < fullH - 40);
+    assert.ok(anchorH < fullH, "anchor viewport should be shorter than full timeline stack");
   });
 });

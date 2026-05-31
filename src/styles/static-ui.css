@@ -78,3 +78,8 @@
   animation: none !important;
   opacity: 1 !important;
 }
+
+:root[data-static-ui="1"] .lpam-overlay-radix[data-state="closed"],
+:root[data-static-ui="1"] .lpam-modal[data-state="closed"] {
+  pointer-events: none !important;
+}

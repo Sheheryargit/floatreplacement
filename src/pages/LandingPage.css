@@ -1,8 +1,8 @@
 /* Schedule — design tokens aligned with PeoplePage / ProjectsPage (T.dark / T.light) */
 .lp-root {
-  --lp-row-h: 92px;
-  --lp-person-pad-y: 20px;
-  --lp-person-pad-x: 22px;
+  --lp-row-h: 72px;
+  --lp-person-pad-y: 12px;
+  --lp-person-pad-x: 16px;
   --lp-block-max-h: 58px;
   --lp-cols: 24;
   /* Fixed resource column — matches Float-style people strip; never shrinks with timeline */
@@ -10,6 +10,11 @@
   --lp-col-min: 36px;
   --lp-timeline-min: 800px;
   --lp-sched-add-btn-size: 32px;
+  --lp-people-rail: color-mix(in srgb, var(--accent) 14%, transparent);
+  --lp-people-divider: color-mix(in srgb, var(--border) 86%, var(--text-muted) 14%);
+  --lp-people-frame: color-mix(in srgb, var(--border-sub) 52%, transparent);
+  --lp-people-frame-hi: color-mix(in srgb, #fff 5%, transparent);
+  --lp-people-inset: 3px 8px 3px 9px;
 
   --bg: #0f1117;
   --surface: #181c26;
@@ -65,7 +70,7 @@
   transition: background 0.35s ease, color 0.35s ease;
 }
 
-.float-premium-modal {
+.float-premium-modal:not(.lpam-modal) {
   position: relative;
   border-radius: 17px !important;
   box-shadow:
@@ -76,7 +81,7 @@
   transition: box-shadow var(--duration-slow, 0.35s) var(--ease-spring, ease);
 }
 
-.float-premium-modal::before {
+.float-premium-modal:not(.lpam-modal)::before {
   content: "";
   position: absolute;
   inset: -1px;
@@ -86,14 +91,14 @@
   pointer-events: none;
 }
 
-.lp-root[data-theme="light"] .float-premium-modal {
+.lp-root[data-theme="light"] .float-premium-modal:not(.lpam-modal) {
   box-shadow:
     0 20px 50px rgba(15, 18, 28, 0.1),
     0 0 0 1px rgba(0, 0, 0, 0.05) inset,
     0 0 40px rgba(79, 106, 230, 0.06) !important;
 }
 
-.lp-root[data-theme="light"] .float-premium-modal::before {
+.lp-root[data-theme="light"] .float-premium-modal:not(.lpam-modal)::before {
   border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
@@ -201,7 +206,7 @@
 
 .lp-root[data-density="comfortable"] {
   --lp-people-w: 300px;
-  --lp-row-h: 84px;
+  --lp-row-h: 72px;
   --lp-person-pad-y: 14px;
   --lp-person-pad-x: 18px;
   --lp-band-pad-y: 12px;
@@ -264,6 +269,10 @@
   --ui-today: #0077e6;
   --ui-today-glow: rgba(0, 136, 255, 0.4);
   --ui-today-soft: rgba(0, 136, 255, 0.18);
+  --lp-people-rail: color-mix(in srgb, var(--accent) 12%, transparent);
+  --lp-people-divider: color-mix(in srgb, var(--border) 92%, #94a3b8 8%);
+  --lp-people-frame: color-mix(in srgb, var(--border-sub) 78%, transparent);
+  --lp-people-frame-hi: color-mix(in srgb, #fff 88%, transparent);
 }
 
 .lp-sidenav {
@@ -1185,6 +1194,16 @@
   overflow: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  scroll-behavior: auto;
+}
+
+/* Snap height changes instantly while scrolling; ease in when idle for a polished feel */
+.lp-schedule-viewport--scrolling .lp-sched-virtual-anchor {
+  transition: none !important;
+}
+
+.lp-schedule-viewport--scrolling .lp-alloc-bar {
+  transition: none !important;
 }
 
 .lp-schedule-viewport::-webkit-scrollbar {
@@ -1239,11 +1258,15 @@
 
 /* One continuous line between people (virtual rows); avoids split borders on sticky panel vs timeline */
 .lp-sched-virtual-rows .lp-sched-virtual-anchor {
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--lp-people-divider);
   isolation: isolate;
   transition: height 0.16s cubic-bezier(0.22, 1, 0.36, 1);
   /* Do NOT set overflow:hidden here — it breaks position:sticky on .lp-sched-person
      so the people column scrolls off-screen with the timeline. */
+}
+
+.lp-sched-virtual-rows--static .lp-sched-row {
+  border-bottom: 1px solid var(--lp-people-divider);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1304,8 +1327,9 @@
   align-items: center;
   justify-content: center;
   background: var(--surf-alt);
-  border-right: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--lp-people-divider);
+  border-bottom: 1px solid var(--lp-people-divider);
+  box-shadow: inset 2px 0 0 var(--lp-people-rail);
 }
 
 .lp-sched-corner--empty {
@@ -1321,14 +1345,15 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  justify-content: stretch;
   position: sticky;
   left: 0;
   z-index: 10;
   background: var(--surf-alt);
-  border-right: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--lp-people-divider);
+  border-bottom: none;
+  box-shadow: inset 2px 0 0 var(--lp-people-rail);
   overflow: visible;
-  /* Height matched by flex stretch from .lp-sched-row */
 }
 
 .lp-sched-timeline {
@@ -1336,7 +1361,16 @@
   min-width: var(--lp-timeline-min);
   box-sizing: border-box;
   background: var(--grid-bg);
-  border-bottom: 1px solid var(--border);
+  border-bottom: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.lp-sched-timeline .lp-grid-stack {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
 }
 
 .lp-sched-sticky-top {
@@ -1410,6 +1444,7 @@
   }
 
   .lp-person-row,
+  .lp-person-row-shell,
   .lp-grid-row,
   .lp-avatar,
   .lp-week-cell,
@@ -1421,11 +1456,35 @@
 
 .lp-person-row-shell {
   display: flex;
-  align-items: stretch;
-  width: 100%;
-  min-height: var(--lp-row-h);
+  align-items: center;
+  width: auto;
+  min-height: 0;
   flex: 1;
+  align-self: stretch;
+  margin: var(--lp-people-inset);
   overflow: visible;
+  border: 1px solid var(--lp-people-frame);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 10%, transparent);
+  box-shadow: inset 0 1px 0 var(--lp-people-frame-hi);
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+
+.lp-person-row-shell:hover,
+.lp-person-row-shell:focus-within {
+  border-color: color-mix(in srgb, var(--border-sub) 82%, var(--accent) 18%);
+  background: color-mix(in srgb, var(--surface) 16%, transparent);
+  box-shadow:
+    inset 0 1px 0 var(--lp-people-frame-hi),
+    0 0 0 1px color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.lp-person-row-shell .lp-person-row {
+  min-height: 0;
+  align-items: center;
 }
 
 /* Name column: identity block + standalone + under meta (hidden until row hover / touch). */
@@ -1629,10 +1688,12 @@ html[data-theme="dark"] .lp-root .lp-person-add-banner {
 
 .lp-person-hours-hit:hover {
   background: rgba(108, 140, 255, 0.06);
+  border-radius: 0 8px 8px 0;
 }
 
 .lp-root[data-theme="light"] .lp-person-hours-hit:hover {
   background: rgba(79, 106, 230, 0.08);
+  border-radius: 0 8px 8px 0;
 }
 
 .lp-person-row {
@@ -2268,9 +2329,35 @@ html[data-theme="dark"] .lp-root .lp-person-add-banner {
   z-index: 0;
 }
 
+/* Sparse rows (0h/d, leave/PH only) — clearer row separators */
+.lp-sched-row--sparse .lp-sched-person,
+.lp-sched-row--sparse .lp-sched-timeline {
+  border-bottom-color: color-mix(in srgb, var(--border) 52%, var(--text-muted) 48%);
+}
+
+.lp-root[data-theme="light"] .lp-sched-row--sparse .lp-sched-person,
+.lp-root[data-theme="light"] .lp-sched-row--sparse .lp-sched-timeline {
+  border-bottom-color: color-mix(in srgb, var(--border) 65%, #64748b 35%);
+}
+
+.lp-sched-virtual-rows .lp-sched-virtual-anchor:has(.lp-sched-row--sparse) {
+  border-bottom-color: color-mix(in srgb, var(--border) 52%, var(--text-muted) 48%);
+}
+
+.lp-root[data-theme="light"] .lp-sched-virtual-rows .lp-sched-virtual-anchor:has(.lp-sched-row--sparse) {
+  border-bottom-color: color-mix(in srgb, var(--border) 65%, #64748b 35%);
+}
+
+.lp-sched-row--sparse .lp-leave-block--icon-only,
+.lp-sched-row--sparse .lp-leave-block--public_holiday {
+  justify-content: center;
+  align-items: center;
+}
+
 .lp-sched-row-overloaded .lp-grid-stack {
   position: relative;
   z-index: 2;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-danger, #ef4444) 28%, transparent);
 }
 
 @keyframes overloadTimelineShimmer {
@@ -2424,21 +2511,21 @@ html[data-theme="dark"] .lp-root .lp-person-add-banner {
   display: grid;
   grid-template-columns: 1fr;
   grid-template-rows: 1fr;
+  position: relative;
   --lp-alloc-lane-count: 1;
   --lp-alloc-lane-h: calc(var(--lp-block-max-h, 58px) + 12px);
-  --lp-alloc-row-pad-vertical: 24px;
+  --lp-alloc-row-pad-vertical: 0px;
   min-width: 0;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  /* Match lane/grid row min-height so the timeline column always grows with stacked allocations. */
   min-height: max(
-    var(--lp-row-h),
     var(--lp-leave-min-h, 0px),
-    var(
-      --lp-sched-alloc-content-h,
-      calc(var(--lp-alloc-lane-count, 1) * var(--lp-alloc-lane-h) + var(--lp-alloc-row-pad-vertical))
-    )
+    var(--lp-sched-alloc-content-h, var(--lp-row-h))
+  );
+  height: max(
+    var(--lp-leave-min-h, 0px),
+    var(--lp-sched-alloc-content-h, var(--lp-row-h))
   );
 }
 
@@ -2452,21 +2539,16 @@ html[data-theme="dark"] .lp-root .lp-person-add-banner {
 .lp-grid-week-lanes {
   display: grid;
   align-self: stretch;
-  min-height: max(
-    var(--lp-row-h),
-    var(--lp-leave-min-h, 0px),
-    var(
-      --lp-sched-alloc-content-h,
-      calc(var(--lp-alloc-lane-count, 1) * var(--lp-alloc-lane-h) + var(--lp-alloc-row-pad-vertical))
-    )
-  );
+  min-height: 100%;
+  height: 100%;
   z-index: 0;
   pointer-events: none;
 }
 
 .lp-week-lane {
   min-height: 100%;
-  border-right: 1px solid var(--grid-line-soft);
+  height: 100%;
+  border-right: 1px solid color-mix(in srgb, var(--grid-line) 88%, var(--text-muted) 12%);
   box-sizing: border-box;
 }
 
@@ -2645,6 +2727,24 @@ button.lp-block.lp-block-alloc.lp-alloc-enter.lp-alloc-enter--bloom {
 .lp-alloc-lanes-root {
   min-width: 0;
   max-width: 100%;
+  box-sizing: border-box;
+}
+
+.lp-grid-leave-layer {
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.lp-grid-leave-layer .lp-leave-block {
+  box-sizing: border-box;
+}
+
+.lp-public-holiday-overlay {
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.lp-public-holiday-overlay .lp-leave-block--public_holiday {
   box-sizing: border-box;
 }
 

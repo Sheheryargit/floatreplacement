@@ -1,18 +1,14 @@
 import { isValidColumnRange } from "./scheduleLayoutRange.js";
-import { buildTimelineRowLayout, leaveMinHeightPx } from "./timelineRowLayout.js";
-import { allocationBarHeightPx, workTileHeightPxForDensity } from "./renderModel/index.js";
-import { weekMondayKeyForScheduleColumn } from "./renderModel/stacking.js";
 import {
-  computeOverlapAwareContentHeight,
-  ROW_ALLOC_PAD,
-} from "./segmentStackTops.js";
-
-const DENSITY_BASE_ROW_PX = {
-  compact: 72,
-  comfortable: 84,
-  spacious: 120,
-};
-
+  buildTimelineRowLayout,
+  leaveMinHeightPx,
+  resolveScheduleRowHeightPx,
+  PERSON_COL_MIN_PX,
+  ROW_EDGE_PAD_PX,
+} from "./timelineRowLayout.js";
+import { allocationBarHeightPx } from "./renderModel/index.js";
+import { weekMondayKeyForScheduleColumn } from "./renderModel/stacking.js";
+import { computeOverlapAwareContentHeight, ROW_ALLOC_PAD } from "./segmentStackTops.js";
 
 /** Sorted by startCol for O(log n + k) range queries at scale. */
 export function sortWorkSegmentsByStartCol(workSegments) {
@@ -82,17 +78,15 @@ export function buildPersonRowHeightPlan({
  * Fast height from a pre-built plan — filters by column range only (O(segments in range)).
  */
 export function computeRowHeightFromPlan(plan, layoutColumnRange, density = "comfortable") {
-  const baseRowH = DENSITY_BASE_ROW_PX[density] ?? DENSITY_BASE_ROW_PX.comfortable;
   if (!plan) {
-    return Math.ceil(baseRowH + 12);
+    const personMin = PERSON_COL_MIN_PX[density] ?? PERSON_COL_MIN_PX.comfortable;
+    return Math.ceil(personMin + ROW_EDGE_PAD_PX);
   }
 
-  const heightSegs = isValidColumnRange(layoutColumnRange)
-    ? workSegmentsInColumnRange(
-        plan.workSegmentsByStartCol ?? plan.workSegments,
-        layoutColumnRange
-      )
-    : plan.workSegments;
+  const heightSegs = workSegmentsInColumnRange(
+    plan.workSegmentsByStartCol,
+    layoutColumnRange
+  );
 
   let schedAllocContentH = ROW_ALLOC_PAD;
   if (heightSegs.length > 0) {
@@ -100,12 +94,15 @@ export function computeRowHeightFromPlan(plan, layoutColumnRange, density = "com
       heightSegs,
       null,
       (s) => s.barH,
-      plan.workSegments
+      heightSegs
     );
   }
 
   const leaveMinH = plan.hasLeave ? plan.leaveMinPxByDensity[density] ?? 0 : 0;
-  const timelineH = Math.max(baseRowH, leaveMinH, schedAllocContentH);
-  const personColMinH = baseRowH + 28;
-  return Math.ceil(Math.max(timelineH, personColMinH) + 12);
+  return resolveScheduleRowHeightPx({
+    schedAllocContentH,
+    hasVisibleWorkSegments: heightSegs.length > 0,
+    density,
+    leaveMinH,
+  });
 }
