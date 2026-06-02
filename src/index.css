@@ -62,24 +62,6 @@ body {
   overflow: hidden;
 }
 
-.app-workspace-presence-strip {
-  flex-shrink: 0;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  min-height: 36px;
-  padding: 12px 28px 0;
-  pointer-events: none;
-}
-
-.app-workspace-presence-strip:not(:has(.ws-presence-root)) {
-  display: none;
-}
-
-.app-workspace-presence-strip .ws-presence-root {
-  pointer-events: auto;
-}
-
 .slap-animation-wrapper {
   overflow: hidden;
 }

@@ -1,4 +1,4 @@
-import { useLayoutEffect } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { getPersonAllocations } from "../utils/allocationsByPerson.js";
 
@@ -58,8 +58,18 @@ export function ScheduleVirtualizedRows({
     estimateSize: estimateScheduleRowSize,
     overscan,
     scrollMargin: scheduleScrollMargin,
-    enabled: !useStaticList,
+    enabled: !useStaticList && schedulePeople.length > 0,
   });
+
+  const rowVirtualizerRef = useRef(rowVirtualizer);
+  rowVirtualizerRef.current = rowVirtualizer;
+
+  const remeasureVirtualizer = () => {
+    if (useStaticList) return;
+    const v = rowVirtualizerRef.current;
+    if (!v?.measure) return;
+    v.measure();
+  };
 
   useLayoutEffect(() => {
     const el = scheduleViewportRef.current;
@@ -71,9 +81,38 @@ export function ScheduleVirtualizedRows({
       onVirtualizer?.(null);
       return () => onVirtualizer?.(null);
     }
-    onVirtualizer?.(rowVirtualizer);
-    return () => onVirtualizer?.(null);
-  }, [useStaticList, rowVirtualizer, onVirtualizer]);
+    const v = rowVirtualizerRef.current;
+    onVirtualizer?.(v);
+    remeasureVirtualizer();
+    const raf = requestAnimationFrame(() => {
+      remeasureVirtualizer();
+      v?.scrollToIndex?.(0, { align: "start" });
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      onVirtualizer?.(null);
+    };
+  }, [useStaticList, schedulePeopleKey, schedulePeople.length, onVirtualizer]);
+
+  useLayoutEffect(() => {
+    if (useStaticList || schedulePeople.length === 0) return undefined;
+    const el = scheduleViewportRef.current;
+    if (!el) return undefined;
+
+    let raf = 0;
+    const bump = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(remeasureVirtualizer);
+    };
+
+    bump();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(bump) : null;
+    ro?.observe(el);
+    return () => {
+      ro?.disconnect();
+      cancelAnimationFrame(raf);
+    };
+  }, [useStaticList, schedulePeopleKey, schedulePeople.length, scheduleViewportRef]);
 
   if (useStaticList) {
     return (

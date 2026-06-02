@@ -18,8 +18,6 @@ import { isStaticUi } from "./config/uiMode.js";
 import LoginPage from "./pages/LoginPage.jsx";
 import AccessDeniedPage from "./pages/AccessDeniedPage.jsx";
 import { SsoPersonProfileSync } from "./components/auth/SsoPersonProfileSync.jsx";
-import { WorkspacePresenceProvider } from "./context/WorkspacePresenceContext.jsx";
-import WorkspacePresenceAvatars from "./components/presence/WorkspacePresenceAvatars.jsx";
 import { VercelAnalytics } from "./components/analytics/VercelAnalytics.jsx";
 import GlobalBackground from "./components/ui/GlobalBackground.jsx";
 import { Toaster } from "sonner";
@@ -47,12 +45,14 @@ const ProjectsPage = lazy(() => import("./pages/ProjectsPage.jsx"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage.jsx"));
 const ReportingPage = lazy(() => import("./pages/ReportingPage.jsx"));
 const DepartmentDashboardPage = lazy(() => import("./pages/DepartmentDashboardPage.jsx"));
+const DepartmentsPage = lazy(() => import("./pages/DepartmentsPage.jsx"));
 const AccessPage = lazy(() => import("./pages/AccessPage.jsx"));
 
 const workspaceRoutes = [
   { path: "/", element: <LandingPage /> },
   { path: "/people", element: <PeoplePage /> },
   { path: "/projects", element: <ProjectsPage /> },
+  { path: "/departments", element: <DepartmentsPage /> },
   { path: "/report", element: <ReportingPage /> },
   { path: "/dept-dashboard", element: <DepartmentDashboardPage /> },
   { path: "/access", element: <AccessPage /> },
@@ -175,24 +175,19 @@ function AuthGate() {
         <WorkspaceReady>
           <AgentCrudHarnessHost />
           <SsoPersonProfileSync />
-          <WorkspacePresenceProvider>
-            <PremiumV2Provider>
-              <SlapAnimationProvider>
-                <Suspense fallback={null}>
-                  <CommandPalette />
-                </Suspense>
-                <div className="app-viewport">
-                  <div className="app-workspace-presence-strip">
-                    <WorkspacePresenceAvatars />
-                  </div>
-                  <AnimatedRoutes />
-                </div>
-                <Suspense fallback={null}>
-                  <WorkspaceAssistant />
-                </Suspense>
-              </SlapAnimationProvider>
-            </PremiumV2Provider>
-          </WorkspacePresenceProvider>
+          <PremiumV2Provider>
+            <SlapAnimationProvider>
+              <Suspense fallback={null}>
+                <CommandPalette />
+              </Suspense>
+              <div className="app-viewport">
+                <AnimatedRoutes />
+              </div>
+              <Suspense fallback={null}>
+                <WorkspaceAssistant />
+              </Suspense>
+            </SlapAnimationProvider>
+          </PremiumV2Provider>
         </WorkspaceReady>
       </AppErrorBoundary>
       <ThemedToaster />

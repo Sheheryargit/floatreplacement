@@ -196,7 +196,7 @@ export default function SettingsPage() {
             Appearance
           </h2>
           <p className="settings-section-desc settings-appearance-lede">
-            New sign-ins default to light mode, Studio typography, and Pill allocation tiles; you can match your OS, swap palette, light/dark, or tint the canvas—all personal tweaks.
+            New sign-ins default to light mode and Studio typography (light canvas background); you can match your OS, swap palette, light/dark, or tint the canvas—all personal tweaks.
           </p>
           <p className="settings-local-privacy-note" role="note">
             Stored only on this browser—nothing here is synced to teammates or uploaded as workspace preferences.
@@ -255,9 +255,9 @@ export default function SettingsPage() {
             Schedule
           </h2>
           <p className="settings-section-desc">
-            Saved on this browser only. Timeline defaults start at the Pill preset for colored project blocks until
-            you pick another; peak-load bands and animations are yours to tune. Teammates don’t inherit these
-            display choices—they keep their own.
+            Saved on this browser only. Timeline defaults use Compact row density, Outline allocation tiles, and
+            peak load labels off until you change them; animations are yours to tune. Teammates don’t inherit
+            these display choices—they keep their own.
           </p>
           <div className="settings-card settings-card--glow">
             <SettingsItem

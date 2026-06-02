@@ -241,14 +241,8 @@ export const useAppStore = create((set, get) => ({
       }
       return { roles: next };
     }),
-  setDepts: (val) =>
-    set((state) => {
-      const next = typeof val === "function" ? val(state.depts) : val;
-      for (const name of diffAdded(state.depts, next)) {
-        dbSync(() => lookupsApi.addDept(name));
-      }
-      return { depts: next };
-    }),
+  /** Department list is managed on the Departments page (`lookup_depts`), not via inline edits. */
+  setDepts: (val) => set({ depts: typeof val === "function" ? val(get().depts) : val }),
   setPeopleTagOpts: (val) =>
     set((state) => {
       const next = typeof val === "function" ? val(state.peopleTagOpts) : val;

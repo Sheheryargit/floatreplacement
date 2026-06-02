@@ -162,9 +162,13 @@ import {
   ALLOCATION_ENTER_ANIM_LS_KEY,
   PEAK_LOAD_LABELS_CHANGED_EVENT,
   PEAK_LOAD_LABELS_LS_KEY,
+  SCHEDULE_DENSITY_CHANGED_EVENT,
+  SCHEDULE_DENSITY_LS_KEY,
   readAllocationBoxStyle,
   readAllocationEnterAnimation,
   readPeakLoadLabelsVisible,
+  readScheduleDensity,
+  writeScheduleDensity,
 } from "../config/scheduleUiPrefs.js";
 import {
   ALLOC8_OPEN_COMMAND_PALETTE_EVENT,
@@ -836,7 +840,7 @@ const TimelineRow = memo(function TimelineRow({
               <div
                 className="lp-person-main-col"
                 onClick={(e) => {
-                  if (e.target.closest(".lp-person-add-banner")) return;
+                  if (e.target.closest(".lp-person-add-banner, .lp-person-hours-hit")) return;
                   openEdit(p);
                 }}
               >
@@ -856,7 +860,9 @@ const TimelineRow = memo(function TimelineRow({
                       <span className="lp-person-meta">
                         <span className="lp-person-identity-stack">
                           <span className="lp-person-name-line">
-                            <span className="lp-person-name">{p.name}</span>
+                            <span className="lp-person-name" title={p.name}>
+                              {p.name}
+                            </span>
                             {showPeakLoadStatus && peakLoadBand !== "none" && (
                               <span className="lp-person-load-wrap" aria-hidden>
                                 <span
@@ -866,10 +872,26 @@ const TimelineRow = memo(function TimelineRow({
                               </span>
                             )}
                           </span>
-                          <span className="lp-person-sub">
+                          <span
+                            className="lp-person-sub"
+                            title={[p.role !== "—" ? p.role : null, p.department || null]
+                              .filter(Boolean)
+                              .join(" · ") || "—"}
+                          >
                             {p.role !== "—" ? `${p.role} · ` : ""}
                             {p.department || "—"}
                           </span>
+                          <button
+                            type="button"
+                            className="lp-person-hours-hit lp-person-hours-hit--meta"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEdit(p);
+                            }}
+                            title={hoursHitTitle}
+                          >
+                            <span className={"lp-person-hours" + hoursToneClass}>{right}</span>
+                          </button>
                           {p.tags.length > 0 && (
                             <span className="lp-person-tags">
                               {p.tags.slice(0, 2).map((tag) => {
@@ -950,14 +972,6 @@ const TimelineRow = memo(function TimelineRow({
               </div>
             </div>
           </div>
-          <button
-            type="button"
-            className="lp-person-row lp-person-hours-hit"
-            onClick={() => openEdit(p)}
-            title={hoursHitTitle}
-          >
-            <span className={"lp-person-hours" + hoursToneClass}>{right}</span>
-          </button>
         </div>
       </div>
       <div className="lp-sched-timeline">
@@ -1536,7 +1550,7 @@ export default function LandingPage() {
 
   const [viewMode, setViewMode] = useState("month");
   const [anchorDate, setAnchorDate] = useState(() => new Date());
-  const [density, setDensity] = useState("comfortable");
+  const [density, setDensity] = useState(() => readScheduleDensity());
   const [utilizationMode, setUtilizationMode] = useState("hours");
   const [showPeakLoadStatus, setShowPeakLoadStatus] = useState(() => readPeakLoadLabelsVisible());
   const [allocationBoxStyle, setAllocationBoxStyle] = useState(() => readAllocationBoxStyle());
@@ -1553,6 +1567,19 @@ export default function LandingPage() {
     window.addEventListener("storage", onStorage);
     return () => {
       window.removeEventListener(PEAK_LOAD_LABELS_CHANGED_EVENT, sync);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setDensity(readScheduleDensity());
+    window.addEventListener(SCHEDULE_DENSITY_CHANGED_EVENT, sync);
+    const onStorage = (e) => {
+      if (e.key === SCHEDULE_DENSITY_LS_KEY || e.key == null) sync();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(SCHEDULE_DENSITY_CHANGED_EVENT, sync);
       window.removeEventListener("storage", onStorage);
     };
   }, []);
@@ -1606,8 +1633,7 @@ export default function LandingPage() {
   const scheduleRowVirtualizerRef = useRef(null);
   const prevTimelineOffsetsRef = useRef({ prev: 1, next: 2 });
   const scheduleHeaderRef = useRef(null);
-  /** Fallback until header is measured — avoids a blank band on first paint. */
-  const [scheduleScrollMargin, setScheduleScrollMargin] = useState(96);
+  const scheduleHeaderInnerRef = useRef(null);
   const lastAnchorKey = useRef(null);
 
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
@@ -1861,6 +1887,13 @@ export default function LandingPage() {
 
   const registerScheduleRowVirtualizer = useCallback((instance) => {
     scheduleRowVirtualizerRef.current = instance;
+    if (instance?.measure) {
+      instance.measure();
+      requestAnimationFrame(() => {
+        instance.measure();
+        instance.scrollToIndex?.(0, { align: "start" });
+      });
+    }
   }, []);
 
   const applyTimeRangePreset = useCallback((presetId) => {
@@ -2595,9 +2628,9 @@ export default function LandingPage() {
   }, [scheduleModel.anchorDateKey, scheduleModel.columnCount]);
 
   const scheduleRowEstimatePx = useMemo(() => {
-    if (density === "compact") return 76;
-    if (density === "spacious") return 108;
-    return 84;
+    if (density === "compact") return 116;
+    if (density === "spacious") return 140;
+    return 126;
   }, [density]);
 
   const scheduleAnchorJumpKey = useMemo(
@@ -2671,6 +2704,7 @@ export default function LandingPage() {
 
   const { onTimelineScroll } = useTimelineScrollController({
     scheduleViewportRef,
+    scheduleHeaderInnerRef,
     scheduleModel,
     colMinPx,
     timelineOffsets,
@@ -2731,16 +2765,6 @@ export default function LandingPage() {
   );
 
   useLayoutEffect(() => {
-    const header = scheduleHeaderRef.current;
-    if (!header) return;
-    const syncMargin = () => setScheduleScrollMargin(header.offsetHeight || 0);
-    syncMargin();
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(syncMargin) : null;
-    ro?.observe(header);
-    return () => ro?.disconnect();
-  }, [scheduleModel, viewMode, customRange, colMinPx, density]);
-
-  useLayoutEffect(() => {
     const el = scheduleViewportRef.current;
     if (el) el.scrollTop = 0;
   }, [schedulePeopleKey]);
@@ -2760,18 +2784,25 @@ export default function LandingPage() {
     const v = scheduleRowVirtualizerRef.current;
     if (!v) return;
 
+    v.measure();
+
     if (hardReset) {
-      v.measure();
       v.scrollToOffset(0, { align: "start" });
       return;
+    }
+
+    if (v.getVirtualItems().length === 0 && schedulePeople.length > 0) {
+      v.scrollToIndex(0, { align: "start" });
+      v.measure();
     }
 
     remeasureScheduleRows();
   }, [
     scheduleAnchorJumpKey,
+    schedulePeopleKey,
+    schedulePeople.length,
     timelineOffsets.prev,
     timelineOffsets.next,
-    scheduleScrollMargin,
     density,
     scheduleRowEstimatePx,
     remeasureScheduleRows,
@@ -3060,6 +3091,7 @@ export default function LandingPage() {
                         }
                         onClick={() => {
                           setDensity(opt.id);
+                          writeScheduleDensity(opt.id);
                         }}
                       >
                         <opt.Icon size={18} strokeWidth={1.8} className="lp-density-icon" />
@@ -3369,18 +3401,16 @@ export default function LandingPage() {
           </div>
         ) : null}
 
-        <div className="lp-schedule">
-          <div
-            className="lp-schedule-viewport"
-            ref={scheduleViewportRef}
-            onScroll={onTimelineScroll}
-            style={{
-              "--lp-cols": scheduleModel.columnCount,
-              "--lp-col-min": `${colMinPx}px`,
-              "--lp-timeline-min": `${timelineMinWidthPx}px`,
-            }}
-          >
-            <div key={scheduleMotionKey} className="lp-schedule-canvas">
+        <div
+          className="lp-schedule"
+          style={{
+            "--lp-cols": scheduleModel.columnCount,
+            "--lp-col-min": `${colMinPx}px`,
+            "--lp-timeline-min": `${timelineMinWidthPx}px`,
+          }}
+        >
+          <div className="lp-schedule-header">
+            <div ref={scheduleHeaderInnerRef} className="lp-schedule-header-inner">
               <div ref={scheduleHeaderRef} className="lp-sched-row lp-sched-row-head">
                 <div className="lp-sched-corner lp-sched-corner--empty" aria-hidden />
                 <div className="lp-sched-timeline lp-sched-sticky-top">
@@ -3443,13 +3473,21 @@ export default function LandingPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
 
+          <div
+            className="lp-schedule-viewport"
+            ref={scheduleViewportRef}
+            onScroll={onTimelineScroll}
+          >
+            <div key={scheduleMotionKey} className="lp-schedule-canvas">
               <ScheduleVirtualizedRows
                 key={schedulePeopleKey}
                 schedulePeople={schedulePeople}
                 schedulePeopleKey={schedulePeopleKey}
                 scheduleViewportRef={scheduleViewportRef}
-                scheduleScrollMargin={scheduleScrollMargin}
+                scheduleScrollMargin={0}
                 estimateScheduleRowSize={estimateScheduleRowSize}
                 onVirtualizer={registerScheduleRowVirtualizer}
                 allocationsByPerson={allocationsByPerson}

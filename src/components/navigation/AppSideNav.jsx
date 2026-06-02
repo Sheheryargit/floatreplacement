@@ -4,6 +4,7 @@ import {
   CalendarDays,
   Users,
   FolderOpen,
+  Building2,
   BarChart3,
   KeyRound,
   Settings,
@@ -25,6 +26,7 @@ const NAV = [
   { to: "/", end: true, icon: CalendarDays, label: "Schedule", guide: "nav-schedule" },
   { to: "/people", icon: Users, label: "People" },
   { to: "/projects", icon: FolderOpen, label: "Projects" },
+  { to: "/departments", icon: Building2, label: "Departments", adminOnly: true },
   { to: "/report", icon: BarChart3, label: "Report" },
 ];
 
@@ -136,7 +138,7 @@ function AppSideNav() {
       </div>
 
       <nav className="app-sidenav-links">
-        {NAV.map((item) => {
+        {NAV.filter((item) => !item.adminOnly || isWorkspaceAdmin).map((item) => {
           const Icon = item.icon;
           if (item.soon) {
             return (

@@ -10,6 +10,7 @@ const SCROLL_IDLE_MS = 140;
  */
 export function useTimelineScrollController({
   scheduleViewportRef,
+  scheduleHeaderInnerRef,
   scheduleModel,
   colMinPx,
   timelineOffsets,
@@ -23,6 +24,28 @@ export function useTimelineScrollController({
   const isProgrammaticScrollRef = useRef(false);
   const lastScrollLeftRef = useRef(0);
   const scrollIdleTimerRef = useRef(null);
+
+  const syncFrozenHeaderScroll = useCallback(
+    (scrollLeft) => {
+      const inner = scheduleHeaderInnerRef?.current;
+      if (!inner) return;
+      inner.style.transform = `translate3d(${-scrollLeft}px, 0, 0)`;
+    },
+    [scheduleHeaderInnerRef]
+  );
+
+  const applyScrollLeft = useCallback(
+    (el, scrollLeft) => {
+      isProgrammaticScrollRef.current = true;
+      el.scrollLeft = scrollLeft;
+      lastScrollLeftRef.current = scrollLeft;
+      syncFrozenHeaderScroll(scrollLeft);
+      requestAnimationFrame(() => {
+        isProgrammaticScrollRef.current = false;
+      });
+    },
+    [syncFrozenHeaderScroll]
+  );
 
   const markViewportScrolling = useCallback((el) => {
     if (!el) return;
@@ -42,11 +65,7 @@ export function useTimelineScrollController({
     if (scheduleModel.anchorDateKey !== lastAnchorKeyRef.current) {
       const slotIdx = scheduleModel.slots.findIndex((s) => s.dateKey >= scheduleModel.anchorDateKey);
       if (slotIdx >= 0) {
-        isProgrammaticScrollRef.current = true;
-        el.scrollLeft = slotIdx * colMinPx;
-        requestAnimationFrame(() => {
-          isProgrammaticScrollRef.current = false;
-        });
+        applyScrollLeft(el, slotIdx * colMinPx);
       }
       lastAnchorKeyRef.current = scheduleModel.anchorDateKey;
     }
@@ -54,12 +73,10 @@ export function useTimelineScrollController({
     else if (prevColCountRef.current > 0 && scheduleModel.columnCount > prevColCountRef.current) {
       if (timelineOffsets.prev > prevOffsetsRef.current.prev) {
         const addedCols = scheduleModel.columnCount - prevColCountRef.current;
-        isProgrammaticScrollRef.current = true;
-        el.scrollLeft += addedCols * colMinPx;
-        requestAnimationFrame(() => {
-          isProgrammaticScrollRef.current = false;
-        });
+        applyScrollLeft(el, el.scrollLeft + addedCols * colMinPx);
       }
+    } else {
+      syncFrozenHeaderScroll(el.scrollLeft);
     }
 
     prevColCountRef.current = scheduleModel.columnCount;
@@ -68,6 +85,7 @@ export function useTimelineScrollController({
     onLayoutRangeSync?.();
   }, [
     scheduleViewportRef,
+    scheduleHeaderInnerRef,
     scheduleModel,
     colMinPx,
     timelineOffsets,
@@ -75,11 +93,14 @@ export function useTimelineScrollController({
     prevColCountRef,
     lastAnchorKeyRef,
     onLayoutRangeSync,
+    applyScrollLeft,
+    syncFrozenHeaderScroll,
   ]);
 
   const onTimelineScroll = useCallback(
     (e) => {
       const el = e.currentTarget;
+      syncFrozenHeaderScroll(el.scrollLeft);
       if (isProgrammaticScrollRef.current) return;
       if (rafRef.current != null) return;
       rafRef.current = requestAnimationFrame(() => {
@@ -99,7 +120,7 @@ export function useTimelineScrollController({
         if (scrollLeftChanged) onLayoutRangeSync?.();
       });
     },
-    [setTimelineOffsets, onLayoutRangeSync, markViewportScrolling]
+    [setTimelineOffsets, onLayoutRangeSync, markViewportScrolling, syncFrozenHeaderScroll]
   );
 
   useEffect(() => {

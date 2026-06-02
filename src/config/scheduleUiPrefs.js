@@ -1,6 +1,9 @@
 /**
- * Schedule display preferences (tiles, animations, peak labels).
+ * Schedule display preferences (density, tiles, animations, peak labels).
  * Persisted via localStorage only — not synced to workspace_settings or teammates.
+ *
+ * First-visit defaults: compact density, outline tiles, peak labels off.
+ * Appearance defaults (ThemeContext): light + Studio palette, no canvas tint.
  */
 
 /** localStorage: show Underallocated / On target / Overallocated on schedule person rows. */
@@ -8,14 +11,15 @@ export const PEAK_LOAD_LABELS_LS_KEY = "float.showPeakLoadStatus.v1";
 
 export const PEAK_LOAD_LABELS_CHANGED_EVENT = "float-peak-load-labels-change";
 
+/** @returns {boolean} First visit: off. */
 export function readPeakLoadLabelsVisible() {
   try {
-    if (typeof window === "undefined") return true;
+    if (typeof window === "undefined") return false;
     const v = window.localStorage.getItem(PEAK_LOAD_LABELS_LS_KEY);
-    if (v === null) return true;
+    if (v === null) return false;
     return v === "1" || v === "true";
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -63,17 +67,17 @@ export const ALLOCATION_BOX_STYLE_LABELS = {
   rail: "Rail",
 };
 
-/** @returns {AllocationBoxStyleId} First visit defaults to Pill. */
+/** @returns {AllocationBoxStyleId} First visit defaults to Outline. */
 export function readAllocationBoxStyle() {
   try {
-    if (typeof window === "undefined") return "pill";
+    if (typeof window === "undefined") return "outline";
     const v = window.localStorage.getItem(ALLOCATION_BOX_STYLE_LS_KEY);
-    if (v == null || v === "") return "pill";
+    if (v == null || v === "") return "outline";
     return ALLOCATION_BOX_STYLE_IDS.includes(/** @type {any} */ (v))
       ? /** @type {AllocationBoxStyleId} */ (v)
-      : "pill";
+      : "outline";
   } catch {
-    return "pill";
+    return "outline";
   }
 }
 
@@ -81,7 +85,7 @@ export function readAllocationBoxStyle() {
 export function writeAllocationBoxStyle(styleId) {
   const id = ALLOCATION_BOX_STYLE_IDS.includes(/** @type {any} */ (styleId))
     ? /** @type {AllocationBoxStyleId} */ (styleId)
-    : "pill";
+    : "outline";
   try {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(ALLOCATION_BOX_STYLE_LS_KEY, id);
@@ -90,6 +94,51 @@ export function writeAllocationBoxStyle(styleId) {
   }
   try {
     window.dispatchEvent(new CustomEvent(ALLOCATION_BOX_STYLE_CHANGED_EVENT));
+  } catch {
+    // ignore
+  }
+}
+
+/** Schedule row density (toolbar on timeline). */
+export const SCHEDULE_DENSITY_LS_KEY = "float.scheduleDensity.v1";
+
+export const SCHEDULE_DENSITY_CHANGED_EVENT = "float-schedule-density-change";
+
+/** @typedef {"compact" | "comfortable" | "spacious"} ScheduleDensityId */
+
+export const SCHEDULE_DENSITY_IDS = /** @type {const} */ ([
+  "compact",
+  "comfortable",
+  "spacious",
+]);
+
+/** @returns {ScheduleDensityId} First visit: compact. */
+export function readScheduleDensity() {
+  try {
+    if (typeof window === "undefined") return "compact";
+    const v = window.localStorage.getItem(SCHEDULE_DENSITY_LS_KEY);
+    if (v == null || v === "") return "compact";
+    return SCHEDULE_DENSITY_IDS.includes(/** @type {any} */ (v))
+      ? /** @type {ScheduleDensityId} */ (v)
+      : "compact";
+  } catch {
+    return "compact";
+  }
+}
+
+/** @param {ScheduleDensityId | string} densityId */
+export function writeScheduleDensity(densityId) {
+  const id = SCHEDULE_DENSITY_IDS.includes(/** @type {any} */ (densityId))
+    ? /** @type {ScheduleDensityId} */ (densityId)
+    : "compact";
+  try {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(SCHEDULE_DENSITY_LS_KEY, id);
+  } catch {
+    // ignore
+  }
+  try {
+    window.dispatchEvent(new CustomEvent(SCHEDULE_DENSITY_CHANGED_EVENT));
   } catch {
     // ignore
   }

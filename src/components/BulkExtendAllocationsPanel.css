@@ -232,7 +232,6 @@
   transition: color 0.14s ease, border-color 0.14s ease, background 0.14s ease;
 }
 
-.lp-person-row-shell:hover .lp-sched-bulk-extend-btn.lp-sched-add-btn--inline,
-.lp-person-row-shell:focus-within .lp-sched-bulk-extend-btn.lp-sched-add-btn--inline {
+.lp-sched-bulk-extend-btn.lp-sched-add-btn--inline {
   opacity: 1;
 }

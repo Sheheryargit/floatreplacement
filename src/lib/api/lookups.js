@@ -46,6 +46,22 @@ export async function addDept(name) {
   if (error && error.code !== "23505") throw error;
 }
 
+export async function deleteDept(name) {
+  if (!isSupabaseConfigured || !name?.trim()) return;
+  const { error } = await supabase.from("lookup_depts").delete().eq("name", name.trim());
+  if (error) throw error;
+}
+
+/** Insert new lookup row, then remove old (rename in lookup table only). */
+export async function renameDept(oldName, newName) {
+  if (!isSupabaseConfigured) return;
+  const oldN = String(oldName || "").trim();
+  const newN = String(newName || "").trim();
+  if (!oldN || !newN || oldN === newN) return;
+  await addDept(newN);
+  await deleteDept(oldN);
+}
+
 export async function addClient(name) {
   if (!isSupabaseConfigured || !name?.trim()) return;
   const { error } = await supabase.from("lookup_clients").insert({ name: name.trim() });

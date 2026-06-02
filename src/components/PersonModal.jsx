@@ -288,7 +288,7 @@ function allocationHasPerson(a, pid) {
   return a.personId === pid;
 }
 
-function InfoTab({ form,setForm,roles,setRoles,depts,setDepts,tagOpts,setTagOpts,t,tagIsDark,pickerKey }) {
+function InfoTab({ form,setForm,roles,setRoles,depts,tagOpts,setTagOpts,t,tagIsDark,pickerKey }) {
   return (
     <div style={{ display:"flex",flexDirection:"column",gap:22 }}>
       <div style={{ background:t.surfAlt,borderRadius:10,padding:20,display:"flex",flexDirection:"column",gap:18,border:`1px solid ${t.borderSub}` }}>
@@ -316,9 +316,10 @@ function InfoTab({ form,setForm,roles,setRoles,depts,setDepts,tagOpts,setTagOpts
           key={pickerKey}
           t={t}
           value={form.department}
-          onChange={(v) => setForm({ ...form, department: v })}
+          onChange={(v) =>
+            setForm({ ...form, department: v === "No department" ? "" : v })
+          }
           depts={depts}
-          setDepts={setDepts}
         />
       </div>
       <div><label style={Lbl(t)}>Tags</label>
@@ -1068,7 +1069,7 @@ function PersonModal({
 
         {/* Content — scrollable */}
         <div style={{ padding:"22px 32px 10px",overflowY:"auto",flex:1,minHeight:0 }}>
-          {tab===0 && <InfoTab form={form} setForm={setFormWrap} roles={roles} setRoles={setRoles} depts={depts} setDepts={setDepts} tagOpts={tagOpts} setTagOpts={setTagOpts} t={t} tagIsDark={tagIsDark} pickerKey={editPerson?.id ?? "new"}/>}
+          {tab===0 && <InfoTab form={form} setForm={setFormWrap} roles={roles} setRoles={setRoles} depts={depts} tagOpts={tagOpts} setTagOpts={setTagOpts} t={t} tagIsDark={tagIsDark} pickerKey={editPerson?.id ?? "new"}/>}
           {tab===1 && (
             <AvailabilityTab
               form={form}

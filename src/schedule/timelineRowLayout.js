@@ -25,11 +25,14 @@ export const TIMELINE_FLOOR_PX = {
   spacious: 96,
 };
 
-/** Minimum people-column card height — keeps avatar + name readable without forcing timeline air. */
+/**
+ * Minimum people-column card height — avatar + name + role + actions (+ hours strip in compact).
+ * Keep in sync with `--lp-person-shell-min-h` / row estimates in LandingPage.css.
+ */
 export const PERSON_COL_MIN_PX = {
-  compact: 64,
-  comfortable: 72,
-  spacious: 96,
+  compact: 108,
+  comfortable: 118,
+  spacious: 132,
 };
 
 /** Vertical breathing room inside the virtual row (split top/bottom in CSS). */

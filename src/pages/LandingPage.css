@@ -1,6 +1,7 @@
 /* Schedule — design tokens aligned with PeoplePage / ProjectsPage (T.dark / T.light) */
 .lp-root {
-  --lp-row-h: 72px;
+  --lp-row-h: 88px;
+  --lp-person-shell-min-h: 108px;
   --lp-person-pad-y: 12px;
   --lp-person-pad-x: 16px;
   --lp-block-max-h: 58px;
@@ -189,9 +190,10 @@
 
 .lp-root[data-density="compact"] {
   --lp-people-w: 288px;
-  --lp-row-h: 72px;
-  --lp-person-pad-y: 12px;
-  --lp-person-pad-x: 16px;
+  --lp-row-h: 96px;
+  --lp-person-shell-min-h: 100px;
+  --lp-person-pad-y: 10px;
+  --lp-person-pad-x: 14px;
   --lp-band-pad-y: 8px;
   --lp-band-pad-x: 10px;
   --lp-day-cell-pad-y: 8px;
@@ -206,7 +208,8 @@
 
 .lp-root[data-density="comfortable"] {
   --lp-people-w: 300px;
-  --lp-row-h: 72px;
+  --lp-row-h: 88px;
+  --lp-person-shell-min-h: 108px;
   --lp-person-pad-y: 14px;
   --lp-person-pad-x: 18px;
   --lp-band-pad-y: 12px;
@@ -224,6 +227,7 @@
 .lp-root[data-density="spacious"] {
   --lp-people-w: 324px;
   --lp-row-h: 120px;
+  --lp-person-shell-min-h: 124px;
   --lp-person-pad-y: 26px;
   --lp-person-pad-x: 26px;
   --lp-band-pad-y: 15px;
@@ -1187,9 +1191,41 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 
-/* Float-style: one scrollport; sticky top header + sticky left people (frozen panes) */
+/* Frozen date header + scrollable people rows (horizontal scroll synced via transform) */
+.lp-schedule-header {
+  flex-shrink: 0;
+  z-index: 20;
+  overflow: hidden;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.14);
+}
+
+.lp-root[data-theme="light"] .lp-schedule-header {
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+}
+
+.lp-schedule-header-inner {
+  min-width: max(100%, calc(var(--lp-people-w) + var(--lp-timeline-min)));
+  will-change: transform;
+}
+
+.lp-schedule-header .lp-sched-row-head {
+  min-width: max(100%, calc(var(--lp-people-w) + var(--lp-timeline-min)));
+}
+
+.lp-schedule-header .lp-sched-corner {
+  top: auto;
+}
+
+.lp-schedule-header .lp-sched-sticky-top {
+  position: relative;
+  top: auto;
+  align-self: stretch;
+}
+
 .lp-schedule-viewport {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
@@ -1261,8 +1297,7 @@
   border-bottom: 1px solid var(--lp-people-divider);
   isolation: isolate;
   transition: height 0.16s cubic-bezier(0.22, 1, 0.36, 1);
-  /* Do NOT set overflow:hidden here — it breaks position:sticky on .lp-sched-person
-     so the people column scrolls off-screen with the timeline. */
+  /* Do NOT set overflow:hidden — breaks position:sticky on .lp-sched-person (people column vanishes on scroll). */
 }
 
 .lp-sched-virtual-rows--static .lp-sched-row {
@@ -1345,7 +1380,10 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  justify-content: stretch;
+  justify-content: flex-start;
+  align-self: stretch;
+  min-height: 0;
+  padding: var(--lp-people-inset);
   position: sticky;
   left: 0;
   z-index: 10;
@@ -1353,7 +1391,7 @@
   border-right: 1px solid var(--lp-people-divider);
   border-bottom: none;
   box-shadow: inset 2px 0 0 var(--lp-people-rail);
-  overflow: visible;
+  overflow: hidden;
 }
 
 .lp-sched-timeline {
@@ -1377,7 +1415,7 @@
   position: sticky;
   top: 0;
   z-index: 11;
-  align-self: flex-start;
+  align-self: stretch;
   background: var(--surface);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
 }
@@ -1456,30 +1494,65 @@
 
 .lp-person-row-shell {
   display: flex;
-  align-items: center;
-  width: auto;
-  min-height: 0;
-  flex: 1;
-  align-self: stretch;
-  margin: var(--lp-people-inset);
-  overflow: visible;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: var(--lp-person-shell-min-h, 0);
+  max-height: 100%;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  margin: 0;
+  overflow: hidden;
   border: 1px solid var(--lp-people-frame);
   border-radius: 8px;
   background: color-mix(in srgb, var(--surface) 10%, transparent);
   box-shadow: inset 0 1px 0 var(--lp-people-frame-hi);
   transition:
     border-color 0.18s ease,
-    box-shadow 0.18s ease,
     background 0.18s ease;
 }
 
 .lp-person-row-shell:hover,
 .lp-person-row-shell:focus-within {
-  border-color: color-mix(in srgb, var(--border-sub) 82%, var(--accent) 18%);
-  background: color-mix(in srgb, var(--surface) 16%, transparent);
-  box-shadow:
-    inset 0 1px 0 var(--lp-people-frame-hi),
-    0 0 0 1px color-mix(in srgb, var(--accent) 7%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--lp-people-frame));
+  background: color-mix(in srgb, var(--surface) 18%, transparent);
+}
+
+/* Peak hours/d — directly under role line inside the identity stack */
+.lp-person-hours-hit--meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  margin: 5px 0 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+  border-radius: 4px;
+}
+
+.lp-person-hours-hit--meta:hover {
+  background: rgba(108, 140, 255, 0.06);
+}
+
+.lp-root[data-theme="light"] .lp-person-hours-hit--meta:hover {
+  background: rgba(79, 106, 230, 0.08);
+}
+
+.lp-root[data-density="compact"] .lp-person-hours-hit--meta {
+  margin-top: 4px;
+}
+
+.lp-root[data-density="compact"] .lp-person-hours-hit--meta .lp-person-hours {
+  font-size: 11px;
 }
 
 .lp-person-row-shell .lp-person-row {
@@ -1487,7 +1560,7 @@
   align-items: center;
 }
 
-/* Name column: identity block + standalone + under meta (hidden until row hover / touch). */
+/* Name column: identity block + add actions (always in-row). */
 .lp-person-row-cluster {
   flex: 1;
   min-width: 0;
@@ -1539,57 +1612,21 @@ button.lp-person-identity-hit {
   min-width: 0;
 }
 
+/* Add controls stay in-row (no hover expand — avoids layout shift and overflow). */
 .lp-person-add-banner {
   display: flex;
   justify-content: flex-end;
   align-items: center;
   flex-shrink: 0;
-  max-height: 0;
-  opacity: 0;
+  gap: 4px;
+  max-height: 32px;
+  opacity: 1;
   overflow: hidden;
-  margin: 0;
-  padding: 0;
-  pointer-events: none;
+  margin: 4px 0 0;
+  padding: 2px 0 0;
+  pointer-events: auto;
   border: none;
   background: none;
-  transition:
-    max-height 0.22s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.18s ease,
-    padding 0.18s ease,
-    margin 0.18s ease;
-}
-
-.lp-person-row-shell:hover .lp-person-add-banner,
-.lp-person-row-shell:focus-within .lp-person-add-banner {
-  max-height: 36px;
-  opacity: 1;
-  margin-top: 4px;
-  padding-top: 2px;
-  padding-bottom: 0;
-  pointer-events: auto;
-}
-
-/* Touch / coarse pointers: keep add control discoverable (no full-width bar) */
-@media (hover: none), (pointer: coarse) {
-  .lp-person-add-banner {
-    max-height: 36px;
-    opacity: 1;
-    margin-top: 4px;
-    padding-top: 2px;
-    padding-bottom: 0;
-    pointer-events: auto;
-  }
-}
-
-/* Dark: inline “+” is visibly styled — parent must participate in hit-testing without row hover */
-.lp-root[data-theme="dark"] .lp-person-add-banner,
-html[data-theme="dark"] .lp-root .lp-person-add-banner {
-  max-height: 36px;
-  opacity: 1;
-  margin-top: 4px;
-  padding-top: 2px;
-  padding-bottom: 0;
-  pointer-events: auto;
 }
 
 /* Minimal + under name strip (overrides full .lp-sched-add-btn) */
@@ -1603,22 +1640,13 @@ html[data-theme="dark"] .lp-root .lp-person-add-banner {
   box-shadow: none;
 }
 
-/* Dark: keep “create allocation” control visible without row hover */
 .lp-root[data-theme="dark"] .lp-sched-add-btn.lp-sched-add-btn--inline {
   border-color: color-mix(in srgb, var(--text-soft) 45%, transparent);
   background: color-mix(in srgb, var(--accent) 9%, transparent);
   color: color-mix(in srgb, #f8fafc 88%, var(--text-soft));
 }
 
-.lp-person-row-shell:hover .lp-sched-add-btn--inline,
-.lp-person-row-shell:focus-within .lp-sched-add-btn--inline {
-  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
-  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
-  color: var(--accent);
-}
-
-.lp-root[data-theme="light"] .lp-person-row-shell:hover .lp-sched-add-btn--inline,
-.lp-root[data-theme="light"] .lp-person-row-shell:focus-within .lp-sched-add-btn--inline {
+.lp-root[data-theme="light"] .lp-sched-add-btn.lp-sched-add-btn--inline {
   border-color: rgba(15, 23, 42, 0.14);
   background: rgba(255, 255, 255, 0.85);
   color: #0f172a;
@@ -1635,65 +1663,14 @@ html[data-theme="dark"] .lp-root .lp-person-add-banner {
   transform: none;
   filter: none;
   pointer-events: none;
-}
-
-.lp-person-row-shell:hover .lp-sched-add-btn--inline:disabled,
-.lp-person-row-shell:focus-within .lp-sched-add-btn--inline:disabled {
   border-color: transparent;
   background: transparent;
   color: var(--text-muted);
 }
 
-@media (hover: none), (pointer: coarse) {
-  .lp-person-add-banner .lp-sched-add-btn--inline {
-    border-color: color-mix(in srgb, var(--accent) 35%, transparent);
-    background: color-mix(in srgb, var(--accent) 12%, var(--surface));
-    color: var(--accent);
-  }
-
-  .lp-root[data-theme="light"] .lp-person-add-banner .lp-sched-add-btn--inline {
-    border-color: rgba(15, 23, 42, 0.14);
-    background: rgba(255, 255, 255, 0.85);
-    color: #0f172a;
-  }
-}
-
 .lp-person-row-main {
   min-width: 0;
   width: auto;
-}
-
-.lp-person-row.lp-person-hours-hit {
-  flex: 0 0 auto;
-  width: auto;
-}
-
-.lp-person-hours-hit {
-  position: relative;
-  flex-shrink: 0;
-  align-self: stretch;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  gap: 6px;
-  padding: var(--lp-person-pad-y) var(--lp-person-pad-x) var(--lp-person-pad-y) 8px;
-  min-width: 3.25rem;
-  border: none;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  transition: background 0.12s ease;
-}
-
-.lp-person-hours-hit:hover {
-  background: rgba(108, 140, 255, 0.06);
-  border-radius: 0 8px 8px 0;
-}
-
-.lp-root[data-theme="light"] .lp-person-hours-hit:hover {
-  background: rgba(79, 106, 230, 0.08);
-  border-radius: 0 8px 8px 0;
 }
 
 .lp-person-row {
@@ -1725,14 +1702,6 @@ html[data-theme="dark"] .lp-root .lp-person-add-banner {
   cursor: default;
 }
 
-.lp-person-row:hover:not(.lp-person-hours-hit) {
-  background: linear-gradient(90deg, rgba(108, 140, 255, 0.06) 0%, rgba(108, 140, 255, 0.02) 100%);
-}
-
-.lp-root[data-theme="light"] .lp-person-row:hover:not(.lp-person-hours-hit) {
-  background: linear-gradient(90deg, rgba(79, 106, 230, 0.08) 0%, rgba(79, 106, 230, 0.03) 100%);
-}
-
 .lp-avatar {
   width: var(--lp-avatar-size, 44px);
   height: var(--lp-avatar-size, 44px);
@@ -1751,18 +1720,11 @@ html[data-theme="dark"] .lp-root .lp-person-add-banner {
     font-size 0.28s cubic-bezier(0.22, 1, 0.36, 1), transform 0.2s ease;
 }
 
-.lp-person-row-shell:hover .lp-avatar {
-  transform: scale(1.04);
-  box-shadow:
-    0 4px 14px rgba(0, 0, 0, 0.25),
-    0 0 0 1px rgba(255, 255, 255, 0.12);
-}
-
 .lp-person-meta {
   display: block;
   flex: 1;
   min-width: 0;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .lp-person-identity-stack {
@@ -1772,8 +1734,8 @@ html[data-theme="dark"] .lp-root .lp-person-add-banner {
   position: relative;
   width: 100%;
   min-width: 0;
-  overflow: visible;
-  z-index: 2;
+  overflow: hidden;
+  z-index: 1;
 }
 
 .lp-person-name-line {
@@ -1966,6 +1928,13 @@ html[data-theme="dark"] .lp-root .lp-person-add-banner {
   line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.lp-root[data-density="compact"] .lp-person-sub {
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
 }
 
 .lp-person-tags {
@@ -2196,11 +2165,13 @@ html[data-theme="dark"] .lp-root .lp-person-add-banner {
 }
 
 .lp-person-hours {
+  display: inline-block;
   font-size: 12px;
   color: var(--text-muted);
   font-weight: 700;
   white-space: nowrap;
-  padding-top: 2px;
+  padding: 0;
+  line-height: 1.35;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }

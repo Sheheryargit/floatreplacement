@@ -72,7 +72,7 @@ describe("scheduleLayoutRange", () => {
 describe("estimateScheduleRowHeightPx", () => {
   it("returns base height for empty work allocations", () => {
     const h = estimateScheduleRowHeightPx({ personAllocations: [], density: "comfortable" });
-    assert.ok(h >= 72 && h < 120, `expected compact empty row, got ${h}`);
+    assert.ok(h >= 118 && h < 150, `expected comfortable empty row >= person min, got ${h}`);
   });
 
   it("does not sum every bar height (avoids virtual scroll gaps)", () => {
