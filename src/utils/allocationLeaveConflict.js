@@ -1,17 +1,17 @@
 import { advanceRepeatWindow } from "./allocationRepeatWindow.js";
+import { isFullDayLeaveAlloc } from "../schedule/renderModel/sizing.js";
+import { isAvailabilityDayOffAlloc } from "./leaveVisuals.js";
 import { allocationHasPersonSchedule } from "./peopleSort.js";
 
 /**
- * Whether a leave row should block rostering **work** on overlapping dates.
- * Public holidays behave like off days for schedule capacity + rendering.
+ * Whether a leave row fully blocks rostering **work** on overlapping dates (full day / PH).
+ * Partial leave (< 7.5h/d) still allows work on the same calendar day.
  */
 function leaveBlocksWorkAllocation(a) {
   if (!a?.isLeave) return false;
-  // Weekly "off" blocks generated from availability are informational — users may still
-  // roster work on those days for one-off scenarios.
   const k = a.availabilitySlotKey;
   if (typeof k === "string" && k.startsWith("avail_off:")) return false;
-  return true;
+  return isFullDayLeaveAlloc(a);
 }
 
 function sliceIso(d) {
@@ -26,8 +26,8 @@ function rangesOverlap(a0, a1, b0, b1) {
  * First leave occurrence (expanded for `repeatId`) that intersects [workStart, workEnd], or null.
  * Non-repeating leave uses stored dates only.
  */
-export function findLeaveOverlapWithWorkRange(leaveAlloc, workStart, workEnd) {
-  if (!leaveBlocksWorkAllocation(leaveAlloc)) return null;
+export function findLeaveOverlapWithWorkRange(leaveAlloc, workStart, workEnd, options = {}) {
+  if (!options.ignoreBlocksCheck && !leaveBlocksWorkAllocation(leaveAlloc)) return null;
   const pStart = sliceIso(workStart);
   const pEnd = sliceIso(workEnd);
   if (!pStart || !pEnd) return null;
@@ -93,8 +93,13 @@ export function maxWorkHoursOnDayForPersonList(
   standardDayHours = 7.5
 ) {
   const dk = String(dateKey).slice(0, 10);
+  let leaveHours = 0;
   for (const a of personAllocations) {
-    if (findLeaveOverlapWithWorkRange(a, dk, dk)) return 0;
+    if (!a?.isLeave) continue;
+    if (!findLeaveOverlapWithWorkRange(a, dk, dk, { ignoreBlocksCheck: true })) continue;
+    if (isAvailabilityDayOffAlloc(a)) continue;
+    if (isFullDayLeaveAlloc(a, standardDayHours)) return 0;
+    leaveHours += Math.max(0, parseFloat(a.hoursPerDay) || 0);
   }
-  return standardDayHours;
+  return Math.max(0, standardDayHours - Math.min(leaveHours, standardDayHours));
 }

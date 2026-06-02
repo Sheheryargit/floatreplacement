@@ -3660,6 +3660,25 @@ button.lp-block.lp-block-leave:hover {
   padding: 4px 5px;
 }
 
+/* Partial-day leave (< 7.5h/d): same proportional height as work bars, pinned to top of cell */
+.lp-leave-block--partial {
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 0;
+  padding: 4px 6px;
+  box-sizing: border-box;
+}
+
+.lp-leave-block--partial .lp-leave-block__icon-pill {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+}
+
+.lp-leave-block--partial .lp-leave-block__icon {
+  transform: scale(0.92);
+}
+
 .lp-leave-block__icon-pill {
   display: inline-flex;
   align-items: center;

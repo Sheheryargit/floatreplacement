@@ -99,6 +99,8 @@ import {
   BAR_H_NORM,
   PX_PER_HOUR,
   allocationBarHeightPx,
+  isFullDayLeaveAlloc,
+  leaveBlockHeightPx,
   workTileHeightPxForDensity,
   clampedSegmentGeometry,
 } from "../schedule/renderModel/index.js";
@@ -123,6 +125,7 @@ import {
   buildExtendedAllocationPayload,
   listLatestEndBulkExtendCandidates,
 } from "../utils/allocationBulkExtend.js";
+import { buildSplitSegments } from "../utils/allocationSplit.js";
 import { BulkExtendAllocationsDialog } from "../components/BulkExtendAllocationsDialog.jsx";
 import "../components/BulkExtendAllocationsPanel.css";
 import { isStaticUi } from "../config/uiMode.js";
@@ -612,22 +615,45 @@ function peakLoadSummaryLine(loadBand, peakHours, target = STANDARD_DAY_HOURS) {
  * overflow visibly as the stack exceeds one cell's worth of height.
  */
 const TABLE_ROW_ENTER_ANIM_MAX = 32;
-const WEEK_CELL_FULL_DAY_PX = BAR_H_BASE_PX + BAR_H_NORM * PX_PER_HOUR;
 
-// Leave bars use a lower "full day" baseline so partial-day differences read clearly.
-// Treat ~5.5h leave as a visually "full" cell.
-const LEAVE_H_NORM = 5.5;
-const LEAVE_PX_PER_HOUR = (WEEK_CELL_FULL_DAY_PX - BAR_H_BASE_PX) / LEAVE_H_NORM;
-// Leave blocks should not occupy the whole day cell; keep them compact so the user can
-// still click empty space below to create allocations.
-const LEAVE_FIXED_HEIGHT_PX = 86;
-const LEAVE_CLICK_GAP_PX = 56;
-/** Matches `.lp-grid-row` vertical padding — in-flow work bars start below this; abspos overlays must inset the same. */
-
-function leaveBarHeightPx(alloc) {
-  // Legacy: leave tiles used variable heights. Schedule now uses consistent tile sizing
-  // across work + leave + public holidays, so this is no longer used for rendering.
-  return LEAVE_FIXED_HEIGHT_PX;
+/** Leave tile class + size styles (full-day column vs partial hours bar). */
+function leaveTimelineBlockChrome(allocUi, { isDayOff, onToday, typeId, leaveBrPx }) {
+  const fullDay = isDayOff || isFullDayLeaveAlloc(allocUi);
+  const partialH = fullDay ? null : leaveBlockHeightPx(allocUi);
+  const className =
+    "lp-leave-block lp-leave-block--" +
+    typeId +
+    (onToday ? " lp-leave-block--today" : "") +
+    (fullDay && !isDayOff ? " lp-leave-block--icon-only" : "") +
+    (partialH != null ? " lp-leave-block--partial" : "");
+  const sizeStyle =
+    partialH != null
+      ? {
+          alignSelf: "start",
+          height: `${partialH}px`,
+          minHeight: `${partialH}px`,
+          maxHeight: `${partialH}px`,
+        }
+      : {
+          alignSelf: "stretch",
+          height: "100%",
+          minHeight: 0,
+          maxHeight: "100%",
+        };
+  return {
+    className,
+    style: {
+      gridRow: 1,
+      width: "100%",
+      minWidth: 0,
+      justifySelf: "stretch",
+      margin: 0,
+      borderRadius: `${leaveBrPx}px`,
+      overflow: "hidden",
+      pointerEvents: "auto",
+      ...sizeStyle,
+    },
+  };
 }
 
 const timelineRowEqual = (prev, next) => {
@@ -1041,31 +1067,21 @@ const TimelineRow = memo(function TimelineRow({
                   const typeId = isDayOff ? "day_off" : normalizeLeaveTypeId(allocUi.leaveType);
                   const onToday = leaveSpansToday(allocUi, todayDateKey);
                   const hoverTitle = buildLeaveHoverTitle(allocUi, leaveLabel);
+                  const leaveChrome = leaveTimelineBlockChrome(allocUi, {
+                    isDayOff,
+                    onToday,
+                    typeId,
+                    leaveBrPx,
+                  });
 
                   return (
                     <button
                       key={`${seg.a.id}-occ-${seg.occIdx}`}
                       type="button"
-                      className={
-                        "lp-leave-block lp-leave-block--" +
-                        typeId +
-                        (onToday ? " lp-leave-block--today" : "") +
-                        (!isDayOff ? " lp-leave-block--icon-only" : "")
-                      }
+                      className={leaveChrome.className}
                       style={{
                         gridColumn: `${colStart} / span ${colSpan}`,
-                        gridRow: 1,
-                        alignSelf: "stretch",
-                        height: "100%",
-                        minHeight: 0,
-                        maxHeight: "100%",
-                        width: "100%",
-                        minWidth: 0,
-                        justifySelf: "stretch",
-                        margin: 0,
-                        borderRadius: `${leaveBrPx}px`,
-                        overflow: "hidden",
-                        pointerEvents: "auto",
+                        ...leaveChrome.style,
                       }}
                       aria-label={allocationAriaLabel(allocUi)}
                       title={hoverTitle}
@@ -1103,32 +1119,22 @@ const TimelineRow = memo(function TimelineRow({
                   const typeId = isDayOff ? "day_off" : normalizeLeaveTypeId(allocUi.leaveType);
                   const onToday = leaveSpansToday(allocUi, todayDateKey);
                   const hoverTitle = buildLeaveHoverTitle(allocUi, leaveLabel);
+                  const leaveChrome = leaveTimelineBlockChrome(allocUi, {
+                    isDayOff,
+                    onToday,
+                    typeId,
+                    leaveBrPx,
+                  });
 
                   return (
                     <motion.button
                       key={`${seg.a.id}-occ-${seg.occIdx}`}
                       type="button"
                       layout={false}
-                      className={
-                        "lp-leave-block lp-leave-block--" +
-                        typeId +
-                        (onToday ? " lp-leave-block--today" : "") +
-                        (!isDayOff ? " lp-leave-block--icon-only" : "")
-                      }
+                      className={leaveChrome.className}
                       style={{
                         gridColumn: `${colStart} / span ${colSpan}`,
-                        gridRow: 1,
-                        alignSelf: "stretch",
-                        height: "100%",
-                        minHeight: 0,
-                        maxHeight: "100%",
-                        width: "100%",
-                        minWidth: 0,
-                        justifySelf: "stretch",
-                        margin: 0,
-                        borderRadius: `${leaveBrPx}px`,
-                        overflow: "hidden",
-                        pointerEvents: "auto",
+                        ...leaveChrome.style,
                       }}
                       aria-label={allocationAriaLabel(allocUi)}
                       title={hoverTitle}
@@ -2312,6 +2318,155 @@ export default function LandingPage() {
       return handleEditAllocation(payload, alloc.id);
     },
     [handleEditAllocation, bulkExtendCtx]
+  );
+
+  const warnLeaveOverlapForWorkPayload = useCallback(
+    (payload, excludeAllocId) => {
+      const pStart = payload.startDate;
+      const pEnd = payload.endDate;
+      for (const pid of payload.personIds || []) {
+        let leaveConflict = null;
+        let overlap = null;
+        for (const a of getPersonAllocations(allocationsByPerson, pid)) {
+          if (excludeAllocId && a.id === excludeAllocId) continue;
+          const o = findLeaveOverlapWithWorkRange(a, pStart, pEnd);
+          if (o) {
+            leaveConflict = a;
+            overlap = o;
+            break;
+          }
+        }
+        if (leaveConflict && overlap) {
+          const personName = people.find((p) => p.id === pid)?.name || "This person";
+          const leaveTypeName = leaveConflict.leaveType
+            ? leaveLabel(leaveConflict.leaveType)
+            : "Leave";
+          const rangeLabel =
+            overlap.start === overlap.end
+              ? overlap.start
+              : `${overlap.start} → ${overlap.end}`;
+          toast.warning(`Allocation includes time off for ${personName}`, {
+            description: `${leaveTypeName} (${rangeLabel}). Off days are skipped in working-day totals.`,
+            duration: 4200,
+          });
+        }
+      }
+    },
+    [allocationsByPerson, people]
+  );
+
+  const handleSplitAllocation = useCallback(
+    async (alloc, input) => {
+      const built = buildSplitSegments(alloc, input, bulkExtendCtx);
+      if (built.error) {
+        toast.error(built.error);
+        return false;
+      }
+
+      const prevAlloc = scheduleAllocations.find((a) => a.id === alloc.id) || alloc;
+      const payloads = [
+        built.originalMerged,
+        ...built.creates.map((c) => ({
+          personIds: c.personIds,
+          startDate: c.startDate,
+          endDate: c.endDate,
+        })),
+      ];
+      for (const p of payloads) {
+        warnLeaveOverlapForWorkPayload(
+          { personIds: p.personIds, startDate: p.startDate, endDate: p.endDate },
+          alloc.id
+        );
+      }
+
+      const createdSaved = [];
+
+      try {
+        const savedOriginal = isSupabaseConfigured
+          ? await syncAllocationUpdate(built.originalMerged)
+          : built.originalMerged;
+        setAllocations((prev) => prev.map((a) => (a.id === alloc.id ? savedOriginal : a)));
+
+        for (const draft of built.creates) {
+          const createdDraft = {
+            id:
+              typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+                ? crypto.randomUUID()
+                : `tmp_${Date.now()}_${createdSaved.length}`,
+            ...draft,
+          };
+          try {
+            const saved = isSupabaseConfigured
+              ? await syncAllocationCreate(createdDraft)
+              : createdDraft;
+            createdSaved.push(saved);
+            setAllocations((prev) => [...prev, saved]);
+            pulseFreshAllocationTile(saved.id);
+          } catch (createErr) {
+            try {
+              if (isSupabaseConfigured) {
+                await syncAllocationUpdate(prevAlloc);
+              }
+              setAllocations((prev) => {
+                let next = prev.map((a) => (a.id === alloc.id ? prevAlloc : a));
+                for (const s of createdSaved) {
+                  next = next.filter((a) => a.id !== s.id);
+                }
+                return next;
+              });
+              for (const s of createdSaved) {
+                if (isSupabaseConfigured) {
+                  await syncAllocationDelete(s.id).catch(() => {});
+                }
+              }
+            } catch {
+              refreshWorkspaceFromSupabase().catch(() => {});
+            }
+            toast.error("Split failed", {
+              description: createErr?.message || String(createErr),
+            });
+            return false;
+          }
+        }
+
+        const rangeBits = [
+          `${built.originalMerged.startDate} → ${built.originalMerged.endDate}`,
+          ...createdSaved.map((s) => `${s.startDate} → ${s.endDate}`),
+        ];
+        showCenterActionFeedback({
+          action: "update",
+          title: "Split allocation",
+          subtitle: `${shortenAllocLabel(built.originalMerged.project, 28)} · ${rangeBits.length} segments`,
+        });
+        setAllocDetailOpen(false);
+        setSelectedAllocation(null);
+        return true;
+      } catch (e) {
+        if (e?.name === "OptimisticLockError") {
+          toast.error("Someone else edited this allocation", {
+            description: "Refreshing the schedule from the server.",
+          });
+          refreshWorkspaceFromSupabase().catch(() => {});
+        } else {
+          toast.error("Split failed", { description: e?.message || String(e) });
+        }
+        return false;
+      }
+    },
+    [
+      bulkExtendCtx,
+      scheduleAllocations,
+      warnLeaveOverlapForWorkPayload,
+      syncAllocationUpdate,
+      syncAllocationCreate,
+      syncAllocationDelete,
+      isSupabaseConfigured,
+      setAllocations,
+      pulseFreshAllocationTile,
+      setAllocDetailOpen,
+      setSelectedAllocation,
+      refreshWorkspaceFromSupabase,
+    ]
   );
 
   const handleDeleteAllocation = useCallback(
@@ -3582,6 +3737,7 @@ export default function LandingPage() {
           onClose={closeAllocationDetail}
           onDelete={canDeleteSelectedAllocation ? handleDeleteAllocation : undefined}
           onExtendAllocation={handleExtendAllocation}
+          onSplitAllocation={handleSplitAllocation}
           allocations={detailModalAllocations}
           publicHolidayAllocations={visiblePublicHolidayAllocations}
           onEditClick={canManageSelectedAllocation ? handleDetailEditClick : undefined}

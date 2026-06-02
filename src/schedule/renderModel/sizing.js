@@ -12,6 +12,27 @@ export function allocationBarHeightPx(alloc) {
   return Math.round(BAR_H_BASE_PX + effective * PX_PER_HOUR);
 }
 
+/** Full-day leave overlay (column fill). Public holidays always qualify. */
+export function isFullDayLeaveAlloc(alloc, fullDayHours = BAR_H_NORM) {
+  if (!alloc?.isLeave) return false;
+  if (alloc.syntheticPublicHoliday || String(alloc.leaveType || "") === "public_holiday") {
+    return true;
+  }
+  const h = Math.max(0, parseFloat(alloc?.hoursPerDay) || 0);
+  return h >= fullDayHours - 0.02;
+}
+
+/**
+ * Pixel height for partial leave bars; `null` means use full-column stretch (≥ full day).
+ * @param {object} alloc
+ * @param {number} [fullDayHours=7.5]
+ * @returns {number | null}
+ */
+export function leaveBlockHeightPx(alloc, fullDayHours = BAR_H_NORM) {
+  if (!alloc?.isLeave || isFullDayLeaveAlloc(alloc, fullDayHours)) return null;
+  return allocationBarHeightPx(alloc);
+}
+
 export function workTileHeightPxForDensity(density) {
   // Must stay in sync with `--lp-block-max-h` in `LandingPage.css`.
   if (density === "compact") return 50;

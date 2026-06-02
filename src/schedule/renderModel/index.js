@@ -13,6 +13,8 @@ export {
   PX_PER_HOUR,
   BAR_H_MIN_VISIBLE_PX,
   allocationBarHeightPx,
+  isFullDayLeaveAlloc,
+  leaveBlockHeightPx,
   workTileHeightPxForDensity,
 } from "./sizing.js";
 export { clampedSegmentGeometry } from "./geometry.js";

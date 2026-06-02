@@ -26,10 +26,11 @@ export function computeOverlapAwareSegmentTopPx(
     endCol = seg.endCol ?? Math.max(0, Math.floor((seg?.lay?.start ?? 0) + (seg?.lay?.span ?? 1) - 1)),
     stack = seg.stack ?? 0,
     weekKey = seg.weekKey,
+    minTopPx,
   } = {}
 ) {
   const segWeek = weekKeyForStartCol(scheduleModel, startCol, weekKey);
-  let top = ROW_ALLOC_PAD / 2;
+  let top = minTopPx != null && minTopPx > 0 ? minTopPx : ROW_ALLOC_PAD / 2;
 
   for (let lane = 0; lane < stack; lane++) {
     let laneH = 0;
@@ -59,14 +60,19 @@ export function computeOverlapAwareContentHeight(
   segments,
   scheduleModel,
   barHeightFn = (s) => s.barH ?? allocationBarHeightPx(s.a),
-  overlapSegments = segments
+  overlapSegments = segments,
+  getMinTopPx
 ) {
   if (!segments?.length) return ROW_ALLOC_PAD;
   return (
     Math.max(
-      ...segments.map(
-        (s) => computeOverlapAwareSegmentTopPx(s, overlapSegments, scheduleModel) + barHeightFn(s)
-      )
+      ...segments.map((s) => {
+        const minTop = getMinTopPx?.(s);
+        const top = computeOverlapAwareSegmentTopPx(s, overlapSegments, scheduleModel, {
+          minTopPx: minTop != null && minTop > 0 ? minTop : undefined,
+        });
+        return top + barHeightFn(s);
+      })
     ) + ROW_ALLOC_PAD / 2
   );
 }

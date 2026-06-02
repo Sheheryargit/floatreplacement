@@ -3,6 +3,8 @@ import { segmentIntersectsColumnRange, isValidColumnRange } from "./scheduleLayo
 import { layoutsForAllocation } from "./renderModel/allocationLayouts.js";
 import {
   allocationBarHeightPx,
+  isFullDayLeaveAlloc,
+  leaveBlockHeightPx,
   workTileHeightPxForDensity,
   assignAllocationStackLevelsByWorkWeek,
   splitLayoutByOffDays,
@@ -17,6 +19,39 @@ import {
 /** Keep in sync with TimelineRow / virtual row height (`LandingPage.jsx`). */
 export { ROW_ALLOC_PAD, LANE_STACK_GAP };
 export const LEAVE_CLICK_GAP_PX = 56;
+
+/** Leave that removes the day from work layout / off-day columns (not partial hours). */
+export function leaveSegmentBlocksWorkColumns(seg) {
+  const a = seg?.a;
+  if (!a) return false;
+  return (
+    isFullDayLeaveAlloc(a) ||
+    !!a.syntheticPublicHoliday ||
+    String(a.leaveType || "") === "public_holiday"
+  );
+}
+
+/** Reserve top of stack for partial leave bars overlapping these columns. */
+export function maxPartialLeaveReservePx(workSeg, partialLeaveSegments) {
+  const segStart = Math.max(0, Math.floor(workSeg?.lay?.start ?? workSeg?.start ?? 0));
+  const segSpan = Math.max(0, Math.floor(workSeg?.lay?.span ?? workSeg?.span ?? 0));
+  const segEnd = segStart + segSpan - 1;
+  if (segEnd < segStart) return 0;
+
+  let reserve = 0;
+  for (const leaveSeg of partialLeaveSegments || []) {
+    if (leaveSegmentBlocksWorkColumns(leaveSeg)) continue;
+    const h = leaveBlockHeightPx(leaveSeg.a);
+    if (h == null) continue;
+    const lStart = Math.max(0, Math.floor(leaveSeg?.lay?.start ?? leaveSeg?.start ?? 0));
+    const lSpan = Math.max(0, Math.floor(leaveSeg?.lay?.span ?? leaveSeg?.span ?? 0));
+    const lEnd = lStart + lSpan - 1;
+    if (segStart <= lEnd && segEnd >= lStart) {
+      reserve = Math.max(reserve, h + LANE_STACK_GAP);
+    }
+  }
+  return reserve;
+}
 
 /** Matches `--lp-row-h` in LandingPage.css per density. */
 export const TIMELINE_FLOOR_PX = {
@@ -104,6 +139,7 @@ export function buildTimelineRowLayout({
 
   const offDayColSet = new Set();
   for (const seg of blockingLeaveAndHolidaySegments) {
+    if (!leaveSegmentBlocksWorkColumns(seg)) continue;
     const start = Math.max(0, Math.floor(seg?.lay?.start ?? seg?.start ?? 0));
     const span = Math.max(0, Math.floor(seg?.lay?.span ?? seg?.span ?? 0));
     const end = Math.min(slotsLen ? slotsLen - 1 : -1, start + span - 1);
@@ -154,6 +190,7 @@ export function buildTimelineRowLayout({
       const segEnd = segStart + segSpan - 1;
       if (segEnd < segStart) return false;
       return !blockingLeaveAndHolidaySegments.some((offSeg) => {
+        if (!leaveSegmentBlocksWorkColumns(offSeg)) return false;
         const offStart = Math.max(0, Math.floor(offSeg?.lay?.start ?? offSeg?.start ?? 0));
         const offSpan = Math.max(0, Math.floor(offSeg?.lay?.span ?? offSeg?.span ?? 0));
         const offEnd = offStart + offSpan - 1;
@@ -162,7 +199,12 @@ export function buildTimelineRowLayout({
       });
     });
 
-  const segmentTopPx = (seg) => computeOverlapAwareSegmentTopPx(seg, workSegments, scheduleModel);
+  const segmentTopPx = (seg) => {
+    const partialReserve = maxPartialLeaveReservePx(seg, leaveSegments);
+    return computeOverlapAwareSegmentTopPx(seg, workSegments, scheduleModel, {
+      minTopPx: partialReserve > 0 ? partialReserve : undefined,
+    });
+  };
 
   const segTopMap = new Map();
   for (const seg of workSegments) {
@@ -171,9 +213,20 @@ export function buildTimelineRowLayout({
 
   const heightSegs = workSegments.filter(heightSegmentsFilter);
 
+  const partialLeaveTopInset = (seg) => {
+    const reserve = maxPartialLeaveReservePx(seg, leaveSegments);
+    return reserve > 0 ? reserve : undefined;
+  };
+
   const schedAllocContentH =
     heightSegs.length > 0
-      ? computeOverlapAwareContentHeight(heightSegs, scheduleModel, undefined, heightSegs)
+      ? computeOverlapAwareContentHeight(
+          heightSegs,
+          scheduleModel,
+          undefined,
+          heightSegs,
+          partialLeaveTopInset
+        )
       : ROW_ALLOC_PAD;
 
   const allocLaneCount = heightSegs.length

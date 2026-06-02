@@ -23,6 +23,13 @@ import {
   allocationTotalHoursRounded,
 } from "../utils/allocationWorkMetrics.js";
 import { suggestHoursPerDayFromAllocations } from "../lib/suggestHoursPremiumV2.js";
+import {
+  buildSplitPreview,
+  validateSplitInput,
+  minSplitEffectiveDate,
+  maxSplitEffectiveDate,
+  maxChangedThroughDate,
+} from "../utils/allocationSplit.js";
 
 const REPEAT_OPTIONS = [
   { id: "none", label: "Doesn't repeat" },
@@ -1326,6 +1333,7 @@ function AllocationDetailModalInner({
   onDelete,
   onEditClick,
   onExtendAllocation,
+  onSplitAllocation,
   allocations = [],
   publicHolidayAllocations = [],
   t,
@@ -1343,10 +1351,26 @@ function AllocationDetailModalInner({
     !allocation.isLeave &&
     !allocation.syntheticPublicHoliday;
 
+  const showSplitPanel = showExtendPanel && !!onSplitAllocation;
+
+  const splitCtx = useMemo(
+    () => ({
+      allocations,
+      publicHolidayAllocations,
+      projects: [],
+    }),
+    [allocations, publicHolidayAllocations]
+  );
+
   const [extendPresetWeeks, setExtendPresetWeeks] = useState(2);
   const [extendChipMode, setExtendChipMode] = useState("preset");
   const [extendCustomWeeksStr, setExtendCustomWeeksStr] = useState("2");
   const [extendBusy, setExtendBusy] = useState(false);
+
+  const [splitEffectiveDate, setSplitEffectiveDate] = useState("");
+  const [splitHoursStr, setSplitHoursStr] = useState("");
+  const [splitThroughDate, setSplitThroughDate] = useState("");
+  const [splitBusy, setSplitBusy] = useState(false);
 
   useEffect(() => {
     if (open && allocation) {
@@ -1354,6 +1378,10 @@ function AllocationDetailModalInner({
       setExtendChipMode("preset");
       setExtendCustomWeeksStr("2");
       setExtendBusy(false);
+      setSplitEffectiveDate(minSplitEffectiveDate(allocation) || "");
+      setSplitHoursStr(String(allocation.hoursPerDay ?? ""));
+      setSplitThroughDate("");
+      setSplitBusy(false);
     }
   }, [open, allocation?.id]);
 
@@ -1435,6 +1463,55 @@ function AllocationDetailModalInner({
       await onExtendAllocation(allocation, nextKey);
     } finally {
       setExtendBusy(false);
+    }
+  };
+
+  const splitInput = useMemo(
+    () => ({
+      effectiveDate: splitEffectiveDate,
+      newHoursPerDay: splitHoursStr,
+      changedThrough:
+        splitThroughDate.trim() !== "" ? splitThroughDate : undefined,
+    }),
+    [splitEffectiveDate, splitHoursStr, splitThroughDate]
+  );
+
+  const splitValid = useMemo(() => {
+    if (!allocation || !showSplitPanel) return false;
+    return validateSplitInput(allocation, splitInput).ok;
+  }, [allocation, showSplitPanel, splitInput]);
+
+  const splitPreview = useMemo(() => {
+    if (!allocation || !splitValid) return null;
+    return buildSplitPreview(allocation, splitInput, splitCtx);
+  }, [allocation, splitValid, splitInput, splitCtx]);
+
+  const splitMinEffective = allocation ? minSplitEffectiveDate(allocation) : "";
+  const splitMaxEffective = allocation ? maxSplitEffectiveDate(allocation) : "";
+  const splitMaxThrough = allocation ? maxChangedThroughDate(allocation) : "";
+
+  const handleApplySplit = async () => {
+    if (!onSplitAllocation || !splitValid || splitBusy || !allocation) return;
+    const n = splitPreview?.segmentCount ?? 2;
+    const creates = Math.max(0, n - 1);
+    const msg =
+      creates === 1
+        ? "Split this allocation? The existing entry will end the day before your effective date, and one new allocation will be created."
+        : `Split into ${n} allocations? The existing entry will be shortened and ${creates} new allocations will be created.`;
+    if (typeof window !== "undefined" && !window.confirm(msg)) return;
+    setSplitBusy(true);
+    try {
+      const hours =
+        typeof splitInput.newHoursPerDay === "number"
+          ? splitInput.newHoursPerDay
+          : Number.parseFloat(String(splitInput.newHoursPerDay ?? "")) || 0;
+      await onSplitAllocation(allocation, {
+        effectiveDate: splitInput.effectiveDate,
+        newHoursPerDay: hours,
+        changedThrough: splitInput.changedThrough,
+      });
+    } finally {
+      setSplitBusy(false);
     }
   };
 
@@ -1788,6 +1865,158 @@ function AllocationDetailModalInner({
                   </button>
                 </div>
               </div>
+              </details>
+            ) : null}
+
+            {showSplitPanel ? (
+              <details className="lpam-detail-extend-drawer lpam-detail-split-drawer">
+                <summary
+                  className="lpam-detail-extend-drawer-sum"
+                  style={{
+                    color: t.text,
+                    borderColor: `color-mix(in srgb, ${t.borderSub} 88%, transparent)`,
+                    background: `color-mix(in srgb, ${t.surfRaised || t.surface} 55%, transparent)`,
+                  }}
+                >
+                  <ArrowLeftRight aria-hidden strokeWidth={2.25} className="lpam-detail-extend-drawer-ico" size={17} />
+                  <span className="lpam-detail-extend-drawer-label">Split hours from date</span>
+                  <span className="lpam-detail-extend-drawer-hint" style={{ color: t.textMuted }}>
+                    change rate mid-range · optional
+                  </span>
+                </summary>
+                <div className="lpam-extend-card-wrap lpam-extend-card-wrap--drawer">
+                  <div
+                    className="lpam-extend-card lpam-split-card"
+                    style={{
+                      borderColor: `color-mix(in srgb, ${t.borderSub} 72%, transparent)`,
+                      boxShadow: `inset 0 1px 0 color-mix(in srgb, ${t.surface} 40%, transparent), 0 10px 32px ${t.accentGlow || "rgba(0,136,255,0.06)"}`,
+                      background: `linear-gradient(
+                        148deg,
+                        color-mix(in srgb, ${t.surface} 92%, ${t.accent} 8%) 0%,
+                        color-mix(in srgb, ${t.surfRaised || t.surface} 97%, ${t.border} 3%) 100%
+                      )`,
+                    }}
+                  >
+                    <div className="lpam-split-fields">
+                      <label className="lpam-split-field">
+                        <span className="lpam-detail-label" style={{ color: t.textMuted }}>
+                          Effective from
+                        </span>
+                        <input
+                          type="date"
+                          className="lpam-split-date"
+                          value={splitEffectiveDate}
+                          min={splitMinEffective}
+                          max={splitMaxEffective}
+                          onChange={(e) => setSplitEffectiveDate(e.target.value)}
+                          style={{
+                            borderColor: t.border,
+                            background: t.surface,
+                            color: t.text,
+                          }}
+                        />
+                      </label>
+                      <label className="lpam-split-field">
+                        <span className="lpam-detail-label" style={{ color: t.textMuted }}>
+                          Hours per day
+                        </span>
+                        <input
+                          type="number"
+                          className="lpam-split-hours"
+                          min={0}
+                          step={0.5}
+                          value={splitHoursStr}
+                          onChange={(e) => setSplitHoursStr(e.target.value)}
+                          style={{
+                            borderColor: t.border,
+                            background: t.surface,
+                            color: t.text,
+                          }}
+                        />
+                      </label>
+                      <label className="lpam-split-field lpam-split-field--full">
+                        <span className="lpam-detail-label" style={{ color: t.textMuted }}>
+                          At this rate through
+                        </span>
+                        <input
+                          type="date"
+                          className="lpam-split-date"
+                          value={splitThroughDate}
+                          min={splitEffectiveDate || splitMinEffective}
+                          max={splitMaxThrough}
+                          onChange={(e) => setSplitThroughDate(e.target.value)}
+                          style={{
+                            borderColor: t.border,
+                            background: t.surface,
+                            color: t.text,
+                          }}
+                        />
+                        <span className="lpam-split-hint" style={{ color: t.textMuted }}>
+                          Leave empty to apply the new hours through the current end date. Set an end
+                          date to restore the previous hours afterward.
+                        </span>
+                      </label>
+                    </div>
+
+                    <div
+                      className={
+                        splitValid
+                          ? "lpam-extend-preview lpam-extend-preview--ok"
+                          : "lpam-extend-preview lpam-extend-preview--warn"
+                      }
+                      style={{
+                        borderColor: splitValid
+                          ? `color-mix(in srgb, ${t.accent} 35%, transparent)`
+                          : `color-mix(in srgb, ${t.warn ?? "#f59e0b"} 40%, transparent)`,
+                        background: splitValid
+                          ? `color-mix(in srgb, ${t.accentGlow || "rgba(0,136,255,0.12)"} 28%, transparent)`
+                          : String(t.warnSoft || "rgba(245,158,11,0.12)"),
+                      }}
+                    >
+                      {splitValid && splitPreview?.segments?.length ? (
+                        <ul className="lpam-split-preview-list" style={{ color: t.textSoft }}>
+                          {splitPreview.segments.map((seg) => (
+                            <li key={`${seg.role}-${seg.startDate}`}>
+                              {formatAllocDate(seg.startDate)} – {formatAllocDate(seg.endDate)} ·{" "}
+                              {seg.hoursPerDay}h/day · {seg.workingDays} working days
+                              {seg.role === "tail" ? " (restored)" : null}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <span style={{ color: t.warn ?? "#f59e0b" }}>
+                          Pick a valid effective date and hours per day.
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      className="lpam-btn lpam-extend-apply"
+                      disabled={!splitValid || splitBusy}
+                      style={{
+                        width: "100%",
+                        justifyContent: "center",
+                        background: splitValid
+                          ? `linear-gradient(145deg, ${t.accent}, ${t.accentSoft || t.accent})`
+                          : t.btnSec || "#1e2235",
+                        borderColor: "transparent",
+                        color: splitValid ? "#fff" : t.textMuted,
+                        opacity: splitBusy ? 0.75 : 1,
+                        boxShadow: splitValid
+                          ? `0 12px 32px ${t.accentGlow || "rgba(0,136,255,0.2)"}`
+                          : undefined,
+                      }}
+                      onClick={handleApplySplit}
+                    >
+                      {splitBusy
+                        ? "Splitting…"
+                        : splitValid
+                          ? `Apply split (${splitPreview?.segmentCount ?? 2} segments)`
+                          : "Complete the fields above"}
+                    </button>
+                  </div>
+                </div>
               </details>
             ) : null}
           </>

@@ -1353,6 +1353,55 @@
   }
 }
 
+.lpam-detail-split-drawer {
+  margin-top: 6px;
+}
+
+.lpam-split-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 14px;
+}
+
+.lpam-split-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lpam-split-field--full {
+  grid-column: 1 / -1;
+}
+
+.lpam-split-date,
+.lpam-split-hours {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid;
+  padding: 8px 10px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.lpam-split-hint {
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+.lpam-split-preview-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
 /* Schedule v2: template row + PH chips */
 .lpam-template-field {
   margin-top: 10px;

@@ -2,6 +2,7 @@ import { isValidColumnRange } from "./scheduleLayoutRange.js";
 import {
   buildTimelineRowLayout,
   leaveMinHeightPx,
+  maxPartialLeaveReservePx,
   resolveScheduleRowHeightPx,
   PERSON_COL_MIN_PX,
   ROW_EDGE_PAD_PX,
@@ -65,6 +66,7 @@ export function buildPersonRowHeightPlan({
   return {
     workSegments,
     workSegmentsByStartCol: sortWorkSegmentsByStartCol(workSegments),
+    partialLeaveSegments: layout.leaveSegments,
     hasLeave: layout.hasLeaveSegments,
     leaveMinPxByDensity: {
       compact: leaveMinHeightPx(layout, "compact"),
@@ -90,11 +92,23 @@ export function computeRowHeightFromPlan(plan, layoutColumnRange, density = "com
 
   let schedAllocContentH = ROW_ALLOC_PAD;
   if (heightSegs.length > 0) {
+    const partialLeaveTopInset = (flatSeg) =>
+      maxPartialLeaveReservePx(
+        {
+          lay: {
+            start: flatSeg.startCol,
+            span: flatSeg.endCol - flatSeg.startCol + 1,
+          },
+        },
+        plan.partialLeaveSegments
+      ) || undefined;
+
     schedAllocContentH = computeOverlapAwareContentHeight(
       heightSegs,
       null,
       (s) => s.barH,
-      heightSegs
+      heightSegs,
+      partialLeaveTopInset
     );
   }
 
