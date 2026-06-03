@@ -1,11 +1,5 @@
 /** @typedef {{ startCol: number, endCol: number }} ColumnRange */
 
-/** Extra columns painted off-screen (work/leave bars); wider than height buffer. */
-export const SCHEDULE_PAINT_COLUMN_BUFFER = 3;
-
-/** @deprecated Height uses anchor band only — not viewport scroll. */
-export const SCHEDULE_HEIGHT_COLUMN_BUFFER = 0;
-
 export function fullColumnRange(columnCount) {
   const n = Math.max(0, Math.floor(columnCount || 0));
   if (n === 0) return { startCol: 0, endCol: -1 };
@@ -74,8 +68,8 @@ function anchorColumnRange(scheduleModel) {
 }
 
 /**
- * Layout column range for row height / stack layout.
- * Uses the anchor calendar band (not horizontal viewport) so row height stays stable while scrolling.
+ * Row-height columns: whatever is visible in the timeline viewport (shrinks/grows on scroll).
+ * Falls back to the anchor band before the viewport is measured.
  */
 export function getEffectiveLayoutColumnRange(scheduleModel, viewportRange) {
   if (scheduleModel?.aggregateAllSlots) return anchorColumnRange(scheduleModel);
@@ -83,7 +77,7 @@ export function getEffectiveLayoutColumnRange(scheduleModel, viewportRange) {
   return anchorColumnRange(scheduleModel);
 }
 
-export function readPaintColumnRangeFromViewport(scheduleViewportEl, scheduleModel, colMinPx) {
+export function readLayoutColumnRangeFromViewport(scheduleViewportEl, scheduleModel, colMinPx) {
   if (!scheduleViewportEl || !scheduleModel?.columnCount) {
     return getEffectiveLayoutColumnRange(scheduleModel, null);
   }
@@ -92,33 +86,7 @@ export function readPaintColumnRangeFromViewport(scheduleViewportEl, scheduleMod
     scheduleViewportEl.clientWidth,
     colMinPx,
     scheduleModel.columnCount,
-    SCHEDULE_PAINT_COLUMN_BUFFER
+    1
   );
   return getEffectiveLayoutColumnRange(scheduleModel, viewportRange);
-}
-
-/** Row height follows the anchor month/week band — horizontal scroll only affects paint culling. */
-export function readHeightColumnRangeFromViewport(_scheduleViewportEl, scheduleModel, _colMinPx) {
-  return getEffectiveLayoutColumnRange(scheduleModel, null);
-}
-
-/** @deprecated Use readPaintColumnRangeFromViewport / readHeightColumnRangeFromViewport */
-export function readLayoutColumnRangeFromViewport(scheduleViewportEl, scheduleModel, colMinPx) {
-  return readHeightColumnRangeFromViewport(scheduleViewportEl, scheduleModel, colMinPx);
-}
-
-/** @param {{ paint?: ColumnRange, height?: ColumnRange, startCol?: number } | null | undefined} ranges */
-export function paintRangeFromSnapshot(ranges) {
-  if (ranges?.paint) return ranges.paint;
-  if (ranges?.height) return ranges.height;
-  if (ranges != null && Number.isFinite(ranges.startCol)) return ranges;
-  return { startCol: 0, endCol: -1 };
-}
-
-/** @param {{ paint?: ColumnRange, height?: ColumnRange, startCol?: number } | null | undefined} ranges */
-export function heightRangeFromSnapshot(ranges) {
-  if (ranges?.height) return ranges.height;
-  if (ranges?.paint) return ranges.paint;
-  if (ranges != null && Number.isFinite(ranges.startCol)) return ranges;
-  return { startCol: 0, endCol: -1 };
 }

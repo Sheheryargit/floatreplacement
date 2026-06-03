@@ -1238,17 +1238,8 @@
   transition: none !important;
 }
 
-.lp-schedule-viewport--scrolling .lp-sched-person,
-.lp-schedule-viewport--scrolling .lp-sched-row {
-  transition: none !important;
-}
-
 .lp-schedule-viewport--scrolling .lp-alloc-bar {
   transition: none !important;
-}
-
-.lp-sched-timeline {
-  contain: layout;
 }
 
 .lp-schedule-viewport::-webkit-scrollbar {
@@ -1305,7 +1296,7 @@
 .lp-sched-virtual-rows .lp-sched-virtual-anchor {
   border-bottom: 1px solid var(--lp-people-divider);
   isolation: isolate;
-  transition: height 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: height 0.16s cubic-bezier(0.22, 1, 0.36, 1);
   /* Do NOT set overflow:hidden — breaks position:sticky on .lp-sched-person (people column vanishes on scroll). */
 }
 
@@ -1324,7 +1315,6 @@
   min-height: 0;
   opacity: 1;
   animation: none;
-  transition: min-height 0.42s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .lp-sched-virtual-rows .lp-sched-virtual-anchor .lp-sched-person,
