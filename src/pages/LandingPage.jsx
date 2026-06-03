@@ -78,10 +78,8 @@ import {
 import {
   buildScheduleRowHeightResolver,
   cancelScheduledRowRemeasure,
-  captureScheduleScrollAnchor,
   queueScheduleRowRemeasure,
-  remeasureVisibleScheduleRows,
-  restoreScheduleScrollAnchor,
+  runScheduleRowHeightMorph,
 } from "../schedule/scheduleRowRemeasure.js";
 import { shrinkLagColsForView } from "../schedule/personRowHeightSticky.js";
 import {
@@ -188,6 +186,7 @@ import { useAssistantPageContext } from "../lib/assistant/alloc8Context.js";
 import { usePremiumV2 } from "../context/PremiumV2Context.jsx";
 import { useAppDialog } from "../context/AppDialogContext.jsx";
 import "./LandingPage.css";
+import "../styles/schedule-row-motion.css";
 import "../styles/premium-schedule.css";
 
 const VIEW_OPTIONS = [
@@ -1453,6 +1452,7 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { theme } = useAppTheme();
+  const reduceMotion = useReducedMotion();
   const t = T[theme];
   const setAlloc8FeedbackDock = useAlloc8ActionFeedbackMount();
 
@@ -2881,26 +2881,22 @@ export default function LandingPage() {
     [resolveScheduleRowHeightPx]
   );
 
-  const remeasureScheduleRows = useCallback(() => {
+  const remeasureScheduleRows = useCallback(async () => {
     const v = scheduleRowVirtualizerRef.current;
     const el = scheduleViewportRef.current;
     if (!v) return;
-    const anchor = captureScheduleScrollAnchor(el, v);
-    const sizeByIndex = new Map(v.getVirtualItems().map((item) => [item.index, item.size]));
     rowHeightUpdateStickyRef.current = true;
     try {
-      remeasureVisibleScheduleRows(v, {
-        indices: collectVirtualRowIndices(v),
-        sizeByIndex,
+      await runScheduleRowHeightMorph({
+        viewportEl: el,
+        virtualizer: v,
         getRowHeightPx: resolveScheduleRowHeightPx,
+        reduceMotion: !!reduceMotion,
       });
     } finally {
       rowHeightUpdateStickyRef.current = false;
     }
-    if (anchor && el) {
-      requestAnimationFrame(() => restoreScheduleScrollAnchor(el, v, anchor));
-    }
-  }, [resolveScheduleRowHeightPx]);
+  }, [resolveScheduleRowHeightPx, reduceMotion]);
 
   const queueRemeasureScheduleRows = useCallback(() => {
     queueScheduleRowRemeasure(remeasureScheduleRows);

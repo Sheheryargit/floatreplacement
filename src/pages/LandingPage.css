@@ -1331,18 +1331,11 @@
 .lp-sched-virtual-rows .lp-sched-virtual-anchor {
   border-bottom: 1px solid var(--lp-people-divider);
   isolation: isolate;
-  transition: height 0.16s cubic-bezier(0.22, 1, 0.36, 1);
-  /* Do NOT set overflow:hidden — breaks position:sticky on .lp-sched-person (people column vanishes on scroll). */
+  /* Height/top easing: schedule-row-motion.css */
 }
 
 .lp-sched-virtual-rows--static .lp-sched-row {
   border-bottom: 1px solid var(--lp-people-divider);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .lp-sched-virtual-rows .lp-sched-virtual-anchor {
-    transition: none;
-  }
 }
 
 .lp-sched-virtual-rows .lp-sched-virtual-anchor .lp-sched-row {

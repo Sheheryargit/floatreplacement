@@ -1,0 +1,94 @@
+/**
+ * Schedule row height morph — grow/shrink after sticky remeasure (scroll idle / data sync).
+ */
+
+:root {
+  --schedule-row-ease-grow: cubic-bezier(0.22, 1, 0.36, 1);
+  --schedule-row-ease-shrink: cubic-bezier(0.4, 0, 0.2, 1);
+  --schedule-row-grow-ms: 380ms;
+  --schedule-row-shrink-ms: 300ms;
+}
+
+/* Baseline (idle): subtle height ease when not actively scrolling */
+.lp-sched-virtual-rows .lp-sched-virtual-anchor {
+  transition:
+    height var(--schedule-row-shrink-ms) var(--schedule-row-ease-shrink),
+    top var(--schedule-row-shrink-ms) var(--schedule-row-ease-shrink);
+}
+
+/* Active morph session: synchronized row + bar motion */
+.lp-schedule-viewport--height-morph .lp-sched-virtual-anchor {
+  will-change: height, top;
+}
+
+.lp-schedule-viewport--height-morph .lp-sched-virtual-anchor[data-row-motion="grow"],
+.lp-schedule-viewport--height-morph .lp-sched-virtual-anchor[data-row-motion="enter"] {
+  transition:
+    height var(--schedule-row-grow-ms) var(--schedule-row-ease-grow),
+    top var(--schedule-row-grow-ms) var(--schedule-row-ease-grow);
+}
+
+.lp-schedule-viewport--height-morph .lp-sched-virtual-anchor[data-row-motion="shrink"] {
+  transition:
+    height var(--schedule-row-shrink-ms) var(--schedule-row-ease-shrink),
+    top var(--schedule-row-shrink-ms) var(--schedule-row-ease-shrink);
+}
+
+.lp-schedule-viewport--height-morph .lp-sched-virtual-anchor .lp-sched-row,
+.lp-schedule-viewport--height-morph .lp-sched-virtual-anchor .lp-grid-stack,
+.lp-schedule-viewport--height-morph .lp-sched-virtual-anchor .lp-grid-leave-layer {
+  transition: min-height var(--schedule-row-grow-ms) var(--schedule-row-ease-grow);
+}
+
+.lp-schedule-viewport--height-morph .lp-sched-virtual-anchor[data-row-motion="shrink"] .lp-sched-row,
+.lp-schedule-viewport--height-morph .lp-sched-virtual-anchor[data-row-motion="shrink"] .lp-grid-stack,
+.lp-schedule-viewport--height-morph .lp-sched-virtual-anchor[data-row-motion="shrink"] .lp-grid-leave-layer {
+  transition-duration: var(--schedule-row-shrink-ms);
+  transition-timing-function: var(--schedule-row-ease-shrink);
+}
+
+.lp-schedule-viewport--height-morph .lp-alloc-bar,
+.lp-schedule-viewport--height-morph .lp-leave-block {
+  transition:
+    top var(--schedule-row-grow-ms) var(--schedule-row-ease-grow),
+    height var(--schedule-row-grow-ms) var(--schedule-row-ease-grow),
+    min-height var(--schedule-row-grow-ms) var(--schedule-row-ease-grow),
+    transform var(--schedule-row-grow-ms) var(--schedule-row-ease-grow);
+}
+
+.lp-schedule-viewport--height-morph
+  .lp-sched-virtual-anchor[data-row-motion="shrink"]
+  .lp-alloc-bar,
+.lp-schedule-viewport--height-morph
+  .lp-sched-virtual-anchor[data-row-motion="shrink"]
+  .lp-leave-block {
+  transition-duration: var(--schedule-row-shrink-ms);
+  transition-timing-function: var(--schedule-row-ease-shrink);
+}
+
+/* Static (non-virtual) lists */
+.lp-schedule-viewport--height-morph .lp-sched-virtual-rows--static .lp-sched-virtual-anchor {
+  transition: height var(--schedule-row-grow-ms) var(--schedule-row-ease-grow);
+}
+
+.lp-schedule-viewport--scrolling .lp-sched-virtual-anchor,
+.lp-schedule-viewport--scrolling .lp-alloc-bar,
+.lp-schedule-viewport--scrolling .lp-leave-block {
+  transition: none !important;
+  will-change: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-sched-virtual-rows .lp-sched-virtual-anchor,
+  .lp-schedule-viewport--height-morph .lp-sched-virtual-anchor,
+  .lp-schedule-viewport--height-morph .lp-alloc-bar,
+  .lp-schedule-viewport--height-morph .lp-leave-block {
+    transition: none !important;
+    will-change: auto;
+  }
+}
+
+:root[data-static-ui="1"] .lp-sched-virtual-rows .lp-sched-virtual-anchor,
+:root[data-static-ui="1"] .lp-schedule-viewport--height-morph .lp-sched-virtual-anchor {
+  transition: none !important;
+}
