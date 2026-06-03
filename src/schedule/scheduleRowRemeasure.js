@@ -33,7 +33,7 @@ export function remeasureVisibleScheduleRows(virtualizer, { indices, sizeByIndex
     if (!Number.isFinite(nextH) || nextH <= 0) continue;
 
     const prevH = sizeByIndex?.get(i);
-    if (prevH != null && Math.abs(prevH - nextH) < 1) continue;
+    if (prevH != null && Math.abs(prevH - nextH) < 4) continue;
 
     virtualizer.resizeItem(i, nextH);
     updates++;

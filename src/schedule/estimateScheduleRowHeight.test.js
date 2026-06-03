@@ -6,6 +6,8 @@ import {
   segmentIntersectsColumnRange,
   getViewportColumnRange,
   getEffectiveLayoutColumnRange,
+  readHeightColumnRangeFromViewport,
+  readPaintColumnRangeFromViewport,
 } from "./scheduleLayoutRange.js";
 import { estimateScheduleRowHeightPx } from "./estimateScheduleRowHeight.js";
 import { computeScheduleRowHeightPx } from "./scheduleRowHeight.js";
@@ -47,12 +49,23 @@ describe("scheduleLayoutRange", () => {
     assert.equal(range.endCol, 5);
   });
 
-  it("uses viewport columns for row height when provided", () => {
+  it("uses viewport columns for layout when explicitly provided", () => {
     const model = { anchorColumnRange: { startCol: 10, endCol: 20 }, columnCount: 44 };
     assert.deepEqual(getEffectiveLayoutColumnRange(model, { startCol: 5, endCol: 8 }), {
       startCol: 5,
       endCol: 8,
     });
+  });
+
+  it("keeps row height on the anchor band regardless of horizontal scroll", () => {
+    const model = { anchorColumnRange: { startCol: 10, endCol: 20 }, columnCount: 44 };
+    const viewportEl = { scrollLeft: 2100, clientWidth: 420 };
+    assert.deepEqual(readHeightColumnRangeFromViewport(viewportEl, model, 105), {
+      startCol: 10,
+      endCol: 20,
+    });
+    const paint = readPaintColumnRangeFromViewport(viewportEl, model, 105);
+    assert.notDeepEqual(paint, model.anchorColumnRange);
   });
 
   it("falls back to anchor band when viewport is missing", () => {

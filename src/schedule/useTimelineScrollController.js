@@ -1,12 +1,20 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import {
+  applyTimelineOffsetChunk,
+  EDGE_LOAD_COOLDOWN_MS,
+  evaluateTimelineEdgeLoad,
+} from "./timelineScrollExtension.js";
 
-const SCROLL_IDLE_MS = 140;
+export const SCROLL_IDLE_MS = 140;
+/** Extra delay before row-height remeasure after scroll stops (paint sync is immediate). */
+export const HEIGHT_REMEASURE_IDLE_MS = 380;
 
 /**
  * Centralizes timeline scrolling behavior so the Schedule canvas is less fragile:
  * - anchor jumps (today / next / prev)
- * - endless-load edge detection
+ * - endless-load edge detection (hysteresis + cooldown)
  * - programmatic scroll guarding (prevents transient desync)
+ * - paint column range on scroll; optional height idle sync (anchor band — usually no-op)
  */
 export function useTimelineScrollController({
   scheduleViewportRef,
@@ -18,12 +26,22 @@ export function useTimelineScrollController({
   prevOffsetsRef,
   prevColCountRef,
   lastAnchorKeyRef,
+  onPaintRangeSync,
+  onScrollIdleSync,
+  /** @deprecated use onPaintRangeSync + onScrollIdleSync */
   onLayoutRangeSync,
 }) {
   const rafRef = useRef(null);
   const isProgrammaticScrollRef = useRef(false);
   const lastScrollLeftRef = useRef(0);
   const scrollIdleTimerRef = useRef(null);
+  const heightIdleTimerRef = useRef(null);
+  const edgeArmsRef = useRef({ prevArmed: false, nextArmed: false });
+  const lastEdgeLoadAtRef = useRef(0);
+  const pendingPrependScrollRef = useRef(null);
+
+  const syncPaint = onPaintRangeSync ?? onLayoutRangeSync;
+  const syncIdle = onScrollIdleSync ?? onLayoutRangeSync;
 
   const syncFrozenHeaderScroll = useCallback(
     (scrollLeft) => {
@@ -47,33 +65,57 @@ export function useTimelineScrollController({
     [syncFrozenHeaderScroll]
   );
 
-  const markViewportScrolling = useCallback((el) => {
-    if (!el) return;
-    el.classList.add("lp-schedule-viewport--scrolling");
-    if (scrollIdleTimerRef.current != null) clearTimeout(scrollIdleTimerRef.current);
-    scrollIdleTimerRef.current = setTimeout(() => {
-      scrollIdleTimerRef.current = null;
-      el.classList.remove("lp-schedule-viewport--scrolling");
-    }, SCROLL_IDLE_MS);
-  }, []);
+  const applyScrollLeftAfterPrepend = useCallback(
+    (el, scrollLeft) => {
+      pendingPrependScrollRef.current = scrollLeft;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const target = pendingPrependScrollRef.current;
+          pendingPrependScrollRef.current = null;
+          if (target == null || !el.isConnected) return;
+          applyScrollLeft(el, target);
+        });
+      });
+    },
+    [applyScrollLeft]
+  );
+
+  const markViewportScrolling = useCallback(
+    (el) => {
+      if (!el) return;
+      el.classList.add("lp-schedule-viewport--scrolling");
+      if (scrollIdleTimerRef.current != null) clearTimeout(scrollIdleTimerRef.current);
+      scrollIdleTimerRef.current = setTimeout(() => {
+        scrollIdleTimerRef.current = null;
+        el.classList.remove("lp-schedule-viewport--scrolling");
+      }, SCROLL_IDLE_MS);
+      if (syncIdle) {
+        if (heightIdleTimerRef.current != null) clearTimeout(heightIdleTimerRef.current);
+        heightIdleTimerRef.current = setTimeout(() => {
+          heightIdleTimerRef.current = null;
+          syncIdle();
+        }, HEIGHT_REMEASURE_IDLE_MS);
+      }
+    },
+    [syncIdle]
+  );
 
   useLayoutEffect(() => {
     if (!scheduleViewportRef.current || scheduleModel.columnCount === 0) return;
     const el = scheduleViewportRef.current;
 
-    // 1) Anchor jump
     if (scheduleModel.anchorDateKey !== lastAnchorKeyRef.current) {
       const slotIdx = scheduleModel.slots.findIndex((s) => s.dateKey >= scheduleModel.anchorDateKey);
       if (slotIdx >= 0) {
         applyScrollLeft(el, slotIdx * colMinPx);
       }
       lastAnchorKeyRef.current = scheduleModel.anchorDateKey;
-    }
-    // 2) Endless-load jump: preserve the apparent anchor when prepending columns
-    else if (prevColCountRef.current > 0 && scheduleModel.columnCount > prevColCountRef.current) {
+    } else if (prevColCountRef.current > 0 && scheduleModel.columnCount > prevColCountRef.current) {
       if (timelineOffsets.prev > prevOffsetsRef.current.prev) {
         const addedCols = scheduleModel.columnCount - prevColCountRef.current;
-        applyScrollLeft(el, el.scrollLeft + addedCols * colMinPx);
+        applyScrollLeftAfterPrepend(el, el.scrollLeft + addedCols * colMinPx);
+      } else {
+        syncFrozenHeaderScroll(el.scrollLeft);
       }
     } else {
       syncFrozenHeaderScroll(el.scrollLeft);
@@ -82,7 +124,8 @@ export function useTimelineScrollController({
     prevColCountRef.current = scheduleModel.columnCount;
     prevOffsetsRef.current = timelineOffsets;
     lastScrollLeftRef.current = el.scrollLeft;
-    onLayoutRangeSync?.();
+    syncPaint?.();
+    syncIdle?.();
   }, [
     scheduleViewportRef,
     scheduleHeaderInnerRef,
@@ -92,8 +135,10 @@ export function useTimelineScrollController({
     prevOffsetsRef,
     prevColCountRef,
     lastAnchorKeyRef,
-    onLayoutRangeSync,
+    syncPaint,
+    syncIdle,
     applyScrollLeft,
+    applyScrollLeftAfterPrepend,
     syncFrozenHeaderScroll,
   ]);
 
@@ -107,20 +152,34 @@ export function useTimelineScrollController({
         rafRef.current = null;
         markViewportScrolling(el);
 
-        const thresholdBase = 250;
-        if (el.scrollLeft < thresholdBase) {
-          setTimelineOffsets((o) => (o.prev < 36 ? { ...o, prev: o.prev + 1 } : o));
-        }
-        if (el.scrollLeft + el.clientWidth > el.scrollWidth - thresholdBase) {
-          setTimelineOffsets((o) => (o.next < 36 ? { ...o, next: o.next + 1 } : o));
+        const now = Date.now();
+        const edge = evaluateTimelineEdgeLoad(
+          el.scrollLeft,
+          el.clientWidth,
+          el.scrollWidth,
+          edgeArmsRef.current
+        );
+        edgeArmsRef.current = edge.arms;
+
+        if (
+          (edge.loadPrev || edge.loadNext) &&
+          now - lastEdgeLoadAtRef.current >= EDGE_LOAD_COOLDOWN_MS
+        ) {
+          lastEdgeLoadAtRef.current = now;
+          setTimelineOffsets((o) =>
+            applyTimelineOffsetChunk(o, {
+              loadPrev: edge.loadPrev,
+              loadNext: edge.loadNext,
+            })
+          );
         }
 
         const scrollLeftChanged = el.scrollLeft !== lastScrollLeftRef.current;
         lastScrollLeftRef.current = el.scrollLeft;
-        if (scrollLeftChanged) onLayoutRangeSync?.();
+        if (scrollLeftChanged) syncPaint?.();
       });
     },
-    [setTimelineOffsets, onLayoutRangeSync, markViewportScrolling, syncFrozenHeaderScroll]
+    [setTimelineOffsets, syncPaint, markViewportScrolling, syncFrozenHeaderScroll]
   );
 
   useEffect(() => {
@@ -132,6 +191,10 @@ export function useTimelineScrollController({
       if (scrollIdleTimerRef.current != null) {
         clearTimeout(scrollIdleTimerRef.current);
         scrollIdleTimerRef.current = null;
+      }
+      if (heightIdleTimerRef.current != null) {
+        clearTimeout(heightIdleTimerRef.current);
+        heightIdleTimerRef.current = null;
       }
     };
   }, []);

@@ -63,12 +63,15 @@ import {
 import { useTimelineScrollController } from "../schedule/useTimelineScrollController.js";
 import {
   getEffectiveLayoutColumnRange,
-  readLayoutColumnRangeFromViewport,
   segmentIntersectsColumnRange,
   isValidColumnRange,
+  readPaintColumnRangeFromViewport,
+  paintRangeFromSnapshot,
+  heightRangeFromSnapshot,
 } from "../schedule/scheduleLayoutRange.js";
 import {
-  publishLayoutColumnRange,
+  publishPaintColumnRange,
+  publishLayoutColumnRanges,
   subscribeLayoutColumnRange,
   getLayoutColumnRangeSnapshot,
 } from "../schedule/scheduleLayoutColumnRangeStore.js";
@@ -712,9 +715,17 @@ const TimelineRow = memo(function TimelineRow({
   premiumV2Enabled,
 }) {
   const { theme } = useAppTheme();
-  const layoutColumnRange = useSyncExternalStore(
+  const layoutColumnRanges = useSyncExternalStore(
     subscribeLayoutColumnRange,
     getLayoutColumnRangeSnapshot
+  );
+  const paintColumnRange = useMemo(
+    () => paintRangeFromSnapshot(layoutColumnRanges),
+    [layoutColumnRanges]
+  );
+  const heightColumnRange = useMemo(
+    () => heightRangeFromSnapshot(layoutColumnRanges),
+    [layoutColumnRanges]
   );
   const t = T[theme];
   const reduceMotion = useReducedMotion();
@@ -788,9 +799,9 @@ const TimelineRow = memo(function TimelineRow({
         personAllocations,
         scheduleModel,
         dismissedAvailOffKeys,
-        layoutColumnRange,
+        layoutColumnRange: heightColumnRange,
       }),
-    [personAllocations, scheduleModel, dismissedAvailOffKeys, layoutColumnRange]
+    [personAllocations, scheduleModel, dismissedAvailOffKeys, heightColumnRange]
   );
 
   const {
@@ -816,9 +827,9 @@ const TimelineRow = memo(function TimelineRow({
   const isSparseRow = !hasVisibleWorkSegments && maxDailyBookedHours < 0.05;
 
   const paintWorkSegments = useMemo(() => {
-    if (!isValidColumnRange(layoutColumnRange)) return workSegments;
-    return workSegments.filter((seg) => segmentIntersectsColumnRange(seg, layoutColumnRange));
-  }, [workSegments, layoutColumnRange]);
+    if (!isValidColumnRange(paintColumnRange)) return workSegments;
+    return workSegments.filter((seg) => segmentIntersectsColumnRange(seg, paintColumnRange));
+  }, [workSegments, paintColumnRange]);
 
   // Dev-only invariants to catch geometry/stack bugs early (prevents "silent" canvas breakage).
   if (import.meta.env.DEV) {
@@ -2761,25 +2772,26 @@ export default function LandingPage() {
   const gridTemplate = `repeat(${scheduleModel.columnCount}, minmax(${colMinPx}px, 1fr))`;
   const timelineMinWidthPx = scheduleModel.columnCount * colMinPx;
 
-  const layoutColumnRangeRef = useRef(
-    getEffectiveLayoutColumnRange(scheduleModel, null)
-  );
+  const layoutColumnRangesRef = useRef({
+    paint: getEffectiveLayoutColumnRange(scheduleModel, null),
+    height: getEffectiveLayoutColumnRange(scheduleModel, null),
+  });
   const scheduleRowHeightRevisionRef = useRef("");
 
-  const syncLayoutColumnRange = useCallback(() => {
+  const syncPaintColumnRange = useCallback(() => {
     const el = scheduleViewportRef.current;
-    const next = el
-      ? readLayoutColumnRangeFromViewport(el, scheduleModel, colMinPx)
+    const paint = el
+      ? readPaintColumnRangeFromViewport(el, scheduleModel, colMinPx)
       : getEffectiveLayoutColumnRange(scheduleModel, null);
-    if (!publishLayoutColumnRange(next)) return false;
-    layoutColumnRangeRef.current = next;
+    if (!publishPaintColumnRange(paint)) return false;
+    layoutColumnRangesRef.current = { ...layoutColumnRangesRef.current, paint };
     return true;
   }, [scheduleModel, colMinPx]);
 
   useLayoutEffect(() => {
-    const next = getEffectiveLayoutColumnRange(scheduleModel, null);
-    layoutColumnRangeRef.current = next;
-    publishLayoutColumnRange(next);
+    const fallback = getEffectiveLayoutColumnRange(scheduleModel, null);
+    layoutColumnRangesRef.current = { paint: fallback, height: fallback };
+    publishLayoutColumnRanges({ paint: fallback, height: fallback });
   }, [scheduleModel.anchorDateKey, scheduleModel.columnCount]);
 
   const scheduleRowEstimatePx = useMemo(() => {
@@ -2819,7 +2831,11 @@ export default function LandingPage() {
         scheduleModel: scheduleModelForCanvas,
         density,
         dismissedAvailOffKeys,
-        layoutColumnRangeRef,
+        layoutColumnRangeRef: {
+          get current() {
+            return layoutColumnRangesRef.current.height;
+          },
+        },
         layoutRevisionRef: scheduleRowHeightRevisionRef,
         fallbackPx: scheduleRowEstimatePx,
       }),
@@ -2853,10 +2869,6 @@ export default function LandingPage() {
     queueScheduleRowRemeasure(remeasureScheduleRows);
   }, [remeasureScheduleRows]);
 
-  const syncLayoutColumnRangeAndRemeasure = useCallback(() => {
-    if (syncLayoutColumnRange()) queueRemeasureScheduleRows();
-  }, [syncLayoutColumnRange, queueRemeasureScheduleRows]);
-
   const { onTimelineScroll } = useTimelineScrollController({
     scheduleViewportRef,
     scheduleHeaderInnerRef,
@@ -2867,7 +2879,7 @@ export default function LandingPage() {
     prevOffsetsRef: prevOffsets,
     prevColCountRef: prevColCount,
     lastAnchorKeyRef: lastAnchorKey,
-    onLayoutRangeSync: syncLayoutColumnRangeAndRemeasure,
+    onPaintRangeSync: syncPaintColumnRange,
   });
 
   useEffect(() => () => cancelScheduledRowRemeasure(), []);
@@ -2939,9 +2951,8 @@ export default function LandingPage() {
     const v = scheduleRowVirtualizerRef.current;
     if (!v) return;
 
-    v.measure();
-
     if (hardReset) {
+      v.measure();
       v.scrollToOffset(0, { align: "start" });
       return;
     }
@@ -2951,7 +2962,7 @@ export default function LandingPage() {
       v.measure();
     }
 
-    remeasureScheduleRows();
+    queueRemeasureScheduleRows();
   }, [
     scheduleAnchorJumpKey,
     schedulePeopleKey,
@@ -2960,7 +2971,7 @@ export default function LandingPage() {
     timelineOffsets.next,
     density,
     scheduleRowEstimatePx,
-    remeasureScheduleRows,
+    queueRemeasureScheduleRows,
   ]);
 
   useLayoutEffect(() => {
