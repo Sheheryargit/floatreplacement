@@ -1,0 +1,65 @@
+.lp-alloc-fte {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 1px;
+  flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
+  font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+}
+
+.lp-alloc-fte__day {
+  font-size: clamp(8px, 2.6cqi, 10px);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.lp-alloc-fte__week {
+  font-size: clamp(7px, 2.2cqi, 8px);
+  font-weight: 600;
+  opacity: 0.88;
+  white-space: nowrap;
+}
+
+.lp-alloc-fte--compact {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0;
+  font-size: clamp(7px, 2.4cqi, 8px);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lp-alloc-fte--hero {
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.lp-alloc-fte--hero .lp-alloc-fte__day {
+  font-family: var(--font-display, "Syne", system-ui, sans-serif);
+  font-size: clamp(14px, 5cqi, 22px);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.lp-alloc-fte--hero .lp-alloc-fte__week {
+  font-size: clamp(8px, 2.8cqi, 11px);
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+.lp-alloc-bar--layout-center .lp-alloc-fte--hero {
+  margin: 2px 0 0;
+}
+
+.lp-alloc-bar__line--meta .lp-alloc-fte {
+  margin-left: auto;
+}

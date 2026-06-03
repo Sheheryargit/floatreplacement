@@ -172,11 +172,31 @@ import {
   ALLOCATION_ENTER_ANIM_LS_KEY,
   SCHEDULE_DENSITY_CHANGED_EVENT,
   SCHEDULE_DENSITY_LS_KEY,
+  UTILIZATION_MODE_CHANGED_EVENT,
+  UTILIZATION_MODE_LS_KEY,
+  FTE_PERSON_RAIL_CHANGED_EVENT,
+  FTE_PERSON_RAIL_LS_KEY,
   readAllocationBoxStyle,
   readAllocationEnterAnimation,
+  readFtePersonRail,
   readScheduleDensity,
+  readUtilizationMode,
+  showFteOnAllocationBlocks,
+  showPersonFteSubheading,
+  showPersonHoursLine,
   writeScheduleDensity,
+  writeFtePersonRail,
+  writeUtilizationMode,
 } from "../config/scheduleUiPrefs.js";
+import { AllocFteMetrics } from "../components/schedule/AllocFteMetrics.jsx";
+import { ScheduleUtilizationControls } from "../components/schedule/ScheduleUtilizationControls.jsx";
+import {
+  allocationFteTooltipExtra,
+  formatPersonFteSubheading,
+  formatPersonRailFte,
+  formatTeamFteBadge,
+  FTE_HOURS_PER_WEEK,
+} from "../utils/fteDisplay.js";
 import {
   ALLOC8_OPEN_COMMAND_PALETTE_EVENT,
   ALLOC8_ASSISTANT_OPEN_ALLOCATION_MODAL_EVENT,
@@ -654,6 +674,7 @@ const timelineRowEqual = (prev, next) => {
   if (prev.viewMode !== next.viewMode) return false;
   if (prev.anchorDate?.getTime?.() !== next.anchorDate?.getTime?.()) return false;
   if (prev.utilizationMode !== next.utilizationMode) return false;
+  if (prev.ftePersonRail !== next.ftePersonRail) return false;
   if (prev.density !== next.density) return false;
   if (prev.gridTemplate !== next.gridTemplate) return false;
   if (prev.scheduleModel !== next.scheduleModel) return false;
@@ -688,6 +709,7 @@ const TimelineRow = memo(function TimelineRow({
   viewMode,
   anchorDate,
   utilizationMode,
+  ftePersonRail,
   density,
   gridTemplate,
   nCols,
@@ -744,10 +766,26 @@ const TimelineRow = memo(function TimelineRow({
       : hours > 1e-6
         ? 100
         : 0;
+  const hoursPerDayLabel = `${maxDailyBookedHours.toFixed(maxDailyBookedHours % 1 ? 1 : 0)}h/d`;
+
+  const personFteSubheadingEnabled = showPersonFteSubheading(utilizationMode);
+  const personHoursLineEnabled = showPersonHoursLine(utilizationMode, ftePersonRail);
+  const fteOnBlocks = showFteOnAllocationBlocks(utilizationMode, ftePersonRail);
+
+  const personFteSubheading = useMemo(() => {
+    if (!personFteSubheadingEnabled || !hoursKeys.length) return "";
+    return formatPersonFteSubheading(maxDailyBookedHours, hours, hoursKeys);
+  }, [personFteSubheadingEnabled, maxDailyBookedHours, hours, hoursKeys]);
+
+  const showPersonFteLine = personFteSubheadingEnabled && Boolean(personFteSubheading);
+
   const right =
     utilizationMode === "hours"
-      ? `${maxDailyBookedHours.toFixed(maxDailyBookedHours % 1 ? 1 : 0)}h/d`
-      : `${pct}%`;
+      ? hoursPerDayLabel
+      : utilizationMode === "percent"
+        ? `${pct}%`
+        : hoursPerDayLabel;
+
   const noWorkingDaysInView = hoursKeys.length > 0 && rawCap < 1e-6;
 
   const showBulkExtendBtn = useMemo(
@@ -769,12 +807,17 @@ const TimelineRow = memo(function TimelineRow({
     peakLoadBand !== "none" ? ` lp-person-hours--load-${peakLoadBand === "onTarget" ? "on" : peakLoadBand}` : "";
 
   const hoursHitTitle = useMemo(() => {
-    const base =
-      utilizationMode === "hours"
-        ? `${hours.toFixed(hours % 1 ? 1 : 0)}h total in view · peak ${maxDailyBookedHours.toFixed(
-            maxDailyBookedHours % 1 ? 1 : 0
-          )}h/day`
-        : `${pct}% utilization in view (peak ${maxDailyBookedHours.toFixed(maxDailyBookedHours % 1 ? 1 : 0)}h/day)`;
+    const peakH = maxDailyBookedHours.toFixed(maxDailyBookedHours % 1 ? 1 : 0);
+    let base;
+    if (utilizationMode === "hours") {
+      base = `${hours.toFixed(hours % 1 ? 1 : 0)}h total in view · peak ${peakH}h/day`;
+    } else if (utilizationMode === "percent") {
+      base = `${pct}% utilization in view (peak ${peakH}h/day)`;
+    } else {
+      base = `${hours.toFixed(hours % 1 ? 1 : 0)}h in view · peak ${formatPersonRailFte(
+        maxDailyBookedHours
+      )} (${FTE_HOURS_PER_WEEK}h = 1 FTE)`;
+    }
     return peakLoadSummary ? `${base}. ${peakLoadSummary}` : base;
   }, [utilizationMode, hours, maxDailyBookedHours, pct, peakLoadSummary]);
 
@@ -896,6 +939,14 @@ const TimelineRow = memo(function TimelineRow({
                               </span>
                             )}
                           </span>
+                          {showPersonFteLine ? (
+                            <span
+                              className="lp-person-fte-sub"
+                              title={`1 FTE = ${FTE_HOURS_PER_WEEK}h/week · ${personFteSubheading}`}
+                            >
+                              {personFteSubheading}
+                            </span>
+                          ) : null}
                           <span
                             className="lp-person-sub"
                             title={[p.role !== "—" ? p.role : null, p.department || null]
@@ -905,17 +956,19 @@ const TimelineRow = memo(function TimelineRow({
                             {p.role !== "—" ? `${p.role} · ` : ""}
                             {p.department || "—"}
                           </span>
-                          <button
-                            type="button"
-                            className="lp-person-hours-hit lp-person-hours-hit--meta"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openEdit(p);
-                            }}
-                            title={hoursHitTitle}
-                          >
-                            <span className={"lp-person-hours" + hoursToneClass}>{right}</span>
-                          </button>
+                          {personHoursLineEnabled ? (
+                            <button
+                              type="button"
+                              className="lp-person-hours-hit lp-person-hours-hit--meta"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEdit(p);
+                              }}
+                              title={hoursHitTitle}
+                            >
+                              <span className={"lp-person-hours" + hoursToneClass}>{right}</span>
+                            </button>
+                          ) : null}
                           {p.tags.length > 0 && (
                             <span className="lp-person-tags">
                               {p.tags.slice(0, 2).map((tag) => {
@@ -1227,7 +1280,15 @@ const TimelineRow = memo(function TimelineRow({
 
                       const repeatOn = (seg.a.repeatId ?? "none") !== "none";
                       const hasNotes = Boolean((seg.a.notes || "").trim());
-                      const tip = buildWorkAllocationTitle(seg.a, projectName, hoursLabel);
+                      const tip = fteOnBlocks
+                        ? allocationFteTooltipExtra(
+                            seg.a,
+                            projectName,
+                            hoursLabel,
+                            seg.lay,
+                            scheduleModel
+                          )
+                        : buildWorkAllocationTitle(seg.a, projectName, hoursLabel);
 
                       const allocId = String(seg.a?.id ?? "");
                       const showFreshEnterAlloc = wantsAllocEnterFx && enteredFreshSet.has(allocId);
@@ -1303,14 +1364,23 @@ const TimelineRow = memo(function TimelineRow({
                                   {projectName || projectCode}
                                 </span>
                               ) : null}
-                              <span
-                                className="lp-alloc-bar__hours-hero"
-                                style={{
-                                  fontSize: `${allocationCenterHoursHeroPx(calculatedHeight)}px`,
-                                }}
-                              >
-                                {hoursLabel}
-                              </span>
+                              {fteOnBlocks ? (
+                                <AllocFteMetrics
+                                  alloc={seg.a}
+                                  lay={seg.lay}
+                                  scheduleModel={scheduleModel}
+                                  hero
+                                />
+                              ) : (
+                                <span
+                                  className="lp-alloc-bar__hours-hero"
+                                  style={{
+                                    fontSize: `${allocationCenterHoursHeroPx(calculatedHeight)}px`,
+                                  }}
+                                >
+                                  {hoursLabel}
+                                </span>
+                              )}
                               <span className="lp-alloc-bar__line lp-alloc-bar__line--meta lp-alloc-bar__line--center-meta">
                                 {projectName && projectCode ? (
                                   <span
@@ -1350,7 +1420,16 @@ const TimelineRow = memo(function TimelineRow({
                                     {projectCode}
                                   </span>
                                 ) : null}
-                                <span className="lp-alloc-hours">{hoursLabel}</span>
+                                {fteOnBlocks ? (
+                                  <AllocFteMetrics
+                                    alloc={seg.a}
+                                    lay={seg.lay}
+                                    scheduleModel={scheduleModel}
+                                    compact={compactBorder}
+                                  />
+                                ) : (
+                                  <span className="lp-alloc-hours">{hoursLabel}</span>
+                                )}
                                 {repeatOn || hasNotes ? (
                                   <span className="lp-alloc-bar__icons">
                                     {repeatOn ? (
@@ -1570,7 +1649,16 @@ export default function LandingPage() {
   const [viewMode, setViewMode] = useState("month");
   const [anchorDate, setAnchorDate] = useState(() => new Date());
   const [density, setDensity] = useState(() => readScheduleDensity());
-  const [utilizationMode, setUtilizationMode] = useState("hours");
+  const [utilizationMode, setUtilizationModeState] = useState(() => readUtilizationMode());
+  const [ftePersonRail, setFtePersonRailState] = useState(() => readFtePersonRail());
+  const setUtilizationMode = useCallback((mode) => {
+    setUtilizationModeState(mode);
+    writeUtilizationMode(mode);
+  }, []);
+  const setFtePersonRail = useCallback((mode) => {
+    setFtePersonRailState(mode);
+    writeFtePersonRail(mode);
+  }, []);
   const showPeakLoadStatus = false;
   const [allocationBoxStyle, setAllocationBoxStyle] = useState(() => readAllocationBoxStyle());
   const [allocationEnterAnim, setAllocationEnterAnim] = useState(() => readAllocationEnterAnimation());
@@ -1579,6 +1667,28 @@ export default function LandingPage() {
   const [scheduleTodayPulse, setScheduleTodayPulse] = useState(false);
   const [scheduleCanvasSettling, setScheduleCanvasSettling] = useState(false);
   const allocationEnterTimersRef = useRef(new Map());
+
+  useLayoutEffect(() => {
+    setUtilizationModeState(readUtilizationMode());
+    setFtePersonRailState(readFtePersonRail());
+  }, []);
+
+  useEffect(() => {
+    const syncUtil = () => setUtilizationModeState(readUtilizationMode());
+    const syncRail = () => setFtePersonRailState(readFtePersonRail());
+    window.addEventListener(UTILIZATION_MODE_CHANGED_EVENT, syncUtil);
+    window.addEventListener(FTE_PERSON_RAIL_CHANGED_EVENT, syncRail);
+    const onUtilStorage = (e) => {
+      if (e.key === UTILIZATION_MODE_LS_KEY || e.key == null) syncUtil();
+      if (e.key === FTE_PERSON_RAIL_LS_KEY || e.key == null) syncRail();
+    };
+    window.addEventListener("storage", onUtilStorage);
+    return () => {
+      window.removeEventListener(UTILIZATION_MODE_CHANGED_EVENT, syncUtil);
+      window.removeEventListener(FTE_PERSON_RAIL_CHANGED_EVENT, syncRail);
+      window.removeEventListener("storage", onUtilStorage);
+    };
+  }, []);
 
   useEffect(() => {
     const sync = () => setDensity(readScheduleDensity());
@@ -2936,6 +3046,7 @@ export default function LandingPage() {
       viewMode,
       anchorDate,
       utilizationMode,
+      ftePersonRail,
       density,
       gridTemplate,
       nCols: scheduleModel.columnCount,
@@ -2960,6 +3071,7 @@ export default function LandingPage() {
       viewMode,
       anchorDate,
       utilizationMode,
+      ftePersonRail,
       density,
       gridTemplate,
       openEdit,
@@ -3320,29 +3432,12 @@ export default function LandingPage() {
                         {density === opt.id && <Check size={16} className="lp-popover-check" />}
                       </button>
                     ))}
-                    <div className="lp-popover-divider" />
-                    <div className="lp-popover-title">Date range insights</div>
-                    <div className="lp-util-row">
-                      <span className="lp-util-label">Show utilization in</span>
-                      <div className="lp-segment" role="group" aria-label="Utilization unit">
-                        <button
-                          type="button"
-                          className={utilizationMode === "hours" ? "lp-seg-active" : ""}
-                          onClick={() => setUtilizationMode("hours")}
-                          title="Hours"
-                        >
-                          <Clock size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          className={utilizationMode === "percent" ? "lp-seg-active" : ""}
-                          onClick={() => setUtilizationMode("percent")}
-                          title="Percent"
-                        >
-                          <Percent size={14} />
-                        </button>
-                      </div>
-                    </div>
+                    <ScheduleUtilizationControls
+                      utilizationMode={utilizationMode}
+                      setUtilizationMode={setUtilizationMode}
+                      ftePersonRail={ftePersonRail}
+                      setFtePersonRail={setFtePersonRail}
+                    />
                   </div>
                 )}
               </div>
@@ -3563,28 +3658,12 @@ export default function LandingPage() {
                         Apply custom range
                       </button>
                     </div>
-                    <div className="lp-popover-divider" />
-                    <div className="lp-util-row lp-util-row-in-time-dd">
-                      <span className="lp-util-label">Show utilization in</span>
-                      <div className="lp-segment" role="group" aria-label="Utilization unit">
-                        <button
-                          type="button"
-                          className={utilizationMode === "hours" ? "lp-seg-active" : ""}
-                          onClick={() => setUtilizationMode("hours")}
-                          title="Hours"
-                        >
-                          <Clock size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          className={utilizationMode === "percent" ? "lp-seg-active" : ""}
-                          onClick={() => setUtilizationMode("percent")}
-                          title="Percent"
-                        >
-                          <Percent size={14} />
-                        </button>
-                      </div>
-                    </div>
+                    <ScheduleUtilizationControls
+                      utilizationMode={utilizationMode}
+                      setUtilizationMode={setUtilizationMode}
+                      ftePersonRail={ftePersonRail}
+                      setFtePersonRail={setFtePersonRail}
+                    />
                   </div>
                 )}
               </div>
@@ -3592,11 +3671,19 @@ export default function LandingPage() {
             <div className="lp-subbar-timeline">
               <span
                 className="lp-hours-total lp-hours-total-badge"
-                title={`${visibleCapacityDays} working day(s) in view · ${schedulePeople.length} people · ${formatHourTotal(totalHours)} total`}
+                title={
+                  utilizationMode === "fte"
+                    ? `${visibleCapacityDays} working day(s) · ${schedulePeople.length} people · ${formatHourTotal(
+                        totalHours
+                      )} total · 1 FTE = ${FTE_HOURS_PER_WEEK}h/week`
+                    : `${visibleCapacityDays} working day(s) in view · ${schedulePeople.length} people · ${formatHourTotal(totalHours)} total`
+                }
               >
                 {utilizationMode === "hours"
                   ? `${Math.round(totalHours).toLocaleString("en-AU")}h`
-                  : `${teamUtilPercent}%`}
+                  : utilizationMode === "percent"
+                    ? `${teamUtilPercent}%`
+                    : formatTeamFteBadge(totalHours, scheduleVisibleKeys)}
               </span>
             </div>
           </div>

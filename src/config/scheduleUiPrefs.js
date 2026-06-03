@@ -37,6 +37,130 @@ export function writePeakLoadLabelsVisible(visible) {
   }
 }
 
+/** Schedule toolbar: person rail + allocation block utilization unit. */
+export const UTILIZATION_MODE_LS_KEY = "float.utilizationMode.v1";
+
+export const UTILIZATION_MODE_CHANGED_EVENT = "float-utilization-mode-change";
+
+/** @typedef {"hours" | "percent" | "fte"} UtilizationModeId */
+
+export const UTILIZATION_MODE_IDS = /** @type {const} */ (["hours", "percent", "fte"]);
+
+/** @returns {UtilizationModeId} */
+export function readUtilizationMode() {
+  try {
+    if (typeof window === "undefined") return "hours";
+    const v = window.localStorage.getItem(UTILIZATION_MODE_LS_KEY);
+    if (v == null || v === "") return "hours";
+    return UTILIZATION_MODE_IDS.includes(/** @type {any} */ (v))
+      ? /** @type {UtilizationModeId} */ (v)
+      : "hours";
+  } catch {
+    return "hours";
+  }
+}
+
+/** @param {UtilizationModeId | string} modeId */
+export function writeUtilizationMode(modeId) {
+  const id = UTILIZATION_MODE_IDS.includes(/** @type {any} */ (modeId))
+    ? /** @type {UtilizationModeId} */ (modeId)
+    : "hours";
+  try {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(UTILIZATION_MODE_LS_KEY, id);
+  } catch {
+    // ignore
+  }
+  try {
+    window.dispatchEvent(new CustomEvent(UTILIZATION_MODE_CHANGED_EVENT));
+  } catch {
+    // ignore
+  }
+}
+
+/** When utilization is FTE: person-row layout + whether blocks use FTE or hours/day. */
+export const FTE_PERSON_RAIL_LS_KEY = "float.ftePersonRail.v1";
+
+export const FTE_PERSON_RAIL_CHANGED_EVENT = "float-fte-person-rail-change";
+
+/** @typedef {"both" | "fte_only" | "hours_only"} FtePersonRailId */
+
+export const FTE_PERSON_RAIL_IDS = /** @type {const} */ (["both", "fte_only", "hours_only"]);
+
+/** @typedef {{ id: FtePersonRailId, label: string, detail: string }} FtePersonRailOption */
+
+/** Settings copy for the three person-rail modes (when global utilization is FTE). */
+export const FTE_PERSON_RAIL_OPTIONS = /** @type {readonly FtePersonRailOption[]} */ ([
+  {
+    id: "both",
+    label: "FTE + hours on person",
+    detail: "FTE subheading and peak h/d under the name · calendar blocks show hours per day",
+  },
+  {
+    id: "fte_only",
+    label: "FTE everywhere",
+    detail: "FTE under the name only · calendar blocks show FTE per day and week",
+  },
+  {
+    id: "hours_only",
+    label: "FTE on person · hours on blocks",
+    detail: "FTE subheading under the name · calendar blocks show hours per day",
+  },
+]);
+
+/** @param {UtilizationModeId | string} utilizationMode */
+/** @param {FtePersonRailId | string} ftePersonRail */
+export function showFteOnAllocationBlocks(utilizationMode, ftePersonRail) {
+  return utilizationMode === "fte" && ftePersonRail === "fte_only";
+}
+
+/** @param {UtilizationModeId | string} utilizationMode */
+export function showPersonFteSubheading(utilizationMode) {
+  return utilizationMode === "fte";
+}
+
+/** @param {UtilizationModeId | string} utilizationMode */
+/** @param {FtePersonRailId | string} ftePersonRail */
+export function showPersonHoursLine(utilizationMode, ftePersonRail) {
+  return (
+    utilizationMode === "hours" ||
+    utilizationMode === "percent" ||
+    (utilizationMode === "fte" && ftePersonRail === "both")
+  );
+}
+
+/** @returns {FtePersonRailId} Default: hours + FTE under name. */
+export function readFtePersonRail() {
+  try {
+    if (typeof window === "undefined") return "both";
+    const v = window.localStorage.getItem(FTE_PERSON_RAIL_LS_KEY);
+    if (v == null || v === "") return "both";
+    return FTE_PERSON_RAIL_IDS.includes(/** @type {any} */ (v))
+      ? /** @type {FtePersonRailId} */ (v)
+      : "both";
+  } catch {
+    return "both";
+  }
+}
+
+/** @param {FtePersonRailId | string} modeId */
+export function writeFtePersonRail(modeId) {
+  const id = FTE_PERSON_RAIL_IDS.includes(/** @type {any} */ (modeId))
+    ? /** @type {FtePersonRailId} */ (modeId)
+    : "both";
+  try {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(FTE_PERSON_RAIL_LS_KEY, id);
+  } catch {
+    // ignore
+  }
+  try {
+    window.dispatchEvent(new CustomEvent(FTE_PERSON_RAIL_CHANGED_EVENT));
+  } catch {
+    // ignore
+  }
+}
+
 /** Work allocation tiles on the schedule timeline (border, shadow, radius, wash). */
 export const ALLOCATION_BOX_STYLE_LS_KEY = "float.allocBoxStyle.v2";
 

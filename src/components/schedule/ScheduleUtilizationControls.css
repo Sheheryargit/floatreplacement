@@ -1,0 +1,106 @@
+.lp-util-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 2px;
+}
+
+.lp-util-block--fte-rail {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.lp-util-fte-caption {
+  margin: 0;
+  padding: 0 2px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.lp-util-fte-rail-hint {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  opacity: 0.92;
+}
+
+.lp-fte-rail-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lp-fte-rail-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+  padding: 9px 10px;
+  text-align: left;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-2, var(--bg-elevated)) 72%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.lp-fte-rail-choice:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface-2, var(--bg-elevated)));
+}
+
+.lp-fte-rail-choice--active {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2, var(--bg-elevated)));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.lp-fte-rail-choice__mark {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1.5px solid color-mix(in srgb, var(--border) 90%, var(--text-muted));
+  color: var(--accent);
+  background: transparent;
+}
+
+.lp-fte-rail-choice--active .lp-fte-rail-choice__mark {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 88%, #fff);
+  color: #fff;
+}
+
+.lp-fte-rail-choice__text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.lp-fte-rail-choice__label {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+}
+
+.lp-fte-rail-choice__detail {
+  font-size: 10px;
+  line-height: 1.35;
+  font-weight: 500;
+  color: var(--text-muted);
+}

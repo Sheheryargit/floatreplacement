@@ -772,6 +772,15 @@
   color: var(--accent-txt);
 }
 
+.lp-segment .lp-seg-fte {
+  min-width: 38px;
+  padding: 8px 10px;
+  font-family: var(--font-display, "Syne", system-ui, sans-serif);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
 .lp-date-pill-group {
   display: flex;
   align-items: center;
@@ -1951,6 +1960,26 @@ button.lp-person-identity-hit {
     0 1px 3px rgba(15, 23, 42, 0.12),
     0 0 10px rgba(251, 113, 133, 0.34),
     0 0 20px rgba(225, 29, 72, 0.14);
+}
+
+.lp-person-fte-sub {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--accent) 72%, var(--text-soft));
+}
+
+.lp-root[data-theme="light"] .lp-person-fte-sub {
+  color: color-mix(in srgb, var(--accent) 55%, #334155);
+}
+
+.lp-root[data-density="compact"] .lp-person-fte-sub {
+  font-size: 10px;
 }
 
 .lp-person-sub {
