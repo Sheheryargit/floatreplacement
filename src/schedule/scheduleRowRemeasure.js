@@ -51,6 +51,8 @@ export function buildScheduleRowHeightResolver({
   layoutColumnRangeRef,
   layoutRevisionRef,
   fallbackPx,
+  updateStickyRef,
+  shrinkLagCols = 15,
 }) {
   return (index) => {
     const p = schedulePeople[index];
@@ -63,6 +65,37 @@ export function buildScheduleRowHeightResolver({
       dismissedAvailOffKeys,
       layoutColumnRange: layoutColumnRangeRef.current,
       layoutRevision: layoutRevisionRef.current,
+      updateSticky: updateStickyRef?.current === true,
+      shrinkLagCols,
     });
   };
+}
+
+/**
+ * Preserve which person is anchored at the top of the viewport across row resizes.
+ */
+export function captureScheduleScrollAnchor(viewportEl, virtualizer) {
+  if (!viewportEl || !virtualizer?.getVirtualItems) return null;
+  const items = virtualizer.getVirtualItems();
+  if (!items.length) return null;
+  const first = items[0];
+  const margin = virtualizer.options?.scrollMargin ?? 0;
+  return {
+    index: first.index,
+    offsetPx: viewportEl.scrollTop - (first.start - margin),
+  };
+}
+
+export function restoreScheduleScrollAnchor(viewportEl, virtualizer, anchor) {
+  if (!viewportEl || !virtualizer || !anchor) return;
+  const items = virtualizer.getVirtualItems();
+  const item = items.find((v) => v.index === anchor.index);
+  if (!item) return;
+  const margin = virtualizer.options?.scrollMargin ?? 0;
+  const target = item.start - margin + anchor.offsetPx;
+  if (typeof virtualizer.scrollToOffset === "function") {
+    virtualizer.scrollToOffset(Math.max(0, target), { align: "start" });
+  } else {
+    viewportEl.scrollTop = Math.max(0, target);
+  }
 }

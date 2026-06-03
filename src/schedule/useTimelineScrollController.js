@@ -19,6 +19,7 @@ export function useTimelineScrollController({
   prevColCountRef,
   lastAnchorKeyRef,
   onLayoutRangeSync,
+  onScrollIdle,
 }) {
   const rafRef = useRef(null);
   const isProgrammaticScrollRef = useRef(false);
@@ -54,8 +55,9 @@ export function useTimelineScrollController({
     scrollIdleTimerRef.current = setTimeout(() => {
       scrollIdleTimerRef.current = null;
       el.classList.remove("lp-schedule-viewport--scrolling");
+      onScrollIdle?.();
     }, SCROLL_IDLE_MS);
-  }, []);
+  }, [onScrollIdle]);
 
   useLayoutEffect(() => {
     if (!scheduleViewportRef.current || scheduleModel.columnCount === 0) return;
@@ -117,10 +119,10 @@ export function useTimelineScrollController({
 
         const scrollLeftChanged = el.scrollLeft !== lastScrollLeftRef.current;
         lastScrollLeftRef.current = el.scrollLeft;
-        if (scrollLeftChanged) onLayoutRangeSync?.();
+        if (scrollLeftChanged) onLayoutRangeSync?.({ remeasureHeights: false });
       });
     },
-    [setTimelineOffsets, onLayoutRangeSync, markViewportScrolling, syncFrozenHeaderScroll]
+    [setTimelineOffsets, onLayoutRangeSync, markViewportScrolling, syncFrozenHeaderScroll, onScrollIdle]
   );
 
   useEffect(() => {

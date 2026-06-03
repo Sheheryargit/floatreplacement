@@ -1,6 +1,12 @@
 import { columnRangesEqual, isValidColumnRange } from "./scheduleLayoutRange.js";
 import { buildPersonRowHeightPlan, computeRowHeightFromPlan } from "./personRowHeightPlan.js";
 import { computeScheduleRowHeightPxLegacy } from "./scheduleRowHeightLegacy.js";
+import {
+  applyStickyRowHeightPx,
+  clearStickyRowHeights,
+  heavyEndColFromPlan,
+  peekStickyRowHeightPx,
+} from "./personRowHeightSticky.js";
 
 const planByPerson = new Map();
 const heightByKey = new Map();
@@ -31,6 +37,7 @@ export function clearScheduleRowHeightRuntime(revision = "") {
   activeRevision = revision || activeRevision;
   planByPerson.clear();
   heightByKey.clear();
+  clearStickyRowHeights();
 }
 
 export function setScheduleRowHeightRevision(revision) {
@@ -38,6 +45,7 @@ export function setScheduleRowHeightRevision(revision) {
     activeRevision = revision;
     planByPerson.clear();
     heightByKey.clear();
+    clearStickyRowHeights();
   }
 }
 
@@ -55,8 +63,8 @@ function getOrBuildPlan(personId, personAllocations, scheduleModel, dismissedAva
 }
 
 /**
- * Cached row height for virtualizer sizing — plan built once per person/revision,
- * height cached per viewport column range.
+ * Cached row height for virtualizer sizing — plan built once per person/revision.
+ * Uses per-person sticky committed height (grow fast, shrink after scroll lag).
  */
 export function getCachedScheduleRowHeightPx({
   personId,
@@ -66,6 +74,8 @@ export function getCachedScheduleRowHeightPx({
   dismissedAvailOffKeys = null,
   layoutColumnRange = null,
   layoutRevision = "",
+  updateSticky = false,
+  shrinkLagCols = 15,
 }) {
   if (layoutRevision) setScheduleRowHeightRevision(layoutRevision);
 
@@ -80,10 +90,6 @@ export function getCachedScheduleRowHeightPx({
   }
 
   const pid = String(personId ?? "");
-  const cacheKey = heightCacheKey(pid, layoutColumnRange, density, activeRevision);
-  const hit = heightByKey.get(cacheKey);
-  if (hit != null) return hit;
-
   const plan = getOrBuildPlan(
     pid,
     personAllocations,
@@ -91,10 +97,23 @@ export function getCachedScheduleRowHeightPx({
     dismissedAvailOffKeys,
     activeRevision
   );
-  const px = computeRowHeightFromPlan(plan, layoutColumnRange, density);
-  heightByKey.set(cacheKey, px);
-  trimHeightCache();
-  return px;
+  const measuredPx = computeRowHeightFromPlan(plan, layoutColumnRange, density);
+  const viewportStartCol = isValidColumnRange(layoutColumnRange)
+    ? layoutColumnRange.startCol
+    : 0;
+
+  if (!updateSticky) {
+    return peekStickyRowHeightPx(pid, measuredPx, density);
+  }
+
+  const heavyEndCol = heavyEndColFromPlan(plan, layoutColumnRange);
+  return applyStickyRowHeightPx(pid, {
+    measuredPx,
+    heavyEndCol,
+    viewportStartCol,
+    shrinkLagCols,
+    density,
+  });
 }
 
 export function collectVirtualRowIndices(virtualizer, padding = 2) {

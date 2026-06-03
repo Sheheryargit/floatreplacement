@@ -68,7 +68,7 @@ function anchorColumnRange(scheduleModel) {
 }
 
 /**
- * Row-height columns: whatever is visible in the timeline viewport (shrinks/grows on scroll).
+ * Row-height measure range: visible viewport columns (committed height uses sticky rules in personRowHeightSticky).
  * Falls back to the anchor band before the viewport is measured.
  */
 export function getEffectiveLayoutColumnRange(scheduleModel, viewportRange) {

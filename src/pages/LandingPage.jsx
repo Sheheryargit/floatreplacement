@@ -78,9 +78,12 @@ import {
 import {
   buildScheduleRowHeightResolver,
   cancelScheduledRowRemeasure,
+  captureScheduleScrollAnchor,
   queueScheduleRowRemeasure,
   remeasureVisibleScheduleRows,
+  restoreScheduleScrollAnchor,
 } from "../schedule/scheduleRowRemeasure.js";
+import { shrinkLagColsForView } from "../schedule/personRowHeightSticky.js";
 import {
   buildTimelineRowLayout,
   leaveMinHeightPx,
@@ -2800,6 +2803,8 @@ export default function LandingPage() {
     getEffectiveLayoutColumnRange(scheduleModel, null)
   );
   const scheduleRowHeightRevisionRef = useRef("");
+  const rowHeightUpdateStickyRef = useRef(false);
+  const shrinkLagCols = useMemo(() => shrinkLagColsForView(viewMode), [viewMode]);
 
   const syncLayoutColumnRange = useCallback(() => {
     const el = scheduleViewportRef.current;
@@ -2857,6 +2862,8 @@ export default function LandingPage() {
         layoutColumnRangeRef,
         layoutRevisionRef: scheduleRowHeightRevisionRef,
         fallbackPx: scheduleRowEstimatePx,
+        updateStickyRef: rowHeightUpdateStickyRef,
+        shrinkLagCols,
       }),
     [
       schedulePeople,
@@ -2865,6 +2872,7 @@ export default function LandingPage() {
       density,
       dismissedAvailOffKeys,
       scheduleRowEstimatePx,
+      shrinkLagCols,
     ]
   );
 
@@ -2875,22 +2883,36 @@ export default function LandingPage() {
 
   const remeasureScheduleRows = useCallback(() => {
     const v = scheduleRowVirtualizerRef.current;
+    const el = scheduleViewportRef.current;
     if (!v) return;
+    const anchor = captureScheduleScrollAnchor(el, v);
     const sizeByIndex = new Map(v.getVirtualItems().map((item) => [item.index, item.size]));
-    remeasureVisibleScheduleRows(v, {
-      indices: collectVirtualRowIndices(v),
-      sizeByIndex,
-      getRowHeightPx: resolveScheduleRowHeightPx,
-    });
+    rowHeightUpdateStickyRef.current = true;
+    try {
+      remeasureVisibleScheduleRows(v, {
+        indices: collectVirtualRowIndices(v),
+        sizeByIndex,
+        getRowHeightPx: resolveScheduleRowHeightPx,
+      });
+    } finally {
+      rowHeightUpdateStickyRef.current = false;
+    }
+    if (anchor && el) {
+      requestAnimationFrame(() => restoreScheduleScrollAnchor(el, v, anchor));
+    }
   }, [resolveScheduleRowHeightPx]);
 
   const queueRemeasureScheduleRows = useCallback(() => {
     queueScheduleRowRemeasure(remeasureScheduleRows);
   }, [remeasureScheduleRows]);
 
-  const syncLayoutColumnRangeAndRemeasure = useCallback(() => {
-    if (syncLayoutColumnRange()) queueRemeasureScheduleRows();
-  }, [syncLayoutColumnRange, queueRemeasureScheduleRows]);
+  const syncLayoutColumnRangeAndRemeasure = useCallback(
+    (opts) => {
+      syncLayoutColumnRange();
+      if (opts?.remeasureHeights !== false) queueRemeasureScheduleRows();
+    },
+    [syncLayoutColumnRange, queueRemeasureScheduleRows]
+  );
 
   const { onTimelineScroll } = useTimelineScrollController({
     scheduleViewportRef,
@@ -2903,6 +2925,10 @@ export default function LandingPage() {
     prevColCountRef: prevColCount,
     lastAnchorKeyRef: lastAnchorKey,
     onLayoutRangeSync: syncLayoutColumnRangeAndRemeasure,
+    onScrollIdle: () => {
+      syncLayoutColumnRange();
+      queueRemeasureScheduleRows();
+    },
   });
 
   useEffect(() => () => cancelScheduledRowRemeasure(), []);

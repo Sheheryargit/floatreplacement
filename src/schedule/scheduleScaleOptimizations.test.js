@@ -81,18 +81,14 @@ describe("scheduleRowHeightRuntime cache", () => {
 
     const h1 = getCachedScheduleRowHeightPx(args);
     const statsMid = __scheduleRowHeightRuntimeStats();
-    const h2 = getCachedScheduleRowHeightPx(args);
+    const h2 = getCachedScheduleRowHeightPx({ ...args, updateSticky: true });
 
     assert.equal(h1, h2);
     assert.equal(statsMid.planCount, 1);
-    assert.ok(statsMid.heightCacheSize >= 1);
 
     setScheduleRowHeightRevision("rev-b");
-    const statsAfterRev = __scheduleRowHeightRuntimeStats();
-    assert.equal(statsAfterRev.heightCacheSize, 0);
-    getCachedScheduleRowHeightPx({ ...args, layoutRevision: "rev-b" });
+    getCachedScheduleRowHeightPx({ ...args, layoutRevision: "rev-b", updateSticky: true });
     assert.equal(__scheduleRowHeightRuntimeStats().planCount, 1);
-    assert.equal(__scheduleRowHeightRuntimeStats().heightCacheSize, 1);
   });
 });
 
