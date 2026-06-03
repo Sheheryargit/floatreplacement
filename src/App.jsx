@@ -21,6 +21,7 @@ import { SsoPersonProfileSync } from "./components/auth/SsoPersonProfileSync.jsx
 import { VercelAnalytics } from "./components/analytics/VercelAnalytics.jsx";
 import GlobalBackground from "./components/ui/GlobalBackground.jsx";
 import { Toaster } from "sonner";
+import { AdminAllocationPulseHost } from "./components/admin/AdminAllocationPulse.jsx";
 import "./styles/premium-overlays.css";
 
 /** Opaque toast shell — detailed fills live in index.css (.alloc8-toast). */
@@ -171,6 +172,7 @@ function AuthGate() {
   return (
     <>
       <SkipToMainLink />
+      <AdminAllocationPulseHost />
       <AppErrorBoundary>
         <WorkspaceReady>
           <AgentCrudHarnessHost />

@@ -139,13 +139,16 @@
 @keyframes lpamSpringPop {
   0% {
     opacity: 0;
-    transform: translate(-50%, -46%) scale(0.92);
+    filter: blur(6px);
+    transform: translate(-50%, -48%) scale(0.94);
   }
   60% {
+    filter: blur(0);
     transform: translate(-50%, -50%) scale(1.02);
   }
   100% {
     opacity: 1;
+    filter: blur(0);
     transform: translate(-50%, -50%) scale(1);
   }
 }
@@ -153,10 +156,12 @@
 @keyframes lpamFadeOutScale {
   from {
     opacity: 1;
+    filter: blur(0);
     transform: translate(-50%, -50%) scale(1);
   }
   to {
     opacity: 0;
+    filter: blur(4px);
     transform: translate(-50%, -50%) scale(0.96);
   }
 }

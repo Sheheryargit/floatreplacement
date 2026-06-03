@@ -11,9 +11,7 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowDownUp,
-  Baby,
   Calendar,
-  CalendarOff,
   CalendarPlus,
   ArrowRightToLine,
   Check,
@@ -22,15 +20,11 @@ import {
   ChevronRight,
   Clock,
   Filter,
-  Flower2,
   FolderPlus,
-  HeartPulse,
-  Landmark,
   LayoutGrid,
   LayoutDashboard,
   Maximize2,
   MousePointer2,
-  Palmtree,
   Percent,
   Plus,
   Repeat2,
@@ -38,10 +32,7 @@ import {
   SlidersHorizontal,
   Star,
   StickyNote,
-  Umbrella,
-  User,
   UserPlus,
-  Wallet,
   X,
 } from "lucide-react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
@@ -60,6 +51,13 @@ import {
   showCenterActionFeedback,
   useAlloc8ActionFeedbackMount,
 } from "../context/CenterActionFeedbackContext.jsx";
+import { showAdminAllocationPulse } from "../lib/adminAllocationPulse.js";
+import {
+  addPendingAllocationKey,
+  removePendingAllocationKey,
+  replacePendingAllocationKey,
+  parsePendingAllocationKeys,
+} from "../schedule/allocationPendingKeys.js";
 import { useTimelineScrollController } from "../schedule/useTimelineScrollController.js";
 import {
   getEffectiveLayoutColumnRange,
@@ -115,7 +113,8 @@ import {
 import {
   avatarGradientFromName as avGrad,
   colorForAllocationBar,
-  contrastingTextColor,
+  allocationBarForegroundColor,
+  allocationProjectDisplay,
   projectCodeChipStyles,
   resolveColorForProjectLabel,
   projectToAllocationLabel,
@@ -127,6 +126,14 @@ import {
 } from "../utils/allocationBulkExtend.js";
 import { buildSplitSegments } from "../utils/allocationSplit.js";
 import { BulkExtendAllocationsDialog } from "../components/BulkExtendAllocationsDialog.jsx";
+import { PublicHolidayTimelineTile } from "../components/schedule/PublicHolidayTimelineTile.jsx";
+import { LeaveTimelineTile } from "../components/schedule/LeaveTimelineTile.jsx";
+import { publicHolidayRegionBadge } from "../utils/publicHolidayDisplay.js";
+import {
+  leaveTypeShortLabel,
+  computeLeaveTileTier,
+  formatPartialLeaveHours,
+} from "../utils/leaveTimelineDisplay.js";
 import "../components/BulkExtendAllocationsPanel.css";
 import { isStaticUi } from "../config/uiMode.js";
 import { tagChromaProps } from "../utils/tagChroma.js";
@@ -153,7 +160,6 @@ import {
 } from "../lib/api/personPublicHolidays.js";
 import {
   normalizeLeaveTypeId,
-  leaveTimelineIconKey,
   leaveSpansToday,
   buildLeaveHoverTitle,
   isAvailabilityDayOffAlloc,
@@ -163,13 +169,10 @@ import {
   ALLOCATION_BOX_STYLE_LS_KEY,
   ALLOCATION_ENTER_ANIM_CHANGED_EVENT,
   ALLOCATION_ENTER_ANIM_LS_KEY,
-  PEAK_LOAD_LABELS_CHANGED_EVENT,
-  PEAK_LOAD_LABELS_LS_KEY,
   SCHEDULE_DENSITY_CHANGED_EVENT,
   SCHEDULE_DENSITY_LS_KEY,
   readAllocationBoxStyle,
   readAllocationEnterAnimation,
-  readPeakLoadLabelsVisible,
   readScheduleDensity,
   writeScheduleDensity,
 } from "../config/scheduleUiPrefs.js";
@@ -183,28 +186,6 @@ import { usePremiumV2 } from "../context/PremiumV2Context.jsx";
 import { useAppDialog } from "../context/AppDialogContext.jsx";
 import "./LandingPage.css";
 import "../styles/premium-schedule.css";
-
-const LEAVE_LUCIDE = {
-  palmtree: Palmtree,
-  heartpulse: HeartPulse,
-  user: User,
-  baby: Baby,
-  flower2: Flower2,
-  wallet: Wallet,
-  landmark: Landmark,
-  umbrella: Umbrella,
-  calendaroff: CalendarOff,
-};
-
-function LeaveTimelineGlyph({ leaveTypeId, className }) {
-  const key = leaveTimelineIconKey(leaveTypeId);
-  const Ic = LEAVE_LUCIDE[key] || Palmtree;
-  return (
-    <span className="lp-leave-block__icon-pill" aria-hidden>
-      <Ic className={className} size={14} strokeWidth={2.35} />
-    </span>
-  );
-}
 
 const VIEW_OPTIONS = [
   { id: "week", label: "Weeks" },
@@ -322,24 +303,7 @@ function shortenAllocLabel(s, maxLen) {
   return s.length > maxLen ? `${s.slice(0, maxLen - 1)}…` : s;
 }
 
-function allocationDisplay(alloc) {
-  const raw = (alloc.project || "").trim();
-  if (!raw) {
-    return { projectName: "", projectCode: "", hoursLabel: `${Number(alloc.hoursPerDay) || 0}h` };
-  }
-  const parts = raw.split("/").map((x) => x.trim()).filter(Boolean);
-  const name = parts.length > 1 ? parts.slice(1).join(" / ") : parts[0] || raw;
-  const code = parts.length > 1 ? parts[0] : "";
-  const h = alloc.hoursPerDay;
-  const hStr = Number.isInteger(h) ? String(h) : String(h);
-  return {
-    projectName: name,
-    projectCode: code,
-    hoursLabel: `${hStr}h`,
-  };
-}
-
-function allocationAriaLabel(alloc) {
+function allocationAriaLabel(alloc, projects) {
   if (alloc.isLeave) {
     const lbl = alloc.leaveType ? leaveLabel(alloc.leaveType) : "Leave";
     const range =
@@ -354,7 +318,12 @@ function allocationAriaLabel(alloc) {
     alloc.startDate === alloc.endDate
       ? `on ${alloc.startDate}`
       : `from ${alloc.startDate} to ${alloc.endDate}`;
-  return `${alloc.project}, ${hStr} hours per day, ${range}. Open allocation details.`;
+  const { projectName, projectCode } = allocationProjectDisplay(alloc, projects);
+  const label =
+    projectCode && projectName
+      ? `${projectCode} / ${projectName}`
+      : projectName || projectCode || alloc.project || "Work";
+  return `${label}, ${hStr} hours per day, ${range}. Open allocation details.`;
 }
 
 function buildScheduleModel(viewMode, anchorDate, offsets = { prev: 0, next: 0 }) {
@@ -624,7 +593,7 @@ function leaveTimelineBlockChrome(allocUi, { isDayOff, onToday, typeId, leaveBrP
     "lp-leave-block lp-leave-block--" +
     typeId +
     (onToday ? " lp-leave-block--today" : "") +
-    (fullDay && !isDayOff ? " lp-leave-block--icon-only" : "") +
+    (!isDayOff ? " lp-leave-block--leave-tile" : "") +
     (partialH != null ? " lp-leave-block--partial" : "");
   const sizeStyle =
     partialH != null
@@ -642,6 +611,7 @@ function leaveTimelineBlockChrome(allocUi, { isDayOff, onToday, typeId, leaveBrP
         };
   return {
     className,
+    partialH,
     style: {
       gridRow: 1,
       width: "100%",
@@ -654,6 +624,26 @@ function leaveTimelineBlockChrome(allocUi, { isDayOff, onToday, typeId, leaveBrP
       ...sizeStyle,
     },
   };
+}
+
+function renderLeaveTimelineTile(allocUi, { colSpan, partialH }) {
+  const notesTrim = (allocUi.notes || "").trim();
+  return (
+    <LeaveTimelineTile
+      leaveTypeId={allocUi.leaveType}
+      typeLabel={leaveTypeShortLabel(allocUi.leaveType)}
+      notes={allocUi.notes}
+      colSpan={colSpan}
+      tier={computeLeaveTileTier({
+        colSpan,
+        blockHeightPx: partialH,
+        hasNotes: notesTrim.length > 0,
+        isPartial: partialH != null,
+      })}
+      isPartial={partialH != null}
+      hoursLabel={partialH != null ? formatPartialLeaveHours(allocUi.hoursPerDay) : ""}
+    />
+  );
 }
 
 const timelineRowEqual = (prev, next) => {
@@ -672,6 +662,7 @@ const timelineRowEqual = (prev, next) => {
   if (prev.allocationBoxStyle !== next.allocationBoxStyle) return false;
   if (prev.allocationEnterAnim !== next.allocationEnterAnim) return false;
   if (prev.freshEnteredAllocationKey !== next.freshEnteredAllocationKey) return false;
+  if (prev.pendingAllocationKeys !== next.pendingAllocationKeys) return false;
   if (prev.premiumV2Enabled !== next.premiumV2Enabled) return false;
 
   return true;
@@ -709,6 +700,7 @@ const TimelineRow = memo(function TimelineRow({
   allocationBoxStyle,
   allocationEnterAnim,
   freshEnteredAllocationKey,
+  pendingAllocationKeys,
   premiumV2Enabled,
 }) {
   const { theme } = useAppTheme();
@@ -723,6 +715,10 @@ const TimelineRow = memo(function TimelineRow({
   const enteredFreshSet = useMemo(
     () => new Set((freshEnteredAllocationKey || "").split("|").filter(Boolean)),
     [freshEnteredAllocationKey]
+  );
+  const pendingAllocSet = useMemo(
+    () => parsePendingAllocationKeys(pendingAllocationKeys),
+    [pendingAllocationKeys]
   );
   const wantsAllocEnterFx = !reduceMotion && allocationEnterAnim !== "instant";
 
@@ -1073,7 +1069,6 @@ const TimelineRow = memo(function TimelineRow({
                     typeId,
                     leaveBrPx,
                   });
-
                   return (
                     <button
                       key={`${seg.a.id}-occ-${seg.occIdx}`}
@@ -1083,7 +1078,7 @@ const TimelineRow = memo(function TimelineRow({
                         gridColumn: `${colStart} / span ${colSpan}`,
                         ...leaveChrome.style,
                       }}
-                      aria-label={allocationAriaLabel(allocUi)}
+                      aria-label={allocationAriaLabel(allocUi, projects)}
                       title={hoverTitle}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1095,7 +1090,10 @@ const TimelineRow = memo(function TimelineRow({
                           <span>Off</span>
                         </span>
                       ) : (
-                        <LeaveTimelineGlyph leaveTypeId={allocUi.leaveType} className="lp-leave-block__icon" />
+                        renderLeaveTimelineTile(allocUi, {
+                          colSpan,
+                          partialH: leaveChrome.partialH,
+                        })
                       )}
                     </button>
                   );
@@ -1125,7 +1123,6 @@ const TimelineRow = memo(function TimelineRow({
                     typeId,
                     leaveBrPx,
                   });
-
                   return (
                     <motion.button
                       key={`${seg.a.id}-occ-${seg.occIdx}`}
@@ -1136,7 +1133,7 @@ const TimelineRow = memo(function TimelineRow({
                         gridColumn: `${colStart} / span ${colSpan}`,
                         ...leaveChrome.style,
                       }}
-                      aria-label={allocationAriaLabel(allocUi)}
+                      aria-label={allocationAriaLabel(allocUi, projects)}
                       title={hoverTitle}
                       initial={
                         reduceMotion
@@ -1172,7 +1169,10 @@ const TimelineRow = memo(function TimelineRow({
                           <span>Off</span>
                         </span>
                       ) : (
-                        <LeaveTimelineGlyph leaveTypeId={allocUi.leaveType} className="lp-leave-block__icon" />
+                        renderLeaveTimelineTile(allocUi, {
+                          colSpan,
+                          partialH: leaveChrome.partialH,
+                        })
                       )}
                     </motion.button>
                   );
@@ -1206,9 +1206,12 @@ const TimelineRow = memo(function TimelineRow({
                       const hnorm = Math.min(1, Math.max(0, h) / BAR_H_NORM);
                       const calculatedHeight = allocationBarHeightPx(seg.a);
 
-                      const { projectName, projectCode, hoursLabel } = allocationDisplay(seg.a);
+                      const { projectName, projectCode, hoursLabel } = allocationProjectDisplay(
+                        seg.a,
+                        projects
+                      );
                       const barColor = colorForAllocationBar(seg.a, projects);
-                      const fg = contrastingTextColor(barColor);
+                      const fg = allocationBarForegroundColor(theme, barColor);
                       const innerWash = allocationBarInnerWash(barColor, theme, allocationBoxStyle);
 
                       const brPx = allocationBarBorderRadiusPx(geo.widthPct, allocationBoxStyle);
@@ -1269,12 +1272,13 @@ const TimelineRow = memo(function TimelineRow({
                             (allocationBoxStyle === "center" ? " lp-alloc-bar--layout-center" : "") +
                             (showFreshEnterAlloc
                               ? ` lp-alloc-enter lp-alloc-enter--${allocationEnterAnim}`
-                              : "")
+                              : "") +
+                            (pendingAllocSet.has(String(seg.a.id)) ? " lp-alloc-bar--pending" : "")
                           }
                           data-hours={h}
                           data-bar-h={calculatedHeight}
                           style={baseStyle}
-                          aria-label={allocationAriaLabel(seg.a)}
+                          aria-label={allocationAriaLabel(seg.a, projects)}
                           title={tip}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1400,7 +1404,7 @@ const TimelineRow = memo(function TimelineRow({
                     <button
                       key={seg.segKey}
                       type="button"
-                      className="lp-leave-block lp-leave-block--public_holiday lp-leave-block--icon-only"
+                      className="lp-leave-block lp-leave-block--public_holiday lp-leave-block--public_holiday-tile"
                       style={{
                         gridColumn: `${colStart} / span ${colSpan}`,
                         gridRow: 1,
@@ -1423,7 +1427,12 @@ const TimelineRow = memo(function TimelineRow({
                       title={phDetailTitle}
                       aria-label={phDetailTitle}
                     >
-                      <LeaveTimelineGlyph leaveTypeId="public_holiday" className="lp-leave-block__icon" />
+                      <PublicHolidayTimelineTile
+                        holidayName={holidayLabel}
+                        regionBadge={publicHolidayRegionBadge(p)}
+                        colSpan={colSpan}
+                        segKey={seg.segKey}
+                      />
                     </button>
                   );
                 })}
@@ -1483,7 +1492,8 @@ export default function LandingPage() {
     setPublicHolidayAllocations,
   } = useSchedulePageData();
 
-  const { premiumV2Enabled, premiumV2Templates } = usePremiumV2();
+  const { premiumV2Templates } = usePremiumV2();
+  const premiumV2Enabled = false;
   const { openDialog } = useAppDialog();
 
   const [dismissedAvailOffKeys, setDismissedAvailOffKeys] = useState(() => {
@@ -1558,24 +1568,14 @@ export default function LandingPage() {
   const [anchorDate, setAnchorDate] = useState(() => new Date());
   const [density, setDensity] = useState(() => readScheduleDensity());
   const [utilizationMode, setUtilizationMode] = useState("hours");
-  const [showPeakLoadStatus, setShowPeakLoadStatus] = useState(() => readPeakLoadLabelsVisible());
+  const showPeakLoadStatus = false;
   const [allocationBoxStyle, setAllocationBoxStyle] = useState(() => readAllocationBoxStyle());
   const [allocationEnterAnim, setAllocationEnterAnim] = useState(() => readAllocationEnterAnimation());
   const [freshEnteredAllocationKey, setFreshEnteredAllocationKey] = useState("");
+  const [pendingAllocationKeys, setPendingAllocationKeys] = useState("");
+  const [scheduleTodayPulse, setScheduleTodayPulse] = useState(false);
+  const [scheduleCanvasSettling, setScheduleCanvasSettling] = useState(false);
   const allocationEnterTimersRef = useRef(new Map());
-
-  useEffect(() => {
-    const sync = () => setShowPeakLoadStatus(readPeakLoadLabelsVisible());
-    window.addEventListener(PEAK_LOAD_LABELS_CHANGED_EVENT, sync);
-    const onStorage = (e) => {
-      if (e.key === PEAK_LOAD_LABELS_LS_KEY || e.key == null) sync();
-    };
-    window.addEventListener("storage", onStorage);
-    return () => {
-      window.removeEventListener(PEAK_LOAD_LABELS_CHANGED_EVENT, sync);
-      window.removeEventListener("storage", onStorage);
-    };
-  }, []);
 
   useEffect(() => {
     const sync = () => setDensity(readScheduleDensity());
@@ -1746,6 +1746,20 @@ export default function LandingPage() {
     [schedulePeople]
   );
 
+  const scheduleFilterSig = useMemo(
+    () =>
+      normalizeFilterRules(scheduleFilterRules)
+        .map((r) => `${r.field}:${r.op}:${String(r.value ?? "")}`)
+        .join(","),
+    [scheduleFilterRules]
+  );
+
+  useEffect(() => {
+    setScheduleCanvasSettling(true);
+    const t = window.setTimeout(() => setScheduleCanvasSettling(false), 300);
+    return () => window.clearTimeout(t);
+  }, [schedulePeopleKey, scheduleSort, scheduleFilterSig]);
+
   const projectByLabel = useMemo(() => {
     const m = new Map();
     for (const p of projects) {
@@ -1889,6 +1903,8 @@ export default function LandingPage() {
     setTimelineOffsets({ prev: 1, next: 2 });
     resetScheduleVerticalScrollRef.current = true;
     lastAnchorKey.current = null;
+    setScheduleTodayPulse(true);
+    window.setTimeout(() => setScheduleTodayPulse(false), 2200);
   }, []);
 
   const registerScheduleRowVirtualizer = useCallback((instance) => {
@@ -2122,51 +2138,58 @@ export default function LandingPage() {
         version: 1,
       };
 
+      setAllocations((prev) => [...prev, createdDraft]);
+      setPendingAllocationKeys((k) => addPendingAllocationKey(k, createdDraft.id));
+
       try {
         const saved = isSupabaseConfigured ? await syncAllocationCreate(createdDraft) : createdDraft;
-        setAllocations((prev) => [...prev, saved]);
+        setAllocations((prev) =>
+          prev.map((a) => (a.id === createdDraft.id ? saved : a))
+        );
+        setPendingAllocationKeys((k) =>
+          replacePendingAllocationKey(k, createdDraft.id, saved.id)
+        );
         if (!payload.isLeave) pulseFreshAllocationTile(saved.id);
 
+        const saveSubtitle = payload.isLeave
+          ? `${payload.startDate} → ${payload.endDate}`
+          : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`;
+        const runUndo = () => {
+          void (async () => {
+            const uid = saved.id;
+            setAllocations((cur) => cur.filter((a) => a.id !== uid));
+            try {
+              if (isSupabaseConfigured) await syncAllocationDelete(uid);
+              showCenterActionFeedback({
+                action: "remove",
+                title: "Undone",
+                subtitle: "Removed what you had just saved.",
+              });
+            } catch (err) {
+              setAllocations((cur) => (cur.some((a) => a.id === uid) ? cur : [...cur, saved]));
+              toast.error("Undo failed", { description: err?.message || String(err) });
+            }
+          })();
+        };
+
         if (premiumV2Enabled && saved?.id) {
-          const savedSnap = saved;
-          toast.success(payload.isLeave ? "Leave saved" : "Saved", {
-            description: payload.isLeave
-              ? `${payload.startDate} → ${payload.endDate}`
-              : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
-            duration: 9000,
-            action: {
-              label: "Undo",
-              onClick: () => {
-                void (async () => {
-                  const uid = savedSnap.id;
-                  setAllocations((cur) => cur.filter((a) => a.id !== uid));
-                  try {
-                    if (isSupabaseConfigured) await syncAllocationDelete(uid);
-                    showCenterActionFeedback({
-                      action: "remove",
-                      title: "Undone",
-                      subtitle: "Removed what you had just saved.",
-                    });
-                  } catch (err) {
-                    setAllocations((cur) =>
-                      cur.some((a) => a.id === uid) ? cur : [...cur, savedSnap]
-                    );
-                    toast.error("Undo failed", { description: err?.message || String(err) });
-                  }
-                })();
-              },
-            },
+          showAdminAllocationPulse({
+            action: "add",
+            title: payload.isLeave ? "Leave saved" : "Saved",
+            subtitle: saveSubtitle,
+            duration: 4200,
+            onUndo: runUndo,
           });
         } else {
           showCenterActionFeedback({
             action: "add",
             title: payload.isLeave ? "Leave saved" : "Saved",
-            subtitle: payload.isLeave
-              ? `${payload.startDate} → ${payload.endDate}`
-              : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
+            subtitle: saveSubtitle,
           });
         }
       } catch (e) {
+        setAllocations((prev) => prev.filter((a) => a.id !== createdDraft.id));
+        setPendingAllocationKeys((k) => removePendingAllocationKey(k, createdDraft.id));
         toast.error("Save failed", { description: e?.message || String(e) });
       }
     },
@@ -2265,10 +2288,16 @@ export default function LandingPage() {
         version: Number(prevAlloc?.version) || 1,
       };
 
+      setAllocations((prev) => prev.map((a) => (a.id === id ? merged : a)));
+      setSelectedAllocation((prev) => (prev && prev.id === id ? merged : prev));
+      setPendingAllocationKeys((k) => addPendingAllocationKey(k, id));
+
       try {
         const saved = isSupabaseConfigured ? await syncAllocationUpdate(merged) : merged;
         setAllocations((prev) => prev.map((a) => (a.id === id ? saved : a)));
         setSelectedAllocation((prev) => (prev && prev.id === id ? saved : prev));
+        setPendingAllocationKeys((k) => removePendingAllocationKey(k, id));
+        if (!payload.isLeave) pulseFreshAllocationTile(id);
         showCenterActionFeedback({
           action: "update",
           title: payload.isLeave ? "Leave updated" : "Updated",
@@ -2278,6 +2307,11 @@ export default function LandingPage() {
         });
         return true;
       } catch (e) {
+        setPendingAllocationKeys((k) => removePendingAllocationKey(k, id));
+        if (prevAlloc) {
+          setAllocations((prev) => prev.map((a) => (a.id === id ? prevAlloc : a)));
+          setSelectedAllocation((prev) => (prev && prev.id === id ? prevAlloc : prev));
+        }
         if (e?.name === "OptimisticLockError") {
           toast.error("Someone else edited this allocation", {
             description: "Refreshing the schedule from the server.",
@@ -2298,6 +2332,7 @@ export default function LandingPage() {
       syncAllocationUpdate,
       refreshWorkspaceFromSupabase,
       scheduleAllocations,
+      pulseFreshAllocationTile,
     ]
   );
 
@@ -2893,6 +2928,7 @@ export default function LandingPage() {
       allocationBoxStyle,
       allocationEnterAnim,
       freshEnteredAllocationKey,
+      pendingAllocationKeys,
       premiumV2Enabled,
     }),
     [
@@ -2915,6 +2951,7 @@ export default function LandingPage() {
       allocationBoxStyle,
       allocationEnterAnim,
       freshEnteredAllocationKey,
+      pendingAllocationKeys,
       premiumV2Enabled,
     ]
   );
@@ -3146,7 +3183,11 @@ export default function LandingPage() {
 
           <div className="lp-toolbar">
             <div className="lp-toolbar-left" />
-            <div className="lp-toolbar-right">
+            <div
+              ref={setAlloc8FeedbackDock}
+              data-alloc8-action-feedback-mount
+              className="lp-toolbar-right"
+            >
               <div className="lp-date-pill-group">
                 <motion.button
                   type="button"
@@ -3344,12 +3385,6 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
-
-          <div
-            ref={setAlloc8FeedbackDock}
-            data-alloc8-action-feedback-mount
-            className="lp-schedule-feedback-mount"
-          />
 
           <div className="lp-subbar">
             <div className="lp-subbar-people">
@@ -3564,7 +3599,10 @@ export default function LandingPage() {
             "--lp-timeline-min": `${timelineMinWidthPx}px`,
           }}
         >
-          <div className="lp-schedule-header">
+          <div
+            className="lp-schedule-header"
+            data-today-pulse={scheduleTodayPulse ? "1" : undefined}
+          >
             <div ref={scheduleHeaderInnerRef} className="lp-schedule-header-inner">
               <div ref={scheduleHeaderRef} className="lp-sched-row lp-sched-row-head">
                 <div className="lp-sched-corner lp-sched-corner--empty" aria-hidden />
@@ -3636,7 +3674,13 @@ export default function LandingPage() {
             ref={scheduleViewportRef}
             onScroll={onTimelineScroll}
           >
-            <div key={scheduleMotionKey} className="lp-schedule-canvas">
+            <div
+              key={scheduleMotionKey}
+              className={
+                "lp-schedule-canvas" +
+                (scheduleCanvasSettling ? " lp-schedule-canvas--settle" : "")
+              }
+            >
               <ScheduleVirtualizedRows
                 key={schedulePeopleKey}
                 schedulePeople={schedulePeople}

@@ -1,0 +1,240 @@
+/* Public holiday tile — flat caption (1-day) or arc (multi-day span) + icon + region */
+
+.lp-ph-tile {
+  container-type: inline-size;
+  container-name: ph-tile;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 5px 4px 4px;
+  box-sizing: border-box;
+  position: relative;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.lp-ph-cluster {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  max-width: 100%;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* ── Flat title (default for single-day columns — week view) ───── */
+.lp-ph-flat-title {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  padding: 0 3px;
+  box-sizing: border-box;
+  font-family: var(--font-display, "Syne", system-ui, sans-serif);
+  font-size: clamp(7px, 3.2cqi, 9px);
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: inherit;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+}
+
+.lp-root[data-theme="light"] .lp-ph-flat-title {
+  text-shadow: none;
+}
+
+@container ph-tile (max-width: 40px) {
+  .lp-ph-flat-title {
+    font-size: 6.5px;
+    letter-spacing: 0.02em;
+  }
+}
+
+/* ── Arc label (multi-day span only) ─────────────────────────── */
+.lp-ph-tile--arc .lp-ph-flat-title {
+  display: none;
+}
+
+.lp-ph-arc {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: 16px;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.lp-ph-arc-text {
+  fill: currentColor;
+  font-family: var(--font-display, "Syne", system-ui, sans-serif);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.lp-ph-tile--span-wide .lp-ph-arc {
+  height: 17px;
+}
+
+.lp-ph-tile--span-wide .lp-ph-arc-text {
+  font-size: 9.5px;
+}
+
+.lp-ph-tile--span-xl .lp-ph-arc {
+  height: 19px;
+}
+
+.lp-ph-tile--span-xl .lp-ph-arc-text {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+}
+
+.lp-ph-tile--flat .lp-ph-arc {
+  display: none;
+}
+
+/* ── Icon + region ───────────────────────────────────────────── */
+.lp-ph-icon-pill {
+  flex-shrink: 0;
+}
+
+.lp-ph-icon {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.28));
+}
+
+.lp-ph-region {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-family: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  flex-shrink: 0;
+  color: #fef9c3;
+  background: color-mix(in srgb, #a16207 42%, rgba(12, 10, 6, 0.55));
+  border: 1px solid color-mix(in srgb, #fde047 55%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+.lp-root[data-theme="light"] .lp-ph-region {
+  color: #854d0e;
+  background: color-mix(in srgb, #fef08a 75%, #fff);
+  border-color: color-mix(in srgb, #ca8a04 45%, transparent);
+}
+
+:root[data-surface-finish="satin"] .lp-ph-region {
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.28),
+    0 3px 8px rgba(0, 0, 0, 0.16);
+}
+
+.lp-ph-region--dot {
+  min-width: 6px;
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+@container ph-tile (max-width: 34px) {
+  .lp-ph-region:not(.lp-ph-region--dot) {
+    font-size: 7px;
+    padding: 1px 4px;
+  }
+}
+
+.lp-ph-hover-name {
+  display: none;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: calc(100% - 6px);
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  color: #fefce8;
+  background: rgba(15, 12, 8, 0.94);
+  border: 1px solid rgba(253, 224, 71, 0.4);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  z-index: 12;
+  pointer-events: none;
+}
+
+.lp-leave-block--public_holiday-tile:hover .lp-ph-hover-name,
+.lp-leave-block--public_holiday-tile:focus-visible .lp-ph-hover-name {
+  display: block;
+}
+
+.lp-root[data-theme="light"] .lp-ph-hover-name {
+  color: #422006;
+  background: rgba(255, 251, 235, 0.98);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lp-leave-block--public_holiday-tile:hover .lp-ph-hover-name,
+  .lp-leave-block--public_holiday-tile:focus-visible .lp-ph-hover-name {
+    animation: lpPhHoverIn 0.18s var(--ease-out-ui, ease) both;
+  }
+}
+
+@keyframes lpPhHoverIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* Parent block */
+.lp-leave-block--public_holiday.lp-leave-block--public_holiday-tile {
+  justify-content: center;
+  align-items: center;
+  gap: 0;
+  padding: 2px 3px;
+  overflow: hidden;
+  color: #fef9c3;
+}
+
+.lp-leave-block--public_holiday.lp-leave-block--public_holiday-tile:hover {
+  filter: brightness(1.06);
+}
+
+.lp-root[data-theme="light"] .lp-leave-block--public_holiday.lp-leave-block--public_holiday-tile {
+  color: #854d0e;
+}
+
+.lp-leave-block--public_holiday.lp-leave-block--readonly .lp-ph-flat-title,
+.lp-leave-block--public_holiday.lp-leave-block--readonly .lp-ph-arc-text {
+  opacity: 0.55;
+}
+
+.lp-leave-block--public_holiday.lp-leave-block--readonly .lp-ph-region {
+  opacity: 0.5;
+}

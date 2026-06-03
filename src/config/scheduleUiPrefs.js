@@ -2,7 +2,7 @@
  * Schedule display preferences (density, tiles, animations, peak labels).
  * Persisted via localStorage only — not synced to workspace_settings or teammates.
  *
- * First-visit defaults: compact density, outline tiles, peak labels off.
+ * First-visit defaults: compact density, luxe allocation tiles, peak labels off.
  * Appearance defaults (ThemeContext): light + Studio palette, no canvas tint.
  */
 
@@ -38,7 +38,7 @@ export function writePeakLoadLabelsVisible(visible) {
 }
 
 /** Work allocation tiles on the schedule timeline (border, shadow, radius, wash). */
-export const ALLOCATION_BOX_STYLE_LS_KEY = "float.allocBoxStyle.v1";
+export const ALLOCATION_BOX_STYLE_LS_KEY = "float.allocBoxStyle.v2";
 
 export const ALLOCATION_BOX_STYLE_CHANGED_EVENT = "float-alloc-box-style-change";
 
@@ -53,6 +53,10 @@ export const ALLOCATION_BOX_STYLE_IDS = /** @type {const} */ ([
   "neon",
   "glass",
   "rail",
+  "velvet",
+  "luxe",
+  "aurora",
+  "satin",
 ]);
 
 /** Short labels for Settings (radiogroup buttons). */
@@ -65,19 +69,26 @@ export const ALLOCATION_BOX_STYLE_LABELS = {
   neon: "Neon",
   glass: "Glass",
   rail: "Rail",
+  velvet: "Velvet",
+  luxe: "Luxe",
+  aurora: "Aurora",
+  satin: "Satin",
 };
 
-/** @returns {AllocationBoxStyleId} First visit defaults to Outline. */
+/** Default work-allocation tile style when nothing saved in localStorage. */
+export const DEFAULT_ALLOCATION_BOX_STYLE = "luxe";
+
+/** @returns {AllocationBoxStyleId} Defaults to Luxe; user overrides persist in v2 localStorage key. */
 export function readAllocationBoxStyle() {
   try {
-    if (typeof window === "undefined") return "outline";
+    if (typeof window === "undefined") return DEFAULT_ALLOCATION_BOX_STYLE;
     const v = window.localStorage.getItem(ALLOCATION_BOX_STYLE_LS_KEY);
-    if (v == null || v === "") return "outline";
+    if (v == null || v === "") return DEFAULT_ALLOCATION_BOX_STYLE;
     return ALLOCATION_BOX_STYLE_IDS.includes(/** @type {any} */ (v))
       ? /** @type {AllocationBoxStyleId} */ (v)
-      : "outline";
+      : DEFAULT_ALLOCATION_BOX_STYLE;
   } catch {
-    return "outline";
+    return DEFAULT_ALLOCATION_BOX_STYLE;
   }
 }
 
@@ -85,7 +96,7 @@ export function readAllocationBoxStyle() {
 export function writeAllocationBoxStyle(styleId) {
   const id = ALLOCATION_BOX_STYLE_IDS.includes(/** @type {any} */ (styleId))
     ? /** @type {AllocationBoxStyleId} */ (styleId)
-    : "outline";
+    : DEFAULT_ALLOCATION_BOX_STYLE;
   try {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(ALLOCATION_BOX_STYLE_LS_KEY, id);

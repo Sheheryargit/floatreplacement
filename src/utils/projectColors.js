@@ -61,6 +61,65 @@ export function projectToAllocationLabel(p) {
   return name || code || `Project #${p.id}`;
 }
 
+/** Parse a stored allocation project label into code + name. */
+export function parseAllocationProjectLabel(raw) {
+  const t = String(raw ?? "").trim();
+  if (!t) return { projectName: "", projectCode: "" };
+  const sep = t.includes(" / ") ? " / " : "/";
+  const parts = t.split(sep).map((x) => x.trim()).filter(Boolean);
+  if (parts.length > 1) {
+    return { projectName: parts.slice(1).join(" / "), projectCode: parts[0] };
+  }
+  return { projectName: parts[0] || t, projectCode: "" };
+}
+
+/**
+ * Schedule bar text — prefers live project registry (by projectId), then label match, then stored string.
+ * @param {{ project?: string, projectId?: string, hoursPerDay?: number, isLeave?: boolean }} alloc
+ * @param {Array<{ id: string | number, name?: string, code?: string, archived?: boolean }>} [projects]
+ */
+export function allocationProjectDisplay(alloc, projects) {
+  const h = Number(alloc?.hoursPerDay) || 0;
+  const hStr = Number.isInteger(h) ? String(h) : String(h);
+  const hoursLabel = `${hStr}h`;
+  if (alloc?.isLeave) {
+    return { projectName: "", projectCode: "", hoursLabel };
+  }
+
+  const pid =
+    alloc?.projectId != null && String(alloc.projectId).trim() !== ""
+      ? String(alloc.projectId).trim()
+      : "";
+  if (pid) {
+    const byId = (projects || []).find((p) => p && String(p.id) === pid);
+    if (byId) {
+      return {
+        projectName: (byId.name || "").trim(),
+        projectCode: (byId.code || "").trim(),
+        hoursLabel,
+      };
+    }
+  }
+
+  const raw = (alloc?.project || "").trim();
+  if (raw) {
+    const match =
+      (projects || []).find((p) => p && projectToAllocationLabel(p) === raw) ||
+      matchProjectFromAllocationPickerLabel(raw, projects);
+    if (match) {
+      return {
+        projectName: (match.name || "").trim(),
+        projectCode: (match.code || "").trim(),
+        hoursLabel,
+      };
+    }
+    const parsed = parseAllocationProjectLabel(raw);
+    return { ...parsed, hoursLabel };
+  }
+
+  return { projectName: "", projectCode: "", hoursLabel };
+}
+
 const PICKER_HINT_SEP = " – ";
 
 /**
@@ -188,6 +247,9 @@ export function colorForAllocationBar(alloc, projects) {
   return resolveColorForProjectLabel(alloc.project, projects);
 }
 
+export const ALLOCATION_BAR_TEXT_LIGHT = "#0f172a";
+export const ALLOCATION_BAR_TEXT_DARK_ON_LIGHT = "#151922";
+
 export function contrastingTextColor(hex) {
   const m = /^#?([0-9a-f]{6})$/i.exec((hex || "").trim());
   if (!m) return "#fff";
@@ -196,7 +258,16 @@ export function contrastingTextColor(hex) {
   const g = (n >> 8) & 255;
   const b = n & 255;
   const L = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return L > 0.62 ? "#151922" : "#fff";
+  return L > 0.62 ? ALLOCATION_BAR_TEXT_DARK_ON_LIGHT : "#fff";
+}
+
+export const ALLOCATION_BAR_TEXT_DARK = "#f8fafc";
+
+/** Schedule allocation bar title / meta — fixed contrast per theme (not per bar color). */
+export function allocationBarForegroundColor(theme, barHex) {
+  if (theme === "light") return ALLOCATION_BAR_TEXT_LIGHT;
+  if (theme === "dark") return ALLOCATION_BAR_TEXT_DARK;
+  return contrastingTextColor(barHex);
 }
 
 /**
@@ -207,7 +278,7 @@ export function contrastingTextColor(hex) {
 export function projectCodeChipStyles(barHex, theme) {
   const hex = (barHex || "#6366f1").trim();
   const isLight = theme === "light";
-  const fg = contrastingTextColor(hex);
+  const fg = allocationBarForegroundColor(theme, hex);
   return {
     background: isLight
       ? `color-mix(in srgb, ${hex} 20%, #ffffff)`

@@ -592,7 +592,9 @@ export default function ProjectsPage(){
     if (editingProject) {
       const draft = { ...clean, id: editingProject.id, archived: editingProject.archived };
       try {
-        const saved = isSupabaseConfigured ? await syncProjectUpdate(draft) : draft;
+        const saved = isSupabaseConfigured
+          ? await syncProjectUpdate(draft, { previousProject: editingProject })
+          : await syncProjectUpdate(draft, { previousProject: editingProject });
         setProjects(projects.map((p) => (p.id === editingProject.id ? saved : p)).sort((a, b) => a.name.localeCompare(b.name)));
         showCenterActionFeedback({
           action: "update",

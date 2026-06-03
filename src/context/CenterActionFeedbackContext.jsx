@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { createPortal } from "react-dom";
 import { AlertTriangle, Check, X } from "lucide-react";
 import { toast } from "sonner";
+import { showAdminAllocationPulse } from "../lib/adminAllocationPulse.js";
 import "../components/CenterActionFeedback.css";
 
 /** @typedef {"success" | "error" | "warning"} CenterActionVariant */
@@ -26,6 +27,21 @@ let emitCenterFeedback = null;
  * @param {CenterActionFeedbackOpts} opts
  */
 export function showCenterActionFeedback(opts) {
+  const variant = opts.variant ?? "success";
+  const action = opts.action;
+  if (
+    variant === "success" &&
+    (action === "add" || action === "update" || action === "remove")
+  ) {
+    const shown = showAdminAllocationPulse({
+      action,
+      title: opts.title,
+      subtitle: opts.subtitle,
+      duration: opts.duration,
+    });
+    if (shown) return;
+  }
+
   const fn = emitCenterFeedback;
   if (fn) {
     fn(opts);
@@ -49,12 +65,20 @@ export function useCenterActionFeedback() {
 /** @type {import("react").Context<(node: HTMLElement | null) => void>} */
 const DockContext = createContext(() => {});
 
+/** @type {import("react").Context<HTMLElement | null>} */
+const DockElementContext = createContext(null);
+
 /**
- * Attach `ref={useAlloc8ActionFeedbackMount()}` to a host element (e.g. schedule header strip)
- * so allocation feedback portals inside that region instead of the viewport center.
+ * Attach `ref={useAlloc8ActionFeedbackMount()}` to a host element (e.g. schedule toolbar controls)
+ * so allocation feedback portals inside that region instead of the viewport edge.
  */
 export function useAlloc8ActionFeedbackMount() {
   return useContext(DockContext);
+}
+
+/** Current dock element (for admin allocation pulse and other anchored overlays). */
+export function useAlloc8ActionFeedbackDock() {
+  return useContext(DockElementContext);
 }
 
 export function CenterActionFeedbackProvider({ children }) {
@@ -150,10 +174,12 @@ export function CenterActionFeedbackProvider({ children }) {
 
   return (
     <DockContext.Provider value={setDockEl}>
-      <CenterFeedbackContext.Provider value={show}>
-        {children}
-        {portal}
-      </CenterFeedbackContext.Provider>
+      <DockElementContext.Provider value={dockEl}>
+        <CenterFeedbackContext.Provider value={show}>
+          {children}
+          {portal}
+        </CenterFeedbackContext.Provider>
+      </DockElementContext.Provider>
     </DockContext.Provider>
   );
 }

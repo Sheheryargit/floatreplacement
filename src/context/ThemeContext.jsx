@@ -7,6 +7,12 @@ import {
   useMemo,
   useCallback,
 } from "react";
+import {
+  readSurfaceFinish,
+  writeSurfaceFinish,
+  SURFACE_FINISH_CHANGED_EVENT,
+  SURFACE_FINISH_LS_KEY,
+} from "../config/surfaceFinishPrefs.js";
 
 /** Personal appearance only — browser localStorage, never written to workspace_settings or Supabase. */
 const STORAGE_KEY = "float-replacement-theme";
@@ -79,10 +85,15 @@ export function computeShellBackground(resolvedTheme, hex) {
   return `color-mix(in srgb, ${n} 38%, #0b0e14)`;
 }
 
-function syncAppearanceDom(resolvedTheme, palette, canvasTintHex) {
+function syncAppearanceDom(resolvedTheme, palette, canvasTintHex, surfaceFinish) {
   if (typeof document === "undefined") return;
   const el = document.documentElement;
   el.dataset.theme = resolvedTheme;
+  if (surfaceFinish === "satin") {
+    el.dataset.surfaceFinish = "satin";
+  } else {
+    delete el.dataset.surfaceFinish;
+  }
   if (palette === "studio") {
     el.dataset.palette = "studio";
   } else {
@@ -115,6 +126,7 @@ export function ThemeProvider({ children }) {
   const [themePreference, setThemePreferenceState] = useState(() => readStoredPreference());
   const [palettePreference, setPalettePreferenceState] = useState(() => readStoredPalette());
   const [canvasTintHex, setCanvasTintHexState] = useState(() => readStoredCanvasTint());
+  const [surfaceFinish, setSurfaceFinishState] = useState(() => readSurfaceFinish());
 
   const resolvedTheme = useMemo(
     () => resolveTheme(themePreference),
@@ -127,8 +139,8 @@ export function ThemeProvider({ children }) {
   );
 
   useLayoutEffect(() => {
-    syncAppearanceDom(resolvedTheme, palettePreference, canvasTintHex);
-  }, [resolvedTheme, palettePreference, canvasTintHex]);
+    syncAppearanceDom(resolvedTheme, palettePreference, canvasTintHex, surfaceFinish);
+  }, [resolvedTheme, palettePreference, canvasTintHex, surfaceFinish]);
 
   useEffect(() => {
     try {
@@ -163,15 +175,32 @@ export function ThemeProvider({ children }) {
   }, [canvasTintHex]);
 
   useEffect(() => {
+    writeSurfaceFinish(surfaceFinish);
+  }, [surfaceFinish]);
+
+  useEffect(() => {
+    const onFinishChange = () => setSurfaceFinishState(readSurfaceFinish());
+    window.addEventListener(SURFACE_FINISH_CHANGED_EVENT, onFinishChange);
+    const onStorage = (e) => {
+      if (e.key === SURFACE_FINISH_LS_KEY || e.key == null) onFinishChange();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(SURFACE_FINISH_CHANGED_EVENT, onFinishChange);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  useEffect(() => {
     if (themePreference !== "system") return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
-      syncAppearanceDom(getSystemTheme(), palettePreference, canvasTintHex);
+      syncAppearanceDom(getSystemTheme(), palettePreference, canvasTintHex, surfaceFinish);
     };
     mq.addEventListener("change", onChange);
-    syncAppearanceDom(resolveTheme("system"), palettePreference, canvasTintHex);
+    syncAppearanceDom(resolveTheme("system"), palettePreference, canvasTintHex, surfaceFinish);
     return () => mq.removeEventListener("change", onChange);
-  }, [themePreference, palettePreference, canvasTintHex]);
+  }, [themePreference, palettePreference, canvasTintHex, surfaceFinish]);
 
   const setThemePreference = useCallback((next) => {
     setThemePreferenceState((prev) =>
@@ -202,6 +231,13 @@ export function ThemeProvider({ children }) {
     });
   }, []);
 
+  const setSurfaceFinish = useCallback((next) => {
+    setSurfaceFinishState((prev) => {
+      const raw = typeof next === "function" ? next(prev) : next;
+      return raw === "standard" ? "standard" : "satin";
+    });
+  }, []);
+
   const value = useMemo(
     () => ({
       /** Resolved appearance: "dark" | "light" */
@@ -217,6 +253,9 @@ export function ThemeProvider({ children }) {
       setCanvasTintHex,
       /** color-mix() for People/Projects shells when tint active; else null. */
       shellBackground,
+      /** "standard" | "satin" — lifts chrome app-wide via data-surface-finish on html */
+      surfaceFinish,
+      setSurfaceFinish,
     }),
     [
       resolvedTheme,
@@ -228,6 +267,8 @@ export function ThemeProvider({ children }) {
       canvasTintHex,
       setCanvasTintHex,
       shellBackground,
+      surfaceFinish,
+      setSurfaceFinish,
     ]
   );
 

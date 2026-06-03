@@ -13,7 +13,11 @@ import {
   SEED_PROJECT_TAGS,
   PROJECTS_SEED,
 } from "../data/projectsSeed.js";
-import { buildAllocationProjectOptionStrings } from "../utils/projectColors.js";
+import {
+  buildAllocationProjectOptionStrings,
+  projectToAllocationLabel,
+} from "../utils/projectColors.js";
+import { patchAllocationsForProjectUpdate } from "../lib/syncProjectAllocations.js";
 import {
   loadWorkspaceFromSupabase,
   loadWorkspaceCriticalFromSupabase,
@@ -419,9 +423,30 @@ export function syncProjectCreate(project) {
   if (!isSupabaseConfigured) return Promise.resolve(project);
   return projectsApi.createProject(project);
 }
-export function syncProjectUpdate(project) {
-  if (!isSupabaseConfigured) return Promise.resolve(project);
-  return projectsApi.updateProject(project);
+/**
+ * @param {object} project
+ * @param {{ previousProject?: object }} [options] — pass the row before edit so legacy label-only allocations relink.
+ */
+export function syncProjectUpdate(project, options = {}) {
+  const { previousProject } = options;
+  const applyLocal = (updated) => {
+    patchAllocationsForProjectUpdate(updated, previousProject);
+    return updated;
+  };
+
+  if (!isSupabaseConfigured) {
+    return Promise.resolve(applyLocal(project));
+  }
+
+  return projectsApi.updateProject(project).then(async (updated) => {
+    const newLabel = projectToAllocationLabel(updated);
+    await allocationsApi.bulkRelabelAllocationsForProject({
+      projectId: updated.id,
+      projectLabel: newLabel,
+      previousLabel: previousProject ? projectToAllocationLabel(previousProject) : undefined,
+    });
+    return applyLocal(updated);
+  });
 }
 export function syncProjectsDelete(ids) {
   if (!isSupabaseConfigured) return Promise.resolve();

@@ -1,0 +1,394 @@
+/**
+ * Satin surface finish — app-wide chrome when html[data-surface-finish="satin"].
+ * Top sheen + floating shadow + softer radii (matches allocation "Satin" tiles).
+ */
+
+:root[data-surface-finish="satin"] {
+  --satin-inset-top: inset 0 2px 0 rgba(255, 255, 255, 0.14);
+  --satin-inset-top-light: inset 0 2px 0 rgba(255, 255, 255, 0.78);
+  --satin-inset-bottom-dark: inset 0 -1px 0 rgba(0, 0, 0, 0.28);
+  --satin-inset-bottom-light: inset 0 -1px 0 rgba(15, 23, 42, 0.06);
+  --satin-float-dark: 0 10px 28px rgba(0, 0, 0, 0.42);
+  --satin-float-light: 0 10px 26px rgba(15, 23, 42, 0.1);
+  --satin-radius-md: 14px;
+  --satin-radius-lg: 18px;
+  --radius-card: 14px;
+  --radius-modal: 20px;
+  --radius-xl: 18px;
+  --shadow-lg:
+    0 26px 64px rgba(0, 0, 0, 0.42),
+    0 8px 24px rgba(0, 0, 0, 0.2),
+    var(--satin-inset-top);
+}
+
+:root[data-surface-finish="satin"][data-theme="light"] {
+  --shadow-lg:
+    0 22px 56px rgba(15, 23, 42, 0.12),
+    0 6px 18px rgba(15, 23, 42, 0.06),
+    var(--satin-inset-top-light);
+}
+
+/* ── Canvas depth ─────────────────────────────────────────── */
+:root[data-surface-finish="satin"] .global-bg {
+  background:
+    radial-gradient(ellipse 100% 70% at 12% 8%, rgba(0, 136, 255, 0.09) 0%, transparent 52%),
+    radial-gradient(ellipse 80% 55% at 88% 6%, rgba(124, 106, 247, 0.07) 0%, transparent 50%),
+    radial-gradient(ellipse 70% 50% at 50% 100%, rgba(0, 136, 255, 0.05) 0%, transparent 55%),
+    linear-gradient(180deg, #0b0e14 0%, #0f131c 48%, #0b0e14 100%);
+}
+
+:root[data-surface-finish="satin"][data-theme="light"] .global-bg {
+  background:
+    radial-gradient(ellipse 100% 70% at 14% 10%, rgba(0, 136, 255, 0.07) 0%, transparent 52%),
+    radial-gradient(ellipse 80% 55% at 90% 8%, rgba(124, 106, 247, 0.05) 0%, transparent 50%),
+    radial-gradient(ellipse 70% 50% at 50% 98%, rgba(0, 136, 255, 0.04) 0%, transparent 55%),
+    linear-gradient(180deg, #fafbfc 0%, #f4f6fa 48%, #eef2f6 100%);
+}
+
+:root[data-surface-finish="satin"] .global-aurora {
+  opacity: 0.78;
+}
+
+/* ── Side nav ─────────────────────────────────────────────── */
+:root[data-surface-finish="satin"] .app-sidenav {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--app-sidebar, #0f1117) 96%, #1a2030) 0%,
+    var(--app-sidebar, #0f1117) 100%
+  );
+  box-shadow:
+    var(--satin-inset-top),
+    4px 0 24px rgba(0, 0, 0, 0.12);
+}
+
+:root[data-surface-finish="satin"][data-theme="light"] .app-sidenav {
+  box-shadow:
+    var(--satin-inset-top-light),
+    4px 0 20px rgba(15, 23, 42, 0.05);
+}
+
+:root[data-surface-finish="satin"] .app-sidenav-item--active {
+  border-radius: 12px;
+  box-shadow:
+    var(--satin-inset-top),
+    0 4px 14px color-mix(in srgb, var(--app-accent) 18%, transparent);
+}
+
+:root[data-surface-finish="satin"][data-theme="light"] .app-sidenav-item--active {
+  box-shadow:
+    var(--satin-inset-top-light),
+    0 4px 12px rgba(0, 119, 230, 0.12);
+}
+
+:root[data-surface-finish="satin"] .app-sidenav-item:hover:not(.app-sidenav-item--disabled):not(.app-sidenav-item--active) {
+  border-radius: 10px;
+}
+
+/* ── Settings cards ───────────────────────────────────────── */
+:root[data-surface-finish="satin"] .settings-card--glow {
+  border-radius: var(--satin-radius-md);
+  box-shadow:
+    var(--satin-inset-top),
+    var(--satin-float-dark),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+}
+
+:root[data-surface-finish="satin"][data-theme="light"] .settings-card--glow {
+  box-shadow:
+    var(--satin-inset-top-light),
+    var(--satin-float-light),
+    0 0 0 1px rgba(255, 255, 255, 0.9) inset;
+}
+
+:root[data-surface-finish="satin"] .settings-card--interactive:hover.settings-card--glow {
+  transform: translate3d(0, -2px, 0);
+}
+
+/* ── Schedule mega-card & header ────────────────────────── */
+:root[data-surface-finish="satin"] .lp-root .lp-schedule {
+  border-radius: 24px;
+  box-shadow:
+    var(--satin-inset-top),
+    0 6px 28px rgba(0, 0, 0, 0.28),
+    0 20px 60px rgba(0, 0, 0, 0.32);
+}
+
+:root[data-surface-finish="satin"] .lp-root[data-theme="light"] .lp-schedule {
+  box-shadow:
+    var(--satin-inset-top-light),
+    0 6px 24px rgba(15, 23, 42, 0.08),
+    0 22px 64px rgba(15, 23, 42, 0.09);
+}
+
+:root[data-surface-finish="satin"] .lp-root .lp-sched-sticky-top {
+  box-shadow:
+    var(--satin-inset-top),
+    0 10px 32px rgba(0, 0, 0, 0.14);
+}
+
+:root[data-surface-finish="satin"] .lp-root[data-theme="light"] .lp-sched-sticky-top {
+  box-shadow:
+    var(--satin-inset-top-light),
+    0 8px 24px rgba(15, 23, 42, 0.05);
+}
+
+/* Toolbar floating tray */
+:root[data-surface-finish="satin"] .lp-root .lp-toolbar {
+  margin-top: 4px;
+  padding: 10px 14px;
+  border-radius: var(--satin-radius-md);
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface) 92%, transparent) 0%,
+    color-mix(in srgb, var(--surface) 78%, transparent) 100%
+  );
+  box-shadow:
+    var(--satin-inset-top),
+    var(--satin-float-dark);
+}
+
+:root[data-surface-finish="satin"] .lp-root[data-theme="light"] .lp-toolbar {
+  background: linear-gradient(180deg, #ffffff 0%, #f6f8fb 100%);
+  box-shadow:
+    var(--satin-inset-top-light),
+    var(--satin-float-light);
+}
+
+/* Pills & secondary buttons */
+:root[data-surface-finish="satin"] .lp-root .lp-pill {
+  border-radius: 999px;
+  box-shadow:
+    var(--satin-inset-top),
+    0 4px 16px rgba(0, 0, 0, 0.14);
+}
+
+:root[data-surface-finish="satin"] .lp-root[data-theme="light"] .lp-pill {
+  box-shadow:
+    var(--satin-inset-top-light),
+    0 4px 14px rgba(15, 23, 42, 0.06);
+}
+
+:root[data-surface-finish="satin"] .lp-root .lp-tag-dd-trigger-active,
+:root[data-surface-finish="satin"] .lp-root .lp-pill-today {
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.2),
+    0 6px 18px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+:root[data-surface-finish="satin"] .lp-root .lp-btn-secondary {
+  border-radius: 10px;
+  box-shadow:
+    var(--satin-inset-top),
+    0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+:root[data-surface-finish="satin"] .lp-root .lp-btn-secondary:hover {
+  transform: translate3d(0, -2px, 0);
+}
+
+/* People rail */
+:root[data-surface-finish="satin"] .lp-root .lp-person-row-shell {
+  border-radius: 12px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface) 22%, transparent) 0%,
+    color-mix(in srgb, var(--surface) 8%, transparent) 100%
+  );
+  box-shadow:
+    var(--satin-inset-top),
+    0 4px 14px rgba(0, 0, 0, 0.1);
+  transition:
+    border-color 0.2s var(--ease-premium, ease),
+    background 0.2s ease,
+    transform 0.2s var(--ease-premium, ease),
+    box-shadow 0.2s ease;
+}
+
+:root[data-surface-finish="satin"] .lp-root[data-theme="light"] .lp-person-row-shell {
+  box-shadow:
+    var(--satin-inset-top-light),
+    0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+:root[data-surface-finish="satin"] .lp-root .lp-person-row-shell:hover,
+:root[data-surface-finish="satin"] .lp-root .lp-person-row-shell:focus-within {
+  transform: translate3d(0, -2px, 0);
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--lp-people-frame));
+  box-shadow:
+    var(--satin-inset-top),
+    0 8px 22px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+:root[data-surface-finish="satin"] .lp-root[data-theme="light"] .lp-person-row-shell:hover,
+:root[data-surface-finish="satin"] .lp-root[data-theme="light"] .lp-person-row-shell:focus-within {
+  box-shadow:
+    var(--satin-inset-top-light),
+    0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+/* Today column */
+:root[data-surface-finish="satin"] .lp-root .lp-day-is-today::before {
+  border-radius: 12px;
+  background: radial-gradient(
+    ellipse 80% 120% at 50% 0%,
+    color-mix(in srgb, var(--ui-today-soft) 85%, transparent),
+    transparent 72%
+  );
+  opacity: 1;
+}
+
+/* Popovers */
+:root[data-surface-finish="satin"] .lp-root .lp-popover {
+  border-radius: var(--satin-radius-md);
+  box-shadow:
+    var(--satin-inset-top),
+    0 24px 56px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-surface-finish="satin"] .lp-root[data-theme="light"] .lp-popover {
+  box-shadow:
+    var(--satin-inset-top-light),
+    0 20px 48px rgba(15, 23, 42, 0.11);
+}
+
+/* ── Modals ───────────────────────────────────────────────── */
+:root[data-surface-finish="satin"][data-theme="dark"] .float-premium-modal:not(.lpam-modal) {
+  border-radius: 22px !important;
+  box-shadow:
+    0 32px 72px rgba(0, 0, 0, 0.55),
+    var(--satin-inset-top),
+    0 0 80px color-mix(in srgb, var(--color-brand) 12%, transparent) !important;
+}
+
+:root[data-surface-finish="satin"][data-theme="light"] .float-premium-modal:not(.lpam-modal) {
+  border-radius: 22px !important;
+  box-shadow:
+    0 28px 64px rgba(15, 23, 42, 0.14),
+    var(--satin-inset-top-light),
+    0 0 60px color-mix(in srgb, var(--color-brand) 8%, transparent) !important;
+}
+
+:root[data-surface-finish="satin"] .lpam-modal[data-state="open"] {
+  border-radius: 22px !important;
+  box-shadow:
+    var(--satin-inset-top),
+    0 28px 72px rgba(0, 0, 0, 0.48) !important;
+}
+
+:root[data-surface-finish="satin"][data-theme="light"] .lpam-modal[data-state="open"] {
+  box-shadow:
+    var(--satin-inset-top-light),
+    0 26px 64px rgba(15, 23, 42, 0.14) !important;
+}
+
+/* ── Toasts / allocation feedback ─────────────────────────── */
+:root[data-surface-finish="satin"] .aap-card {
+  border-radius: 18px;
+  box-shadow:
+    var(--satin-inset-top),
+    0 20px 44px rgba(0, 0, 0, 0.28);
+}
+
+:root[data-surface-finish="satin"][data-theme="light"] .aap-card {
+  box-shadow:
+    var(--satin-inset-top-light),
+    0 18px 40px rgba(15, 23, 42, 0.12);
+}
+
+:root[data-surface-finish="satin"] .aap-host--anchored:has(.aap-card)::before {
+  border-radius: 16px;
+  box-shadow:
+    var(--satin-inset-top),
+    0 10px 32px rgba(0, 0, 0, 0.14);
+}
+
+:root[data-surface-finish="satin"] .caf-pill {
+  box-shadow:
+    var(--satin-inset-top),
+    0 12px 32px rgba(0, 0, 0, 0.28);
+}
+
+:root[data-surface-finish="satin"][data-theme="light"] .caf-pill {
+  box-shadow:
+    var(--satin-inset-top-light),
+    0 10px 28px rgba(15, 23, 42, 0.1);
+}
+
+/* ── People & Projects tables ─────────────────────────────── */
+:root[data-surface-finish="satin"] .people-page-table-wrap {
+  border-radius: var(--satin-radius-md);
+  box-shadow:
+    var(--satin-inset-top),
+    var(--satin-float-dark);
+}
+
+:root[data-surface-finish="satin"][data-theme="light"] .people-page-table-wrap {
+  box-shadow:
+    var(--satin-inset-top-light),
+    var(--satin-float-light);
+}
+
+:root[data-surface-finish="satin"] .projects-page-table-card {
+  border-radius: var(--satin-radius-md);
+  box-shadow:
+    var(--satin-inset-top),
+    var(--satin-float-dark);
+}
+
+:root[data-surface-finish="satin"] .projects-page-table-card[data-theme="light"] {
+  box-shadow:
+    var(--satin-inset-top-light),
+    var(--satin-float-light);
+}
+
+/* ── Route skeleton shimmer ───────────────────────────────── */
+@keyframes satinShimmer {
+  0% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -40% 0;
+  }
+}
+
+:root[data-surface-finish="satin"] .route-skeleton-bar,
+:root[data-surface-finish="satin"] .route-skeleton-title,
+:root[data-surface-finish="satin"] .route-skeleton-nav-dot {
+  background-image: linear-gradient(
+    105deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.14) 42%,
+    rgba(255, 255, 255, 0.04) 58%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  background-size: 220% 100%;
+  animation: satinShimmer 1.8s ease-in-out infinite;
+}
+
+:root[data-surface-finish="satin"][data-theme="light"] .route-skeleton-bar,
+:root[data-surface-finish="satin"][data-theme="light"] .route-skeleton-title,
+:root[data-surface-finish="satin"][data-theme="light"] .route-skeleton-nav-dot {
+  background-image: linear-gradient(
+    105deg,
+    rgba(15, 23, 42, 0.04) 0%,
+    rgba(255, 255, 255, 0.85) 42%,
+    rgba(15, 23, 42, 0.04) 58%,
+    rgba(15, 23, 42, 0.02) 100%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-surface-finish="satin"] .settings-card--interactive:hover.settings-card--glow,
+  :root[data-surface-finish="satin"] .lp-root .lp-person-row-shell:hover,
+  :root[data-surface-finish="satin"] .lp-root .lp-person-row-shell:focus-within,
+  :root[data-surface-finish="satin"] .lp-root .lp-btn-secondary:hover {
+    transform: none;
+  }
+
+  :root[data-surface-finish="satin"] .route-skeleton-bar,
+  :root[data-surface-finish="satin"] .route-skeleton-title,
+  :root[data-surface-finish="satin"] .route-skeleton-nav-dot {
+    animation: none;
+  }
+}

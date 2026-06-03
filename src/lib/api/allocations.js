@@ -244,3 +244,33 @@ export async function deleteAllocation(id) {
   const { error } = await supabase.from("allocations").delete().eq("id", String(id));
   if (error) throw error;
 }
+
+/**
+ * When a project's name/code changes, keep allocation rows in sync (schedule bars + reporting).
+ * Updates rows linked by project_id; optionally backfills project_id on rows that still use the old label.
+ */
+export async function bulkRelabelAllocationsForProject({
+  projectId,
+  projectLabel,
+  previousLabel,
+}) {
+  if (!isSupabaseConfigured) return;
+  const pid = String(projectId);
+  const label = String(projectLabel ?? "");
+
+  const { error: byIdErr } = await supabase
+    .from("allocations")
+    .update({ project_label: label })
+    .eq("project_id", pid);
+  if (byIdErr) throw byIdErr;
+
+  const prev = String(previousLabel ?? "").trim();
+  if (!prev || prev === label) return;
+
+  const { error: legacyErr } = await supabase
+    .from("allocations")
+    .update({ project_label: label, project_id: pid })
+    .eq("project_label", prev)
+    .is("project_id", null);
+  if (legacyErr) throw legacyErr;
+}

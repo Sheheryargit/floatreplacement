@@ -98,6 +98,44 @@ export function allocationBarChromeStyles(barColor, hours, theme, { thin = false
       borderLeft: `5px solid ${barColor}`,
     };
   }
+  if (boxStyle === "velvet") {
+    const borderPx = thin ? 1 : 1;
+    return {
+      boxShadow: light
+        ? `inset 0 1px 0 rgba(255,255,255,0.38), inset 0 -3px 10px ${hexToRgba(barColor, 0.14)}, 0 4px 18px ${hexToRgba(barColor, 0.16 + hnorm * 0.06)}, 0 1px 3px rgba(15,23,42,0.07)`
+        : `inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -4px 12px rgba(0,0,0,0.42), 0 8px 24px rgba(0,0,0,0.5), 0 0 0 1px ${hexToRgba(barColor, 0.2)}`,
+      border: `${borderPx}px solid ${hexToRgba(barColor, light ? 0.2 : 0.26)}`,
+    };
+  }
+  if (boxStyle === "luxe") {
+    const borderPx = thin ? 1 : 1;
+    const glow = hexToRgba(barColor, light ? 0.2 + hnorm * 0.08 : 0.28 + hnorm * 0.1);
+    return {
+      boxShadow: light
+        ? `0 0 0 1px rgba(255,255,255,0.82), 0 0 0 2px ${hexToRgba(barColor, 0.24)}, 0 12px 32px ${glow}, inset 0 2px 0 rgba(255,255,255,0.72), inset 0 -1px 0 ${hexToRgba(barColor, 0.1)}`
+        : `0 0 0 1px ${hexToRgba(barColor, 0.42)}, 0 0 0 2px rgba(255,255,255,0.07), 0 14px 36px ${glow}, inset 0 2px 0 rgba(255,255,255,0.18), inset 0 -1px 0 rgba(0,0,0,0.45)`,
+      border: `${borderPx}px solid ${hexToRgba(barColor, light ? 0.58 : 0.72)}`,
+    };
+  }
+  if (boxStyle === "aurora") {
+    const borderPx = thin ? 1 : 1;
+    const bloom = hexToRgba(barColor, light ? 0.22 + hnorm * 0.08 : 0.32 + hnorm * 0.1);
+    return {
+      boxShadow: light
+        ? `0 0 0 1px ${hexToRgba(barColor, 0.18)}, 0 6px 28px ${bloom}, 0 14px 44px ${hexToRgba(barColor, 0.1)}, inset 0 1px 0 rgba(255,255,255,0.58)`
+        : `0 0 0 1px ${hexToRgba(barColor, 0.32)}, 0 8px 32px ${bloom}, 0 18px 52px ${hexToRgba(barColor, 0.14)}, inset 0 1px 0 rgba(255,255,255,0.14)`,
+      border: `${borderPx}px solid ${hexToRgba(barColor, light ? 0.48 : 0.58)}`,
+    };
+  }
+  if (boxStyle === "satin") {
+    const borderPx = thin ? 1 : 1;
+    return {
+      boxShadow: light
+        ? `inset 0 2px 0 rgba(255,255,255,0.78), inset 0 -2px 0 ${hexToRgba(barColor, 0.12)}, 0 10px 26px ${hexToRgba(barColor, 0.2 + hnorm * 0.08)}, 0 3px 8px rgba(15,23,42,0.09)`
+        : `inset 0 2px 0 rgba(255,255,255,0.24), inset 0 -2px 0 rgba(0,0,0,0.38), 0 12px 30px rgba(0,0,0,0.52), 0 4px 12px ${hexToRgba(barColor, 0.22)}`,
+      border: `${borderPx}px solid ${hexToRgba(barColor, light ? 0.36 : 0.46)}`,
+    };
+  }
 
   const sheen = light
     ? "inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -1px 0 rgba(0,0,0,0.05)"
@@ -156,6 +194,31 @@ export function allocationBarInnerWash(barColor, theme, boxStyle = "classic") {
     const lo = mixRgbHex(barColor, light ? 250 : 0, light ? 0.22 : 0.32);
     return `linear-gradient(90deg, ${mixRgbHex(barColor, 0, light ? 0.06 : 0.2)} 0%, ${mid} 18%, ${hi} 52%, ${lo} 100%)`;
   }
+  if (boxStyle === "velvet") {
+    const hi = mixRgbHex(barColor, light ? 255 : 200, light ? 0.58 : 0.42);
+    const mid = mixRgbHex(barColor, light ? 255 : 16, light ? 0.32 : 0.28);
+    const lo = mixRgbHex(barColor, 0, light ? 0.14 : 0.44);
+    return `linear-gradient(175deg, ${hi} 0%, ${mid} 46%, ${lo} 100%)`;
+  }
+  if (boxStyle === "luxe") {
+    const hi = mixRgbHex(barColor, 255, light ? 0.9 : 0.62);
+    const mid = mixRgbHex(barColor, light ? 255 : 40, light ? 0.52 : 0.34);
+    const lo = mixRgbHex(barColor, light ? 248 : 0, light ? 0.24 : 0.38);
+    return `linear-gradient(160deg, ${hi} 0%, ${mid} 38%, ${lo} 100%)`;
+  }
+  if (boxStyle === "aurora") {
+    const hi = mixRgbHex(barColor, 255, light ? 0.74 : 0.48);
+    const mid = mixRgbHex(barColor, light ? 255 : 80, light ? 0.38 : 0.3);
+    const lo = mixRgbHex(barColor, 0, light ? 0.1 : 0.42);
+    const flare = mixRgbHex(barColor, light ? 255 : 120, light ? 0.52 : 0.34);
+    return `linear-gradient(128deg, ${flare} 0%, ${hi} 22%, ${mid} 55%, ${lo} 100%)`;
+  }
+  if (boxStyle === "satin") {
+    const hi = mixRgbHex(barColor, 255, light ? 0.86 : 0.54);
+    const mid = mixRgbHex(barColor, light ? 255 : 0, light ? 0.44 : 0.28);
+    const lo = mixRgbHex(barColor, light ? 240 : 0, light ? 0.16 : 0.36);
+    return `linear-gradient(180deg, ${hi} 0%, ${mid} 35%, ${lo} 100%)`;
+  }
   const hi = mixRgbHex(barColor, 255, light ? 0.72 : 0.46);
   const mid = mixRgbHex(barColor, light ? 255 : 0, light ? 0.36 : 0.28);
   const lo = mixRgbHex(barColor, 0, light ? 0.1 : 0.34);
@@ -174,6 +237,10 @@ export function allocationBarBorderRadiusPx(widthPct, boxStyle = "classic") {
   if (boxStyle === "neon") return r + 2;
   if (boxStyle === "glass") return r + 3;
   if (boxStyle === "rail") return Math.max(3, r - 2);
+  if (boxStyle === "velvet") return r + 3;
+  if (boxStyle === "luxe") return r + 2;
+  if (boxStyle === "aurora") return Math.min(999, r + 8);
+  if (boxStyle === "satin") return Math.min(999, r + 11);
   return r;
 }
 
@@ -193,5 +260,9 @@ export function allocationLoadFillTopAlpha(theme, boxStyle) {
   if (boxStyle === "neon") return light ? 0.36 : 0.46;
   if (boxStyle === "glass") return light ? 0.24 : 0.32;
   if (boxStyle === "rail") return light ? 0.3 : 0.4;
+  if (boxStyle === "velvet") return light ? 0.3 : 0.4;
+  if (boxStyle === "luxe") return light ? 0.26 : 0.36;
+  if (boxStyle === "aurora") return light ? 0.34 : 0.44;
+  if (boxStyle === "satin") return light ? 0.24 : 0.32;
   return light ? 0.34 : 0.42;
 }

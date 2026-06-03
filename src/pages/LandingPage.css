@@ -453,6 +453,8 @@
 
 .lp-toolbar-right {
   flex: 0 0 auto;
+  position: relative;
+  overflow: visible;
 }
 
 /* Portal target: zero height so the pill overlays the gap without shifting the schedule. */
@@ -857,6 +859,39 @@
 .lp-day-is-today .lp-day-main {
   color: #fff;
   font-weight: 600;
+}
+
+.lp-schedule-header[data-today-pulse="1"] .lp-day-is-today {
+  border-radius: 8px;
+  animation: lpTodayColumnBreathe 2s cubic-bezier(0.22, 1, 0.36, 1) 1;
+}
+
+@keyframes lpTodayColumnBreathe {
+  0% {
+    box-shadow: inset 0 0 0 0 transparent;
+    background: transparent;
+  }
+  35% {
+    box-shadow: inset 0 0 0 1px var(--ui-today-soft), 0 0 18px var(--ui-today-soft);
+    background: color-mix(in srgb, var(--ui-today) 12%, transparent);
+  }
+  100% {
+    box-shadow: inset 0 0 0 0 transparent;
+    background: transparent;
+  }
+}
+
+.lp-schedule-canvas--settle {
+  animation: lpScheduleCanvasSettle 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes lpScheduleCanvasSettle {
+  from {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .lp-icon-btn {
@@ -1451,6 +1486,12 @@
   .lp-sched-row {
     animation: none !important;
     opacity: 1;
+  }
+
+  .lp-alloc-bar--pending::after,
+  .lp-schedule-header[data-today-pulse="1"] .lp-day-is-today,
+  .lp-schedule-canvas--settle {
+    animation: none;
   }
 
   .lp-today-grid-dot::after {
@@ -2319,8 +2360,10 @@ button.lp-person-identity-hit {
   border-bottom-color: color-mix(in srgb, var(--border) 65%, #64748b 35%);
 }
 
+.lp-sched-row--sparse .lp-leave-block--leave-tile,
 .lp-sched-row--sparse .lp-leave-block--icon-only,
-.lp-sched-row--sparse .lp-leave-block--public_holiday {
+.lp-sched-row--sparse .lp-leave-block--public_holiday,
+.lp-sched-row--sparse .lp-leave-block--public_holiday-tile {
   justify-content: center;
   align-items: center;
 }
@@ -2792,9 +2835,44 @@ button.lp-block.lp-block-alloc.lp-block-alloc-project {
 
 .lp-root[data-theme="light"] .lp-block-alloc-project .lp-alloc-name,
 .lp-root[data-theme="light"] .lp-block-alloc-project .lp-alloc-code {
-  text-shadow:
-    0 1px 1px rgba(255, 255, 255, 0.35),
-    0 1px 4px rgba(0, 0, 0, 0.2);
+  text-shadow: none;
+}
+
+/* Light mode: consistent dark type on all project bars (title, code chip, hours). */
+.lp-root[data-theme="light"] button.lp-block.lp-block-alloc.lp-alloc-bar,
+.lp-root[data-theme="light"] button.lp-block.lp-block-alloc.lp-alloc-bar .lp-alloc-bar__line,
+.lp-root[data-theme="light"] button.lp-block.lp-block-alloc.lp-alloc-bar .lp-alloc-bar__line--name,
+.lp-root[data-theme="light"] button.lp-block.lp-block-alloc.lp-alloc-bar .lp-alloc-bar__line--meta,
+.lp-root[data-theme="light"] button.lp-block.lp-block-alloc.lp-alloc-bar .lp-alloc-bar__line--center-subtitle,
+.lp-root[data-theme="light"] button.lp-block.lp-block-alloc.lp-alloc-bar .lp-alloc-hours,
+.lp-root[data-theme="light"] button.lp-block.lp-block-alloc.lp-alloc-bar .lp-alloc-bar__hours-hero,
+.lp-root[data-theme="light"] button.lp-block.lp-block-alloc.lp-alloc-bar .lp-alloc-bar__ic {
+  color: #0f172a !important;
+}
+
+.lp-root[data-theme="light"] button.lp-block.lp-block-alloc.lp-alloc-bar .lp-alloc-code-chip {
+  color: #0f172a !important;
+}
+
+/* Dark mode: consistent light type on all project bars */
+.lp-root[data-theme="dark"] button.lp-block.lp-block-alloc.lp-alloc-bar,
+.lp-root[data-theme="dark"] button.lp-block.lp-block-alloc.lp-alloc-bar .lp-alloc-bar__line,
+.lp-root[data-theme="dark"] button.lp-block.lp-block-alloc.lp-alloc-bar .lp-alloc-bar__line--name,
+.lp-root[data-theme="dark"] button.lp-block.lp-block-alloc.lp-alloc-bar .lp-alloc-bar__line--meta,
+.lp-root[data-theme="dark"] button.lp-block.lp-block-alloc.lp-alloc-bar .lp-alloc-bar__line--center-subtitle,
+.lp-root[data-theme="dark"] button.lp-block.lp-block-alloc.lp-alloc-bar .lp-alloc-hours,
+.lp-root[data-theme="dark"] button.lp-block.lp-block-alloc.lp-alloc-bar .lp-alloc-bar__hours-hero,
+.lp-root[data-theme="dark"] button.lp-block.lp-block-alloc.lp-alloc-bar .lp-alloc-bar__ic {
+  color: #f8fafc !important;
+}
+
+.lp-root[data-theme="dark"] button.lp-block.lp-block-alloc.lp-alloc-bar .lp-alloc-code-chip {
+  color: #f8fafc !important;
+}
+
+.lp-root[data-theme="dark"] .lp-block-alloc-project .lp-alloc-name,
+.lp-root[data-theme="dark"] .lp-block-alloc-project .lp-alloc-code {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 .lp-block-alloc-project .lp-alloc-hours {
@@ -2885,6 +2963,37 @@ button.lp-block.lp-block-alloc.lp-block-alloc-project {
   transform: translate3d(-1px, -2px, 0);
 }
 
+.lp-root[data-alloc-box-style="velvet"] .lp-block-alloc.lp-block-alloc-project:hover {
+  transform: translate3d(0, -2px, 0);
+  filter: brightness(1.04);
+}
+
+.lp-root[data-theme="light"][data-alloc-box-style="velvet"] .lp-block-alloc.lp-block-alloc-project:hover {
+  filter: brightness(1.02);
+}
+
+.lp-root[data-alloc-box-style="luxe"] .lp-block-alloc.lp-block-alloc-project:hover {
+  transform: translate3d(0, -2px, 0) scale(1.01);
+  filter: brightness(1.05);
+}
+
+.lp-root[data-theme="light"][data-alloc-box-style="luxe"] .lp-block-alloc.lp-block-alloc-project:hover {
+  filter: brightness(1.03);
+}
+
+.lp-root[data-alloc-box-style="aurora"] .lp-block-alloc.lp-block-alloc-project:hover {
+  transform: translate3d(0, -2px, 0);
+  filter: brightness(1.08) saturate(1.06);
+}
+
+.lp-root[data-theme="light"][data-alloc-box-style="aurora"] .lp-block-alloc.lp-block-alloc-project:hover {
+  filter: brightness(1.04) saturate(1.04);
+}
+
+.lp-root[data-alloc-box-style="satin"] .lp-block-alloc.lp-block-alloc-project:hover {
+  transform: translate3d(0, -2px, 0) scale(1.008);
+}
+
 .lp-root[data-alloc-box-style="minimal"] .lp-block-alloc-project .lp-alloc-bar__line--name,
 .lp-root[data-alloc-box-style="outline"] .lp-block-alloc-project .lp-alloc-bar__line--name {
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.22);
@@ -2892,9 +3001,7 @@ button.lp-block.lp-block-alloc.lp-block-alloc-project {
 
 .lp-root[data-theme="light"][data-alloc-box-style="minimal"] .lp-block-alloc-project .lp-alloc-bar__line--name,
 .lp-root[data-theme="light"][data-alloc-box-style="outline"] .lp-block-alloc-project .lp-alloc-bar__line--name {
-  text-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.4),
-    0 1px 3px rgba(0, 0, 0, 0.12);
+  text-shadow: none;
 }
 
 .lp-block-alloc:focus-visible {
@@ -2914,6 +3021,52 @@ button.lp-block.lp-block-alloc.lp-block-alloc-project {
 
 .lp-alloc-bar.lp-block-alloc-project {
   transform-origin: center center;
+}
+
+@media (hover: hover) {
+  .lp-schedule-viewport:not(.lp-schedule-viewport--scrolling)
+    button.lp-block.lp-block-alloc.lp-alloc-bar:not(.lp-alloc-bar--pending):hover {
+    transform: translateY(-1px);
+    filter: brightness(1.05);
+    box-shadow: 0 5px 16px rgba(0, 0, 0, 0.2);
+    z-index: 6;
+  }
+}
+
+button.lp-block.lp-block-alloc.lp-alloc-bar:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  z-index: 6;
+}
+
+.lp-alloc-bar--pending {
+  opacity: 0.92;
+}
+
+.lp-alloc-bar--pending::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 32%,
+    rgba(255, 255, 255, 0.2) 48%,
+    transparent 64%
+  );
+  background-size: 220% 100%;
+  animation: lpAllocPendingShimmer 1.15s ease-in-out infinite;
+}
+
+@keyframes lpAllocPendingShimmer {
+  0% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -40% 0;
+  }
 }
 
 /* The allocation tile height is pinned via `--alloc-bar-h` (set inline) so every
@@ -2996,9 +3149,7 @@ button.lp-block.lp-block-alloc.lp-alloc-bar {
 }
 
 .lp-root[data-theme="light"] .lp-alloc-bar__hours-hero {
-  text-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.45),
-    0 1px 3px rgba(0, 0, 0, 0.12);
+  text-shadow: none;
 }
 
 .lp-alloc-bar__line--center-meta {
@@ -3097,8 +3248,9 @@ button.lp-block.lp-block-alloc.lp-alloc-bar {
 }
 
 .lp-root[data-theme="light"] .lp-alloc-code-chip {
-  background: rgba(255, 255, 255, 0.58);
-  border-color: rgba(15, 22, 40, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(15, 23, 42, 0.18);
+  color: #0f172a;
 }
 
 button.lp-block.lp-block-alloc.lp-block-alloc-project.lp-alloc-bar:hover {
@@ -3653,11 +3805,17 @@ button.lp-block.lp-block-leave:hover {
   transform: scale(0.992);
 }
 
-/* Leave / public holiday: icon-only (no in-bar text); part-time "Off" keeps label below */
+/* Legacy icon-only (unused); leave tiles use --leave-tile */
 .lp-leave-block--icon-only {
   justify-content: center;
   gap: 0;
   padding: 4px 5px;
+}
+
+.lp-leave-block--leave-tile {
+  justify-content: center;
+  align-items: center;
+  gap: 0;
 }
 
 /* Partial-day leave (< 7.5h/d): same proportional height as work bars, pinned to top of cell */

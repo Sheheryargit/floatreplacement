@@ -96,6 +96,8 @@ export function buildLeaveHoverTitle(alloc, leaveLabelFn) {
   const wd = alloc.workingDays;
   const wdPart = typeof wd === "number" && wd > 0 ? ` · ${wd} working day${wd === 1 ? "" : "s"}` : "";
   const notes = (alloc.notes || "").trim();
-  const notePart = notes ? ` · ${notes.length > 80 ? `${notes.slice(0, 77)}…` : notes}` : "";
+  const notePart = notes
+    ? ` · Notes: ${notes.length > 80 ? `${notes.slice(0, 77)}…` : notes}`
+    : "";
   return `${lbl} · ${range}${wdPart}${notePart}. Click for details.`;
 }

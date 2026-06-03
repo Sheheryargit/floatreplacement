@@ -40,6 +40,7 @@ import {
   showCenterActionFeedback,
   useAlloc8ActionFeedbackMount,
 } from "../context/CenterActionFeedbackContext.jsx";
+import { showAdminAllocationPulse } from "../lib/adminAllocationPulse.js";
 import { tagChromaProps } from "../utils/tagChroma.js";
 import {
   SCHEDULE_SORT_OPTIONS,
@@ -226,43 +227,40 @@ export default function PeoplePage() {
         const saved = isSupabaseConfigured ? await syncAllocationCreate(createdDraft) : createdDraft;
         setAllocations((prev) => [...prev, saved]);
 
+        const saveSubtitle = payload.isLeave
+          ? `${payload.startDate} → ${payload.endDate}`
+          : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`;
+        const runUndo = () => {
+          void (async () => {
+            const uid = saved.id;
+            setAllocations((cur) => cur.filter((a) => a.id !== uid));
+            try {
+              if (isSupabaseConfigured) await syncAllocationDelete(uid);
+              showCenterActionFeedback({
+                action: "remove",
+                title: "Undone",
+                subtitle: "Removed what you had just saved.",
+              });
+            } catch (err) {
+              setAllocations((cur) => (cur.some((a) => a.id === uid) ? cur : [...cur, saved]));
+              toast.error("Undo failed", { description: err?.message || String(err) });
+            }
+          })();
+        };
+
         if (premiumV2Enabled && saved?.id) {
-          const savedSnap = saved;
-          toast.success(payload.isLeave ? "Leave saved" : "Saved", {
-            description: payload.isLeave
-              ? `${payload.startDate} → ${payload.endDate}`
-              : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
-            duration: 9000,
-            action: {
-              label: "Undo",
-              onClick: () => {
-                void (async () => {
-                  const uid = savedSnap.id;
-                  setAllocations((cur) => cur.filter((a) => a.id !== uid));
-                  try {
-                    if (isSupabaseConfigured) await syncAllocationDelete(uid);
-                    showCenterActionFeedback({
-                      action: "remove",
-                      title: "Undone",
-                      subtitle: "Removed what you had just saved.",
-                    });
-                  } catch (err) {
-                    setAllocations((cur) =>
-                      cur.some((a) => a.id === uid) ? cur : [...cur, savedSnap]
-                    );
-                    toast.error("Undo failed", { description: err?.message || String(err) });
-                  }
-                })();
-              },
-            },
+          showAdminAllocationPulse({
+            action: "add",
+            title: payload.isLeave ? "Leave saved" : "Saved",
+            subtitle: saveSubtitle,
+            duration: 4200,
+            onUndo: runUndo,
           });
         } else {
           showCenterActionFeedback({
             action: "add",
             title: payload.isLeave ? "Leave saved" : "Saved",
-            subtitle: payload.isLeave
-              ? `${payload.startDate} → ${payload.endDate}`
-              : `${shortenAllocLabel(payload.project, 42)} · ${Number(payload.hoursPerDay) || 0}h/day`,
+            subtitle: saveSubtitle,
           });
         }
       } catch (e) {
