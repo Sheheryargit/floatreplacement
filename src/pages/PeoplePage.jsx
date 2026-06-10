@@ -224,8 +224,14 @@ export default function PeoplePage() {
         version: 1,
       };
       try {
+        // Optimistic update: show the block immediately with the draft data.
+        setAllocations((prev) => [...prev, createdDraft]);
+
+        // Persist to server, then swap the draft for the real record.
         const saved = isSupabaseConfigured ? await syncAllocationCreate(createdDraft) : createdDraft;
-        setAllocations((prev) => [...prev, saved]);
+        setAllocations((prev) =>
+          prev.map((a) => (a.id === createdDraft.id ? saved : a))
+        );
 
         const saveSubtitle = payload.isLeave
           ? `${payload.startDate} → ${payload.endDate}`
@@ -264,6 +270,8 @@ export default function PeoplePage() {
           });
         }
       } catch (e) {
+        // Roll back optimistic update on failure
+        setAllocations((prev) => prev.filter((a) => a.id !== createdDraft.id));
         toast.error("Save failed", { description: e?.message || String(e) });
       }
     },

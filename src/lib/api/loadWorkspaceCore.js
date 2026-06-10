@@ -84,6 +84,7 @@ function workspaceSettingsSlice(workspaceSettings) {
 }
 
 async function fetchWorkspaceCoreBundle({ start, end, includePublicHolidays }) {
+  const _t0 = performance.now();
   const [
     rawPeople,
     projectsRaw,
@@ -136,6 +137,7 @@ async function fetchWorkspaceCoreBundle({ start, end, includePublicHolidays }) {
     projectTagOpts,
     extraAllocationLabels,
     ...workspaceSettingsSlice(workspaceSettings),
+    _loadMs: Math.round(performance.now() - _t0),
   };
 }
 

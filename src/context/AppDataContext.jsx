@@ -63,6 +63,18 @@ const LEGACY_STORAGE_KEY = "float-workspace-v1";
 /** Debounce window for postgres_changes → full reload (coalesces bursts from many editors). */
 const WORKSPACE_REALTIME_DEBOUNCE_MS = 900;
 
+/**
+ * Self-change suppression: tracks the last time this client wrote to each table.
+ * Realtime events arriving within the suppression window are skipped because the
+ * local state already reflects the change — avoids a redundant full refetch.
+ */
+const SELF_CHANGE_SUPPRESS_MS = 3000;
+const _lastLocalWrite = { allocations: 0, people: 0, projects: 0 };
+function stampLocalWrite(table) { _lastLocalWrite[table] = Date.now(); }
+function isRecentLocalWrite(table) {
+  return Date.now() - (_lastLocalWrite[table] || 0) < SELF_CHANGE_SUPPRESS_MS;
+}
+
 /** If Supabase hangs, still leave the animated loader instead of trapping the user indefinitely. */
 /** Unblock UI if Supabase is slow — schedule may backfill allocations shortly after. */
 const WORKSPACE_READY_FALLBACK_MS = 12_000;
@@ -454,14 +466,17 @@ export function syncProjectsDelete(ids) {
 }
 export function syncAllocationCreate(allocation) {
   if (!isSupabaseConfigured) return Promise.resolve(allocation);
+  stampLocalWrite("allocations");
   return allocationsApi.createAllocation(allocation);
 }
 export function syncAllocationUpdate(allocation) {
   if (!isSupabaseConfigured) return Promise.resolve(allocation);
+  stampLocalWrite("allocations");
   return allocationsApi.updateAllocation(allocation);
 }
 export function syncAllocationDelete(id) {
   if (!isSupabaseConfigured) return Promise.resolve();
+  stampLocalWrite("allocations");
   return allocationsApi.deleteAllocation(id);
 }
 
@@ -586,6 +601,7 @@ export function AppDataProvider({ children }) {
 
     const runPartialRealtimeRefresh = async (tables) => {
       if (cancelled || tables.size === 0) return;
+      const _t0 = performance.now();
       try {
         if (tables.has("people")) {
           const people = await peopleApi.fetchPeople();
@@ -606,6 +622,7 @@ export function AppDataProvider({ children }) {
           if (cancelled) return;
           useAppStore.setState({ allocations });
         }
+        console.debug(`[perf] realtimeRefresh: ${Math.round(performance.now() - _t0)}ms (tables: ${[...tables].join(', ')})`);
       } catch (e) {
         console.warn("[float] Supabase partial reload:", e?.message || e);
         if (!cancelled) runFullReload();
@@ -621,6 +638,8 @@ export function AppDataProvider({ children }) {
     };
 
     const markRealtimeDirty = (table) => {
+      // Skip if this client recently wrote to this table — the local state is already up to date.
+      if (isRecentLocalWrite(table)) return;
       dirtyRealtime.add(table);
       if (timer) clearTimeout(timer);
       timer = setTimeout(flushRealtimeDirty, WORKSPACE_REALTIME_DEBOUNCE_MS);
@@ -677,9 +696,11 @@ export function AppDataProvider({ children }) {
       const run = () => {
         const { people } = useAppStore.getState();
         if (!people?.length || cancelled) return;
+        const _t0 = performance.now();
         void enrichWorkspaceFromSupabase(people)
           .then((extra) => {
             if (cancelled || !extra) return;
+            console.debug(`[perf] enrichWorkspace: ${Math.round(performance.now() - _t0)}ms (${extra.allocations?.length ?? 0} allocs)`);
             useAppStore.setState({
               allocations: extra.allocations,
               publicHolidayAllocations: extra.publicHolidayAllocations,
@@ -708,6 +729,7 @@ export function AppDataProvider({ children }) {
           }
           return;
         }
+        console.debug(`[perf] loadWorkspaceCritical: ${data._loadMs ?? '?'}ms (${data.allocations?.length ?? 0} allocs, ${data.people?.length ?? 0} people)`);
         mergeRemoteWorkspace(data);
         applyDevWorkspaceSeedIfEmpty(
           "Connected to Supabase but people and projects tables are empty."

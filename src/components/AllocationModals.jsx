@@ -219,8 +219,21 @@ export function CreateAllocationModal({
   const leaveTypeWrapRef = useRef(null);
   const [projectMenuBox, setProjectMenuBox] = useState(null);
 
+  // Track whether we've already initialized the form for this modal session.
+  // Prevents background data updates (enrichment, realtime) from resetting
+  // the user's in-progress edits while the modal is open.
+  const formInitKeyRef = useRef("");
+
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      formInitKeyRef.current = "";
+      return;
+    }
+    // Build a stable key for this modal session — only re-init when the modal
+    // first opens or when a genuinely different allocation is loaded for editing.
+    const sessionKey = editAllocation ? `edit-${editAllocation.id}` : `create-${preselectDate}-${preselectPerson?.id}`;
+    if (formInitKeyRef.current === sessionKey) return;
+    formInitKeyRef.current = sessionKey;
     if (editAllocation) {
       setTemplatePresetId("");
       setStartDate(editAllocation.startDate || "");

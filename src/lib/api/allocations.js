@@ -49,14 +49,29 @@ function saveAllocationRpcSchemaMismatch(err) {
   );
 }
 
-/** Call `save_allocation`; if the server has no `p_project_id` arg yet, retry without it. */
+/** Cached flag: once we know the server lacks `p_project_id`, skip it on all future calls
+ *  instead of failing and retrying every time. */
+let _schemaSupportsProjectId = true;
+
+/** Call `save_allocation`; if the server has no `p_project_id` arg yet, retry without it
+ *  and cache the result so subsequent calls skip the failing attempt. */
 async function rpcSaveAllocation(payload) {
+  // If we already know the schema doesn't support p_project_id, strip it upfront.
+  if (
+    !_schemaSupportsProjectId &&
+    Object.prototype.hasOwnProperty.call(payload, "p_project_id")
+  ) {
+    const { p_project_id: _drop, ...rest } = payload;
+    return supabase.rpc("save_allocation", rest);
+  }
+
   let res = await supabase.rpc("save_allocation", payload);
   if (
     res.error &&
     Object.prototype.hasOwnProperty.call(payload, "p_project_id") &&
     saveAllocationRpcSchemaMismatch(res.error)
   ) {
+    _schemaSupportsProjectId = false;
     const { p_project_id: _drop, ...rest } = payload;
     res = await supabase.rpc("save_allocation", rest);
   }
@@ -109,6 +124,7 @@ function isoDateKey(d) {
 
 export async function fetchAllocations({ startDate, endDate } = {}) {
   if (!isSupabaseConfigured) return [];
+  const _t0 = performance.now();
   const s = isoDateKey(startDate);
   const e = isoDateKey(endDate);
 
@@ -149,11 +165,14 @@ export async function fetchAllocations({ startDate, endDate } = {}) {
     .select(select)
     .order("start_date");
   if (error) throw error;
-  return (data || []).map(rowToAllocation);
+  const result = (data || []).map(rowToAllocation);
+  console.debug(`[perf] fetchAllocations: ${Math.round(performance.now() - _t0)}ms (${result.length} rows, ${s || '*'}→${e || '*'})`);
+  return result;
 }
 
 export async function createAllocation(allocation) {
   if (!isSupabaseConfigured) return allocation;
+  const _t0 = performance.now();
   const row = allocationToRow(allocation);
   const { data, error } = await rpcSaveAllocation(
     applyProjectIdRpcArg(
@@ -180,17 +199,18 @@ export async function createAllocation(allocation) {
   if (error) throw error;
   const created = rowToAllocation(data);
 
-  const { data: full, error: fullErr } = await supabase
-    .from("allocations")
-    .select("*, allocation_people(person_id)")
-    .eq("id", String(created.id))
-    .single();
-  if (fullErr) throw fullErr;
-  return rowToAllocation(full);
+  // Enrich with the person_ids we already have from the request payload instead of
+  // making a second round-trip to re-fetch the row with the allocation_people join.
+  if (created && (!created.personIds || created.personIds.length === 0)) {
+    created.personIds = row.person_ids.map(String).filter(Boolean);
+  }
+  console.debug(`[perf] createAllocation: ${Math.round(performance.now() - _t0)}ms`);
+  return created;
 }
 
 export async function updateAllocation(allocation) {
   if (!isSupabaseConfigured) return allocation;
+  const _t0 = performance.now();
   const prevVersion = Number(allocation.version);
   if (!Number.isFinite(prevVersion)) {
     throw new Error("Allocation version missing (optimistic locking)");
@@ -230,13 +250,13 @@ export async function updateAllocation(allocation) {
   }
   const saved = rowToAllocation(data);
 
-  const { data: full, error: fullErr } = await supabase
-    .from("allocations")
-    .select("*, allocation_people(person_id)")
-    .eq("id", String(saved.id))
-    .single();
-  if (fullErr) throw fullErr;
-  return rowToAllocation(full);
+  // Enrich with the person_ids we already have from the request payload instead of
+  // making a second round-trip to re-fetch the row with the allocation_people join.
+  if (saved && (!saved.personIds || saved.personIds.length === 0)) {
+    saved.personIds = row.person_ids.map(String).filter(Boolean);
+  }
+  console.debug(`[perf] updateAllocation: ${Math.round(performance.now() - _t0)}ms`);
+  return saved;
 }
 
 export async function deleteAllocation(id) {
