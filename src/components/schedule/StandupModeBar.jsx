@@ -81,6 +81,7 @@ export function StandupModeBar({
     <div
       ref={barRef}
       className="standup-bar standup-bar--toolbar"
+      data-alloc8-guide="standup-mode-bar"
       tabIndex={-1}
       role="toolbar"
       aria-label="Standup controls"

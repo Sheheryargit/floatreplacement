@@ -1,0 +1,181 @@
+.standup-spotlight {
+  position: relative;
+  display: inline-flex;
+  vertical-align: middle;
+  isolation: isolate;
+}
+
+.standup-spotlight--nav {
+  display: flex;
+  width: 100%;
+}
+
+.standup-spotlight-hit {
+  position: relative;
+  z-index: 2;
+  display: inherit;
+  width: inherit;
+}
+
+.standup-spotlight--nav .standup-spotlight-hit {
+  display: flex;
+  width: 100%;
+}
+
+.standup-spotlight-orbit {
+  position: absolute;
+  inset: -3px;
+  border-radius: 999px;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--standup-spotlight-angle, 0deg),
+    #6366f1,
+    #22d3ee,
+    #a78bfa,
+    #6366f1
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation:
+    standup-spotlight-orbit-spin 3.2s linear infinite,
+    standup-spotlight-orbit-glow 2.4s ease-in-out infinite;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.standup-spotlight--nav .standup-spotlight-orbit {
+  inset: -2px;
+  border-radius: var(--radius-button, 10px);
+}
+
+.standup-spotlight-ring {
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 2px solid color-mix(in srgb, #818cf8 55%, transparent);
+  pointer-events: none;
+  z-index: 0;
+  animation: standup-spotlight-ring-pulse 2.8s ease-out infinite;
+}
+
+.standup-spotlight--pill .standup-spotlight-ring {
+  border-radius: 999px;
+}
+
+.standup-spotlight--nav .standup-spotlight-ring {
+  inset: -1px;
+  border-radius: var(--radius-button, 10px);
+}
+
+.standup-spotlight-ring--b {
+  animation-delay: 1.4s;
+}
+
+.standup-spotlight-badge {
+  position: absolute;
+  top: -10px;
+  right: -6px;
+  z-index: 3;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 45%, #06b6d4 100%);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow:
+    0 4px 14px rgba(99, 102, 241, 0.45),
+    0 0 0 1px rgba(99, 102, 241, 0.25);
+  animation: standup-spotlight-badge-float 2.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.standup-spotlight--nav .standup-spotlight-badge {
+  top: 4px;
+  right: 8px;
+}
+
+.app-sidenav--collapsed .standup-spotlight-badge {
+  top: 2px;
+  right: 2px;
+  padding: 1px 5px;
+  font-size: 8px;
+}
+
+.standup-spotlight--pill .standup-spotlight-hit > .lp-standup-pill {
+  position: relative;
+  z-index: 1;
+}
+
+.standup-spotlight--static .standup-spotlight-badge {
+  animation: none;
+}
+
+@keyframes standup-spotlight-orbit-spin {
+  to {
+    --standup-spotlight-angle: 360deg;
+  }
+}
+
+@property --standup-spotlight-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes standup-spotlight-orbit-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.03);
+  }
+}
+
+@keyframes standup-spotlight-ring-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.65;
+  }
+  70%,
+  100% {
+    transform: scale(1.22);
+    opacity: 0;
+  }
+}
+
+@keyframes standup-spotlight-badge-float {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-2px) scale(1.04);
+  }
+}
+
+:root[data-theme="light"] .standup-spotlight-badge {
+  color: #fff;
+  box-shadow:
+    0 4px 12px rgba(79, 70, 229, 0.35),
+    0 0 0 1px rgba(79, 70, 229, 0.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .standup-spotlight-orbit,
+  .standup-spotlight-ring,
+  .standup-spotlight-badge {
+    animation: none;
+  }
+}

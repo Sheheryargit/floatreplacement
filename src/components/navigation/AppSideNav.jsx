@@ -19,6 +19,9 @@ import { useSlapAnimation } from "../../context/SlapAnimationContext.jsx";
 import { useAppTheme } from "../../context/ThemeContext.jsx";
 import { useAuth, initialsFromDisplayName } from "../../context/AuthContext.jsx";
 import { SupportSlackModal } from "../support/SupportSlackModal.jsx";
+import { StandupFeatureSpotlight } from "../schedule/StandupFeatureSpotlight.jsx";
+import { useStandupFeatureSpotlight } from "../../hooks/useStandupFeatureSpotlight.js";
+import { useStandupWalkthroughOptional } from "../../context/StandupWalkthroughContext.jsx";
 import "./AppSideNav.css";
 
 const COLLAPSE_KEY = "alloc8-sidenav-collapsed";
@@ -55,6 +58,10 @@ function AppSideNav() {
     }
   });
   const [supportOpen, setSupportOpen] = useState(false);
+  const { showSpotlight: showStandupSpotlight, dismissSpotlight: dismissStandupSpotlight } =
+    useStandupFeatureSpotlight();
+  const standupWalkthrough = useStandupWalkthroughOptional();
+  const walkthroughActive = Boolean(standupWalkthrough?.active);
 
   useEffect(() => {
     try {
@@ -159,30 +166,53 @@ function AppSideNav() {
               </motion.button>
             );
           }
+          const linkBody = ({ isActive }) => (
+            <>
+              {isActive ? (
+                <motion.span
+                  layoutId="sidenav-pip"
+                  className="app-sidenav-pip"
+                  transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                />
+              ) : null}
+              <Icon size={19} strokeWidth={isActive ? 2.15 : 1.85} aria-hidden />
+              <span className="app-sidenav-label">{item.label}</span>
+            </>
+          );
+
+          if (item.to !== "/standup") {
+            return (
+              <NavLink
+                key={item.label}
+                to={item.to}
+                end={!!item.end}
+                data-alloc8-guide={item.guide || undefined}
+                className={({ isActive }) =>
+                  "app-sidenav-item" + (isActive ? " app-sidenav-item--active" : "")
+                }
+              >
+                {linkBody}
+              </NavLink>
+            );
+          }
+
           return (
-            <NavLink
+            <StandupFeatureSpotlight
               key={item.label}
-              to={item.to}
-              end={!!item.end}
-              data-alloc8-guide={item.guide || undefined}
-              className={({ isActive }) =>
-                "app-sidenav-item" + (isActive ? " app-sidenav-item--active" : "")
-              }
+              show={showStandupSpotlight && !walkthroughActive}
+              variant="nav"
+              onDismiss={dismissStandupSpotlight}
             >
-              {({ isActive }) => (
-                <>
-                  {isActive ? (
-                    <motion.span
-                      layoutId="sidenav-pip"
-                      className="app-sidenav-pip"
-                      transition={{ type: "spring", stiffness: 380, damping: 32 }}
-                    />
-                  ) : null}
-                  <Icon size={19} strokeWidth={isActive ? 2.15 : 1.85} aria-hidden />
-                  <span className="app-sidenav-label">{item.label}</span>
-                </>
-              )}
-            </NavLink>
+              <NavLink
+                to={item.to}
+                data-alloc8-guide="standup-nav"
+                className={({ isActive }) =>
+                  "app-sidenav-item" + (isActive ? " app-sidenav-item--active" : "")
+                }
+              >
+                {linkBody}
+              </NavLink>
+            </StandupFeatureSpotlight>
           );
         })}
       </nav>

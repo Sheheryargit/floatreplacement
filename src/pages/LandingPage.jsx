@@ -47,7 +47,10 @@ import {
 } from "../components/AllocationModals.jsx";
 import { ScheduleAllocationFilterMenu } from "../components/ScheduleAllocationFilterMenu.jsx";
 import { StandupModeBar } from "../components/schedule/StandupModeBar.jsx";
+import { StandupFeatureSpotlight } from "../components/schedule/StandupFeatureSpotlight.jsx";
 import { useStandupSession } from "../hooks/useStandupSession.js";
+import { useStandupFeatureSpotlight } from "../hooks/useStandupFeatureSpotlight.js";
+import { useStandupWalkthroughOptional } from "../context/StandupWalkthroughContext.jsx";
 import {
   buildStandupDeptCatalog,
   sanitizeStandupOrder,
@@ -1598,11 +1601,20 @@ export default function LandingPage() {
     scheduleFilterRules,
   });
 
+  const { showSpotlight: showStandupSpotlight, dismissSpotlight: dismissStandupSpotlight } =
+    useStandupFeatureSpotlight();
+  const standupWalkthrough = useStandupWalkthroughOptional();
+  const walkthroughActive = Boolean(standupWalkthrough?.active);
+
   const filterRulesForSchedule = standup.active
     ? standup.effectiveFilterRules
     : scheduleFilterRules;
 
   const standupAutoStartRef = useRef(false);
+
+  useEffect(() => {
+    standupWalkthrough?.registerStandupActive(standup.active);
+  }, [standup.active, standupWalkthrough]);
 
   useEffect(() => {
     if (!location.state?.startStandup || standupAutoStartRef.current) return;
@@ -1617,8 +1629,10 @@ export default function LandingPage() {
     }
     if (!standup.start()) {
       toast.error("Could not start standup", { className: "alloc8-toast" });
+      return;
     }
-  }, [location.state, location.pathname, navigate, standup, standupOrder.length]);
+    standupWalkthrough?.notifyStandupStarted();
+  }, [location.state, location.pathname, navigate, standup, standupOrder.length, standupWalkthrough]);
 
   const handleStandupEnd = useCallback(() => {
     const final = standup.end();
@@ -3265,19 +3279,25 @@ export default function LandingPage() {
                   />
                 </div>
 
-                <Link
-                  to="/standup"
-                  className={
-                    "lp-standup-pill" + (standup.active ? " lp-standup-pill--live" : "")
-                  }
-                  title="Standup department order"
-                  data-alloc8-guide="standup-setup"
+                <StandupFeatureSpotlight
+                  show={showStandupSpotlight && !walkthroughActive && !standup.active}
+                  variant="pill"
+                  onDismiss={dismissStandupSpotlight}
                 >
-                  <span className="lp-standup-pill-icon" aria-hidden>
-                    <ListOrdered size={14} strokeWidth={2.25} />
-                  </span>
-                  Standup
-                </Link>
+                  <Link
+                    to="/standup"
+                    className={
+                      "lp-standup-pill" + (standup.active ? " lp-standup-pill--live" : "")
+                    }
+                    title="Standup department order"
+                    data-alloc8-guide="standup-setup"
+                  >
+                    <span className="lp-standup-pill-icon" aria-hidden>
+                      <ListOrdered size={14} strokeWidth={2.25} />
+                    </span>
+                    Standup
+                  </Link>
+                </StandupFeatureSpotlight>
 
                 {deptDashboardEnabled ? (
                   <div className="lp-dropdown-wrap">

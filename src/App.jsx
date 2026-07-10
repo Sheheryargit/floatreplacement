@@ -4,6 +4,7 @@ import { BrowserRouter, useLocation, useRoutes, Navigate } from "react-router-do
 import { MotionConfig } from "framer-motion";
 import { ThemeProvider, useAppTheme } from "./context/ThemeContext.jsx";
 import { CenterActionFeedbackProvider } from "./context/CenterActionFeedbackContext.jsx";
+import { StandupWalkthroughProvider } from "./context/StandupWalkthroughContext.jsx";
 import { AuthProvider, useAuth, isPasswordWorkspaceGate } from "./context/AuthContext.jsx";
 import { AppDialogProvider } from "./context/AppDialogContext.jsx";
 import { PremiumV2Provider } from "./context/PremiumV2Context.jsx";
@@ -237,9 +238,11 @@ export default function App() {
               <GlobalBackground />
               <BrowserRouter>
                 <VercelAnalytics />
-                <CenterActionFeedbackProvider>
-                  <AuthGate />
-                </CenterActionFeedbackProvider>
+                <StandupWalkthroughProvider>
+                  <CenterActionFeedbackProvider>
+                    <AuthGate />
+                  </CenterActionFeedbackProvider>
+                </StandupWalkthroughProvider>
               </BrowserRouter>
             </AppDataProvider>
           </AppDialogProvider>

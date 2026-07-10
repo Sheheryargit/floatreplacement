@@ -19,6 +19,7 @@ import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useAppData } from "../context/AppDataContext.jsx";
 import { isSupabaseConfigured } from "../lib/supabase.js";
 import { upsertStandupDepartmentOrder } from "../lib/api/workspaceSettings.js";
+import { useStandupWalkthroughOptional } from "../context/StandupWalkthroughContext.jsx";
 import {
   buildStandupDeptCatalog,
   departmentDisplayLabel,
@@ -30,6 +31,8 @@ export default function StandupSetupPage() {
   const navigate = useNavigate();
   const { theme } = useAppTheme();
   const { depts, people, standupDepartmentOrder, setStandupDepartmentOrder } = useAppData();
+
+  const standupWalkthrough = useStandupWalkthroughOptional();
 
   const catalog = useMemo(() => buildStandupDeptCatalog(depts, people), [depts, people]);
 
@@ -121,6 +124,7 @@ export default function StandupSetupPage() {
       if (dirty) {
         await persistOrder();
       }
+      standupWalkthrough?.notifyStandupStarted();
       navigate("/", { state: { startStandup: true } });
     } catch (e) {
       toast.error("Could not start standup", {
@@ -130,7 +134,7 @@ export default function StandupSetupPage() {
     } finally {
       setStarting(false);
     }
-  }, [dirty, draftOrder.length, navigate, persistOrder]);
+  }, [dirty, draftOrder.length, navigate, persistOrder, standupWalkthrough]);
 
   return (
     <div className="standup-setup-root" data-theme={theme === "light" ? "light" : "dark"}>
@@ -167,7 +171,11 @@ export default function StandupSetupPage() {
         </motion.header>
 
         <div className="standup-setup-grid">
-          <section className="standup-setup-panel" aria-labelledby="standup-order-heading">
+          <section
+            className="standup-setup-panel"
+            aria-labelledby="standup-order-heading"
+            data-alloc8-guide="standup-order-panel"
+          >
             <div className="standup-setup-panel-head">
               <ListOrdered size={18} aria-hidden />
               <h2 id="standup-order-heading">Rotation order</h2>
@@ -215,7 +223,11 @@ export default function StandupSetupPage() {
             )}
           </section>
 
-          <section className="standup-setup-panel" aria-labelledby="standup-available-heading">
+          <section
+            className="standup-setup-panel"
+            aria-labelledby="standup-available-heading"
+            data-alloc8-guide="standup-available-panel"
+          >
             <div className="standup-setup-panel-head">
               <Building2 size={18} aria-hidden />
               <h2 id="standup-available-heading">Available</h2>
@@ -249,7 +261,7 @@ export default function StandupSetupPage() {
           </section>
         </div>
 
-        <div className="standup-setup-footer">
+        <div className="standup-setup-footer" data-alloc8-guide="standup-start-btn">
           <Button
             type="button"
             variant="primary"
