@@ -80,6 +80,9 @@ function workspaceSettingsSlice(workspaceSettings) {
     scheduleAllocationFilter: Array.isArray(workspaceSettings.scheduleAllocationFilter)
       ? workspaceSettings.scheduleAllocationFilter
       : [],
+    standupDepartmentOrder: Array.isArray(workspaceSettings.standupDepartmentOrder)
+      ? workspaceSettings.standupDepartmentOrder
+      : [],
   };
 }
 

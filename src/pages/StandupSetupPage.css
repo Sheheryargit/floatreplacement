@@ -1,0 +1,220 @@
+.standup-setup-root {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  background: var(--settings-bg, #0b0e14);
+  color: var(--settings-fg, #f1f5f9);
+}
+
+:root[data-theme="light"] .standup-setup-root {
+  --settings-bg: #f6f7f9;
+  --settings-fg: #0f172a;
+}
+
+.standup-setup-main {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: var(--space-8) var(--space-8) var(--space-10);
+  max-width: 880px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.standup-setup-hero {
+  margin-bottom: var(--space-8);
+}
+
+.standup-setup-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #a5b4fc;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(129, 140, 248, 0.25);
+  margin-bottom: var(--space-4);
+}
+
+.standup-setup-title {
+  margin: 0;
+  font-size: clamp(1.75rem, 3vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.standup-setup-lede {
+  margin: var(--space-3) 0 0;
+  font-size: 0.95rem;
+  color: #94a3b8;
+  max-width: 48ch;
+  line-height: 1.5;
+}
+
+.standup-setup-note {
+  margin: var(--space-4) 0 0;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.standup-setup-note--warn {
+  color: #fcd34d;
+}
+
+.standup-setup-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+}
+
+@media (max-width: 760px) {
+  .standup-setup-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.standup-setup-panel {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: var(--space-5);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+:root[data-theme="light"] .standup-setup-panel {
+  border-color: rgba(15, 23, 42, 0.1);
+  background: #fff;
+}
+
+.standup-setup-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: var(--space-4);
+}
+
+.standup-setup-panel-head h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.standup-setup-count {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 650;
+  color: #94a3b8;
+}
+
+.standup-setup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.standup-setup-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+:root[data-theme="light"] .standup-setup-row {
+  border-color: rgba(15, 23, 42, 0.08);
+  background: #f8fafc;
+}
+
+.standup-setup-row-index {
+  width: 22px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.standup-setup-row-label {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.standup-setup-row-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.standup-setup-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.standup-setup-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.standup-setup-icon-btn--remove {
+  color: #fca5a5;
+}
+
+.standup-setup-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  background: rgba(99, 102, 241, 0.1);
+  color: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.standup-setup-empty {
+  margin: 0;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.standup-setup-link {
+  color: #818cf8;
+  text-decoration: none;
+}
+
+.standup-setup-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: var(--space-8);
+}
+
+.standup-setup-run-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 650;
+  color: #818cf8;
+  text-decoration: none;
+}

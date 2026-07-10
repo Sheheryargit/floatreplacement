@@ -57,6 +57,7 @@ import {
   newStarredFilterId,
 } from "../config/starredScheduleFilterPrefs.js";
 import { toast } from "sonner";
+import { readStandupDepartmentOrderLocal } from "../config/standupPrefs.js";
 
 const LEGACY_STORAGE_KEY = "float-workspace-v1";
 
@@ -156,6 +157,7 @@ function buildInitialSlices() {
       clients: [...SEED_CLIENTS],
       projectTagOpts: [...SEED_PROJECT_TAGS],
       extraAllocationLabels: [...ALLOCATION_PROJECT_SEED],
+      standupDepartmentOrder: [],
       ...scheduleFilter,
     };
   }
@@ -171,6 +173,7 @@ function buildInitialSlices() {
     clients: [...SEED_CLIENTS],
     projectTagOpts: [...SEED_PROJECT_TAGS],
     extraAllocationLabels: [...ALLOCATION_PROJECT_SEED],
+    standupDepartmentOrder: [],
     ...scheduleFilter,
   };
 }
@@ -209,6 +212,11 @@ function mergeRemoteWorkspace(remote) {
     starredScheduleFilters,
     schedulePeopleTagFilter,
     scheduleFilterRules,
+    standupDepartmentOrder: Array.isArray(remote.standupDepartmentOrder)
+      ? remote.standupDepartmentOrder.length
+        ? remote.standupDepartmentOrder
+        : readStandupDepartmentOrderLocal()
+      : readStandupDepartmentOrderLocal(),
   });
 }
 
@@ -386,6 +394,13 @@ export const useAppStore = create((set, get) => ({
         scheduleFilterRules: norm,
       };
     }),
+
+  setStandupDepartmentOrder: (val) =>
+    set((state) => {
+      const next = typeof val === "function" ? val(state.standupDepartmentOrder) : val;
+      const safe = Array.isArray(next) ? next.map(String) : [];
+      return { standupDepartmentOrder: safe };
+    }),
 }));
 
 export function syncPersonCreate(person) {
@@ -502,6 +517,8 @@ export function useAppData() {
       applyStarredFilterPreset: s.applyStarredFilterPreset,
       setSchedulePeopleTagFilter: s.setSchedulePeopleTagFilter,
       setScheduleFilterRules: s.setScheduleFilterRules,
+      standupDepartmentOrder: s.standupDepartmentOrder,
+      setStandupDepartmentOrder: s.setStandupDepartmentOrder,
       getNextPersonId: s.getNextPersonId,
       getNextProjectId: s.getNextProjectId,
       addAllocationProjectLabel: s.addAllocationProjectLabel,

@@ -47,6 +47,7 @@ const SettingsPage = lazy(() => import("./pages/SettingsPage.jsx"));
 const ReportingPage = lazy(() => import("./pages/ReportingPage.jsx"));
 const DepartmentDashboardPage = lazy(() => import("./pages/DepartmentDashboardPage.jsx"));
 const DepartmentsPage = lazy(() => import("./pages/DepartmentsPage.jsx"));
+const StandupSetupPage = lazy(() => import("./pages/StandupSetupPage.jsx"));
 const AccessPage = lazy(() => import("./pages/AccessPage.jsx"));
 
 const workspaceRoutes = [
@@ -54,6 +55,7 @@ const workspaceRoutes = [
   { path: "/people", element: <PeoplePage /> },
   { path: "/projects", element: <ProjectsPage /> },
   { path: "/departments", element: <DepartmentsPage /> },
+  { path: "/standup", element: <StandupSetupPage /> },
   { path: "/report", element: <ReportingPage /> },
   { path: "/dept-dashboard", element: <DepartmentDashboardPage /> },
   { path: "/access", element: <AccessPage /> },

@@ -6,6 +6,7 @@ import {
   FolderOpen,
   Building2,
   BarChart3,
+  ListOrdered,
   KeyRound,
   Settings,
   HelpCircle,
@@ -27,6 +28,7 @@ const NAV = [
   { to: "/people", icon: Users, label: "People" },
   { to: "/projects", icon: FolderOpen, label: "Projects" },
   { to: "/departments", icon: Building2, label: "Departments", adminOnly: true },
+  { to: "/standup", icon: ListOrdered, label: "Standup" },
   { to: "/report", icon: BarChart3, label: "Report" },
 ];
 

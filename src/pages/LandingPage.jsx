@@ -8,7 +8,7 @@ import {
   useLayoutEffect,
   useSyncExternalStore,
 } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import {
   ArrowDownUp,
   Calendar,
@@ -23,6 +23,7 @@ import {
   FolderPlus,
   LayoutGrid,
   LayoutDashboard,
+  ListOrdered,
   Maximize2,
   MousePointer2,
   Percent,
@@ -45,6 +46,13 @@ import {
   leaveLabel,
 } from "../components/AllocationModals.jsx";
 import { ScheduleAllocationFilterMenu } from "../components/ScheduleAllocationFilterMenu.jsx";
+import { StandupModeBar } from "../components/schedule/StandupModeBar.jsx";
+import { useStandupSession } from "../hooks/useStandupSession.js";
+import {
+  buildStandupDeptCatalog,
+  sanitizeStandupOrder,
+  standupSessionSummary,
+} from "../utils/standupSession.js";
 import { useSchedulePageData } from "../hooks/useSchedulePageData.js";
 import AppSideNav from "../components/navigation/AppSideNav.jsx";
 import {
@@ -1564,6 +1572,7 @@ export default function LandingPage() {
     removeStarredFilterPreset,
     applyStarredFilterPreset,
     setScheduleFilterRules,
+    standupDepartmentOrder,
     syncPersonCreate,
     syncPersonUpdate,
     syncProjectCreate,
@@ -1573,6 +1582,54 @@ export default function LandingPage() {
     refreshWorkspaceFromSupabase,
     setPublicHolidayAllocations,
   } = useSchedulePageData();
+
+  const standupDeptCatalog = useMemo(
+    () => buildStandupDeptCatalog(depts, people),
+    [depts, people]
+  );
+
+  const standupOrder = useMemo(
+    () => sanitizeStandupOrder(standupDepartmentOrder, standupDeptCatalog),
+    [standupDepartmentOrder, standupDeptCatalog]
+  );
+
+  const standup = useStandupSession({
+    departmentOrder: standupOrder,
+    scheduleFilterRules,
+  });
+
+  const filterRulesForSchedule = standup.active
+    ? standup.effectiveFilterRules
+    : scheduleFilterRules;
+
+  const standupAutoStartRef = useRef(false);
+
+  useEffect(() => {
+    if (!location.state?.startStandup || standupAutoStartRef.current) return;
+    standupAutoStartRef.current = true;
+    navigate(location.pathname, { replace: true, state: null });
+    if (standupOrder.length === 0) {
+      toast.error("Standup order is empty", {
+        description: "Add departments on the Standup page first.",
+        className: "alloc8-toast",
+      });
+      return;
+    }
+    if (!standup.start()) {
+      toast.error("Could not start standup", { className: "alloc8-toast" });
+    }
+  }, [location.state, location.pathname, navigate, standup, standupOrder.length]);
+
+  const handleStandupEnd = useCallback(() => {
+    const final = standup.end();
+    if (final) {
+      const counts = standupSessionSummary(final);
+      toast.success("Standup ended", {
+        description: `${counts.done} done · ${counts.later} later · ${counts.pending} pending`,
+        className: "alloc8-toast",
+      });
+    }
+  }, [standup]);
 
   const { premiumV2Templates } = usePremiumV2();
   const premiumV2Enabled = false;
@@ -1825,7 +1882,7 @@ export default function LandingPage() {
     let list = people.filter((p) => !p.archived);
     
     list = list.filter((p) =>
-      personMatchesScheduleFilter(p, scheduleFilterRules, {
+      personMatchesScheduleFilter(p, filterRulesForSchedule, {
         allocations: scheduleAllocations,
         personAllocations: getPersonAllocations(allocationsByPerson, p.id),
         projects,
@@ -1843,7 +1900,7 @@ export default function LandingPage() {
     return { schedulePeople: sorted, schedulePeopleHoursInView: hoursMap };
   }, [
     people,
-    scheduleFilterRules,
+    filterRulesForSchedule,
     scheduleVisibleKeys,
     scheduleSort,
     peopleOrderMap,
@@ -1861,10 +1918,10 @@ export default function LandingPage() {
 
   const scheduleFilterSig = useMemo(
     () =>
-      normalizeFilterRules(scheduleFilterRules)
+      normalizeFilterRules(filterRulesForSchedule)
         .map((r) => `${r.field}:${r.op}:${String(r.value ?? "")}`)
         .join(","),
-    [scheduleFilterRules]
+    [filterRulesForSchedule]
   );
 
   useEffect(() => {
@@ -1881,7 +1938,7 @@ export default function LandingPage() {
     return m;
   }, [projects]);
 
-  const scheduleFilterActiveCount = countActiveFilterRules(scheduleFilterRules);
+  const scheduleFilterActiveCount = countActiveFilterRules(filterRulesForSchedule);
 
   useAssistantPageContext("schedule", {
     visibleCount: schedulePeople.length,
@@ -3208,6 +3265,20 @@ export default function LandingPage() {
                   />
                 </div>
 
+                <Link
+                  to="/standup"
+                  className={
+                    "lp-standup-pill" + (standup.active ? " lp-standup-pill--live" : "")
+                  }
+                  title="Standup department order"
+                  data-alloc8-guide="standup-setup"
+                >
+                  <span className="lp-standup-pill-icon" aria-hidden>
+                    <ListOrdered size={14} strokeWidth={2.25} />
+                  </span>
+                  Standup
+                </Link>
+
                 {deptDashboardEnabled ? (
                   <div className="lp-dropdown-wrap">
                     <button
@@ -3316,7 +3387,26 @@ export default function LandingPage() {
           </div>
 
           <div className="lp-toolbar">
-            <div className="lp-toolbar-left" />
+            <div className="lp-toolbar-left">
+              {standup.active ? (
+                <StandupModeBar
+                  active={standup.active}
+                  session={standup.session}
+                  currentDept={standup.currentDept}
+                  summary={standup.summary}
+                  orderLength={standup.orderLength}
+                  allComplete={standup.allComplete}
+                  hasRemaining={standup.hasRemaining}
+                  onEnd={handleStandupEnd}
+                  onDone={standup.markDone}
+                  onLater={standup.markLater}
+                  onPrev={standup.goPrev}
+                  onNext={standup.goNext}
+                  onReviewRemaining={standup.reviewRemaining}
+                  onJumpToIndex={standup.jumpToIndex}
+                />
+              ) : null}
+            </div>
             <div
               ref={setAlloc8FeedbackDock}
               data-alloc8-action-feedback-mount
@@ -3783,26 +3873,44 @@ export default function LandingPage() {
             ref={scheduleViewportRef}
             onScroll={onTimelineScroll}
           >
-            <div
-              key={scheduleMotionKey}
-              className={
-                "lp-schedule-canvas" +
-                (scheduleCanvasSettling ? " lp-schedule-canvas--settle" : "")
-              }
-            >
-              <ScheduleVirtualizedRows
-                key={schedulePeopleKey}
-                schedulePeople={schedulePeople}
-                schedulePeopleKey={schedulePeopleKey}
-                scheduleViewportRef={scheduleViewportRef}
-                scheduleScrollMargin={0}
-                estimateScheduleRowSize={estimateScheduleRowSize}
-                onVirtualizer={registerScheduleRowVirtualizer}
-                allocationsByPerson={allocationsByPerson}
-                TimelineRow={TimelineRow}
-                timelineRowProps={timelineRowProps}
-              />
-            </div>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={
+                  standup.active
+                    ? `standup-${standup.currentDept}-${standup.session?.currentIndex ?? 0}`
+                    : scheduleMotionKey
+                }
+                className={
+                  "lp-schedule-canvas" +
+                  (scheduleCanvasSettling ? " lp-schedule-canvas--settle" : "")
+                }
+                initial={
+                  standup.active && !reduceMotion
+                    ? { opacity: 0, x: standup.slideDirection * 24 }
+                    : false
+                }
+                animate={standup.active && !reduceMotion ? { opacity: 1, x: 0 } : undefined}
+                exit={
+                  standup.active && !reduceMotion
+                    ? { opacity: 0, x: standup.slideDirection * -24 }
+                    : undefined
+                }
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <ScheduleVirtualizedRows
+                  key={schedulePeopleKey}
+                  schedulePeople={schedulePeople}
+                  schedulePeopleKey={schedulePeopleKey}
+                  scheduleViewportRef={scheduleViewportRef}
+                  scheduleScrollMargin={0}
+                  estimateScheduleRowSize={estimateScheduleRowSize}
+                  onVirtualizer={registerScheduleRowVirtualizer}
+                  allocationsByPerson={allocationsByPerson}
+                  TimelineRow={TimelineRow}
+                  timelineRowProps={timelineRowProps}
+                />
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
       </main>

@@ -45,6 +45,8 @@ export function useSchedulePageData() {
   const applyStarredFilterPreset = useAppStore((s) => s.applyStarredFilterPreset);
   const scheduleFilterRules = useAppStore((s) => s.scheduleFilterRules);
   const setScheduleFilterRules = useAppStore((s) => s.setScheduleFilterRules);
+  const standupDepartmentOrder = useAppStore((s) => s.standupDepartmentOrder);
+  const setStandupDepartmentOrder = useAppStore((s) => s.setStandupDepartmentOrder);
 
   const allocationProjectOptions = useMemo(
     () => buildAllocationProjectOptionStrings(projects, extraAllocationLabels),
@@ -81,6 +83,8 @@ export function useSchedulePageData() {
     removeStarredFilterPreset,
     applyStarredFilterPreset,
     setScheduleFilterRules,
+    standupDepartmentOrder,
+    setStandupDepartmentOrder,
     syncPersonCreate,
     syncPersonUpdate,
     syncProjectCreate,
