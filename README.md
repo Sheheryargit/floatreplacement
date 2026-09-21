@@ -41,7 +41,15 @@ It is inspired by Float-class workforce tools, purpose-built for modern enterpri
 
 - [Features](#features)
 - [Tech stack](#tech-stack)
-- [System architecture](#system-architecture)
+- [Diagrams](#diagrams)
+  - [System architecture](#1-system-architecture)
+  - [Dependency graph](#2-dependency-graph)
+  - [Frontend module map](#3-frontend-module-map)
+  - [Domain ER diagram](#4-domain-er-diagram)
+  - [Auth sequence](#5-auth-sequence)
+  - [Schedule write path](#6-schedule-write-path)
+  - [AI assistant sequence](#7-ai-assistant-sequence)
+  - [CI / CD pipeline](#8-ci--cd-pipeline)
 - [Repository layout](#repository-layout)
 - [Domain model](#domain-model)
 - [Auth & access](#auth--access)
@@ -122,31 +130,337 @@ It is inspired by Float-class workforce tools, purpose-built for modern enterpri
 
 ---
 
-## System architecture
+## Diagrams
 
-```text
-                        ┌──────────────────────────────────────┐
-                        │           GitHub · alloc8            │
-                        │         push → main / PR             │
-                        └──────────────────┬───────────────────┘
-                                           │
-                                           ▼
-┌──────────────┐   HTTPS    ┌──────────────────────────────────┐
-│   Browser    │ ─────────► │  Vercel                          │
-│  Alloc8 SPA  │            │  • Vite build → dist/            │
-└──────┬───────┘            │  • SPA rewrites (vercel.json)    │
-       │                    │  • Serverless /api/alloc8-…      │
-       │ @supabase/supabase-js└───────────────┬──────────────────┘
-       │                                      │ service role (server)
-       ▼                                      ▼
-┌──────────────────┐                 ┌─────────────────┐
-│     Supabase     │◄──── RAG ───────│  OpenAI API     │
-│  Auth · Postgres │                 │  (optional)     │
-│  RLS · RPCs      │                 └─────────────────┘
-└──────────────────┘
+GitHub renders the Mermaid graphs below automatically on the repository README.
+
+### 1. System architecture
+
+End-to-end runtime: browser SPA, Vercel edge, Supabase, Entra, OpenAI.
+
+```mermaid
+flowchart TB
+  subgraph Clients["👤 Clients"]
+    Browser["Browser<br/>Alloc8 SPA"]
+  end
+
+  subgraph Edge["⬛ Vercel"]
+    CDN["Static assets<br/>dist/"]
+    SPA["SPA rewrites<br/>vercel.json"]
+    API["Serverless<br/>/api/alloc8-assistant"]
+  end
+
+  subgraph Identity["🔵 Microsoft Entra ID"]
+    Entra["Azure AD / OIDC"]
+  end
+
+  subgraph Data["🟢 Supabase"]
+    Auth["Auth"]
+    PG["PostgreSQL<br/>+ RLS + RPCs"]
+    Storage["Assistant knowledge"]
+  end
+
+  subgraph AI["🟣 OpenAI"]
+    LLM["Chat Completions<br/>SSE stream"]
+  end
+
+  subgraph Source["⬛ GitHub"]
+    Repo["sherryyar/alloc8"]
+  end
+
+  Repo -->|push main| Edge
+  Browser --> CDN
+  Browser --> SPA
+  Browser -->|"@supabase/supabase-js<br/>anon key"| Auth
+  Browser -->|"CRUD under RLS"| PG
+  Browser -->|"SSO redirect"| Entra
+  Entra -->|callback| Auth
+  Browser -->|"POST /api/alloc8-assistant"| API
+  API -->|"service role"| PG
+  API --> Storage
+  API --> LLM
+
+  classDef client fill:#e8f4ff,stroke:#0088ff,color:#0b1220
+  classDef edge fill:#111,stroke:#86bc25,color:#f8fafc
+  classDef data fill:#e8fff0,stroke:#3ECF8E,color:#0b1220
+  classDef id fill:#e8f1ff,stroke:#0078D4,color:#0b1220
+  classDef ai fill:#f3e8ff,stroke:#412991,color:#0b1220
+  class Browser client
+  class CDN,SPA,API,Repo edge
+  class Auth,PG,Storage data
+  class Entra id
+  class LLM ai
 ```
 
-**Trust boundary:** browser holds only `VITE_*` public keys. OpenAI keys and Supabase **service role** stay on the server (Vercel env / local API plugin).
+**Trust boundary:** browser only receives `VITE_*` public keys. `OPENAI_API_KEY` and Supabase **service role** stay on the server.
+
+### 2. Dependency graph
+
+Major runtime libraries and what they support.
+
+```mermaid
+flowchart LR
+  subgraph App["Alloc8 application"]
+    SPA["React SPA"]
+    AgentAPI["api/alloc8-assistant"]
+  end
+
+  subgraph UI["UI & UX"]
+    React["react / react-dom"]
+    RR["react-router-dom"]
+    FM["framer-motion"]
+    Lucide["lucide-react"]
+    Radix["@radix-ui/react-dialog"]
+    Sonner["sonner"]
+  end
+
+  subgraph State["State & schedule"]
+    Zustand["zustand"]
+    Virtual["@tanstack/react-virtual"]
+  end
+
+  subgraph Platform["Platform"]
+    Vite["vite"]
+    SB["@supabase/supabase-js"]
+    VA["@vercel/analytics"]
+  end
+
+  subgraph QA["Quality"]
+    PW["@playwright/test"]
+    NodeTest["node:test"]
+  end
+
+  SPA --> React
+  SPA --> RR
+  SPA --> FM
+  SPA --> Lucide
+  SPA --> Radix
+  SPA --> Sonner
+  SPA --> Zustand
+  SPA --> Virtual
+  SPA --> SB
+  SPA --> VA
+  SPA -.-> Vite
+  AgentAPI --> SB
+  SPA -.-> PW
+  SPA -.-> NodeTest
+
+  classDef app fill:#86bc25,stroke:#6b961e,color:#0b1220
+  classDef ui fill:#61DAFB,stroke:#0891b2,color:#0b1220
+  classDef st fill:#c4b5fd,stroke:#7c3aed,color:#0b1220
+  classDef pl fill:#3ECF8E,stroke:#059669,color:#0b1220
+  classDef qa fill:#86efac,stroke:#16a34a,color:#0b1220
+  class SPA,AgentAPI app
+  class React,RR,FM,Lucide,Radix,Sonner ui
+  class Zustand,Virtual st
+  class Vite,SB,VA pl
+  class PW,NodeTest qa
+```
+
+### 3. Frontend module map
+
+How source folders depend on each other (simplified).
+
+```mermaid
+flowchart TB
+  main["main.jsx"] --> App["App.jsx"]
+  App --> Pages["pages/*"]
+  App --> Ctx["context/*"]
+  App --> Comp["components/*"]
+
+  Pages --> Comp
+  Pages --> Ctx
+  Pages --> Sched["schedule/*"]
+  Pages --> Lib["lib/*"]
+  Pages --> Utils["utils/*"]
+
+  Comp --> Ctx
+  Comp --> Lib
+  Comp --> Utils
+
+  Ctx --> Lib
+  Lib --> SB["lib/supabase.js"]
+  Sched --> Utils
+
+  Pages --> Styles["styles/* + page CSS"]
+  Comp --> Styles
+
+  classDef entry fill:#86bc25,stroke:#6b961e,color:#0b1220
+  classDef core fill:#dbeafe,stroke:#2563eb,color:#0b1220
+  classDef leaf fill:#f1f5f9,stroke:#64748b,color:#0b1220
+  class main,App entry
+  class Pages,Ctx,Comp,Sched,Lib core
+  class Utils,Styles,SB leaf
+```
+
+### 4. Domain ER diagram
+
+Core scheduling entities (logical model).
+
+```mermaid
+erDiagram
+  PEOPLE ||--o{ ALLOCATION_PEOPLE : assigned
+  ALLOCATIONS ||--o{ ALLOCATION_PEOPLE : includes
+  PROJECTS ||--o{ ALLOCATIONS : booked_on
+  PEOPLE ||--o| USER_AVAILABILITY : has
+  PEOPLE ||--o{ PERSON_PUBLIC_HOLIDAYS : observes
+  WORKSPACE_SETTINGS ||--|| WORKSPACE : configures
+  WORKSPACE_ACCESS ||--o{ PEOPLE : allowlists
+  LOOKUP_ROLES ||--o{ PEOPLE : titles
+  PEOPLE {
+    uuid id PK
+    text name
+    text email
+    text role
+    text department
+    text type "Employee|Contractor|Placeholder"
+    boolean archived
+  }
+  PROJECTS {
+    uuid id PK
+    text name
+    text client
+    uuid[] teamIds
+  }
+  ALLOCATIONS {
+    uuid id PK
+    text project
+    date startDate
+    date endDate
+    boolean isLeave
+    numeric hours
+  }
+  ALLOCATION_PEOPLE {
+    uuid allocation_id FK
+    uuid person_id FK
+  }
+  USER_AVAILABILITY {
+    uuid person_id FK
+    text employment_type
+    numeric weekly_hours
+  }
+  WORKSPACE_ACCESS {
+    text email PK
+    boolean is_admin
+    boolean enabled
+  }
+```
+
+### 5. Auth sequence
+
+Primary SAML/OIDC path vs password fallback.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant L as LoginPage
+  participant SB as Supabase Auth
+  participant E as Entra ID
+  participant A as AuthContext
+  participant W as Allowlist
+  participant App as Workspace
+
+  alt Continue with SAML
+    U->>L: Click SAML
+    L->>SB: signInWithOAuth(azure)
+    SB->>E: OIDC redirect
+    E-->>SB: Auth code / tokens
+    SB-->>L: Session cookie / JWT
+    L->>A: Session established
+  else Workspace password
+    U->>L: Enter password + Go
+    L->>A: unlock(displayName)
+  end
+
+  A->>W: Check work email allowlist
+  alt Not allowlisted
+    W-->>U: AccessDeniedPage
+  else Allowed
+    W-->>App: WorkspaceReady
+    App->>App: Load people / projects / allocations
+  end
+```
+
+### 6. Schedule write path
+
+Creating or updating an allocation from the timeline.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Scheduler
+  participant UI as LandingPage / Modals
+  participant Store as AppDataContext / Zustand
+  participant API as lib/api/allocations
+  participant DB as Supabase Postgres
+
+  U->>UI: Create / edit allocation
+  UI->>Store: Optimistic local update
+  Store->>API: syncAllocationCreate / Update
+  API->>DB: INSERT/UPDATE + allocation_people<br/>(or save RPC)
+  DB-->>API: Row + RLS enforcement
+  alt Success
+    API-->>Store: Canonical row
+    Store-->>UI: Reconcile UI
+  else Failure
+    API-->>Store: Error
+    Store-->>UI: Toast + rollback / refetch
+  end
+```
+
+### 7. AI assistant sequence
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Admin user
+  participant UI as Alloc8Assistant
+  participant API as /api/alloc8-assistant
+  participant AuthZ as authorizeAssistant
+  participant DB as Supabase (service role)
+  participant AI as OpenAI
+
+  U->>UI: Ask question / request action
+  UI->>API: POST { question, context, history }
+  API->>AuthZ: Verify workspace admin
+  alt Unauthorized
+    AuthZ-->>UI: 401/403
+  else Authorized
+    API->>DB: Retrieve knowledge snippets
+    alt OPENAI_API_KEY set
+      API->>AI: Stream chat completion
+      AI-->>API: SSE tokens
+    else No key
+      API->>API: localFallbackAnswer
+    end
+    API-->>UI: SSE answer + optional action payload
+    UI->>UI: Render / execute safe UI action
+  end
+```
+
+### 8. CI / CD pipeline
+
+```mermaid
+flowchart LR
+  Dev["💻 Local<br/>npm run dev"] -->|git push| GH["GitHub<br/>sherryyar/alloc8"]
+  GH -->|main| Vercel["Vercel Build<br/>npm run build"]
+  Vercel --> Dist["dist/ SPA"]
+  Vercel --> Fn["Serverless /api"]
+  Dist --> Prod["🌐 Production URL"]
+  Fn --> Prod
+  Prod --> SB["Supabase project"]
+  Prod --> OAI["OpenAI optional"]
+
+  classDef local fill:#fef3c7,stroke:#d97706,color:#0b1220
+  classDef git fill:#111,stroke:#86bc25,color:#f8fafc
+  classDef host fill:#e0e7ff,stroke:#4f46e5,color:#0b1220
+  classDef data fill:#d1fae5,stroke:#059669,color:#0b1220
+  class Dev local
+  class GH git
+  class Vercel,Dist,Fn,Prod host
+  class SB,OAI data
+```
 
 ---
 
@@ -192,6 +506,8 @@ alloc8/
 
 ## Domain model
 
+See the [ER diagram](#4-domain-er-diagram) above. Summary:
+
 | Entity | Purpose |
 |--------|---------|
 | `people` | Roster; `type` ∈ Employee · Contractor · Placeholder |
@@ -210,18 +526,7 @@ Client mappers: `src/lib/api/*` (DB snake_case ↔ app camelCase).
 
 ## Auth & access
 
-```text
-LoginPage
-  ├─ Primary ──► Entra SSO (Supabase azure provider)
-  └─ Fallback ─► Workspace password (minimal lock icon)
-         │
-         ▼
-  AuthContext + allowlist
-         │
-    ┌────┴────┐
-    ▼         ▼
- AccessDenied   WorkspaceReady → app routes
-```
+See the [auth sequence](#5-auth-sequence). Quick reference:
 
 | Mode | Notes |
 |------|--------|
