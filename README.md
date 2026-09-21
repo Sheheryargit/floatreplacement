@@ -1,133 +1,152 @@
 # Alloc8
 
-**Alloc8** is an agentic workforce scheduling platform — a modern Float-style system for planning capacity, allocating people to projects, and running delivery standups. Teams schedule work on a live timeline, manage people and projects, report on utilization, and can ask an in-app AI assistant to explain workflows or take safe UI actions.
+<p align="center">
+  <strong>Agentic workforce scheduling</strong><br/>
+  Plan capacity · Allocate people · Run standups · Ask the agent
+</p>
 
-> Primary repository: [github.com/sherryyar/alloc8](https://github.com/sherryyar/alloc8)
+<p align="center">
+  <a href="#tech-stack"><img src="https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React" /></a>
+  <a href="#tech-stack"><img src="https://img.shields.io/badge/Vite-5-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite" /></a>
+  <a href="#tech-stack"><img src="https://img.shields.io/badge/Supabase-Postgres%20%2B%20Auth-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" /></a>
+  <a href="#tech-stack"><img src="https://img.shields.io/badge/Vercel-Hosting-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Vercel" /></a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/status-private-6b961e?style=flat-square" alt="Private" />
+  <img src="https://img.shields.io/badge/license-proprietary-86bc25?style=flat-square" alt="License" />
+  <img src="https://img.shields.io/badge/node-%3E%3D20-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node" />
+  <img src="https://img.shields.io/badge/package-npm-CB3837?style=flat-square&logo=npm&logoColor=white" alt="npm" />
+  <a href="https://github.com/sherryyar/alloc8"><img src="https://img.shields.io/badge/repo-sherryyar%2Falloc8-181717?style=flat-square&logo=github" alt="GitHub" /></a>
+</p>
 
 ---
 
-## Table of contents
+## Description
 
-- [Overview](#overview)
+**Alloc8** is an internal **resource & capacity planning** product for delivery organizations. It replaces spreadsheet-heavy scheduling with a live timeline, a people/project registry, utilization reporting, standup workflows, and an optional **AI agent** that can explain the product and perform safe UI actions.
+
+It is inspired by Float-class workforce tools, purpose-built for modern enterprise sign-in (Microsoft Entra / SAML-style SSO), Postgres-backed tenancy via Supabase, and Vercel deployment.
+
+| | |
+|---|---|
+| **Problem** | Delivery leads need one place to see who is free, who is booked, and how to rebalance work — without drowning in filters and exports. |
+| **Solution** | A schedule-first SPA with strong filters, placeholders, reporting, and conversational assistance. |
+| **Users** | Delivery leads, resource managers, department heads, workspace admins. |
+| **Deploy** | GitHub → Vercel; data & auth on Supabase. |
+
+---
+
+## Contents
+
 - [Features](#features)
-- [Architecture](#architecture)
 - [Tech stack](#tech-stack)
+- [System architecture](#system-architecture)
 - [Repository layout](#repository-layout)
-- [Data model (high level)](#data-model-high-level)
-- [Auth & access flow](#auth--access-flow)
-- [Application flows](#application-flows)
+- [Domain model](#domain-model)
+- [Auth & access](#auth--access)
+- [Runtime flows](#runtime-flows)
 - [AI assistant](#ai-assistant)
 - [Getting started](#getting-started)
-- [Environment variables](#environment-variables)
+- [Configuration](#configuration)
 - [Scripts](#scripts)
 - [Deployment](#deployment)
-- [Testing](#testing)
+- [Quality](#quality)
 - [Contributing](#contributing)
 - [License](#license)
 
 ---
 
-## Overview
-
-| Layer | Responsibility |
-|-------|----------------|
-| **SPA (Vite + React)** | Schedule UI, people/projects, reporting, settings, assistant UI |
-| **Supabase (Postgres + Auth)** | Source of truth for workspace data; Azure/Entra SSO; RLS |
-| **Vercel** | Static hosting + serverless `/api/*` (assistant) |
-| **OpenAI (optional)** | Streaming chat for Alloc8 Agent (server-side only) |
-
-The client talks to Supabase directly for CRUD (with RLS). Privileged assistant traffic goes through Vercel/Vite API routes so API keys never ship to the browser.
-
-```text
-┌─────────────┐     HTTPS      ┌──────────────────┐
-│   Browser   │ ─────────────► │  Vercel (SPA)    │
-│  Alloc8 UI  │                │  dist/ + rewrites│
-└──────┬──────┘                └────────┬─────────┘
-       │                                │
-       │ Supabase JS                    │ /api/alloc8-assistant
-       ▼                                ▼
-┌──────────────────┐           ┌──────────────────┐
-│     Supabase     │◄──────────│ Serverless API   │
-│ Auth · Postgres  │  admin    │ OpenAI + RAG     │
-│ RLS · Realtime*  │           └──────────────────┘
-└──────────────────┘
-```
-
-\*Realtime is available via Supabase; primary sync today is load-on-enter + optimistic client writes.
-
----
-
 ## Features
 
-- **Schedule timeline** — people rows, allocation bars, leave, public holidays, filters, density modes, virtualized rows
-- **People & projects** — directory, roles/departments, placeholders, project teams, rates
-- **Reporting & dept dashboard** — capacity, utilization, department views
-- **Standup mode** — department order setup and guided walkthrough
-- **Access control** — work-email allowlist + workspace admin gates
-- **Alloc8 Agent** — contextual help and safe UI actions (admin-oriented)
-- **Auth** — SAML/OIDC via Microsoft Entra (Azure AD) through Supabase Auth, plus optional workspace password fallback
-
----
-
-## Architecture
-
-### Frontend
-
-- **React 18** SPA bootstrapped by Vite (`src/main.jsx` → `src/App.jsx`)
-- **React Router v6** with lazy-loaded pages and a shared shell (nav, toasts, providers)
-- **State**
-  - `AppDataContext` + Zustand store — workspace entities (people, projects, allocations, settings)
-  - Context providers for auth, theme, assistant, standup walkthrough, dialogs, premium visuals
-- **Schedule engine** — `src/schedule/` (virtualization, row height, allocation layouts) + `LandingPage`
-- **Design system** — CSS variables in `src/styles/`; page-colocated CSS; Syne / DM Sans / JetBrains Mono
-
-### Backend / data
-
-- **Supabase Postgres** — schema owned by numbered SQL migrations under `supabase/migrations/`
-- **Supabase Auth** — Azure provider for enterprise SSO; session consumed by `AuthContext`
-- **RLS** — row-level security on workspace tables; access allowlist in dedicated migrations
-- **RPCs** — e.g. allocation save helpers for atomic multi-table writes
-
-### Edge / API
-
-- `api/alloc8-assistant.js` — Vercel serverless handler (also mounted in Vite via `scripts/assistant-dev-api-plugin.mjs` for local `npm run dev`)
-- Authorizes workspace admins, retrieves assistant knowledge from Supabase, streams OpenAI (or local fallback)
-
-### Deploy shape
-
-```text
-GitHub (sherryyar/alloc8)
-        │
-        ▼ push main
-     Vercel build
-        │  npm run build → dist/
-        │  vercel.json SPA rewrites + /api/*
-        ▼
-   Production URL
-        │
-        ├──► Supabase project (URL + anon key in VITE_*)
-        └──► Server env: OPENAI_*, SUPABASE_SERVICE_ROLE_KEY
-```
+| Area | Capabilities |
+|------|----------------|
+| **Schedule** | Virtualized people timeline, allocation bars, leave, public holidays, density modes, advanced filters |
+| **People** | Directory, roles, departments, Employee / Contractor / **Placeholder** types |
+| **Projects** | Registry, teams, rates, project-scoped planning |
+| **Insights** | Reporting, department dashboard, capacity / utilization |
+| **Standup** | Department order + guided walkthrough on the live schedule |
+| **Security** | Work-email allowlist, workspace admin gates, RLS on Postgres |
+| **Agent** | Contextual help + safe UI actions (admin-oriented) |
+| **Auth** | Entra SSO (primary) + minimal workspace-password fallback |
 
 ---
 
 ## Tech stack
 
-| Area | Choice |
-|------|--------|
-| Language | JavaScript (ES modules), JSX |
-| UI | React 18, Framer Motion, Lucide icons, Radix Dialog |
-| Routing | `react-router-dom` v6 |
-| Build | Vite 5 (`@vitejs/plugin-react`) |
-| Client state | Zustand + React Context |
-| Virtualization | `@tanstack/react-virtual` |
-| Backend-as-a-service | Supabase (`@supabase/supabase-js`) |
-| Auth | Supabase Auth + Microsoft Entra ID (Azure AD / SAML-style enterprise SSO) |
-| Hosting | Vercel (static + serverless) |
-| Analytics | `@vercel/analytics` |
-| E2E | Playwright |
-| Unit | Node.js built-in test runner (`node --test`) |
-| Package manager | npm |
+### At a glance
+
+<p>
+  <img src="https://img.shields.io/badge/JavaScript-ESM-F7DF1E?style=flat-square&logo=javascript&logoColor=black" alt="JavaScript" />
+  <img src="https://img.shields.io/badge/React-18.3-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React" />
+  <img src="https://img.shields.io/badge/React_Router-6-CA4245?style=flat-square&logo=reactrouter&logoColor=white" alt="React Router" />
+  <img src="https://img.shields.io/badge/Vite-5.4-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite" />
+  <img src="https://img.shields.io/badge/Zustand-5-000000?style=flat-square&logo=redux&logoColor=white" alt="Zustand" />
+  <img src="https://img.shields.io/badge/Framer_Motion-12-0055FF?style=flat-square&logo=framer&logoColor=white" alt="Framer Motion" />
+  <img src="https://img.shields.io/badge/TanStack_Virtual-3-FF4154?style=flat-square&logo=reactquery&logoColor=white" alt="TanStack Virtual" />
+  <img src="https://img.shields.io/badge/Radix_UI-Dialog-161618?style=flat-square&logo=radixui&logoColor=white" alt="Radix" />
+  <img src="https://img.shields.io/badge/Lucide-icons-F56565?style=flat-square&logo=lucide&logoColor=white" alt="Lucide" />
+  <img src="https://img.shields.io/badge/Sonner-toasts-18181B?style=flat-square" alt="Sonner" />
+</p>
+<p>
+  <img src="https://img.shields.io/badge/Supabase-JS_Client-3ECF8E?style=flat-square&logo=supabase&logoColor=white" alt="Supabase JS" />
+  <img src="https://img.shields.io/badge/PostgreSQL-RLS-4169E1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Auth-Microsoft_Entra-0078D4?style=flat-square&logo=microsoftazure&logoColor=white" alt="Entra" />
+  <img src="https://img.shields.io/badge/OpenAI-Chat_API-412991?style=flat-square&logo=openai&logoColor=white" alt="OpenAI" />
+  <img src="https://img.shields.io/badge/Vercel-SPA_%2B_Serverless-000000?style=flat-square&logo=vercel&logoColor=white" alt="Vercel" />
+  <img src="https://img.shields.io/badge/Playwright-E2E-2EAD33?style=flat-square&logo=playwright&logoColor=white" alt="Playwright" />
+  <img src="https://img.shields.io/badge/Node_Test-unit-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node test" />
+</p>
+
+### By layer
+
+| Layer | Technology | Role |
+|:-----:|------------|------|
+| <img src="https://img.shields.io/badge/-UI-61DAFB?style=flat-square&logoColor=black" alt="UI" /> | **React 18**, React Router 6, Framer Motion, Lucide, Radix Dialog, Sonner | Interactive SPA, routing, motion, feedback |
+| <img src="https://img.shields.io/badge/-State-764ABC?style=flat-square" alt="State" /> | **Zustand** + React Context | Workspace store + cross-cutting providers |
+| <img src="https://img.shields.io/badge/-Schedule-FF4154?style=flat-square" alt="Schedule" /> | **@tanstack/react-virtual** + custom layout engine | Large timelines without DOM blow-ups |
+| <img src="https://img.shields.io/badge/-Build-646CFF?style=flat-square" alt="Build" /> | **Vite 5**, `@vitejs/plugin-react` | Dev server, HMR, production bundles |
+| <img src="https://img.shields.io/badge/-Data-3ECF8E?style=flat-square" alt="Data" /> | **Supabase** (Postgres, Auth, RLS, RPCs) | Source of truth for people / projects / allocations |
+| <img src="https://img.shields.io/badge/-Identity-0078D4?style=flat-square" alt="Identity" /> | **Microsoft Entra ID** via Supabase Azure provider | Enterprise SSO (primary entry) |
+| <img src="https://img.shields.io/badge/-Edge-000000?style=flat-square" alt="Edge" /> | **Vercel** static + `/api/*` serverless | Hosting, SPA rewrites, assistant API |
+| <img src="https://img.shields.io/badge/-AI-412991?style=flat-square" alt="AI" /> | **OpenAI** (server-only) + optional RAG docs | Streaming Alloc8 Agent |
+| <img src="https://img.shields.io/badge/-QA-2EAD33?style=flat-square" alt="QA" /> | **Playwright** + `node --test` | E2E and unit smoke |
+
+### Styling & design tokens
+
+| Token | Value / approach |
+|-------|------------------|
+| Brand green | `#86bc25` / `#9fd43a` / `#6b961e` (enterprise green theme) |
+| Typography | **Syne** (display), **DM Sans** (body), **JetBrains Mono** (meta) |
+| CSS strategy | Design-system variables + page-colocated CSS (no Tailwind required) |
+
+---
+
+## System architecture
+
+```text
+                        ┌──────────────────────────────────────┐
+                        │           GitHub · alloc8            │
+                        │         push → main / PR             │
+                        └──────────────────┬───────────────────┘
+                                           │
+                                           ▼
+┌──────────────┐   HTTPS    ┌──────────────────────────────────┐
+│   Browser    │ ─────────► │  Vercel                          │
+│  Alloc8 SPA  │            │  • Vite build → dist/            │
+└──────┬───────┘            │  • SPA rewrites (vercel.json)    │
+       │                    │  • Serverless /api/alloc8-…      │
+       │ @supabase/supabase-js└───────────────┬──────────────────┘
+       │                                      │ service role (server)
+       ▼                                      ▼
+┌──────────────────┐                 ┌─────────────────┐
+│     Supabase     │◄──── RAG ───────│  OpenAI API     │
+│  Auth · Postgres │                 │  (optional)     │
+│  RLS · RPCs      │                 └─────────────────┘
+└──────────────────┘
+```
+
+**Trust boundary:** browser holds only `VITE_*` public keys. OpenAI keys and Supabase **service role** stay on the server (Vercel env / local API plugin).
 
 ---
 
@@ -135,141 +154,103 @@ GitHub (sherryyar/alloc8)
 
 ```text
 alloc8/
-├── api/                      # Vercel serverless (assistant)
-│   ├── alloc8-assistant.js
-│   └── _lib/                 # auth, OpenAI, prompts, Supabase admin
-├── docs/                     # Product/assistant notes
-├── public/                   # Static assets (holidays JSON, etc.)
-├── scripts/                  # SSO config, migrations, CSV import, Vite API plugin
+├── api/                 # Vercel serverless — Alloc8 Agent
+├── docs/                # Product / assistant notes
+├── public/              # Static assets
+├── scripts/             # SSO, migrations, CSV import, Vite API plugin
 ├── src/
-│   ├── App.jsx               # Providers, routes, auth gate
-│   ├── main.jsx
-│   ├── pages/                # Route screens (+ colocated CSS)
-│   ├── components/           # Modals, nav, assistant, command palette, UI
-│   ├── context/              # Auth, data, theme, assistant, …
-│   ├── schedule/             # Timeline virtualization & layout
-│   ├── lib/                  # Supabase client, API modules, assistant client
-│   ├── utils/                # Pure helpers (filters, sort, capacity, …)
-│   ├── data/                 # Seeds / static catalogs
-│   ├── hooks/
-│   ├── config/
-│   └── styles/               # Design tokens & global CSS
-├── supabase/
-│   ├── migrations/           # Ordered SQL migrations
-│   ├── config.toml
-│   └── seed.sql
-├── tests/                    # Playwright specs
-├── vercel.json               # SPA + API rewrites
+│   ├── App.jsx          # Providers, auth gate, routes
+│   ├── pages/           # Route screens (+ CSS)
+│   ├── components/      # UI, modals, assistant, nav
+│   ├── context/         # Auth, data, theme, assistant, …
+│   ├── schedule/        # Timeline virtualization & geometry
+│   ├── lib/             # Supabase client + domain API
+│   ├── utils/           # Pure helpers
+│   └── styles/          # Design tokens
+├── supabase/migrations/ # Ordered SQL schema
+├── tests/               # Playwright
+├── vercel.json
 ├── vite.config.js
-├── package.json
-└── .env.example              # Documented env template
+└── .env.example
 ```
 
-### Primary routes
+### Routes
 
-| Path | Screen |
+| Path | Module |
 |------|--------|
-| `/` | Schedule (LandingPage) |
-| `/people` | People directory |
+| `/` | Schedule (`LandingPage`) |
+| `/people` | People |
 | `/projects` | Projects |
 | `/departments` | Departments |
 | `/standup` | Standup setup |
 | `/report` | Reporting |
 | `/dept-dashboard` | Department dashboard |
-| `/access` | Workspace access allowlist (admins) |
+| `/access` | Allowlist (admins) |
 | `/settings` | Settings |
 
 ---
 
-## Data model (high level)
+## Domain model
 
-Core tables (see migrations for authoritative schema):
-
-| Entity | Role |
-|--------|------|
-| `people` | Roster; `type` = Employee / Contractor / Placeholder |
-| `projects` | Project registry + team membership |
-| `allocations` | Dated work/leave on people × projects |
-| `allocation_people` | Many-to-many assignees |
-| `lookup_roles` / departments | Catalogs for UI |
+| Entity | Purpose |
+|--------|---------|
+| `people` | Roster; `type` ∈ Employee · Contractor · Placeholder |
+| `projects` | Projects + team membership |
+| `allocations` / `allocation_people` | Dated work & leave |
+| Lookups | Roles, departments |
 | `user_availability` | Weekly capacity patterns |
-| `person_public_holidays*` | Region/country holidays |
+| Public holidays | Region/country calendars per person |
 | `workspace_settings` | Workspace prefs |
-| `workspace_access` | Email allowlist / admin flags |
-| Assistant knowledge | Docs for RAG (`032_assistant_knowledge.sql`) |
+| `workspace_access` | Email allowlist / admin |
+| Assistant knowledge | RAG corpus for the agent |
 
-Client mapping lives under `src/lib/api/` (e.g. `people.js`, `allocations.js`) with snake_case ↔ camelCase conversion.
+Client mappers: `src/lib/api/*` (DB snake_case ↔ app camelCase).
 
 ---
 
-## Auth & access flow
+## Auth & access
 
 ```text
-                  ┌─────────────────────┐
-                  │     LoginPage       │
-                  │  Primary: SAML SSO  │
-                  │  Fallback: password │
-                  └──────────┬──────────┘
-                             │
-           ┌─────────────────┼─────────────────┐
-           ▼                                   ▼
-  supabase.auth.signInWithOAuth          unlock() with
-       (provider: azure)                 workspace password
-           │                                   │
-           ▼                                   ▼
-   Entra → Supabase callback          local session flag
-           │                                   │
-           └─────────────┬─────────────────────┘
-                         ▼
-              AuthContext + allowlist check
-                         │
-            ┌────────────┴────────────┐
-            ▼                         ▼
-      AccessDeniedPage          WorkspaceReady
-                                   (load data)
-                                      │
-                                      ▼
-                                 App routes
+LoginPage
+  ├─ Primary ──► Entra SSO (Supabase azure provider)
+  └─ Fallback ─► Workspace password (minimal lock icon)
+         │
+         ▼
+  AuthContext + allowlist
+         │
+    ┌────┴────┐
+    ▼         ▼
+ AccessDenied   WorkspaceReady → app routes
 ```
 
-- **SAML / SSO** is the intended primary entry (Microsoft Entra via Supabase Azure provider).
-- **Workspace password** is a minimal fallback (hidden lock icon on the login card).
-- **Allowlist** gates which work emails may enter; admins manage `/access`.
-- Never put `service_role` keys in client bundles except deliberate local-dev overrides documented in `.env.example`.
+| Mode | Notes |
+|------|--------|
+| **SSO** | Intended production path; redirect URLs must include Vercel + localhost |
+| **Password** | Local / break-glass; set `VITE_APP_ACCESS_PASSWORD` |
+| **Allowlist** | Admins manage `/access`; failed sign-in prompts Slack support |
 
 ---
 
-## Application flows
+## Runtime flows
 
-### Schedule
-
-1. Load workspace snapshot (people, projects, allocations, settings).
-2. Filter/sort people → virtualized timeline rows.
-3. Create/edit allocations via modals; persist through Supabase API helpers / RPCs.
-4. Placeholders support planning slots (diamond avatar, swap/reassign flows).
-
-### People / projects
-
-CRUD against Supabase tables; optimistic UI updates through `AppDataContext` sync helpers.
-
-### Reporting
-
-Derived metrics (capacity, scheduled, overtime) over date ranges; placeholders contribute zero capacity.
-
-### Standup
-
-Department order + walkthrough contexts guide live delivery reviews on the schedule.
+1. **Boot** — providers mount → auth gate → load workspace snapshot into Zustand.
+2. **Schedule** — filter/sort people → virtualize rows → create/edit allocations via modals → persist through Supabase / RPCs.
+3. **Placeholders** — plan work on diamond rows; reassign via drag/swap utilities.
+4. **Reporting** — capacity & utilization over ranges (placeholders = zero capacity).
+5. **Standup** — department order + walkthrough overlays on the live grid.
 
 ---
 
 ## AI assistant
 
-- UI: `Alloc8Assistant` + highlight/ghost-cursor takeover layers
-- API: `POST /api/alloc8-assistant` (SSE stream)
-- Auth: workspace-admin oriented (`authorizeAssistantRequest`)
-- Knowledge: ingested docs (`npm run assistant:ingest`) stored in Supabase
-- Local: Vite plugin serves the same handler without a separate API process
-- Without `OPENAI_API_KEY`, a local fallback answer path is used
+| Piece | Location |
+|-------|----------|
+| UI | `src/components/assistant/*` |
+| API | `POST /api/alloc8-assistant` (SSE) |
+| Local dev | Vite plugin mirrors the same handler |
+| Auth | Workspace-admin oriented |
+| Knowledge | `npm run assistant:ingest` → Supabase |
+| Fallback | Works without `OPENAI_API_KEY` (limited local answers) |
 
 ---
 
@@ -277,50 +258,61 @@ Department order + walkthrough contexts guide live delivery reviews on the sched
 
 ### Prerequisites
 
-- Node.js **20+** (LTS recommended)
-- npm 10+
-- (Optional) Docker + [Supabase CLI](https://supabase.com/docs/guides/cli) for local Postgres
-- (Optional) Vercel CLI for preview deploys
+- **Node.js** ≥ 20 (LTS)
+- **npm** 10+
+- Optional: Docker + Supabase CLI, Vercel CLI
 
-### Install & run
+### Install
 
 ```bash
 git clone https://github.com/sherryyar/alloc8.git
 cd alloc8
 npm install
 cp .env.example .env.local
-# Fill VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or use password-only local gate)
+```
+
+Fill at least:
+
+```env
+VITE_SUPABASE_URL=https://<project>.supabase.co
+VITE_SUPABASE_ANON_KEY=<anon-or-publishable-key>
+```
+
+### Develop
+
+```bash
 npm run dev
 ```
 
-App: [http://127.0.0.1:5173/](http://127.0.0.1:5173/)
+Open **http://127.0.0.1:5173/**
 
-### Local Supabase (optional)
+### Local database (optional)
 
 ```bash
 npm run supabase:start
-# Copy URL + anon key from `npm run supabase:status` into .env.local
-npm run supabase:db:reset   # apply migrations + seed
+npm run supabase:db:reset
 ```
+
+Copy URL + anon key from `npm run supabase:status` into `.env.local`.
 
 ---
 
-## Environment variables
+## Configuration
 
-See **`.env.example`** for the full annotated list.
+Full annotated list: **[`.env.example`](.env.example)**.
 
-| Variable | Where | Purpose |
-|----------|--------|---------|
-| `VITE_SUPABASE_URL` | Client | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | Client | Public anon / publishable key |
-| `VITE_APP_ACCESS_PASSWORD` | Client | Workspace password fallback |
-| `VITE_LOGIN_SKIP_AUTH` | Client | Dev-only skip login |
-| `VITE_SSO_EMAIL_DOMAIN` | Client | Optional Entra `domain_hint` |
-| `OPENAI_API_KEY` | Server | Assistant streaming |
-| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | Server | Assistant RAG + privileged reads |
-| `ASSISTANT_DEV_BYPASS` | Server | Local assistant auth bypass (dev) |
+| Variable | Runtime | Purpose |
+|----------|---------|---------|
+| `VITE_SUPABASE_URL` | Browser | Project URL |
+| `VITE_SUPABASE_ANON_KEY` | Browser | Public key (RLS applies) |
+| `VITE_APP_ACCESS_PASSWORD` | Browser | Password fallback |
+| `VITE_LOGIN_SKIP_AUTH` | Browser | Dev skip-login |
+| `VITE_SSO_EMAIL_DOMAIN` | Browser | Entra `domain_hint` |
+| `OPENAI_API_KEY` | Server | Agent streaming |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server | Privileged assistant / RAG |
+| `ASSISTANT_DEV_BYPASS` | Server | Local assistant auth bypass |
 
-**Do not commit** `.env.local`, service role keys, or Azure client secrets.
+> Never commit `.env.local`, service-role keys, or Azure client secrets.
 
 ---
 
@@ -328,17 +320,15 @@ See **`.env.example`** for the full annotated list.
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Vite dev server + local assistant API plugin |
-| `npm run build` | Production build → `dist/` |
+| `npm run dev` | Vite + local assistant API |
+| `npm run build` | Production → `dist/` |
 | `npm run preview` | Preview production build |
-| `npm run test:e2e` | Playwright e2e |
-| `npm run test:agent-crud` | Agent CRUD unit smoke tests |
-| `npm run supabase:start` / `stop` / `status` | Local Supabase stack |
-| `npm run supabase:db:reset` | Reset DB + migrations |
-| `npm run supabase:db:push` | Push migrations (linked project) |
-| `npm run sso:configure` | Entra + Supabase SSO helper |
-| `npm run migrate:float-csv` | Import Float people CSV |
-| `npm run assistant:ingest` | Ingest assistant knowledge docs |
+| `npm run test:e2e` | Playwright |
+| `npm run test:agent-crud` | Unit smoke (`node --test`) |
+| `npm run supabase:*` | Local / linked DB workflows |
+| `npm run sso:configure` | Entra + Supabase helper |
+| `npm run migrate:float-csv` | Float people CSV import |
+| `npm run assistant:ingest` | Ingest agent knowledge |
 
 ---
 
@@ -346,55 +336,51 @@ See **`.env.example`** for the full annotated list.
 
 ### GitHub
 
-Remote: **https://github.com/sherryyar/alloc8**
+Repository: **[github.com/sherryyar/alloc8](https://github.com/sherryyar/alloc8)**
 
 ```bash
-git remote add alloc8 https://github.com/sherryyar/alloc8.git   # if needed
-git push -u alloc8 main
+git push -u origin main
 ```
 
 ### Vercel
 
-1. Import `sherryyar/alloc8` in the Vercel dashboard.
-2. Framework preset: **Vite** — build `npm run build`, output `dist`.
-3. Set client env (`VITE_*`) and server env (`OPENAI_*`, `SUPABASE_SERVICE_ROLE_KEY`, …).
-4. Production branch: `main`.
-5. `vercel.json` rewrites:
-   - `/api/*` → serverless functions
-   - all other non-asset routes → `index.html` (SPA)
+1. Import `sherryyar/alloc8`.
+2. Framework: **Vite** · Build: `npm run build` · Output: `dist`.
+3. Set `VITE_*` (client) and server secrets (`OPENAI_*`, service role, …).
+4. Production branch: **`main`**.
+5. Confirm Auth redirect allowlists include production, previews, and `http://localhost:5173/**`.
 
-Ensure Supabase Auth redirect allowlists include your Vercel production and preview URLs (and `http://localhost:5173/**` for local SSO testing).
+`vercel.json` keeps `/api/*` on serverless functions and sends other routes to `index.html` for client-side routing.
 
 ---
 
-## Testing
+## Quality
 
 ```bash
 npm run test:agent-crud
-npx playwright install    # once
+npx playwright install   # once
 npm run test:e2e
+npm run build            # required before merge
 ```
-
-Playwright config: `playwright.config.mjs`. Specs under `tests/`.
 
 ---
 
 ## Contributing
 
 1. Branch from `main` (`feat/…`, `fix/…`).
-2. Keep changes focused; match existing patterns in `src/lib/api` and page CSS.
-3. Run `npm run build` before opening a PR.
-4. Never commit secrets, dumps, or large CSV exports (see `.gitignore`).
-5. Prefer migrations for schema changes; keep them ordered and idempotent where possible.
+2. Match existing API/CSS patterns under `src/`.
+3. Prefer ordered SQL migrations for schema changes.
+4. Do not commit secrets, dumps, or large CSVs (see `.gitignore`).
+5. Open PRs against `main` with a short summary + test notes.
 
 ---
 
 ## License
 
-Private / internal use unless otherwise stated by the repository owner.
+**Proprietary** — internal use only unless the repository owner states otherwise.
 
 ---
 
-## Credits
-
-Made with ❤️ by Sheher
+<p align="center">
+  <sub>Made with ❤️ by Sheher</sub>
+</p>
