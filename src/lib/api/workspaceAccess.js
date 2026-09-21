@@ -61,7 +61,7 @@ async function clientForWorkspaceAccessWrites() {
   const dev = getDevServiceClient();
   if (dev) return dev;
   throw new Error(
-    "Access management needs a Deloitte SSO session. For local password login, add VITE_SUPABASE_SERVICE_ROLE_KEY to .env.local (dev only), or run migration 026 on Supabase."
+    "Access management needs a work-email SSO session. For local password login, add VITE_SUPABASE_SERVICE_ROLE_KEY to .env.local (dev only), or run migration 026 on Supabase."
   );
 }
 
@@ -105,7 +105,7 @@ export async function fetchWorkspaceAccessList() {
   }
 
   throw new Error(
-    "Sign in with Deloitte SSO to load the access list, or set VITE_SUPABASE_SERVICE_ROLE_KEY in .env.local for password login (dev only)."
+    "Sign in with work email SSO to load the access list, or set VITE_SUPABASE_SERVICE_ROLE_KEY in .env.local for password login (dev only)."
   );
 }
 
@@ -114,7 +114,7 @@ export async function upsertWorkspaceAccess(entry) {
   const email = normEmail(entry?.email);
   if (!email) throw new Error("Email is required.");
   if (!isAllowedDeloitteEmail(email)) {
-    throw new Error("Only Deloitte emails can be added.");
+    throw new Error("Only approved work emails can be added.");
   }
   const payload = {
     email,

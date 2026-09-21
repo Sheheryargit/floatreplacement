@@ -4060,7 +4060,11 @@ export default function LandingPage() {
         tagIsDark={theme === "dark"}
       />
 
-
+      <div className="lp-made-with-love-zone">
+        <p className="lp-made-with-love" aria-label="Made with love by Sheher">
+          Made with ❤️ by Sheher
+        </p>
+      </div>
     </div>
   );
 }

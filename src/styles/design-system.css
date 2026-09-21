@@ -120,7 +120,7 @@
   color-scheme: dark;
 }
 
-/* Dark mode — Deloitte enterprise (matches LoginPage) */
+/* Dark mode — Alloc8 enterprise (matches LoginPage) */
 :root[data-theme="dark"] {
   --alloc8-green: #86bc25;
   --alloc8-green-light: #9fd43a;
@@ -172,7 +172,7 @@
     0 14px 40px color-mix(in srgb, var(--color-brand) 22%, transparent);
 }
 
-/* Light mode — Deloitte enterprise (matches LoginPage) */
+/* Light mode — Alloc8 enterprise (matches LoginPage) */
 :root[data-theme="light"] {
   --alloc8-green: #86bc25;
   --alloc8-green-light: #9fd43a;

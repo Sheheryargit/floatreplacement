@@ -361,7 +361,7 @@ export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }
   const onAdd = useCallback(async () => {
     const em = normEmail(addEmail);
     if (!em || !isAllowedDeloitteEmail(em)) {
-      toast.error("Deloitte email required", { className: "alloc8-toast" });
+      toast.error("Approved work email required", { className: "alloc8-toast" });
       return;
     }
     setSavingEmail(em);
@@ -427,7 +427,7 @@ export function WorkspaceAccessManager({ isWorkspaceAdmin, layout = "embedded" }
         >
           <input
             type="email"
-            placeholder="Add Deloitte email"
+            placeholder="Add work email"
             value={addEmail}
             onChange={(e) => setAddEmail(e.target.value)}
             aria-label="Add user email"

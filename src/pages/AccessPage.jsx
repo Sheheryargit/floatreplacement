@@ -52,7 +52,7 @@ export default function AccessPage() {
                 <p className="access-page-eyebrow">Workspace security</p>
                 <h1 className="access-page-title">Access control</h1>
                 <p className="access-page-lede">
-                  Manage Deloitte SSO allowlist. Changes apply on the next sign-in.
+                  Manage the work-email allowlist. Changes apply on the next sign-in.
                 </p>
               </div>
             </div>

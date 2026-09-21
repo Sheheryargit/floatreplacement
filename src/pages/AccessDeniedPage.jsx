@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowLeft, LifeBuoy, ShieldAlert, Mail } from "lucide-react";
+import { ArrowLeft, LifeBuoy, ShieldAlert, Mail, Sparkles } from "lucide-react";
 import { useAppTheme } from "../context/ThemeContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { SupportSlackModal } from "../components/support/SupportSlackModal.jsx";
@@ -9,7 +9,7 @@ import "./AccessDeniedPage.css";
 const REASON_COPY = {
   "not-allowlisted": {
     title: "Access not granted",
-    lead: "Your Deloitte email isn’t on the workspace allowlist yet.",
+    lead: "Your work email isn’t on the workspace allowlist yet.",
     detail: "Ask a Workspace Admin to add you under Settings → Access, then try signing in again.",
   },
   disabled: {
@@ -19,7 +19,7 @@ const REASON_COPY = {
   },
   "missing-email": {
     title: "Sign-in incomplete",
-    lead: "We couldn’t read an email address from your Deloitte account.",
+    lead: "We couldn’t read an email address from your account.",
     detail: "Try signing in again with your work email, or contact support.",
   },
   "query-failed": {
@@ -38,7 +38,6 @@ export default function AccessDeniedPage() {
   const { accessDenied, clearAccessDenied } = useAuth();
   const reduceMotion = useReducedMotion();
   const [supportOpen, setSupportOpen] = useState(false);
-  const [logoFailed, setLogoFailed] = useState(false);
 
   const reason = accessDenied?.reason ?? "query-failed";
   const email = accessDenied?.email ?? "";
@@ -56,32 +55,21 @@ export default function AccessDeniedPage() {
         variant="login"
         slackUrl="https://app.slack.com/client/T02879QRU/C0B68PYE3EZ"
         title="Contact Alloc8 Support"
-        subtitle="Need help with workspace access? Open Slack support and include your Deloitte email."
+        subtitle="Need help with workspace access? Open Slack support and include your work email."
       />
-      <div className="access-denied-bg" aria-hidden />
+      <div className="access-denied-bg" aria-hidden>
+        <div className="access-denied-bg-glow" />
+      </div>
 
       <header className="access-denied-header">
-        <div className="access-denied-header-brand">
-          {!logoFailed ? (
-            <img
-              src="/branding/deloitte-logo.png"
-              alt="Deloitte"
-              className="access-denied-deloitte-logo"
-              width={168}
-              height={32}
-              decoding="async"
-              onError={() => setLogoFailed(true)}
-            />
-          ) : (
-            <span className="access-denied-deloitte-wordmark" aria-label="Deloitte">
-              Deloitte<span className="access-denied-deloitte-dot">.</span>
-            </span>
-          )}
+        <div className="access-denied-brand" aria-label="Alloc8">
+          <span className="access-denied-brand-mark" aria-hidden>
+            <Sparkles size={15} strokeWidth={2.25} />
+          </span>
+          <span className="access-denied-brand-name">
+            Alloc<span className="access-denied-eight">8</span>
+          </span>
         </div>
-        <span className="access-denied-header-divider" aria-hidden />
-        <span className="access-denied-header-product">
-          Alloc<span className="access-denied-eight">8</span>
-        </span>
       </header>
 
       <main id="main-content" className="access-denied-main">
@@ -93,7 +81,7 @@ export default function AccessDeniedPage() {
           aria-labelledby="access-denied-title"
         >
           <div className="access-denied-icon-wrap" aria-hidden>
-            <ShieldAlert size={34} strokeWidth={1.75} />
+            <ShieldAlert size={28} strokeWidth={1.75} />
           </div>
 
           <p className="access-denied-eyebrow">Workspace access</p>
@@ -128,8 +116,8 @@ export default function AccessDeniedPage() {
       </main>
 
       <footer className="access-denied-footer">
-        <span>Alloc8 · Engineering as a Service</span>
-        <span className="access-denied-footer-muted">Authorized Deloitte users only</span>
+        <span>Alloc8</span>
+        <span className="access-denied-footer-muted">Authorized users only</span>
       </footer>
     </div>
   );

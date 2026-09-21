@@ -261,7 +261,7 @@
   background: rgba(248, 250, 252, 0.8);
 }
 
-/* Login page variant — Deloitte green + glass (matches LoginPage) */
+/* Login page variant — Alloc8 teal + glass (matches LoginPage) */
 .support-slack-backdrop--login {
   background: rgba(0, 0, 0, 0.62);
   backdrop-filter: blur(14px) saturate(1.15);
