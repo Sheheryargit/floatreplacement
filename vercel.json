@@ -1,6 +1,9 @@
 {
+  "framework": null,
+  "installCommand": "echo skip",
+  "buildCommand": "mkdir -p dist && cp index.html dist/index.html",
+  "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/((?!assets/|api/).*)", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

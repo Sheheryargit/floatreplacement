@@ -1,0 +1,9 @@
+api
+src
+scripts
+supabase
+docs
+tests
+public
+node_modules
+.git
